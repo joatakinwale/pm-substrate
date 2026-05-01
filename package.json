@@ -1,0 +1,33 @@
+{
+  "name": "pm-substrate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PM-layer Tier-1 substrate. Universal entity graph + event log + capability registry + workflow runtime.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "build": "pnpm -r --filter './packages/**' run build",
+    "typecheck": "pnpm -r --filter './packages/**' run typecheck",
+    "test": "vitest run",
+    "lint": "pnpm -r --filter './packages/**' run lint",
+    "clean": "pnpm -r exec rm -rf dist build .tsbuildinfo coverage",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:psql": "docker compose exec postgres psql -U pm -d pm_substrate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:reset": "pnpm db:down && rm -rf pgdata && pnpm db:up && sleep 3 && pnpm db:migrate && pnpm db:seed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

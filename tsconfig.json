@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/types" },
+    { "path": "./packages/graph" },
+    { "path": "./packages/events" },
+    { "path": "./packages/registry" },
+    { "path": "./packages/workflow" },
+    { "path": "./packages/projections" }
+  ]
+}
