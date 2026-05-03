@@ -2,7 +2,7 @@
   "name": "@pm/registry",
   "version": "0.1.0",
   "private": true,
-  "description": "TODO: registry layer.",
+  "description": "Capability registry. Postgres-backed day 1.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,9 +19,11 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
-    "@pm/types": "workspace:*"
+    "@pm/types": "workspace:*",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.10",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"
   }

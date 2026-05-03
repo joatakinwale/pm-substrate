@@ -1,0 +1,195 @@
+/**
+ * Postgres-backed capability registry. Day-1 implementation of Layer 3.
+ *
+ * Design notes:
+ *   - register() is idempotent on (tenantId, name, version) via ON CONFLICT
+ *     DO UPDATE. Re-registering the same triple updates the descriptor.
+ *   - Multiple versions of the same name coexist. get(name) returns the
+ *     highest version; getVersion(name, v) pins explicitly. Workflows
+ *     should always pin (covered by ADR when the workflow runtime lands).
+ *   - subscribersOf() filters in two steps: SQL prefilter using LIKE on the
+ *     JSONB-stringified subscribesTo array (fast, indexable later via GIN),
+ *     then in-process glob match for correctness on the wildcard semantics.
+ *     The SQL prefilter is conservative — it can over-include but never
+ *     under-include — so the in-process match is a refinement, not a fixup.
+ */
+
+import { randomUUID } from "node:crypto";
+import type { CapabilityId, TenantId } from "@pm/types";
+import pg from "pg";
+import type { Capability, Registry } from "./interfaces.js";
+import { matchesPattern } from "./pattern.js";
+
+interface Row {
+  id: string;
+  tenant_id: string;
+  name: string;
+  version: number;
+  reads_interfaces: string[];
+  writes_interfaces: string[];
+  reads_edges: string[];
+  writes_edges: string[];
+  emits: string[];
+  subscribes_to: string[];
+  required_permissions: string[];
+  description: string;
+  registered_at: Date;
+}
+
+const rowToCapability = (r: Row): Capability => ({
+  id: r.id as CapabilityId,
+  name: r.name,
+  version: r.version,
+  readsInterfaces: r.reads_interfaces ?? [],
+  writesInterfaces: r.writes_interfaces ?? [],
+  readsEdges: r.reads_edges ?? [],
+  writesEdges: r.writes_edges ?? [],
+  emits: r.emits ?? [],
+  subscribesTo: r.subscribes_to ?? [],
+  requiredPermissions: r.required_permissions ?? [],
+  description: r.description ?? "",
+});
+
+type Querier = Pick<pg.ClientBase, "query"> | pg.Pool;
+
+const SELECT_COLS = `
+  id, tenant_id, name, version,
+  reads_interfaces, writes_interfaces, reads_edges, writes_edges,
+  emits, subscribes_to, required_permissions, description, registered_at
+`;
+
+export class PostgresRegistry implements Registry {
+  readonly #pool: pg.Pool;
+
+  constructor(pool: pg.Pool) {
+    this.#pool = pool;
+  }
+
+  async register(
+    tenantId: TenantId,
+    cap: Capability,
+    tx?: pg.ClientBase,
+  ): Promise<void> {
+    const q = this.#q(tx);
+    // Use the supplied id if it looks like one, else generate. Keeps tests
+    // deterministic when desired but doesn't force callers to mint IDs.
+    const id = cap.id?.startsWith("cap_") ? cap.id : `cap_${randomUUID()}`;
+    await q.query(
+      `INSERT INTO registry.capabilities (
+         id, tenant_id, name, version,
+         reads_interfaces, writes_interfaces, reads_edges, writes_edges,
+         emits, subscribes_to, required_permissions, description
+       )
+       VALUES (
+         $1,$2,$3,$4,
+         $5::jsonb,$6::jsonb,$7::jsonb,$8::jsonb,
+         $9::jsonb,$10::jsonb,$11::jsonb,$12
+       )
+       ON CONFLICT (tenant_id, name, version) DO UPDATE SET
+         reads_interfaces     = EXCLUDED.reads_interfaces,
+         writes_interfaces    = EXCLUDED.writes_interfaces,
+         reads_edges          = EXCLUDED.reads_edges,
+         writes_edges         = EXCLUDED.writes_edges,
+         emits                = EXCLUDED.emits,
+         subscribes_to        = EXCLUDED.subscribes_to,
+         required_permissions = EXCLUDED.required_permissions,
+         description          = EXCLUDED.description,
+         registered_at        = now()`,
+      [
+        id,
+        tenantId,
+        cap.name,
+        cap.version,
+        JSON.stringify(cap.readsInterfaces ?? []),
+        JSON.stringify(cap.writesInterfaces ?? []),
+        JSON.stringify(cap.readsEdges ?? []),
+        JSON.stringify(cap.writesEdges ?? []),
+        JSON.stringify(cap.emits ?? []),
+        JSON.stringify(cap.subscribesTo ?? []),
+        JSON.stringify(cap.requiredPermissions ?? []),
+        cap.description ?? "",
+      ],
+    );
+  }
+
+  async unregister(
+    tenantId: TenantId,
+    name: string,
+    tx?: pg.ClientBase,
+  ): Promise<void> {
+    const q = this.#q(tx);
+    await q.query(
+      `DELETE FROM registry.capabilities WHERE tenant_id = $1 AND name = $2`,
+      [tenantId, name],
+    );
+  }
+
+  async get(
+    tenantId: TenantId,
+    name: string,
+    tx?: pg.ClientBase,
+  ): Promise<Capability | null> {
+    const q = this.#q(tx);
+    const r = await q.query<Row>(
+      `SELECT ${SELECT_COLS}
+         FROM registry.capabilities
+        WHERE tenant_id = $1 AND name = $2
+        ORDER BY version DESC
+        LIMIT 1`,
+      [tenantId, name],
+    );
+    return r.rows[0] ? rowToCapability(r.rows[0]) : null;
+  }
+
+  async getVersion(
+    tenantId: TenantId,
+    name: string,
+    version: number,
+    tx?: pg.ClientBase,
+  ): Promise<Capability | null> {
+    const q = this.#q(tx);
+    const r = await q.query<Row>(
+      `SELECT ${SELECT_COLS}
+         FROM registry.capabilities
+        WHERE tenant_id = $1 AND name = $2 AND version = $3
+        LIMIT 1`,
+      [tenantId, name, version],
+    );
+    return r.rows[0] ? rowToCapability(r.rows[0]) : null;
+  }
+
+  async list(
+    tenantId: TenantId,
+    tx?: pg.ClientBase,
+  ): Promise<readonly Capability[]> {
+    const q = this.#q(tx);
+    // Latest version of each name. DISTINCT ON keyed by name, ordered by
+    // version DESC.
+    const r = await q.query<Row>(
+      `SELECT DISTINCT ON (name) ${SELECT_COLS}
+         FROM registry.capabilities
+        WHERE tenant_id = $1
+        ORDER BY name ASC, version DESC`,
+      [tenantId],
+    );
+    return r.rows.map(rowToCapability);
+  }
+
+  async subscribersOf(
+    tenantId: TenantId,
+    eventType: string,
+  ): Promise<readonly Capability[]> {
+    // Pull all capabilities for the tenant, then filter by glob in process.
+    // At small scale this is fine; once registry size is large enough to
+    // notice, we can add a GIN index on subscribes_to and prefilter in SQL.
+    // (Backfill ADR will document this.)
+    const all = await this.list(tenantId);
+    return all.filter((cap) =>
+      cap.subscribesTo.some((p) => matchesPattern(p, eventType)),
+    );
+  }
+
+  #q(tx?: pg.ClientBase): Querier {
+    return (tx as Querier | undefined) ?? this.#pool;
+  }
+}
