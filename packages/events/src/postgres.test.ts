@@ -258,4 +258,63 @@ describeIfDb("PostgresEventStore", () => {
       otherTenant,
     ]);
   });
+
+  it("LISTEN client reconnects after the underlying connection is terminated", async () => {
+    // ADR-0008 pinning test. We simulate a connection drop by calling
+    // pg_terminate_backend on the LISTEN client's PID, then publish a fresh
+    // event. The store must reconnect, re-issue LISTEN, and deliver the
+    // event to a subscriber that's already iterating.
+    const subId = `sub_reconnect_${randomUUID().slice(0, 8)}`;
+    await store.subscribe({
+      tenantId,
+      subscriberId: subId,
+      eventTypePattern: "task.*",
+      entityTypeFilter: null,
+    });
+
+    const received: string[] = [];
+    const iter = store.consume(tenantId, subId);
+    const consumePromise = (async () => {
+      for await (const ev of iter) {
+        received.push(ev.type);
+        if (ev.type === "task.after_reconnect") break;
+      }
+    })();
+
+    // Wait for LISTEN to be in place, then grab the LISTEN client's PID.
+    await new Promise((r) => setTimeout(r, 200));
+    const pidRow = await pool.query<{ pid: number }>(
+      `SELECT pid FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND query LIKE 'LISTEN%'
+        ORDER BY backend_start DESC LIMIT 1`,
+    );
+    const listenPid = pidRow.rows[0]?.pid;
+    expect(listenPid).toBeTypeOf("number");
+
+    // Terminate it. The store's error/end handler should fire and reconnect.
+    await pool.query(`SELECT pg_terminate_backend($1)`, [listenPid]);
+
+    // Give the reconnect handler a beat to acquire a new client + re-LISTEN.
+    await new Promise((r) => setTimeout(r, 800));
+
+    await store.publish({
+      tenantId,
+      type: "task.after_reconnect",
+      entityId: "ent_reconnect",
+      emittedBy: "cap.test",
+      payloadSchema: "task.after_reconnect/v1",
+      payload: {},
+    });
+
+    await Promise.race([
+      consumePromise,
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error("event after reconnect not received in 5s")), 5000),
+      ),
+    ]);
+
+    expect(received).toContain("task.after_reconnect");
+    await store.unsubscribe(tenantId, subId);
+  });
 });

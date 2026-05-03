@@ -103,10 +103,13 @@ export class PostgresEventStore
 
   /**
    * Long-lived dedicated connection for LISTEN/NOTIFY. Lazily acquired on
-   * first `consume()` call. One per store instance / process.
+   * first `consume()` call. One per store instance / process. ADR-0008.
    */
   #listenClient: pg.PoolClient | null = null;
   #listenChannels = new Set<string>();
+  #closing = false;
+  /** Single in-flight reconnect promise so concurrent error events coalesce. */
+  #reconnecting: Promise<void> | null = null;
 
   /**
    * In-process fan-out. Keyed by tenant id; emits `event` with a `NotifyMsg`.
@@ -402,35 +405,95 @@ export class PostgresEventStore
 
   async #ensureListening(tenantId: TenantId): Promise<void> {
     const channel = channelFor(tenantId);
-    if (this.#listenChannels.has(channel)) return;
-
-    if (!this.#listenClient) {
-      this.#listenClient = await this.#pool.connect();
-      this.#listenClient.on("notification", (msg) => {
-        if (!msg.payload) return;
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(msg.payload);
-        } catch {
-          return;
-        }
-        if (isNotifyMsg(parsed)) {
-          this.#bus.emit("event", parsed);
-        }
-      });
-      // Don't release; keep this connection open for the life of the store.
-    }
-
-    await this.#listenClient.query(`LISTEN "${channel}"`);
+    // Track the channel BEFORE issuing LISTEN so a reconnect that runs
+    // before this call returns will still re-register it.
     this.#listenChannels.add(channel);
+    await this.#ensureListenClient();
+    await this.#listenClient!.query(`LISTEN "${channel}"`);
+  }
+
+  /**
+   * Acquire the LISTEN client if not already held, and wire up the
+   * notification + error/end handlers. ADR-0008: error/end triggers a
+   * reconnect + re-LISTEN. The notification handler bridges into the
+   * in-process bus.
+   */
+  async #ensureListenClient(): Promise<void> {
+    if (this.#listenClient) return;
+
+    const client = await this.#pool.connect();
+    client.on("notification", (msg) => {
+      if (!msg.payload) return;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(msg.payload);
+      } catch {
+        return;
+      }
+      if (isNotifyMsg(parsed)) {
+        this.#bus.emit("event", parsed);
+      }
+    });
+    const onLost = (err?: Error): void => {
+      if (this.#listenClient !== client) return; // stale handler from prior client
+      this.#listenClient = null;
+      // Release the dead client back to the pool (with the error) so
+      // pool.end() doesn't wait for it forever. node-postgres treats
+      // release(err) as a signal to evict + destroy the connection.
+      try {
+        client.release(err ?? new Error("listen client lost"));
+      } catch {
+        // already released or pool teardown — both safe to ignore
+      }
+      if (this.#closing) return;
+      if (!this.#reconnecting) {
+        this.#reconnecting = this.#reconnect().finally(() => {
+          this.#reconnecting = null;
+        });
+      }
+    };
+    client.on("error", onLost);
+    client.on("end", onLost);
+
+    this.#listenClient = client;
+  }
+
+  async #reconnect(): Promise<void> {
+    const maxAttempts = 5;
+    for (let i = 0; i < maxAttempts; i++) {
+      if (this.#closing) return; // bail out if close() was called mid-backoff
+      try {
+        await this.#ensureListenClient();
+        if (this.#closing) return;
+        for (const ch of this.#listenChannels) {
+          await this.#listenClient!.query(`LISTEN "${ch}"`);
+        }
+        return;
+      } catch (err) {
+        const delay = 100 * 2 ** i;
+        await new Promise((r) => setTimeout(r, delay));
+        if (i === maxAttempts - 1) {
+          this.#bus.emit("reconnect-failed", err);
+        }
+      }
+    }
   }
 
   /** Cleanly stop listening and release the LISTEN connection. */
   async close(): Promise<void> {
+    this.#closing = true;
+    // Wait for any in-flight reconnect to settle before tearing down,
+    // otherwise a reconnect mid-close re-acquires a client we never release.
+    if (this.#reconnecting) {
+      await this.#reconnecting.catch(() => {});
+    }
     if (this.#listenClient) {
+      // UNLISTEN is fail-safe per PG17 docs (ADR-0008 A1) — unknown channel
+      // is a no-op. Defensive UNLISTEN * catches anything we forgot to track.
       for (const ch of this.#listenChannels) {
         await this.#listenClient.query(`UNLISTEN "${ch}"`).catch(() => {});
       }
+      await this.#listenClient.query(`UNLISTEN *`).catch(() => {});
       this.#listenChannels.clear();
       this.#listenClient.release();
       this.#listenClient = null;
