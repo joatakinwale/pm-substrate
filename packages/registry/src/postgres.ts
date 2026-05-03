@@ -71,9 +71,14 @@ export class PostgresRegistry implements Registry {
     tx?: pg.ClientBase,
   ): Promise<void> {
     const q = this.#q(tx);
-    // Use the supplied id if it looks like one, else generate. Keeps tests
-    // deterministic when desired but doesn't force callers to mint IDs.
-    const id = cap.id?.startsWith("cap_") ? cap.id : `cap_${randomUUID()}`;
+    // The row's `id` is per-tenant. The caller's `cap.id` is a stable type
+    // identifier (e.g. cap_common_audit_log_v1) shared across tenants for
+    // the same capability — and is NOT the row PK. Always generate a fresh
+    // row id per insert; ON CONFLICT below handles the (tenant, name, version)
+    // dedup. (Earlier impl reused cap.id as the PK, causing collisions when
+    // the same capability descriptor was registered against two tenants.
+    // Caught by capability-audit Tier-1 cross-tenant test.)
+    const id = `cap_${randomUUID()}`;
     await q.query(
       `INSERT INTO registry.capabilities (
          id, tenant_id, name, version,
