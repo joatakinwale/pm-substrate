@@ -16,3 +16,4 @@ export type {
 
 export { PostgresEventStore } from "./postgres.js";
 export { matchesPattern } from "./pattern.js";
+export { ensureMonthPartition, monthRange } from "./partitions.js";

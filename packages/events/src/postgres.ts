@@ -10,7 +10,8 @@
  *
  *   - LISTEN/NOTIFY payloads are deliberately small: only the event id +
  *     tenant + type. Subscribers read the full row from the events table.
- *     This avoids the 8KB NOTIFY payload cap and keeps NOTIFY costs bounded.
+ *     This stays well under the documented 8000-byte NOTIFY payload limit
+ *     (PG17 docs; see ADR-0004) and keeps NOTIFY costs bounded.
  *
  *   - Subscribers consume via a single LISTEN connection per process. Multiple
  *     subscribers in the same process share the connection; the router fans
@@ -42,6 +43,7 @@ import type {
   SubscriptionRouter,
 } from "./interfaces.js";
 import { patternToSqlLike } from "./pattern.js";
+import { ensureMonthPartition } from "./partitions.js";
 
 /**
  * Tenant id sanitization for use in NOTIFY channel names. Channel identifiers
@@ -126,6 +128,10 @@ export class PostgresEventStore
    * external triggers).
    */
   async publish(input: PublishInput): Promise<PMEvent> {
+    // Ensure the partition for the current month exists before opening the
+    // tx. Doing it inside the tx is fine but slightly noisier on logs; outside
+    // is fine because partition creation is idempotent + cached. ADR-0005.
+    await ensureMonthPartition(this.#pool, new Date());
     const client = await this.#pool.connect();
     try {
       await client.query("BEGIN");
@@ -148,6 +154,10 @@ export class PostgresEventStore
     client: pg.ClientBase,
     input: PublishInput,
   ): Promise<PMEvent> {
+    // Caller-managed tx path: still ensure the partition exists. Uses the
+    // pool (separate connection) intentionally — partition CREATE shouldn't
+    // hold locks inside the caller's tx, and it's idempotent.
+    await ensureMonthPartition(this.#pool, new Date());
     const id = `evt_${randomUUID()}`;
     const occurredAt =
       input.occurredAt ?? (new Date().toISOString() as Timestamp);
