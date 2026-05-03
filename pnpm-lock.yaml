@@ -133,10 +133,22 @@ importers:
 
   packages/workflow:
     dependencies:
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
       '@pm/types':
         specifier: workspace:*
         version: link:../types
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
     devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
