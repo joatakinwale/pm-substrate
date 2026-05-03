@@ -1,0 +1,38 @@
+{
+  "name": "@pm/substrate-http",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HTTP integration surface over the substrate. Endpoints map 1:1 onto existing package methods — no speculative API.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/projections": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*",
+    "hono": "^4.6.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@pm/capability-audit": "workspace:*",
+    "@pm/profile-wedding": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

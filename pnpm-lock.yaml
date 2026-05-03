@@ -218,6 +218,49 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/substrate-http:
+    dependencies:
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/profile-registry':
+        specifier: workspace:*
+        version: link:../profile-registry
+      '@pm/projections':
+        specifier: workspace:*
+        version: link:../projections
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+      hono:
+        specifier: ^4.6.0
+        version: 4.12.16
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+    devDependencies:
+      '@pm/capability-audit':
+        specifier: workspace:*
+        version: link:../capability-audit
+      '@pm/profile-wedding':
+        specifier: workspace:*
+        version: link:../profile-wedding
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/types:
     devDependencies:
       typescript:
@@ -770,6 +813,10 @@ packages:
 
   get-tsconfig@4.14.0:
     resolution: {integrity: sha512-yTb+8DXzDREzgvYmh6s9vHsSVCHeC0G3PI5bEXNBHtmshPnO+S5O7qgLEOn0I5QvMy6kpZN8K1NKGyilLb93wA==}
+
+  hono@4.12.16:
+    resolution: {integrity: sha512-jN0ZewiNAWSe5khM3EyCmBb250+b40wWbwNILNfEvq84VREWwOIkuUsFONk/3i3nqkz7Oe1PcpM2mwQEK2L9Kg==}
+    engines: {node: '>=16.9.0'}
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
@@ -1342,6 +1389,8 @@ snapshots:
   get-tsconfig@4.14.0:
     dependencies:
       resolve-pkg-maps: 1.0.0
+
+  hono@4.12.16: {}
 
   loupe@3.2.1: {}
 
