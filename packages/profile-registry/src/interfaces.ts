@@ -52,6 +52,17 @@ export interface ProfileValidator {
    * caller-supplied counts to keep the validator stateless).
    */
   validateEdge(input: EdgeWriteCheck): void;
+
+  /**
+   * Validate a lifecycle state transition for a profile-declared concrete
+   * type. Caller supplies (currentState, proposedState); the validator
+   * confirms that the profile declares the type, has a lifecycle for it,
+   * and that (currentState → proposedState) is a legal transition.
+   *
+   * Stays stateless: caller is responsible for reading currentState from
+   * the graph; validator only reasons about the transition catalog.
+   */
+  validateLifecycleTransition(input: LifecycleCheck): void;
 }
 
 export interface NodeWriteCheck {
@@ -59,6 +70,13 @@ export interface NodeWriteCheck {
   readonly profile: ProfileBinding;
   readonly identity: Readonly<Record<string, unknown>>;
   readonly schemaVersion: number;
+}
+
+export interface LifecycleCheck {
+  readonly tenantId: TenantId;
+  readonly profile: ProfileBinding;
+  readonly currentState: string;
+  readonly proposedState: string;
 }
 
 export interface EdgeWriteCheck {

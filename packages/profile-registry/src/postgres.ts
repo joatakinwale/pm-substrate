@@ -15,6 +15,7 @@ import type {
   CardinalityConstraint,
   EdgeTypeDef,
   EntityTypeDef,
+  LifecycleDef,
   ProfileDefinition,
   TenantId,
 } from "@pm/types";
@@ -23,6 +24,7 @@ import { ProfileValidationError } from "./errors.js";
 import {
   parseCardinality,
   type EdgeWriteCheck,
+  type LifecycleCheck,
   type NodeWriteCheck,
   type ProfileRegistry,
   type ProfileValidator,
@@ -105,6 +107,8 @@ class SnapshotValidator implements ProfileValidator {
   readonly #entityTypes = new Map<string, { profile: string; def: EntityTypeDef }>();
   /** Profile-prefixed edge name ("wedding/has_principal") → EdgeTypeDef. */
   readonly #edgeTypes = new Map<string, EdgeTypeDef>();
+  /** (profileName, concreteType) → LifecycleDef. */
+  readonly #lifecycles = new Map<string, LifecycleDef>();
 
   constructor(tenantId: TenantId, profiles: readonly ProfileDefinition[]) {
     this.#tenantId = tenantId;
@@ -124,6 +128,9 @@ class SnapshotValidator implements ProfileValidator {
       }
       for (const [localName, def] of Object.entries(p.edgeTypes)) {
         this.#edgeTypes.set(`${p.name}/${localName}`, def);
+      }
+      for (const [concrete, lifecycle] of Object.entries(p.lifecycles ?? {})) {
+        this.#lifecycles.set(`${p.name}::${concrete}`, lifecycle);
       }
     }
   }
@@ -169,6 +176,49 @@ class SnapshotValidator implements ProfileValidator {
     if (input.schemaVersion !== entry.def.schemaVersion) {
       throw new ProfileValidationError(
         `schemaVersion mismatch for ${profile.concrete}: caller=${input.schemaVersion}, profile=${entry.def.schemaVersion}`,
+        this.#tenantId,
+        profile.concrete,
+      );
+    }
+  }
+
+  validateLifecycleTransition(input: LifecycleCheck): void {
+    const { profile, currentState, proposedState } = input;
+    if (profile.profile === null) {
+      throw new ProfileValidationError(
+        `lifecycle transitions require a profile binding (raw Tier-1 has no lifecycle)`,
+        this.#tenantId,
+        profile.concrete,
+      );
+    }
+    const lc = this.#lifecycles.get(`${profile.profile}::${profile.concrete}`);
+    if (!lc) {
+      throw new ProfileValidationError(
+        `no lifecycle declared for ${profile.profile}::${profile.concrete}`,
+        this.#tenantId,
+        profile.concrete,
+      );
+    }
+    if (!lc.states.includes(currentState)) {
+      throw new ProfileValidationError(
+        `currentState "${currentState}" is not in declared states for ${profile.concrete}: ${lc.states.join(", ")}`,
+        this.#tenantId,
+        profile.concrete,
+      );
+    }
+    if (!lc.states.includes(proposedState)) {
+      throw new ProfileValidationError(
+        `proposedState "${proposedState}" is not in declared states for ${profile.concrete}: ${lc.states.join(", ")}`,
+        this.#tenantId,
+        profile.concrete,
+      );
+    }
+    const legal = lc.transitions.some(
+      (t) => t.from.includes(currentState) && t.to === proposedState,
+    );
+    if (!legal) {
+      throw new ProfileValidationError(
+        `illegal transition for ${profile.concrete}: ${currentState} → ${proposedState}`,
         this.#tenantId,
         profile.concrete,
       );

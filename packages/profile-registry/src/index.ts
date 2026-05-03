@@ -9,6 +9,12 @@
  * every node/edge write to enforce the declared catalog.
  */
 
-export type { ProfileRegistry, ProfileValidator } from "./interfaces.js";
+export type {
+  ProfileRegistry,
+  ProfileValidator,
+  NodeWriteCheck,
+  EdgeWriteCheck,
+  LifecycleCheck,
+} from "./interfaces.js";
 export { PostgresProfileRegistry } from "./postgres.js";
 export { ProfileValidationError } from "./errors.js";
