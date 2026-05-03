@@ -29,6 +29,7 @@ import type {
   Tier1TypeName,
   Timestamp,
 } from "@pm/types";
+import type { ProfileValidator } from "@pm/profile-registry";
 import pg from "pg";
 import { NotFoundError, OptimisticConcurrencyError } from "./errors.js";
 import type {
@@ -37,6 +38,26 @@ import type {
   Graph,
   UpdateNodeInput,
 } from "./interfaces.js";
+
+/**
+ * Optional dependency on a profile validator. When supplied, every node
+ * create/update + every edge create is checked against the tenant's
+ * installed profiles BEFORE the SQL hits the DB.
+ *
+ * Pattern: caller passes a *factory* rather than a snapshot, so the graph
+ * always gets a fresh catalog (profile installs are admin actions; not
+ * hot-path). Implementations can cache internally if needed.
+ */
+export type ValidatorFactory = (tenantId: TenantId) => Promise<ProfileValidator>;
+
+export interface PostgresGraphOptions {
+  /**
+   * If set, every write is validated against the tenant's installed
+   * profiles before SQL execution. If unset, the graph runs in raw mode
+   * (substrate-only validation — Tier-1 type CHECK constraint still applies).
+   */
+  readonly validatorFactory?: ValidatorFactory;
+}
 
 interface NodeRow {
   id: string;
@@ -97,9 +118,11 @@ type Querier = Pick<pg.ClientBase, "query"> | pg.Pool;
 
 export class PostgresGraph implements Graph {
   readonly #pool: pg.Pool;
+  readonly #validatorFactory: ValidatorFactory | null;
 
-  constructor(pool: pg.Pool) {
+  constructor(pool: pg.Pool, options: PostgresGraphOptions = {}) {
     this.#pool = pool;
+    this.#validatorFactory = options.validatorFactory ?? null;
   }
 
   // -------------------------------------------------------------------------
@@ -169,6 +192,15 @@ export class PostgresGraph implements Graph {
     input: CreateNodeInput,
     tx?: pg.ClientBase,
   ): Promise<NodeBase> {
+    if (this.#validatorFactory) {
+      const v = await this.#validatorFactory(input.tenantId);
+      v.validateNode({
+        tenantId: input.tenantId,
+        profile: input.profile,
+        identity: input.identity,
+        schemaVersion: input.schemaVersion,
+      });
+    }
     const id = `ent_${randomUUID()}`;
     const q = this.#q(tx);
     const r = await q.query<NodeRow>(
@@ -194,6 +226,23 @@ export class PostgresGraph implements Graph {
     input: UpdateNodeInput,
     tx?: pg.ClientBase,
   ): Promise<NodeBase> {
+    // Validate the proposed identity against the tenant's installed
+    // profiles. We need the existing node to know the profile binding
+    // (caller supplies only the tenantId+id+identity), so we read first.
+    if (this.#validatorFactory) {
+      const existing = await this.getNode(input.tenantId, input.id, tx);
+      if (existing) {
+        const v = await this.#validatorFactory(input.tenantId);
+        v.validateNode({
+          tenantId: input.tenantId,
+          profile: existing.profile,
+          identity: input.identity,
+          schemaVersion: existing.schemaVersion,
+        });
+      }
+      // If existing is null, fall through — the UPDATE will return 0 rows
+      // and we'll throw NotFoundError below, which is the right error.
+    }
     const q = this.#q(tx);
     const r = await q.query<NodeRow>(
       `UPDATE graph.nodes
@@ -226,6 +275,42 @@ export class PostgresGraph implements Graph {
     input: CreateEdgeInput,
     tx?: pg.ClientBase,
   ): Promise<Edge> {
+    if (this.#validatorFactory) {
+      // Look up the concrete types of the from/to nodes + count existing
+      // edges of this type from/to each side. The validator does the
+      // cardinality math.
+      const [fromNode, toNode] = await Promise.all([
+        this.getNode(input.tenantId, input.fromId, tx),
+        this.getNode(input.tenantId, input.toId, tx),
+      ]);
+      if (!fromNode) throw new NotFoundError("node", input.fromId);
+      if (!toNode) throw new NotFoundError("node", input.toId);
+
+      const q0 = this.#q(tx);
+      const [fromCountRes, toCountRes] = await Promise.all([
+        q0.query<{ c: string }>(
+          `SELECT count(*)::text AS c FROM graph.edges
+            WHERE tenant_id = $1 AND from_id = $2 AND type = $3
+              AND deleted_at IS NULL`,
+          [input.tenantId, input.fromId, input.type],
+        ),
+        q0.query<{ c: string }>(
+          `SELECT count(*)::text AS c FROM graph.edges
+            WHERE tenant_id = $1 AND to_id = $2 AND type = $3
+              AND deleted_at IS NULL`,
+          [input.tenantId, input.toId, input.type],
+        ),
+      ]);
+      const v = await this.#validatorFactory(input.tenantId);
+      v.validateEdge({
+        tenantId: input.tenantId,
+        type: input.type,
+        fromConcrete: fromNode.profile.concrete,
+        toConcrete: toNode.profile.concrete,
+        existingFromCount: Number(fromCountRes.rows[0]!.c),
+        existingToCount: Number(toCountRes.rows[0]!.c),
+      });
+    }
     const id = `edg_${randomUUID()}`;
     const q = this.#q(tx);
     const r = await q.query<EdgeRow>(

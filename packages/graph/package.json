@@ -19,11 +19,13 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
+    "@pm/profile-registry": "workspace:*",
     "@pm/types": "workspace:*",
     "pg": "^8.13.0"
   },
   "devDependencies": {
     "@pm/events": "workspace:*",
+    "@pm/profile-wedding": "workspace:*",
     "@types/pg": "^8.11.10",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"

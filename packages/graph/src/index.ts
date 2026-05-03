@@ -16,4 +16,5 @@ export type {
 } from "./interfaces.js";
 
 export { PostgresGraph } from "./postgres.js";
+export type { PostgresGraphOptions, ValidatorFactory } from "./postgres.js";
 export { OptimisticConcurrencyError, NotFoundError } from "./errors.js";
