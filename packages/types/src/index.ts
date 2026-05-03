@@ -18,3 +18,4 @@ export * from "./node.js";
 export * from "./edge.js";
 export * from "./event.js";
 export * from "./tier1.js";
+export * from "./profile.js";
