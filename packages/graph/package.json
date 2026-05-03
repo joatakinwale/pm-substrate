@@ -2,7 +2,7 @@
   "name": "@pm/graph",
   "version": "0.1.0",
   "private": true,
-  "description": "TODO: graph layer.",
+  "description": "Entity graph: tier-1 nodes + typed edges. Postgres-backed day 1.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,9 +19,12 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
-    "@pm/types": "workspace:*"
+    "@pm/types": "workspace:*",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@pm/events": "workspace:*",
+    "@types/pg": "^8.11.10",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"
   }
