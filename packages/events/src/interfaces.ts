@@ -55,6 +55,18 @@ export interface ReadQuery {
   readonly since?: Timestamp;
   /** ISO-8601 exclusive upper bound on `occurredAt`. */
   readonly until?: Timestamp;
+  /**
+   * Exclusive lower bound on `recordedAt`. Used by projection cursors and
+   * other replay machinery that need monotonic, server-assigned ordering.
+   * Distinct from `since`/`until` which filter by `occurredAt` (which can
+   * be caller-supplied and out-of-order).
+   *
+   * Accepts a raw string (not a `Timestamp` brand) because callers typically
+   * pass `recorded_at::text` straight from the DB to preserve microsecond
+   * precision — round-tripping through JS `Date` truncates to milliseconds
+   * and breaks boundary semantics.
+   */
+  readonly afterRecordedAt?: string;
   /** Default 1000. */
   readonly limit?: number;
 }

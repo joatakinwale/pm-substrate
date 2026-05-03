@@ -213,6 +213,10 @@ export class PostgresEventStore
       params.push(query.until);
       where.push(`occurred_at < $${params.length}`);
     }
+    if (query.afterRecordedAt) {
+      params.push(query.afterRecordedAt);
+      where.push(`recorded_at > $${params.length}`);
+    }
     params.push(limit);
 
     const rows = await this.#pool.query<RowShape>(
