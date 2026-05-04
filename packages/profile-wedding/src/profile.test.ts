@@ -17,11 +17,13 @@ import { describe, expect, it } from "vitest";
 import type {
   Counterparty,
   Engagement,
+  Resource,
   Transaction,
   ProfileEntity,
 } from "@pm/types";
 
 import type {
+  BudgetCategory,
   Contract,
   Couple,
   Guest,
@@ -60,6 +62,9 @@ type _Couple_isCounterparty = Assert<IsAssignable<Couple, Counterparty>>;
 type _Guest_isCounterparty = Assert<IsAssignable<Guest, Counterparty>>;
 type _Vendor_isCounterparty = Assert<IsAssignable<Vendor, Counterparty>>;
 
+// Resource specializations
+type _BudgetCategory_isResource = Assert<IsAssignable<BudgetCategory, Resource>>;
+
 // Transaction specializations
 type _Contract_isTransaction = Assert<IsAssignable<Contract, Transaction>>;
 type _Payment_isTransaction = Assert<IsAssignable<Payment, Transaction>>;
@@ -79,6 +84,7 @@ type _Refs =
   | _Couple_isCounterparty
   | _Guest_isCounterparty
   | _Vendor_isCounterparty
+  | _BudgetCategory_isResource
   | _Contract_isTransaction
   | _Payment_isTransaction
   | _Invoice_isTransaction
@@ -207,5 +213,24 @@ describe("Wedding profile constraints", () => {
 
   it("Wedding is the identity-primacy spine", () => {
     expect(WEDDING_PROFILE.identityPrimacy).toBe("Wedding");
+  });
+
+  it("vendor_budget_category connects Vendor to BudgetCategory (budget rollup topology)", () => {
+    const edge = EDGE_CATALOG.vendor_budget_category;
+    expect(edge).toBeDefined();
+    expect(edge!.fromTypes).toEqual(["Vendor"]);
+    expect(edge!.toTypes).toEqual(["BudgetCategory"]);
+    // At-most-1 from a vendor (a vendor belongs to one budget category).
+    expect(edge!.fromCardinality).toBe("at-most:1");
+    // Many vendors can share a budget category.
+    expect(edge!.toCardinality).toBe("unbounded");
+  });
+
+  it("BudgetCategory is a declared entity type bound to Resource", () => {
+    const def = WEDDING_PROFILE.entityTypes["BudgetCategory"];
+    expect(def).toBeDefined();
+    expect(def!.tier1).toBe("Resource");
+    expect(def!.requiredFields).toContain("actualSpentMinor");
+    expect(def!.requiredFields).toContain("allocatedMinor");
   });
 });

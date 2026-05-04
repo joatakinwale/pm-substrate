@@ -79,6 +79,26 @@ export const PLUS_ONE: EdgeTypeDef = {
 };
 
 /**
+ * Vendor → BudgetCategory. Used by the wedding.budget capability to infer
+ * which budget envelope a contract's payment rolls up into.
+ *
+ * A vendor belongs to at most one budget category (a florist is in "Flowers";
+ * the caterer is in "Catering"). Many vendors can share a category.
+ *
+ * Architecture note: this edge is the reason `budget_category_id` does NOT
+ * appear on Contract payloads. The budget capability walks the graph to find
+ * the rollup target — eliminating the hardcoded-None production bug in
+ * WeddingWebApp. See P2 plan in docs.
+ */
+export const VENDOR_BUDGET_CATEGORY: EdgeTypeDef = {
+  name: "vendor_budget_category",
+  fromTypes: ["Vendor"],
+  toTypes: ["BudgetCategory"],
+  fromCardinality: "at-most:1",  // A vendor rolls up to at most one budget category.
+  toCardinality: "unbounded",    // Many vendors can share a budget category.
+};
+
+/**
  * The full edge catalog. Indexed by local name (no profile prefix).
  */
 export const EDGE_CATALOG: Readonly<Record<string, EdgeTypeDef>> = {
@@ -90,4 +110,5 @@ export const EDGE_CATALOG: Readonly<Record<string, EdgeTypeDef>> = {
   contract_invoice: CONTRACT_INVOICE,
   invoice_payment: INVOICE_PAYMENT,
   plus_one: PLUS_ONE,
+  vendor_budget_category: VENDOR_BUDGET_CATEGORY,
 };

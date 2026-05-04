@@ -69,11 +69,29 @@ const ENTITY_TYPES: Readonly<Record<string, EntityTypeDef>> = {
     optionalFields: ["dueAt"],
     schemaVersion: 1,
   },
+  /**
+   * BudgetCategory — a spending envelope for a category of vendors.
+   * Specializes Resource.
+   *
+   * `actualSpentMinor` starts at 0 and is maintained exclusively by the
+   * wedding.budget capability via graph-inferred rollup. The `vendor_budget_category`
+   * edge connects vendors to their category; the budget capability walks that
+   * edge to find the rollup target without needing budget_category_id on
+   * the contract payload (the field that was hardcoded None in the WeddingWebApp
+   * production bug). See docs/adr/0010-budget-applied-payments-idempotency.md.
+   */
+  BudgetCategory: {
+    concrete: "BudgetCategory",
+    tier1: "Resource",
+    requiredFields: ["name", "kind", "allocatedMinor", "currency", "actualSpentMinor"],
+    optionalFields: [],
+    schemaVersion: 1,
+  },
 };
 
 export const WEDDING_PROFILE: ProfileDefinition = {
   name: "wedding",
-  version: 1,
+  version: 2,  // v2: added BudgetCategory entity + vendor_budget_category edge (P2.1b)
   description:
     "The wedding industry profile. Specializes Engagement→Wedding (with exactly-2-principals constraint), Counterparty→{Couple,Guest,Vendor}, Transaction→{Contract,Payment,Invoice}. Identity primacy = Wedding.",
   entityTypes: ENTITY_TYPES,

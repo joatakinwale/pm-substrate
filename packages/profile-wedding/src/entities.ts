@@ -138,3 +138,32 @@ export type InvoiceState =
   | "paid"
   | "void"
   | "uncollectible";
+
+/**
+ * BudgetCategory — an envelope for planned vs. actual spending by vendor category.
+ * Specializes Resource.
+ *
+ * `actualSpentMinor` is owned exclusively by @pm/capability-wedding-budget.
+ * The capability increments it on each `wedding.contract.payment_recorded` event
+ * by walking the graph (contract → vendor → budgetCategory). No other writer
+ * should touch this field. The capability uses `FOR UPDATE` on the node row
+ * to serialize concurrent payment events.
+ *
+ * Why `kind`? The Resource Tier-1 interface requires a `kind` discriminator.
+ * BudgetCategory always sets it to the literal "budget_category".
+ */
+export interface BudgetCategory
+  extends ProfileEntity<{
+    name: string;
+    /** Resource kind discriminator. Always "budget_category" for this type. */
+    kind: "budget_category";
+    /** Planned budget envelope, integer minor units (cents). */
+    allocatedMinor: number;
+    /** ISO-4217 currency code. */
+    currency: string;
+    /**
+     * Running rollup of actual payments applied to this category.
+     * Initial value: 0. Updated exclusively by @pm/capability-wedding-budget.
+     */
+    actualSpentMinor: number;
+  }> {}
