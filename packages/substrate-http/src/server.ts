@@ -16,6 +16,7 @@
  */
 
 import { createServer } from "node:http";
+import type { EntityId } from "@pm/types";
 import { env, exit } from "node:process";
 
 import pg from "pg";
@@ -25,6 +26,7 @@ import { PostgresGraph } from "@pm/graph";
 import { PostgresProfileRegistry } from "@pm/profile-registry";
 import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresRegistry } from "@pm/registry";
+import { BudgetRollupHandler } from "@pm/capability-wedding-budget";
 
 import { createSubstrateApp } from "./app.js";
 
@@ -55,6 +57,12 @@ const graph = new PostgresGraph(pool, {
 });
 const capabilityRegistry = new PostgresRegistry(pool);
 const projections = new PostgresProjectionRunner(pool, events);
+const budgetRollup = new BudgetRollupHandler({
+  pool,
+  graph,
+  events,
+  emittedBy: "pm-substrate-http/wedding.budget",
+});
 
 const app = createSubstrateApp({
   profileRegistry,
@@ -62,6 +70,16 @@ const app = createSubstrateApp({
   graph,
   events,
   projections,
+  domainEventHandlers: {
+    "wedding.contract.payment_recorded": async (input) => {
+      await budgetRollup.handle(input.tenantId, {
+        contractId: String(input.payload["contractId"]) as EntityId,
+        amount: Number(input.payload["amount"]),
+        recordedAt: String(input.payload["recordedAt"]),
+        paymentId: String(input.payload["paymentId"]),
+      });
+    },
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -77,11 +95,14 @@ const server = createServer(async (req, res) => {
   }
   const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
 
-  const fetchReq = new Request(url, {
+  const init: RequestInit = {
     method: req.method ?? "GET",
     headers: req.headers as Record<string, string>,
-    body: body?.length ? body : undefined,
-  });
+  };
+  if (body?.length) {
+    init.body = body;
+  }
+  const fetchReq = new Request(url, init);
 
   const fetchRes = await app.fetch(fetchReq);
 

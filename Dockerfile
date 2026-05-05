@@ -49,7 +49,7 @@ WORKDIR /app
 # pnpm for production install
 RUN corepack enable && corepack prepare pnpm@10.0.0 --activate
 
-# Re-install only production deps.
+# Install runtime deps plus tsx for migration/seed entrypoints.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/types/package.json                 ./packages/types/
 COPY packages/events/package.json                ./packages/events/
@@ -65,7 +65,7 @@ COPY packages/capability-audit/package.json      ./packages/capability-audit/
 COPY packages/profile-wedding/package.json       ./packages/profile-wedding/
 COPY tsconfig.base.json ./
 
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile
 
 # Copy compiled dist from builder.
 COPY --from=builder /app/packages/types/dist             ./packages/types/dist
@@ -84,8 +84,6 @@ COPY --from=builder /app/packages/profile-wedding/dist   ./packages/profile-wedd
 # Migrations (needed by the migrate-substrate init container — same image, different CMD).
 COPY db/ ./db/
 COPY scripts/ ./scripts/
-# tsx is needed to run the migration script (TypeScript).
-RUN pnpm add -w tsx
 
 # Non-root user.
 RUN adduser -D -u 10001 pmuser && chown -R pmuser:pmuser /app

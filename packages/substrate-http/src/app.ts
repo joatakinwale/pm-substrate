@@ -17,6 +17,7 @@ import { profileRoutes } from "./routes/profiles.js";
 import { capabilityRoutes } from "./routes/capabilities.js";
 import { graphRoutes } from "./routes/graph.js";
 import { eventRoutes } from "./routes/events.js";
+import type { DomainEventHandler } from "./routes/events.js";
 import { projectionRoutes } from "./routes/projections.js";
 
 export interface SubstrateAppDeps {
@@ -25,6 +26,7 @@ export interface SubstrateAppDeps {
   readonly graph: Graph;
   readonly events: EventPublisher & EventReader;
   readonly projections: ProjectionRunner;
+  readonly domainEventHandlers?: Readonly<Record<string, DomainEventHandler>>;
 }
 
 export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
@@ -35,7 +37,7 @@ export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
   app.route("/tenants/:tenantId/profiles", profileRoutes(deps.profileRegistry));
   app.route("/tenants/:tenantId/capabilities", capabilityRoutes(deps.capabilityRegistry));
   app.route("/tenants/:tenantId", graphRoutes(deps.graph));
-  app.route("/tenants/:tenantId/events", eventRoutes(deps.events));
+  app.route("/tenants/:tenantId/events", eventRoutes(deps.events, deps.domainEventHandlers));
   app.route("/tenants/:tenantId/projections", projectionRoutes(deps.projections));
 
   app.onError((err, c) => {

@@ -6,9 +6,14 @@ import type {
   ReadQuery,
 } from "@pm/events";
 import type { EventId, TenantId } from "@pm/types";
+
+export type DomainEventHandler = (input: PublishInput) => Promise<void>;
 import { toHTTPException } from "../errors.js";
 
-export const eventRoutes = (events: EventPublisher & EventReader): Hono => {
+export const eventRoutes = (
+  events: EventPublisher & EventReader,
+  handlers: Readonly<Record<string, DomainEventHandler>> = {},
+): Hono => {
   const app = new Hono();
 
   // POST /tenants/:tenantId/events
@@ -21,7 +26,14 @@ export const eventRoutes = (events: EventPublisher & EventReader): Hono => {
       return c.json({ error: "invalid JSON body" }, 400);
     }
     try {
-      const event = await events.publish({ tenantId, ...body });
+      const input: PublishInput = { tenantId, ...body };
+      const event = await events.publish(input);
+
+      const handler = handlers[input.type];
+      if (handler) {
+        await handler(input);
+      }
+
       return c.json(event);
     } catch (err) {
       throw toHTTPException(err);

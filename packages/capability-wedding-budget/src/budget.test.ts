@@ -7,7 +7,7 @@
  *   2. Idempotency: same paymentId delivered twice → rollup applied once,
  *      no double-count.
  *   3. No-vendor-link: contract has no vendor edge → warning logged, no
- *      rollup, no error thrown.
+ *      rollup, no error thrown, payment marked processed.
  *   4. Atomicity: if event publish fails, both the graph UPDATE and the
  *      applied_payments INSERT are rolled back.
  *
@@ -238,12 +238,14 @@ describeIfDb("wedding.budget capability", () => {
     const bcBefore = await graph.getNode(tenantId, budgetCategoryId);
     const spentBefore = bcBefore?.identity["actualSpentMinor"] as number;
 
+    const paymentId = `pay_orphan_${randomUUID().slice(0, 8)}`;
+
     // Must not throw.
     await expect(
       handler.handle(tenantId, {
         contractId: orphanNode.id,
         amount: 99_999,
-        paymentId: `pay_orphan_${randomUUID().slice(0, 8)}`,
+        paymentId,
         recordedAt: new Date().toISOString(),
       }),
     ).resolves.toBeUndefined();
@@ -251,6 +253,15 @@ describeIfDb("wedding.budget capability", () => {
     // BudgetCategory unchanged.
     const bcAfter = await graph.getNode(tenantId, budgetCategoryId);
     expect(bcAfter?.identity["actualSpentMinor"]).toBe(spentBefore);
+
+    // The payment is still marked processed so a replay after topology changes
+    // cannot accidentally roll up an old no-link payment.
+    const res = await pool.query<{ payment_id: string }>(
+      `SELECT payment_id FROM budget.applied_payments
+        WHERE tenant_id = $1 AND payment_id = $2`,
+      [tenantId, paymentId],
+    );
+    expect(res.rowCount).toBe(1);
   });
 
   // ---------------------------------------------------------------------------

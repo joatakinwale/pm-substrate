@@ -85,48 +85,15 @@ export class BudgetRollupHandler {
   ): Promise<void> {
     const { contractId, amount, paymentId } = payload;
 
-    // ---- Graph walk (read-only, outside tx) ----
-    // Edge topology is stable at the time of payment recording; reading
-    // outside the transaction is safe and avoids holding locks during the
-    // walk. IF topology could change concurrently (edge deleted mid-payment),
-    // a locked read inside the tx would be safer — not a day-1 concern.
-
-    const contractVendorEdges = await this.#graph.outgoingEdges(
-      tenantId,
-      contractId,
-      "wedding/contract_vendor",
-    );
-    if (contractVendorEdges.length === 0) {
-      console.warn(
-        `[wedding.budget] contract ${contractId} has no vendor edge (tenant=${tenantId}). ` +
-          `Skipping rollup — raw Tier-1 tenant or vendor not linked.`,
-      );
-      return;
-    }
-    const vendorId = contractVendorEdges[0]!.toId;
-
-    const vendorBudgetEdges = await this.#graph.outgoingEdges(
-      tenantId,
-      vendorId,
-      "wedding/vendor_budget_category",
-    );
-    if (vendorBudgetEdges.length === 0) {
-      console.warn(
-        `[wedding.budget] vendor ${vendorId} has no budget category edge (tenant=${tenantId}). ` +
-          `Skipping rollup — vendor not assigned to a budget category.`,
-      );
-      return;
-    }
-    const budgetCategoryId = vendorBudgetEdges[0]!.toId;
-
-    // ---- Transaction: idempotency + rollup + event ----
+    // ---- Transaction: idempotency + optional rollup + event ----
     const c = await this.#pool.connect();
     try {
       await c.query("BEGIN");
 
-      // Step 1: idempotency guard.
-      // INSERT ON CONFLICT DO NOTHING returns rowCount=0 on duplicate.
-      // ON CONFLICT path means this payment was already applied → clean exit.
+      // Step 1: idempotency guard. We record the payment before the topology
+      // walk so even a no-link/no-category case is exactly-once-effective:
+      // the event was seen and intentionally skipped, not left replayable as
+      // an accidental future rollup after topology changes.
       const ins = await c.query(
         `INSERT INTO budget.applied_payments (tenant_id, payment_id)
          VALUES ($1, $2)
@@ -137,6 +104,37 @@ export class BudgetRollupHandler {
         await c.query("ROLLBACK");
         return; // Already processed — idempotent no-op.
       }
+
+      // ---- Graph walk (read-only) ----
+      const contractVendorEdges = await this.#graph.outgoingEdges(
+        tenantId,
+        contractId,
+        "wedding/contract_vendor",
+      );
+      if (contractVendorEdges.length === 0) {
+        console.warn(
+          `[wedding.budget] contract ${contractId} has no vendor edge (tenant=${tenantId}). ` +
+            `Skipping rollup — raw Tier-1 tenant or vendor not linked.`,
+        );
+        await c.query("COMMIT");
+        return;
+      }
+      const vendorId = contractVendorEdges[0]!.toId;
+
+      const vendorBudgetEdges = await this.#graph.outgoingEdges(
+        tenantId,
+        vendorId,
+        "wedding/vendor_budget_category",
+      );
+      if (vendorBudgetEdges.length === 0) {
+        console.warn(
+          `[wedding.budget] vendor ${vendorId} has no budget category edge (tenant=${tenantId}). ` +
+            `Skipping rollup — vendor not assigned to a budget category.`,
+        );
+        await c.query("COMMIT");
+        return;
+      }
+      const budgetCategoryId = vendorBudgetEdges[0]!.toId;
 
       // Step 2: lock the BudgetCategory row so concurrent payments on the
       // same category serialize. Without FOR UPDATE, two concurrent payments

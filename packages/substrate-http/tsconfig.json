@@ -5,14 +5,34 @@
     "rootDir": "./src",
     "tsBuildInfoFile": ".tsbuildinfo"
   },
-  "include": ["src/**/*"],
-  "exclude": ["**/*.test.ts", "dist"],
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "dist"
+  ],
   "references": [
-    { "path": "../types" },
-    { "path": "../events" },
-    { "path": "../graph" },
-    { "path": "../profile-registry" },
-    { "path": "../projections" },
-    { "path": "../registry" }
+    {
+      "path": "../types"
+    },
+    {
+      "path": "../capability-wedding-budget"
+    },
+    {
+      "path": "../events"
+    },
+    {
+      "path": "../graph"
+    },
+    {
+      "path": "../profile-registry"
+    },
+    {
+      "path": "../projections"
+    },
+    {
+      "path": "../registry"
+    }
   ]
 }

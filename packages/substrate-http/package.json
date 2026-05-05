@@ -2,7 +2,7 @@
   "name": "@pm/substrate-http",
   "version": "0.1.0",
   "private": true,
-  "description": "HTTP integration surface over the substrate. Endpoints map 1:1 onto existing package methods — no speculative API.",
+  "description": "HTTP integration surface over the substrate. Endpoints map 1:1 onto existing package methods \u2014 no speculative API.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -28,7 +28,8 @@
     "@pm/registry": "workspace:*",
     "@pm/types": "workspace:*",
     "hono": "^4.6.0",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "@pm/capability-wedding-budget": "workspace:*"
   },
   "devDependencies": {
     "@pm/capability-audit": "workspace:*",

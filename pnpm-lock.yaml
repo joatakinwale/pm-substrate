@@ -254,6 +254,9 @@ importers:
 
   packages/substrate-http:
     dependencies:
+      '@pm/capability-wedding-budget':
+        specifier: workspace:*
+        version: link:../capability-wedding-budget
       '@pm/events':
         specifier: workspace:*
         version: link:../events
