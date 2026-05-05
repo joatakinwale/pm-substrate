@@ -22,6 +22,15 @@
     "@pm/types": "workspace:*"
   },
   "devDependencies": {
+    "@pm/capability-audit": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/profile-wedding": "workspace:*",
+    "@pm/projections": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"
   }
