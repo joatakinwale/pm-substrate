@@ -1,5 +1,10 @@
 import { HTTPException } from "hono/http-exception";
-import { NotFoundError, OptimisticConcurrencyError } from "@pm/graph";
+import {
+  InvalidIdError,
+  NodeConflictError,
+  NotFoundError,
+  OptimisticConcurrencyError,
+} from "@pm/graph";
 import { ProfileValidationError } from "@pm/profile-registry";
 
 /**
@@ -9,6 +14,14 @@ import { ProfileValidationError } from "@pm/profile-registry";
  *
  * Discipline: if a new substrate exception class is added, it MUST be added
  * here too. The mapping is the contract the HTTP clients depend on.
+ *
+ * Current mapping (P2.3a additions marked):
+ *   ProfileValidationError   → 422 Unprocessable Entity
+ *   OptimisticConcurrencyError → 409 Conflict
+ *   NodeConflictError        → 409 Conflict   [P2.3a]
+ *   InvalidIdError           → 400 Bad Request [P2.3a]
+ *   NotFoundError            → 404 Not Found
+ *   everything else          → 500 Internal Server Error
  */
 export const toHTTPException = (err: unknown): HTTPException => {
   if (err instanceof HTTPException) return err;
@@ -18,10 +31,26 @@ export const toHTTPException = (err: unknown): HTTPException => {
       cause: { kind: "profile_validation", subject: err.subject },
     });
   }
+  if (err instanceof NodeConflictError) {
+    return new HTTPException(409, {
+      message: err.message,
+      cause: {
+        kind: "node_conflict",
+        existing: err.existingProfile,
+        requested: err.requestedProfile,
+      },
+    });
+  }
   if (err instanceof OptimisticConcurrencyError) {
     return new HTTPException(409, {
       message: err.message,
       cause: { kind: "optimistic_concurrency" },
+    });
+  }
+  if (err instanceof InvalidIdError) {
+    return new HTTPException(400, {
+      message: err.message,
+      cause: { kind: "invalid_id" },
     });
   }
   if (err instanceof NotFoundError) {

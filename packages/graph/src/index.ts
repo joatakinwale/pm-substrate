@@ -11,10 +11,16 @@ export type {
   GraphReader,
   GraphWriter,
   CreateNodeInput,
+  CreateNodeResult,
   UpdateNodeInput,
   CreateEdgeInput,
 } from "./interfaces.js";
 
 export { PostgresGraph } from "./postgres.js";
 export type { PostgresGraphOptions, ValidatorFactory } from "./postgres.js";
-export { OptimisticConcurrencyError, NotFoundError } from "./errors.js";
+export {
+  OptimisticConcurrencyError,
+  NotFoundError,
+  InvalidIdError,
+  NodeConflictError,
+} from "./errors.js";

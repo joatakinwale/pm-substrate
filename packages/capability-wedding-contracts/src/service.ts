@@ -80,7 +80,7 @@ export class WeddingContracts {
     const c = await this.#pool.connect();
     try {
       await c.query("BEGIN");
-      const node = await (this.#graph as Graph & {
+      const { node } = await (this.#graph as Graph & {
         createNode: (
           input: Parameters<Graph["createNode"]>[0],
           tx?: pg.ClientBase,

@@ -26,8 +26,33 @@ export interface GraphReader {
   ): Promise<readonly Edge[]>;
 }
 
+/**
+ * Result returned by createNode.
+ * - `created: true`  — a new node was inserted (HTTP 201).
+ * - `created: false` — the supplied id already existed for this tenant and
+ *   the profile/type matches. The existing node is returned unchanged (HTTP 200).
+ */
+export interface CreateNodeResult {
+  readonly node: NodeBase;
+  readonly created: boolean;
+}
+
 export interface GraphWriter {
-  createNode(input: CreateNodeInput): Promise<NodeBase>;
+  /**
+   * Create a node, optionally with a caller-supplied UUID.
+   *
+   * When `input.id` is provided:
+   *   - Must be a valid UUID. Rejects with `InvalidIdError` otherwise.
+   *   - If a node with that id already exists **in this tenant** and its
+   *     profile/type matches, returns `{ node, created: false }` (idempotent).
+   *   - If a node with that id already exists but its profile/type differs,
+   *     throws `NodeConflictError` (HTTP 409).
+   *
+   * When `input.id` is omitted:
+   *   - Server generates a unique id. Behaviour is identical to the pre-P2.3a
+   *     contract: always returns `{ node, created: true }`.
+   */
+  createNode(input: CreateNodeInput): Promise<CreateNodeResult>;
 
   /**
    * Optimistic concurrency: caller passes the schemaVersion they read.
@@ -43,6 +68,12 @@ export interface GraphWriter {
 
 export interface CreateNodeInput {
   readonly tenantId: TenantId;
+  /**
+   * Optional caller-supplied node ID. Must be a valid UUID (v1–v5 or nil).
+   * When omitted the substrate generates one. See `GraphWriter.createNode`
+   * for the full idempotency semantics.
+   */
+  readonly id?: string;
   readonly profile: ProfileBinding;
   readonly identity: Readonly<Record<string, unknown>>;
   readonly schemaVersion: number;

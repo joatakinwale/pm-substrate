@@ -82,7 +82,7 @@ describeIfDb("PostgresGraph validator wiring", () => {
   });
 
   it("accepts a well-formed Wedding node", async () => {
-    const w = await graph.createNode({
+    const { node: w } = await graph.createNode({
       tenantId,
       profile: WEDDING,
       identity: {
@@ -97,7 +97,7 @@ describeIfDb("PostgresGraph validator wiring", () => {
   });
 
   it("rejects createEdge that would exceed has_principal exactly:2", async () => {
-    const w = await graph.createNode({
+    const { node: w } = await graph.createNode({
       tenantId, profile: WEDDING,
       identity: {
         title: "Edge Test", eventDate: "2026-10-01", venue: "X",
@@ -105,13 +105,13 @@ describeIfDb("PostgresGraph validator wiring", () => {
       },
       schemaVersion: 1,
     });
-    const c1 = await graph.createNode({
+    const { node: c1 } = await graph.createNode({
       tenantId, profile: COUPLE, identity: { name: "P1" }, schemaVersion: 1,
     });
-    const c2 = await graph.createNode({
+    const { node: c2 } = await graph.createNode({
       tenantId, profile: COUPLE, identity: { name: "P2" }, schemaVersion: 1,
     });
-    const c3 = await graph.createNode({
+    const { node: c3 } = await graph.createNode({
       tenantId, profile: COUPLE, identity: { name: "P3" }, schemaVersion: 1,
     });
 
@@ -133,7 +133,7 @@ describeIfDb("PostgresGraph validator wiring", () => {
   });
 
   it("rejects createEdge with from-type not in the declared from-types", async () => {
-    const w = await graph.createNode({
+    const { node: w } = await graph.createNode({
       tenantId, profile: WEDDING,
       identity: {
         title: "FromType", eventDate: "2026-10-01", venue: "X",
@@ -141,7 +141,7 @@ describeIfDb("PostgresGraph validator wiring", () => {
       },
       schemaVersion: 1,
     });
-    const c = await graph.createNode({
+    const { node: c } = await graph.createNode({
       tenantId, profile: COUPLE, identity: { name: "P" }, schemaVersion: 1,
     });
     // has_principal is declared as Wedding -> Couple. Reverse the direction.
@@ -154,7 +154,7 @@ describeIfDb("PostgresGraph validator wiring", () => {
   });
 
   it("rejects updateNode that drops a required field", async () => {
-    const w = await graph.createNode({
+    const { node: w } = await graph.createNode({
       tenantId, profile: WEDDING,
       identity: {
         title: "Update Test", eventDate: "2026-10-01", venue: "X",
@@ -175,7 +175,7 @@ describeIfDb("PostgresGraph validator wiring", () => {
   it("permits raw Tier-1 writes (no profile binding) regardless of installed profiles", async () => {
     // Layered ontology rule: raw Tier-1 stays usable even when profiles are
     // installed. The validator passes profile=null through with no checks.
-    const n = await graph.createNode({
+    const { node: n } = await graph.createNode({
       tenantId,
       profile: { tier1: "Counterparty", profile: null, concrete: "Counterparty" },
       identity: {},

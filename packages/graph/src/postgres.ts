@@ -16,6 +16,10 @@
  *   - Edges are tombstoned (`deleted_at`) rather than hard-deleted. Audit log
  *     and time-travel queries depend on it. Indexes filter `WHERE deleted_at
  *     IS NULL` so live queries don't pay a tombstone tax.
+ *
+ *   - Caller-supplied IDs (P2.3a, ADR-0011): `createNode` accepts an optional
+ *     `id` field. If supplied and valid UUID, the INSERT uses ON CONFLICT DO
+ *     NOTHING for idempotent upsert semantics. See ADR-0011.
  */
 
 import { randomUUID } from "node:crypto";
@@ -31,13 +35,28 @@ import type {
 } from "@pm/types";
 import type { ProfileValidator } from "@pm/profile-registry";
 import pg from "pg";
-import { NotFoundError, OptimisticConcurrencyError } from "./errors.js";
+import {
+  InvalidIdError,
+  NodeConflictError,
+  NotFoundError,
+  OptimisticConcurrencyError,
+} from "./errors.js";
 import type {
   CreateEdgeInput,
   CreateNodeInput,
+  CreateNodeResult,
   Graph,
   UpdateNodeInput,
 } from "./interfaces.js";
+
+/**
+ * UUID regex: covers v1–v5 and nil UUID (all-zeros). Case-insensitive.
+ * Must be exactly 8-4-4-4-12 hex groups.
+ */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const isValidUUID = (s: string): boolean => UUID_RE.test(s);
 
 /**
  * Optional dependency on a profile validator. When supplied, every node
@@ -188,10 +207,31 @@ export class PostgresGraph implements Graph {
   // Writer
   // -------------------------------------------------------------------------
 
+  /**
+   * Create a node with optional caller-supplied UUID for cross-system
+   * idempotency. See ADR-0011 for the full design.
+   *
+   * Tenant scope: `graph.nodes` has `id TEXT PRIMARY KEY` (globally unique).
+   * UUID5 collision risk across tenants is negligible — the uuid5 namespace +
+   * name derivation makes same-UUID-different-tenant virtually impossible.
+   * ADR-0011 records this explicitly.
+   */
   async createNode(
     input: CreateNodeInput,
     tx?: pg.ClientBase,
-  ): Promise<NodeBase> {
+  ): Promise<CreateNodeResult> {
+    // -----------------------------------------------------------------------
+    // 1. Validate caller-supplied ID if present.
+    // -----------------------------------------------------------------------
+    if (input.id !== undefined) {
+      if (!isValidUUID(input.id)) {
+        throw new InvalidIdError(input.id);
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Profile validation (runs before any SQL, unchanged from pre-P2.3a).
+    // -----------------------------------------------------------------------
     if (this.#validatorFactory) {
       const v = await this.#validatorFactory(input.tenantId);
       v.validateNode({
@@ -201,12 +241,20 @@ export class PostgresGraph implements Graph {
         schemaVersion: input.schemaVersion,
       });
     }
-    const id = `ent_${randomUUID()}`;
+
+    // -----------------------------------------------------------------------
+    // 3. INSERT with ON CONFLICT DO NOTHING.
+    //    - Caller-supplied id: conflict possible → idempotent upsert path.
+    //    - Server-generated id: randomUUID prefix `ent_` is not a bare UUID
+    //      but is globally unique — conflict is cosmically impossible.
+    // -----------------------------------------------------------------------
+    const id = input.id ?? `ent_${randomUUID()}`;
     const q = this.#q(tx);
     const r = await q.query<NodeRow>(
       `INSERT INTO graph.nodes
         (id, tenant_id, tier1, profile, concrete, schema_version, identity)
        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)
+       ON CONFLICT (id) DO NOTHING
        RETURNING id, tenant_id, tier1, profile, concrete, schema_version,
                  identity, created_at, updated_at`,
       [
@@ -219,7 +267,45 @@ export class PostgresGraph implements Graph {
         JSON.stringify(input.identity ?? {}),
       ],
     );
-    return rowToNode(r.rows[0]!);
+
+    // -----------------------------------------------------------------------
+    // 4. Fresh insert: return immediately.
+    // -----------------------------------------------------------------------
+    if (r.rows[0]) {
+      return { node: rowToNode(r.rows[0]), created: true };
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. Conflict: ID already exists. Fetch the existing node for this tenant.
+    //    (If it belongs to a different tenant, getNode returns null — that's a
+    //    UUID collision across tenants, negligible in practice with UUID5 but
+    //    we surface it as an error rather than silently lying.)
+    // -----------------------------------------------------------------------
+    const existing = await this.getNode(input.tenantId, id as EntityId, tx);
+    if (!existing) {
+      // The id row exists in graph.nodes but belongs to a different tenant.
+      // Treat as an id collision rather than an idempotency hit.
+      throw new InvalidIdError(
+        id,
+        "UUID already assigned to a different tenant — UUID collision (use a different id)",
+      );
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. Profile / type mismatch → 409.
+    // -----------------------------------------------------------------------
+    if (
+      existing.profile.tier1 !== input.profile.tier1 ||
+      existing.profile.profile !== input.profile.profile ||
+      existing.profile.concrete !== input.profile.concrete
+    ) {
+      throw new NodeConflictError(id, existing.profile, input.profile);
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. Profile matches → idempotent hit, return existing node.
+    // -----------------------------------------------------------------------
+    return { node: existing, created: false };
   }
 
   async updateNode(

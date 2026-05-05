@@ -70,7 +70,7 @@ describeIfDb("wedding.budget capability", () => {
     });
 
     // Create a Vendor entity.
-    const vendorNode = await graph.createNode({
+    const { node: vendorNode } = await graph.createNode({
       tenantId,
       profile: { tier1: "Counterparty", profile: "wedding", concrete: "Vendor" },
       identity: {
@@ -82,7 +82,7 @@ describeIfDb("wedding.budget capability", () => {
     vendorId = vendorNode.id;
 
     // Create a BudgetCategory entity. actualSpentMinor starts at 0.
-    const bcNode = await graph.createNode({
+    const { node: bcNode } = await graph.createNode({
       tenantId,
       profile: { tier1: "Resource", profile: "wedding", concrete: "BudgetCategory" },
       identity: {
@@ -97,7 +97,7 @@ describeIfDb("wedding.budget capability", () => {
     budgetCategoryId = bcNode.id;
 
     // Create a Contract entity.
-    const contractNode = await graph.createNode({
+    const { node: contractNode } = await graph.createNode({
       tenantId,
       profile: { tier1: "Transaction", profile: "wedding", concrete: "Contract" },
       identity: {
@@ -223,7 +223,7 @@ describeIfDb("wedding.budget capability", () => {
   // ---------------------------------------------------------------------------
   it("contract with no vendor edge logs warning and skips rollup without throwing", async () => {
     // Create an orphan contract — no edges.
-    const orphanNode = await graph.createNode({
+    const { node: orphanNode } = await graph.createNode({
       tenantId,
       profile: { tier1: "Transaction", profile: "wedding", concrete: "Contract" },
       identity: {

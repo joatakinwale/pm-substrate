@@ -151,7 +151,7 @@ describeIfDb("substrate HTTP", () => {
         identity,
         schemaVersion: 1,
       });
-      expect(r.status).toBe(200);
+      expect(r.status).toBe(201);
       const node = (await r.json()) as { id: string };
       return node.id;
     };
@@ -266,7 +266,7 @@ describeIfDb("substrate HTTP", () => {
       identity: { name: "v1" },
       schemaVersion: 1,
     });
-    expect(r.status).toBe(200);
+    expect(r.status).toBe(201);
     const node = (await r.json()) as { id: string };
 
     // First update with version 1 → succeeds.
@@ -282,5 +282,111 @@ describeIfDb("substrate HTTP", () => {
       expectedSchemaVersion: 1,
     });
     expect(r.status).toBe(409);
+  });
+
+  // ---------------------------------------------------------------------------
+  // P2.3a: POST /nodes caller-supplied UUID idempotency
+  // ---------------------------------------------------------------------------
+
+  it("P2.3a: POST /nodes with explicit id returns 201 on first call", async () => {
+    const tenantId = await makeTenant();
+    const callerUUID = randomUUID();
+    const r = await call("POST", `/tenants/${tenantId}/nodes`, {
+      id: callerUUID,
+      profile: { tier1: "Counterparty", profile: null, concrete: "Counterparty" },
+      identity: { name: "idempotent-v1" },
+      schemaVersion: 1,
+    });
+    expect(r.status).toBe(201);
+    const node = (await r.json()) as { id: string };
+    expect(node.id).toBe(callerUUID);
+  });
+
+  it("P2.3a: POST /nodes with duplicate id + matching type returns 200 with existing node", async () => {
+    const tenantId = await makeTenant();
+    const callerUUID = randomUUID();
+    const profile = { tier1: "Counterparty", profile: null, concrete: "Counterparty" };
+
+    // First call → 201
+    await call("POST", `/tenants/${tenantId}/nodes`, {
+      id: callerUUID,
+      profile,
+      identity: { name: "first" },
+      schemaVersion: 1,
+    });
+
+    // Second call with same id + same profile → 200, original node returned
+    const r2 = await call("POST", `/tenants/${tenantId}/nodes`, {
+      id: callerUUID,
+      profile,
+      identity: { name: "should-not-overwrite" },
+      schemaVersion: 1,
+    });
+    expect(r2.status).toBe(200);
+    const node2 = (await r2.json()) as { id: string; identity: Record<string, unknown> };
+    expect(node2.id).toBe(callerUUID);
+    // Original identity preserved
+    expect(node2.identity["name"]).toBe("first");
+  });
+
+  it("P2.3a: POST /nodes with duplicate id + mismatched type returns 409", async () => {
+    const tenantId = await makeTenant();
+    const callerUUID = randomUUID();
+
+    // Insert as Counterparty
+    await call("POST", `/tenants/${tenantId}/nodes`, {
+      id: callerUUID,
+      profile: { tier1: "Counterparty", profile: null, concrete: "Counterparty" },
+      identity: {},
+      schemaVersion: 1,
+    });
+
+    // Try to insert same id as Engagement → 409 NodeConflictError
+    const r2 = await call("POST", `/tenants/${tenantId}/nodes`, {
+      id: callerUUID,
+      profile: { tier1: "Engagement", profile: null, concrete: "Engagement" },
+      identity: {},
+      schemaVersion: 1,
+    });
+    expect(r2.status).toBe(409);
+    const body = (await r2.json()) as { cause: { kind: string } };
+    expect(body.cause.kind).toBe("node_conflict");
+  });
+
+  it("P2.3a: POST /nodes with invalid UUID string returns 400", async () => {
+    const tenantId = await makeTenant();
+    const r = await call("POST", `/tenants/${tenantId}/nodes`, {
+      id: "not-a-uuid-at-all",
+      profile: { tier1: "Counterparty", profile: null, concrete: "Counterparty" },
+      identity: {},
+      schemaVersion: 1,
+    });
+    expect(r.status).toBe(400);
+    const body = (await r.json()) as { cause: { kind: string } };
+    expect(body.cause.kind).toBe("invalid_id");
+  });
+
+  it("P2.3a: same UUID in two tenants creates two distinct nodes", async () => {
+    const tenantId1 = await makeTenant();
+    const tenantId2 = await makeTenant();
+    const sharedUUID = randomUUID();
+    const profile = { tier1: "Counterparty", profile: null, concrete: "Counterparty" };
+
+    // Tenant 1 creates a node with the UUID → 201
+    const r1 = await call("POST", `/tenants/${tenantId1}/nodes`, {
+      id: sharedUUID,
+      profile,
+      identity: { tenant: "t1" },
+      schemaVersion: 1,
+    });
+    expect(r1.status).toBe(201);
+
+    // Tenant 1 can read it back
+    const get1 = await call("GET", `/tenants/${tenantId1}/nodes/${sharedUUID}`);
+    expect(get1.status).toBe(200);
+
+    // Tenant 2 cannot see tenant 1's node — 404
+    const get2 = await call("GET", `/tenants/${tenantId2}/nodes/${sharedUUID}`);
+    expect(get2.status).toBe(404);
   });
 });

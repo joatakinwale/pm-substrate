@@ -11,7 +11,32 @@ import { toHTTPException } from "../errors.js";
 export const graphRoutes = (graph: Graph): Hono => {
   const app = new Hono();
 
-  // POST /tenants/:tenantId/nodes
+  /**
+   * POST /tenants/:tenantId/nodes
+   *
+   * Create a node, optionally with a caller-supplied UUID for cross-system
+   * idempotency (P2.3a, ADR-0011).
+   *
+   * Request body (all fields except `profile`, `identity`, `schemaVersion`
+   * are optional):
+   * ```json
+   * {
+   *   "id": "550e8400-e29b-41d4-a716-446655440000",  // optional UUID
+   *   "profile": { "tier1": "...", "profile": "...", "concrete": "..." },
+   *   "identity": { ... },
+   *   "schemaVersion": 1
+   * }
+   * ```
+   *
+   * Response:
+   * - 201 Created — node was newly inserted. Body: the new node.
+   * - 200 OK      — supplied `id` already existed for this tenant with the
+   *                 same profile/type. Body: the existing node (no change made).
+   * - 400 Bad Request — supplied `id` is not a valid UUID.
+   * - 409 Conflict    — supplied `id` already exists with a different
+   *                     profile/type. Body: `{ error, cause: { kind, existing, requested } }`.
+   * - 422 Unprocessable Entity — profile validation failed.
+   */
   app.post("/nodes", async (c) => {
     const tenantId = c.req.param("tenantId") as TenantId;
     let body: Omit<CreateNodeInput, "tenantId">;
@@ -21,8 +46,8 @@ export const graphRoutes = (graph: Graph): Hono => {
       return c.json({ error: "invalid JSON body" }, 400);
     }
     try {
-      const node = await graph.createNode({ tenantId, ...body });
-      return c.json(node);
+      const result = await graph.createNode({ tenantId, ...body });
+      return c.json(result.node, result.created ? 201 : 200);
     } catch (err) {
       throw toHTTPException(err);
     }
