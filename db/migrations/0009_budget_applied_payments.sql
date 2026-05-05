@@ -1,6 +1,17 @@
 -- 0009_budget_applied_payments.sql
 -- Idempotency guard table for the @pm/capability-wedding-budget rollup handler.
 --
+-- PARTITION CHECK (P2.3a, ADR-0005 standing rule):
+-- ADR-0005 requires that every range-partitioned table has auto-provisioning +
+-- a DEFAULT partition + lookahead. This table is NOT range-partitioned.
+-- Rationale: applied_payments is a small idempotency lookup table, not a
+-- high-volume time-series. Its access pattern is point lookups by (tenant_id,
+-- payment_id) via the PRIMARY KEY. Monthly range-partitioning would add
+-- maintenance complexity with zero benefit — there is no archival or cold-
+-- storage use case for idempotency guards. The table grows monotonically;
+-- old rows can be archived after the BudgetCategory is finalised (P4
+-- operational work, deferred). The ADR-0005 obligation does not apply here.
+--
 -- When `wedding.contract.payment_recorded` arrives, the handler inserts a row
 -- here (inside its main transaction) before incrementing
 -- BudgetCategory.actualSpentMinor. The PRIMARY KEY on (tenant_id, payment_id)
