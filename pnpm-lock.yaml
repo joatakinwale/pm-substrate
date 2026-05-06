@@ -116,6 +116,9 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@pm/capability-wedding-contracts':
+        specifier: workspace:*
+        version: link:../capability-wedding-contracts
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
