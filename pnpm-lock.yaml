@@ -132,7 +132,81 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/capability-wedding-calendar:
+    dependencies:
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/profile-registry':
+        specifier: workspace:*
+        version: link:../profile-registry
+      '@pm/profile-wedding':
+        specifier: workspace:*
+        version: link:../profile-wedding
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@pm/capability-wedding-contracts':
+        specifier: workspace:*
+        version: link:../capability-wedding-contracts
+      '@pm/capability-wedding-tasks':
+        specifier: workspace:*
+        version: link:../capability-wedding-tasks
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/capability-wedding-contracts:
+    dependencies:
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/profile-registry':
+        specifier: workspace:*
+        version: link:../profile-registry
+      '@pm/profile-wedding':
+        specifier: workspace:*
+        version: link:../profile-wedding
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
+  packages/capability-wedding-tasks:
     dependencies:
       '@pm/events':
         specifier: workspace:*
