@@ -16,8 +16,6 @@
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "clean": "rm -rf dist .tsbuildinfo",
-    "start": "node dist/server.js",
-    "dev": "tsx src/server.ts",
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
@@ -28,8 +26,7 @@
     "@pm/registry": "workspace:*",
     "@pm/types": "workspace:*",
     "hono": "^4.6.0",
-    "pg": "^8.13.0",
-    "@pm/capability-wedding-budget": "workspace:*"
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@pm/capability-audit": "workspace:*",

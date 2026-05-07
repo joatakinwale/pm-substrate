@@ -1,6 +1,14 @@
 #!/usr/bin/env tsx
 /**
- * substrate-http server entry point.
+ * @pm/substrate-http-demo — sample server entry point.
+ *
+ * Demonstrates @pm/substrate-http wired with the wedding profile and the
+ * wedding-budget capability. This is the demo bootstrap that docker-compose
+ * and `pnpm db:reset` run against. It is NOT part of the substrate library;
+ * @pm/substrate-http itself is profile-agnostic and contains no references
+ * to any specific profile or capability.
+ *
+ * Closes ADR-0012 (substrate-http demo wiring extracted from the library).
  *
  * Wires Postgres adapters → substrate packages → Hono app → Node HTTP server.
  *
@@ -9,10 +17,10 @@
  *   PORT              Port to listen on (default: 4000)
  *
  * Usage:
- *   tsx packages/substrate-http/src/server.ts
- *   node --import=tsx packages/substrate-http/src/server.ts
+ *   tsx packages/substrate-http-demo/src/server.ts
+ *   node --import=tsx packages/substrate-http-demo/src/server.ts
  *   # Or via the built dist:
- *   node packages/substrate-http/dist/server.js
+ *   node packages/substrate-http-demo/dist/server.js
  */
 
 import { createServer } from "node:http";
@@ -28,7 +36,7 @@ import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresRegistry } from "@pm/registry";
 import { BudgetRollupHandler } from "@pm/capability-wedding-budget";
 
-import { createSubstrateApp } from "./app.js";
+import { createSubstrateApp } from "@pm/substrate-http";
 
 // ---------------------------------------------------------------------------
 // Configuration

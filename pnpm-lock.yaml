@@ -331,9 +331,6 @@ importers:
 
   packages/substrate-http:
     dependencies:
-      '@pm/capability-wedding-budget':
-        specifier: workspace:*
-        version: link:../capability-wedding-budget
       '@pm/events':
         specifier: workspace:*
         version: link:../events
@@ -374,6 +371,49 @@ importers:
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
+
+  packages/substrate-http-demo:
+    dependencies:
+      '@pm/capability-wedding-budget':
+        specifier: workspace:*
+        version: link:../capability-wedding-budget
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/profile-registry':
+        specifier: workspace:*
+        version: link:../profile-registry
+      '@pm/profile-wedding':
+        specifier: workspace:*
+        version: link:../profile-wedding
+      '@pm/projections':
+        specifier: workspace:*
+        version: link:../projections
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
+      '@pm/substrate-http':
+        specifier: workspace:*
+        version: link:../substrate-http
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
 
   packages/types:
     devDependencies:

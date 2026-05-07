@@ -4,7 +4,7 @@
 # Multi-stage build: install all workspace deps + build TypeScript, then
 # copy only the compiled output + runtime node_modules into the final image.
 #
-# The image exposes port 4000 and runs packages/substrate-http/dist/server.js.
+# The image exposes port 4000 and runs packages/substrate-http-demo/dist/server.js.
 #
 # Required env at runtime:
 #   PM_DATABASE_URL   Postgres connection string
@@ -29,6 +29,7 @@ COPY packages/projections/package.json           ./packages/projections/
 COPY packages/registry/package.json              ./packages/registry/
 COPY packages/workflow/package.json              ./packages/workflow/
 COPY packages/substrate-http/package.json        ./packages/substrate-http/
+COPY packages/substrate-http-demo/package.json   ./packages/substrate-http-demo/
 COPY packages/capability-wedding-budget/package.json ./packages/capability-wedding-budget/
 COPY packages/capability-wedding-contracts/package.json ./packages/capability-wedding-contracts/
 COPY packages/capability-audit/package.json      ./packages/capability-audit/
@@ -59,6 +60,7 @@ COPY packages/projections/package.json           ./packages/projections/
 COPY packages/registry/package.json              ./packages/registry/
 COPY packages/workflow/package.json              ./packages/workflow/
 COPY packages/substrate-http/package.json        ./packages/substrate-http/
+COPY packages/substrate-http-demo/package.json   ./packages/substrate-http-demo/
 COPY packages/capability-wedding-budget/package.json ./packages/capability-wedding-budget/
 COPY packages/capability-wedding-contracts/package.json ./packages/capability-wedding-contracts/
 COPY packages/capability-audit/package.json      ./packages/capability-audit/
@@ -75,7 +77,8 @@ COPY --from=builder /app/packages/profile-registry/dist  ./packages/profile-regi
 COPY --from=builder /app/packages/projections/dist       ./packages/projections/dist
 COPY --from=builder /app/packages/registry/dist          ./packages/registry/dist
 COPY --from=builder /app/packages/workflow/dist          ./packages/workflow/dist
-COPY --from=builder /app/packages/substrate-http/dist    ./packages/substrate-http/dist
+COPY --from=builder /app/packages/substrate-http/dist        ./packages/substrate-http/dist
+COPY --from=builder /app/packages/substrate-http-demo/dist   ./packages/substrate-http-demo/dist
 COPY --from=builder /app/packages/capability-wedding-budget/dist   ./packages/capability-wedding-budget/dist
 COPY --from=builder /app/packages/capability-wedding-contracts/dist ./packages/capability-wedding-contracts/dist
 COPY --from=builder /app/packages/capability-audit/dist  ./packages/capability-audit/dist
@@ -91,4 +94,4 @@ USER pmuser
 
 EXPOSE 4000
 
-CMD ["node", "packages/substrate-http/dist/server.js"]
+CMD ["node", "packages/substrate-http-demo/dist/server.js"]
