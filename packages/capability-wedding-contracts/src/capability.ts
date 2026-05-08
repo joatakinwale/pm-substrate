@@ -1,6 +1,15 @@
 import type { Capability } from "@pm/registry";
 import type { CapabilityId } from "@pm/types";
 
+const contractEvent = (type: string) => ({
+  schema: {
+    type,
+    version: { major: 1, minor: 0, patch: 0 },
+    schemaPath: `schemas/${type.replace(/\./g, "-")}.v1.json`,
+  },
+  affectsEntities: ["Transaction"],
+});
+
 /**
  * Capability descriptor for wedding/contracts. Registered per-tenant.
  *
@@ -16,17 +25,30 @@ export const WEDDING_CONTRACTS_CAPABILITY = {
   id: "cap_wedding_contracts_v1" as CapabilityId,
   name: "wedding/contracts",
   version: 1,
-  readsInterfaces: ["Transaction[state,amountMinor,currency,effectiveDate]"],
-  writesInterfaces: ["Transaction[state,amountMinor,currency,effectiveDate]"],
+  readsInterfaces: [
+    {
+      interface: "Transaction",
+      fields: ["state", "amountMinor", "currency", "effectiveDate"],
+      cardinality: "exactly-one",
+      required: true,
+    },
+  ],
+  writesInterfaces: [
+    {
+      interface: "Transaction",
+      fields: ["state", "amountMinor", "currency", "effectiveDate"],
+      ownership: "owner",
+    },
+  ],
   readsEdges: ["wedding/contract_vendor", "wedding/vendor_contract"],
   writesEdges: ["wedding/contract_vendor", "wedding/vendor_contract"],
   emits: [
-    "wedding.contract.drafted",
-    "wedding.contract.sent",
-    "wedding.contract.signed",
-    "wedding.contract.work_started",
-    "wedding.contract.completed",
-    "wedding.contract.cancelled",
+    contractEvent("wedding.contract.drafted"),
+    contractEvent("wedding.contract.sent"),
+    contractEvent("wedding.contract.signed"),
+    contractEvent("wedding.contract.work_started"),
+    contractEvent("wedding.contract.completed"),
+    contractEvent("wedding.contract.cancelled"),
   ],
   subscribesTo: [],
   requiredPermissions: ["wedding.contracts.write"],

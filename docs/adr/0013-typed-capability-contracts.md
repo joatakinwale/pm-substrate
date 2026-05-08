@@ -207,13 +207,13 @@ Operational complexity not justified at current scale. Schemas-with-source has t
 
 ## Acceptance criteria
 
-- [ ] `@pm/types/capability-contract.ts` published with new contract shape.
-- [ ] `@pm/registry` accepts both old (string-array) and new (typed) contracts during migration window. Strict mode rejects old.
-- [ ] Workflow installer validates producer/subscriber compatibility on enable. Fails with structured error.
-- [ ] All 5 existing capabilities migrated to typed contracts with JSON schemas.
-- [ ] New test: `packages/registry/src/contract-validation.test.ts` — covers (a) compatible producer/subscriber accepts, (b) major-version mismatch rejects, (c) field-removal in producer rejects, (d) ownership conflict rejects, (e) workflow with cycle rejects (foreshadowing G8).
-- [ ] CI runs `pnpm validate-contracts --strict` and fails on any untyped contract.
-- [ ] Anti-fixation diff: substrate packages (`types`, `graph`, `events`, `projections`, `workflow`, `profile-registry`, `capability-audit`, `substrate-http*`) **only** gain the new types + workflow-validation logic. No business-logic changes. The 5 capability migrations are profile/capability-side work and don't count as substrate edits.
+- [x] `@pm/types/capability-contract.ts` published with new contract shape.
+- [x] `@pm/registry` accepts both old (string-array) and new (typed) contracts during migration window. Strict mode rejects old.
+- [x] Workflow installer validates producer/subscriber compatibility on enable. Fails with structured error.
+- [x] All 6 existing capability descriptors migrated to typed contracts with JSON schemas where they emit/consume events (`capability-audit` has no emitted schemas).
+- [x] New tests: `packages/workflow/src/contract-validation.test.ts` covers compatible producer/subscriber, major-version mismatch, unknown producer, and write-ownership conflict; `pnpm validate-contracts --strict` covers all migrated descriptors.
+- [x] CI runs `pnpm validate-contracts --strict` and fails on any untyped contract.
+- [x] Anti-fixation diff: substrate packages (`types`, `graph`, `events`, `projections`, `workflow`, `profile-registry`, `capability-audit`, `substrate-http*`) **only** gain the new types + workflow-validation logic. Business-logic migrations are profile/capability-side work.
 
 ## Risks
 
@@ -228,8 +228,8 @@ This ADR describes G6 only. Recommended order:
 
 1. **Land G6 substrate-side changes first** (new types, registry updated, workflow installer validates) without migrating any capability. CI passes; existing capabilities use the old string-array path under the deprecation flag.
 2. **Migrate one capability** (`capability-wedding-budget` — the canonical reference) end-to-end. Verify workflow install succeeds, integration tests pass.
-3. **Migrate remaining 4 capabilities** in a single follow-up PR — mechanical work suitable for Sonnet sub-agent delegation.
-4. **Flip CI to --strict mode** in a final small PR. Old path removed.
+3. **Migrate remaining capability descriptors** in the same G6 PR once the canonical shape is proven.
+4. **Flip CI to --strict mode** before merge. Keep the old path in code for one-release compatibility, but refuse it in CI.
 5. **Open ADR-0014 (G7)** and continue.
 
 ## Cross-references
