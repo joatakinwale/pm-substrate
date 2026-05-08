@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wedding.budget.actual_spent_updated.v1",
+  "title": "wedding.budget.actual_spent_updated v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "budgetCategoryId",
+    "delta",
+    "newTotal",
+    "sourcePaymentId"
+  ],
+  "properties": {
+    "budgetCategoryId": {
+      "type": "string",
+      "description": "EntityId of the BudgetCategory whose actualSpentMinor changed."
+    },
+    "delta": {
+      "type": "integer",
+      "description": "Payment amount applied to the budget category, in minor currency units."
+    },
+    "newTotal": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "New BudgetCategory.actualSpentMinor after applying delta."
+    },
+    "sourcePaymentId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Caller-assigned payment id used as the idempotency key."
+    }
+  }
+}

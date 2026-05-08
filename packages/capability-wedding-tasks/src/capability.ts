@@ -20,15 +20,38 @@ export const WEDDING_TASKS_CAPABILITY = {
   name: "wedding.tasks",
   version: 1,
   readsInterfaces: [
-    "Transaction[state,amountMinor,currency]",
+    {
+      interface: "Transaction",
+      fields: ["state", "amountMinor", "currency"],
+      cardinality: "exactly-one",
+      required: true,
+    },
   ],
   writesInterfaces: [
-    "Engagement[title,state,priority,category]",
+    {
+      interface: "Engagement",
+      fields: ["title", "state", "priority", "category"],
+      ownership: "owner",
+    },
   ],
   readsEdges: [],
   writesEdges: ["wedding/contract_task"],
-  emits: ["wedding.task.created"],
-  subscribesTo: ["wedding.contract.signed"],
+  emits: [
+    {
+      schema: {
+        type: "wedding.task.created",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/task-created.v1.json",
+      },
+      affectsEntities: ["Engagement"],
+    },
+  ],
+  subscribesTo: [
+    {
+      pattern: "wedding.contract.signed",
+      accepts: { minMajor: 1, maxMajor: 1 },
+    },
+  ],
   requiredPermissions: ["wedding.tasks.write"],
   description:
     "Owns PlannerTask creation in response to contract milestones. " +

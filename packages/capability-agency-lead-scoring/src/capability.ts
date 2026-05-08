@@ -1,6 +1,11 @@
 import type { Capability } from "@pm/registry";
 import type { CapabilityId } from "@pm/types";
 
+const leadProgressionSub = (pattern: string) => ({
+  pattern,
+  accepts: { minMajor: 1, maxMajor: 1 },
+});
+
 /**
  * Capability descriptor for agency.lead-scoring.
  *
@@ -8,33 +13,31 @@ import type { CapabilityId } from "@pm/types";
  * mechanism: when a lead-progression event arrives (e.g. `agency.lead.qualified`),
  * the handler walks the graph to find the rollup target without needing
  * `scoring_config_id` on the event payload.
- *
- * Resolution order (mirrors the same graph-inference shape that
- * @pm/capability-wedding-budget uses for budget categories):
- *
- *   1. lead → (agency/lead_scored_by) → LeadScoringConfig    (lead-bound override)
- *   2. lead → (agency/lead_assigned_to_user) → AgencyUser
- *          → (agency/user_default_scoring) → LeadScoringConfig (user default)
- *
- * If neither path resolves, the handler logs a warning and skips — same
- * pattern as wedding.budget when the topology is incomplete.
- *
- * G4 finding: this capability is the second proof point in the anti-fixation
- * test. It's structurally identical to wedding.budget — same atomic-tx
- * shape, same idempotency-table mechanism, same "topology is the contract"
- * design — but operates on agency-profile entities. The pattern transferred
- * with zero substrate changes.
  */
 export const AGENCY_LEAD_SCORING_CAPABILITY = {
   id: "cap_agency_lead_scoring_v1" as CapabilityId,
   name: "agency.lead-scoring",
   version: 1,
   readsInterfaces: [
-    "Counterparty[name,qualificationStatus,source]",
-    "Resource[name,kind,thresholds,currentTotalLeadsScored]",
+    {
+      interface: "Counterparty",
+      fields: ["name", "qualificationStatus", "source"],
+      cardinality: "exactly-one",
+      required: true,
+    },
+    {
+      interface: "Resource",
+      fields: ["name", "kind", "thresholds", "currentTotalLeadsScored"],
+      cardinality: "exactly-one",
+      required: true,
+    },
   ],
   writesInterfaces: [
-    "Resource[currentTotalLeadsScored]",
+    {
+      interface: "Resource",
+      fields: ["currentTotalLeadsScored"],
+      ownership: "owner",
+    },
   ],
   readsEdges: [
     "agency/lead_scored_by",
@@ -42,11 +45,20 @@ export const AGENCY_LEAD_SCORING_CAPABILITY = {
     "agency/user_default_scoring",
   ],
   writesEdges: [],
-  emits: ["agency.lead.scored"],
+  emits: [
+    {
+      schema: {
+        type: "agency.lead.scored",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/lead-scored.v1.json",
+      },
+      affectsEntities: ["Resource", "Counterparty"],
+    },
+  ],
   subscribesTo: [
-    "agency.lead.qualified",
-    "agency.lead.contacted",
-    "agency.lead.disqualified",
+    leadProgressionSub("agency.lead.qualified"),
+    leadProgressionSub("agency.lead.contacted"),
+    leadProgressionSub("agency.lead.disqualified"),
   ],
   requiredPermissions: ["agency.lead-scoring.write"],
   description:

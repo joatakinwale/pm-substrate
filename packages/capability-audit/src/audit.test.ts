@@ -74,8 +74,20 @@ describeIfDb("common/audit-log capability — Tier-1 tool proof", () => {
     await capRegistry.register(a, AUDIT_CAPABILITY);
     await capRegistry.register(b, AUDIT_CAPABILITY);
 
-    expect((await capRegistry.get(a, "common/audit-log"))?.subscribesTo).toEqual(["*"]);
-    expect((await capRegistry.get(b, "common/audit-log"))?.subscribesTo).toEqual(["*"]);
+    expect((await capRegistry.get(a, "common/audit-log"))?.subscribesTo).toEqual([
+      {
+        pattern: "*",
+        accepts: { minMajor: 1, maxMajor: 1 },
+        tolerateUnknown: true,
+      },
+    ]);
+    expect((await capRegistry.get(b, "common/audit-log"))?.subscribesTo).toEqual([
+      {
+        pattern: "*",
+        accepts: { minMajor: 1, maxMajor: 1 },
+        tolerateUnknown: true,
+      },
+    ]);
   });
 
   it("produces the same audit shape across a wedding tenant and a raw Tier-1 tenant", async () => {

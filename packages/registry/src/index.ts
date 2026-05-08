@@ -7,6 +7,11 @@
  *   "Integration" stops existing as a concept.
  */
 
-export type { Capability, Registry } from "./interfaces.js";
+export type {
+  Capability,
+  NormalizedCapability,
+  Registry,
+} from "./interfaces.js";
+export { normalizeCapability } from "./interfaces.js";
 export { PostgresRegistry } from "./postgres.js";
 export { matchesPattern } from "./pattern.js";

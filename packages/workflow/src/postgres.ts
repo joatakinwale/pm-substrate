@@ -30,10 +30,11 @@ import type {
   WorkflowId,
 } from "@pm/types";
 import type { EventReader } from "@pm/events";
-import type { Registry } from "@pm/registry";
+import type { Capability, Registry } from "@pm/registry";
 import { matchesPattern } from "@pm/registry";
 import pg from "pg";
 import { WorkflowValidationError } from "./errors.js";
+import { validateCapabilityContracts } from "./contract-validation.js";
 import type {
   InvocationDispatcher,
   WorkflowDoc,
@@ -55,6 +56,12 @@ export interface RuntimeDeps {
   readonly registry: Registry;
   readonly events: EventReader;
   readonly dispatcher: InvocationDispatcher;
+  /**
+   * If true, install() rejects workflows whose capabilities still use
+   * untyped (V1) contract declarations. Default: false (migration window).
+   * Flip to true once all capabilities are migrated per ADR-0013 step 4.
+   */
+  readonly strictContracts?: boolean;
 }
 
 export class PostgresWorkflowRuntime implements WorkflowRuntime {
@@ -62,12 +69,14 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
   readonly #registry: Registry;
   readonly #events: EventReader;
   readonly #dispatcher: InvocationDispatcher;
+  readonly #strictContracts: boolean;
 
   constructor(deps: RuntimeDeps) {
     this.#pool = deps.pool;
     this.#registry = deps.registry;
     this.#events = deps.events;
     this.#dispatcher = deps.dispatcher;
+    this.#strictContracts = deps.strictContracts ?? false;
   }
 
   // -------------------------------------------------------------------------
@@ -107,6 +116,25 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         );
       }
     }
+
+    // G6: typed-contract validation. Gather all capabilities the workflow
+    // references, normalize their contracts, and verify cross-capability
+    // compatibility (subscriber accepts producer's major version) and
+    // ownership (no two capabilities own the same (interface, field)).
+    const capSet: Capability[] = [];
+    for (const n of invokeNodes) {
+      const cap = await this.#registry.get(doc.tenantId, n.capability);
+      // Already validated existence above; null shouldn't happen here.
+      if (cap) capSet.push(cap);
+    }
+    validateCapabilityContracts(
+      {
+        capabilities: capSet,
+        workflowName: doc.name,
+        workflowVersion: doc.version,
+      },
+      { strict: this.#strictContracts },
+    );
 
     await this.#pool.query(
       `INSERT INTO workflow.workflows (id, tenant_id, name, version, doc, enabled)

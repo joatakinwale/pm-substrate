@@ -24,15 +24,38 @@ export const WEDDING_CALENDAR_CAPABILITY = {
   name: "wedding.calendar",
   version: 1,
   readsInterfaces: [
-    "Engagement[title,state,priority,category]",
+    {
+      interface: "Engagement",
+      fields: ["title", "state", "priority", "category"],
+      cardinality: "exactly-one",
+      required: true,
+    },
   ],
   writesInterfaces: [
-    "Resource[title,kind,startAt,endAt,timezone,state]",
+    {
+      interface: "Resource",
+      fields: ["title", "kind", "startAt", "endAt", "timezone", "state"],
+      ownership: "owner",
+    },
   ],
   readsEdges: [],
   writesEdges: ["wedding/task_calendar_event"],
-  emits: ["wedding.calendar.event_created"],
-  subscribesTo: ["wedding.task.created"],
+  emits: [
+    {
+      schema: {
+        type: "wedding.calendar.event_created",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/calendar-event-created.v1.json",
+      },
+      affectsEntities: ["Resource"],
+    },
+  ],
+  subscribesTo: [
+    {
+      pattern: "wedding.task.created",
+      accepts: { minMajor: 1, maxMajor: 1 },
+    },
+  ],
   requiredPermissions: ["wedding.calendar.write"],
   description:
     "Materializes a CalendarEvent for each new PlannerTask. " +

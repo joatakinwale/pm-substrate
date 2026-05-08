@@ -50,6 +50,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Validate capability contracts
+        run: pnpm validate-contracts --strict
+
       - name: Build
         run: pnpm build
 
