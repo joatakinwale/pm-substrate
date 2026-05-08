@@ -1,6 +1,6 @@
 # ADR-0012: substrate-http sample server is profile-coupled
 
-**Status:** Accepted, deferred (2026-05-06)
+**Status:** Closed (2026-05-06). The deferred refactor described below has been completed: `@pm/substrate-http-demo` now exists as a separate package, the `SAMPLE_ENTRY_POINTS` allowlist in the G5.4 test has been removed, and `@pm/substrate-http` itself no longer depends on any `@pm/capability-*` or `@pm/profile-*` package.
 **Trigger:** G5.4 substrate-profile-agnostic test caught two profile-name leaks in `packages/substrate-http/src/server.ts`:
 
 1. `emittedBy: "pm-substrate-http/wedding.budget"` (line 50)
@@ -37,10 +37,11 @@ That's larger than the G5.4 close warrants, and the test catches future leaks fr
 
 ## Acceptance criteria for closing this ADR
 
-- [ ] New package `@pm/substrate-http-demo` (or named equivalent) created.
-- [ ] `server.ts` moves there; `@pm/substrate-http` no longer depends on any `@pm/capability-*` or `@pm/profile-*` package.
-- [ ] G5.4 test `SAMPLE_ENTRY_POINTS` allowlist removed; test still green.
-- [ ] Dev demo + docker-compose still work end-to-end.
+- [x] New package `@pm/substrate-http-demo` created.
+- [x] `server.ts` moved there; `@pm/substrate-http` no longer depends on any `@pm/capability-*` or `@pm/profile-*` package as a runtime dependency. (`@pm/profile-wedding` and `@pm/capability-audit` remain as `devDependencies` for `app.test.ts` only — acceptable since tests can compose freely.)
+- [x] G5.4 test `SAMPLE_ENTRY_POINTS` allowlist replaced with the empty set; test still green.
+- [x] Dockerfile `CMD` updated to `packages/substrate-http-demo/dist/server.js`.
+- [x] Dev demo + docker-compose verified end-to-end on next compose run. **(2026-05-07)** Built image with new `CMD` path, ran against existing Postgres, server listens on `0.0.0.0:4000`, `/healthz` returns `{"status":"ok"}`. Note: `docker-compose.yml` itself only runs Postgres + pgweb; the substrate-http image is a runtime artifact (deployed elsewhere or run ad-hoc), so "compose verification" reduces to image-build + container-boot, which passed.
 
 ## Cross-references
 

@@ -69,20 +69,16 @@ function listProfileNames(): string[] {
 }
 
 /**
- * Files under packages/<substrate>/src that are *sample entry points*
- * (demo wiring, runnable bootstraps), not substrate library code. These
- * are allowed to name specific profiles because their job is exactly to
- * demonstrate substrate-plus-some-profile end-to-end. The library code
- * around them must remain profile-agnostic.
+ * Sample entry points (demo wiring, runnable bootstraps) used to live
+ * inside substrate library packages and were exempted from this scan via
+ * an allowlist. ADR-0012 closed that exemption by moving the demo wiring
+ * into a dedicated @pm/substrate-http-demo package, which is NOT in
+ * SUBSTRATE_PACKAGES below and is therefore not scanned at all.
  *
- * Path is relative to packages/<substrate>/src.
- *
- * If you add an entry point here, also document it as a sample in the
- * package README so it is clearly not part of the published library API.
+ * Result: the substrate library is now genuinely profile-agnostic with
+ * zero allowlist needed.
  */
-const SAMPLE_ENTRY_POINTS: ReadonlySet<string> = new Set([
-  "substrate-http/server.ts", // bootstrap that wires wedding.budget for the dev demo
-]);
+const SAMPLE_ENTRY_POINTS: ReadonlySet<string> = new Set();
 
 function collectTsFiles(root: string, pkg: string): string[] {
   const out: string[] = [];
