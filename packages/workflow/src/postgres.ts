@@ -35,6 +35,7 @@ import { matchesPattern } from "@pm/registry";
 import pg from "pg";
 import { WorkflowValidationError } from "./errors.js";
 import { validateCapabilityContracts } from "./contract-validation.js";
+import { allowAllAuthorizer, type PermissionAuthorizer } from "./permissions.js";
 import type {
   InvocationDispatcher,
   WorkflowDoc,
@@ -62,6 +63,11 @@ export interface RuntimeDeps {
    * Flip to true once all capabilities are migrated per ADR-0013 step 4.
    */
   readonly strictContracts?: boolean;
+  /**
+   * G7: authorizes each invoke node before dispatch. If omitted, uses an
+   * explicit allow-all authorizer for migration/backward compatibility.
+   */
+  readonly authorizer?: PermissionAuthorizer;
 }
 
 export class PostgresWorkflowRuntime implements WorkflowRuntime {
@@ -70,6 +76,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
   readonly #events: EventReader;
   readonly #dispatcher: InvocationDispatcher;
   readonly #strictContracts: boolean;
+  readonly #authorizer: PermissionAuthorizer;
 
   constructor(deps: RuntimeDeps) {
     this.#pool = deps.pool;
@@ -77,6 +84,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     this.#events = deps.events;
     this.#dispatcher = deps.dispatcher;
     this.#strictContracts = deps.strictContracts ?? false;
+    this.#authorizer = deps.authorizer ?? allowAllAuthorizer();
   }
 
   // -------------------------------------------------------------------------
@@ -240,6 +248,36 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         );
 
         await this.#recordStep(runId, node.nodeId, node.capability, "running", null);
+
+        const capability = await this.#registry.get(doc.tenantId, node.capability);
+        if (!capability) {
+          await this.#recordStep(runId, node.nodeId, node.capability, "failed", {
+            error: `capability not found at runtime: ${node.capability}`,
+          });
+          runStatus = "failed";
+          return;
+        }
+
+        const decision = await this.#authorizer.authorize({
+          tenantId: doc.tenantId,
+          workflowId: doc.id,
+          workflowName: doc.name,
+          workflowVersion: doc.version,
+          nodeId: node.nodeId,
+          capability: node.capability,
+          requiredPermissions: capability.requiredPermissions,
+          triggerEvent: event,
+        });
+        if (!decision.allowed) {
+          await this.#recordStep(runId, node.nodeId, node.capability, "failed", {
+            error: "permission_denied",
+            reason: decision.reason,
+            requiredPermissions: capability.requiredPermissions,
+          });
+          runStatus = "failed";
+          return;
+        }
+
         const inv = await this.#dispatcher.invoke({
           tenantId: doc.tenantId,
           capability: node.capability,

@@ -21,6 +21,11 @@ import type {
   InvocationResult,
   WorkflowDoc,
 } from "./interfaces.js";
+import type {
+  PermissionAuthorizer,
+  PermissionCheck,
+  PermissionDecision,
+} from "./permissions.js";
 
 const DATABASE_URL = process.env["PM_DATABASE_URL"];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
@@ -44,6 +49,16 @@ class RecordingDispatcher implements InvocationDispatcher {
   }
 }
 
+class RecordingAuthorizer implements PermissionAuthorizer {
+  readonly calls: PermissionCheck[] = [];
+  decision: PermissionDecision = { allowed: true };
+
+  async authorize(ctx: PermissionCheck): Promise<PermissionDecision> {
+    this.calls.push(ctx);
+    return this.decision;
+  }
+}
+
 describeIfDb("PostgresWorkflowRuntime", () => {
   let pool: pg.Pool;
   let events: PostgresEventStore;
@@ -61,14 +76,18 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     return id;
   };
 
-  const registerCap = async (tenantId: TenantId, name: string): Promise<void> => {
+  const registerCap = async (
+    tenantId: TenantId,
+    name: string,
+    requiredPermissions: readonly string[] = [],
+  ): Promise<void> => {
     await registry.register(tenantId, {
       id: `cap_${randomUUID()}` as CapabilityId,
       name,
       version: 1,
       readsInterfaces: [], writesInterfaces: [],
       readsEdges: [], writesEdges: [],
-      emits: [], subscribesTo: [], requiredPermissions: [],
+      emits: [], subscribesTo: [], requiredPermissions,
       description: "",
     });
   };
@@ -205,6 +224,94 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     );
     expect(map.confirm).toBe("completed");
     expect(map.notify).toBe("completed");
+  });
+
+  it("authorizes each invoke node before dispatch", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const authorizer = new RecordingAuthorizer();
+    const runtime = new PostgresWorkflowRuntime({
+      pool, registry, events, dispatcher, authorizer,
+    });
+    await registerCap(tenantId, "secure/cap", ["secure.write"]);
+
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "auth-allow", version: 1,
+      nodes: [
+        { nodeId: "t", kind: "trigger", on: "secure.fire" },
+        { nodeId: "n", kind: "invoke", capability: "secure/cap", inputs: {} },
+      ],
+      edges: [{ from: "t", to: "n" }],
+    };
+    await runtime.install(doc);
+
+    const ev = await events.publish({
+      tenantId, type: "secure.fire", entityId: "e",
+      emittedBy: "agent.runtime", payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+
+    expect(authorizer.calls).toHaveLength(1);
+    expect(authorizer.calls[0]).toMatchObject({
+      tenantId,
+      workflowName: "auth-allow",
+      workflowVersion: 1,
+      nodeId: "n",
+      capability: "secure/cap",
+      requiredPermissions: ["secure.write"],
+    });
+    expect(dispatcher.calls.map((c) => c.capability)).toEqual(["secure/cap"]);
+  });
+
+  it("fails the step and does not dispatch when authorization denies", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const authorizer = new RecordingAuthorizer();
+    authorizer.decision = { allowed: false, reason: "missing secure.write" };
+    const runtime = new PostgresWorkflowRuntime({
+      pool, registry, events, dispatcher, authorizer,
+    });
+    await registerCap(tenantId, "secure/cap", ["secure.write"]);
+
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "auth-deny", version: 1,
+      nodes: [
+        { nodeId: "t", kind: "trigger", on: "secure.fire" },
+        { nodeId: "n", kind: "invoke", capability: "secure/cap", inputs: {} },
+      ],
+      edges: [{ from: "t", to: "n" }],
+    };
+    await runtime.install(doc);
+
+    const ev = await events.publish({
+      tenantId, type: "secure.fire", entityId: "e",
+      emittedBy: "agent.runtime", payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+
+    expect(authorizer.calls).toHaveLength(1);
+    expect(dispatcher.calls).toEqual([]);
+
+    const run = await pool.query<{ status: string }>(
+      `SELECT status FROM workflow.runs WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    expect(run.rows[0]?.status).toBe("failed");
+
+    const step = await pool.query<{ status: string; result: Record<string, unknown> }>(
+      `SELECT status, result FROM workflow.run_steps
+        WHERE run_id IN (SELECT id FROM workflow.runs WHERE tenant_id = $1)
+          AND node_id = 'n'`,
+      [tenantId],
+    );
+    expect(step.rows[0]?.status).toBe("failed");
+    expect(step.rows[0]?.result).toMatchObject({
+      error: "permission_denied",
+      reason: "missing secure.write",
+      requiredPermissions: ["secure.write"],
+    });
   });
 
   it("is idempotent: same trigger event re-delivered does not re-run", async () => {

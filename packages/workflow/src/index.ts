@@ -26,3 +26,9 @@ export {
   type ContractValidationContext,
   type ContractValidationOptions,
 } from "./contract-validation.js";
+export {
+  allowAllAuthorizer,
+  type PermissionAuthorizer,
+  type PermissionCheck,
+  type PermissionDecision,
+} from "./permissions.js";
