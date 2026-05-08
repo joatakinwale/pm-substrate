@@ -41,7 +41,7 @@ That's larger than the G5.4 close warrants, and the test catches future leaks fr
 - [x] `server.ts` moved there; `@pm/substrate-http` no longer depends on any `@pm/capability-*` or `@pm/profile-*` package as a runtime dependency. (`@pm/profile-wedding` and `@pm/capability-audit` remain as `devDependencies` for `app.test.ts` only — acceptable since tests can compose freely.)
 - [x] G5.4 test `SAMPLE_ENTRY_POINTS` allowlist replaced with the empty set; test still green.
 - [x] Dockerfile `CMD` updated to `packages/substrate-http-demo/dist/server.js`.
-- [ ] Dev demo + docker-compose verified end-to-end on next compose run.
+- [x] Dev demo + docker-compose verified end-to-end on next compose run. **(2026-05-07)** Built image with new `CMD` path, ran against existing Postgres, server listens on `0.0.0.0:4000`, `/healthz` returns `{"status":"ok"}`. Note: `docker-compose.yml` itself only runs Postgres + pgweb; the substrate-http image is a runtime artifact (deployed elsewhere or run ad-hoc), so "compose verification" reduces to image-build + container-boot, which passed.
 
 ## Cross-references
 
