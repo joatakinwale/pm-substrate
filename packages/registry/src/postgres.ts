@@ -15,22 +15,35 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { CapabilityId, TenantId } from "@pm/types";
+import type {
+  CapabilityId,
+  EmitDecl,
+  ReadDecl,
+  SubscribeDecl,
+  TenantId,
+  WriteDecl,
+} from "@pm/types";
+import { isSubscribeContract } from "@pm/types";
 import pg from "pg";
 import type { Capability, Registry } from "./interfaces.js";
 import { matchesPattern } from "./pattern.js";
 
+/**
+ * JSONB columns hold mixed V1/V2 declarations during the G6 migration window.
+ * V1 entries deserialize as strings; V2 entries deserialize as objects.
+ * We keep the row type permissive and let `Capability` carry the union types.
+ */
 interface Row {
   id: string;
   tenant_id: string;
   name: string;
   version: number;
-  reads_interfaces: string[];
-  writes_interfaces: string[];
+  reads_interfaces: ReadDecl[];
+  writes_interfaces: WriteDecl[];
   reads_edges: string[];
   writes_edges: string[];
-  emits: string[];
-  subscribes_to: string[];
+  emits: EmitDecl[];
+  subscribes_to: SubscribeDecl[];
   required_permissions: string[];
   description: string;
   registered_at: Date;
@@ -49,6 +62,13 @@ const rowToCapability = (r: Row): Capability => ({
   requiredPermissions: r.required_permissions ?? [],
   description: r.description ?? "",
 });
+
+/**
+ * Extract the pattern string from a SubscribeDecl (V1 or V2). Used by
+ * `subscribersOf` to do glob matching uniformly across both forms.
+ */
+const subscribePattern = (d: SubscribeDecl): string =>
+  isSubscribeContract(d) ? d.pattern : d;
 
 type Querier = Pick<pg.ClientBase, "query"> | pg.Pool;
 
@@ -190,7 +210,7 @@ export class PostgresRegistry implements Registry {
     // (Backfill ADR will document this.)
     const all = await this.list(tenantId);
     return all.filter((cap) =>
-      cap.subscribesTo.some((p) => matchesPattern(p, eventType)),
+      cap.subscribesTo.some((d) => matchesPattern(subscribePattern(d), eventType)),
     );
   }
 

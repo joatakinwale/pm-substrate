@@ -20,7 +20,8 @@
     "db:psql": "docker compose exec postgres psql -U pm -d pm_substrate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "db:reset": "pnpm db:down && rm -rf pgdata && pnpm db:up && sleep 3 && pnpm db:migrate && pnpm db:seed"
+    "db:reset": "pnpm db:down && rm -rf pgdata && pnpm db:up && sleep 3 && pnpm db:migrate && pnpm db:seed",
+    "validate-contracts": "tsx scripts/validate-contracts.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

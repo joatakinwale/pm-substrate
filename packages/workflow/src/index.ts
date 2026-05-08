@@ -21,3 +21,8 @@ export type {
 
 export { PostgresWorkflowRuntime } from "./postgres.js";
 export { WorkflowValidationError } from "./errors.js";
+export {
+  validateCapabilityContracts,
+  type ContractValidationContext,
+  type ContractValidationOptions,
+} from "./contract-validation.js";
