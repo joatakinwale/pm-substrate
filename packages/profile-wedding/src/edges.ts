@@ -99,6 +99,34 @@ export const VENDOR_BUDGET_CATEGORY: EdgeTypeDef = {
 };
 
 /**
+ * Contract → PlannerTask. A signed contract may spawn one or more
+ * planner tasks (e.g., "confirm vendor walk-through"). The wedding-tasks
+ * capability writes this edge when it creates a task in response to
+ * `wedding.contract.signed`. Each task belongs to exactly one contract.
+ */
+export const CONTRACT_TASK: EdgeTypeDef = {
+  name: "contract_task",
+  fromTypes: ["Contract"],
+  toTypes: ["PlannerTask"],
+  fromCardinality: "exactly:1",
+  toCardinality: "unbounded",
+};
+
+/**
+ * PlannerTask → CalendarEvent. A task may have at most one calendar event
+ * scheduled for it (e.g., the meeting block to actually do the work).
+ * The wedding-calendar capability writes this edge when it materializes
+ * a calendar event in response to `wedding.task.created`.
+ */
+export const TASK_CALENDAR_EVENT: EdgeTypeDef = {
+  name: "task_calendar_event",
+  fromTypes: ["PlannerTask"],
+  toTypes: ["CalendarEvent"],
+  fromCardinality: "at-most:1",
+  toCardinality: "exactly:1",
+};
+
+/**
  * The full edge catalog. Indexed by local name (no profile prefix).
  */
 export const EDGE_CATALOG: Readonly<Record<string, EdgeTypeDef>> = {
@@ -111,4 +139,6 @@ export const EDGE_CATALOG: Readonly<Record<string, EdgeTypeDef>> = {
   invoice_payment: INVOICE_PAYMENT,
   plus_one: PLUS_ONE,
   vendor_budget_category: VENDOR_BUDGET_CATEGORY,
+  contract_task: CONTRACT_TASK,
+  task_calendar_event: TASK_CALENDAR_EVENT,
 };

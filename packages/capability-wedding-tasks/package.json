@@ -1,0 +1,35 @@
+{
+  "name": "@pm/capability-wedding-tasks",
+  "version": "0.1.0",
+  "private": true,
+  "description": "wedding.tasks capability — owns PlannerTask creation in response to contract milestones. Subscribes to wedding.contract.signed; writes a PlannerTask graph node + Contract→PlannerTask edge; emits wedding.task.created. Modeled after WeddingWebApp's planner_tasks (Aurinko era).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/profile-wedding": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

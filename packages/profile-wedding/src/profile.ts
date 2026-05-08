@@ -87,13 +87,70 @@ const ENTITY_TYPES: Readonly<Record<string, EntityTypeDef>> = {
     optionalFields: [],
     schemaVersion: 1,
   },
+  /**
+   * PlannerTask — a piece of planner work tied to a wedding (typically
+   * created in response to a contract milestone, vendor change, or other
+   * domain event). Specializes Engagement.
+   *
+   * Modeled after WeddingWebApp's PlannerTaskModel (see upstream branch
+   * claude/replace-google-calendar-calcom — the Aurinko-era refactor that
+   * normalized away from Google-specific fields). Provider-neutral:
+   * `sourceType` carries the upstream provider tag ("aurinko", "manual",
+   * etc.) but the substrate doesn't know what those values mean.
+   *
+   * Lifecycle states: pending → in_progress → completed (or cancelled).
+   * Capability that owns task creation: capability-wedding-tasks.
+   */
+  PlannerTask: {
+    concrete: "PlannerTask",
+    tier1: "Engagement",
+    requiredFields: ["title", "state", "priority", "category"],
+    optionalFields: [
+      "description",
+      "dueAt",
+      "reminderMinutes",
+      "sourceType",
+      "externalRef",
+    ],
+    schemaVersion: 1,
+  },
+  /**
+   * CalendarEvent — a scheduled time block linked to a planner task.
+   * Specializes Resource.
+   *
+   * Modeled after the canonical meeting/calendar event from WeddingWebApp.
+   * The substrate does not own delivery semantics (ICS attachments, push
+   * notifications, OAuth-scoped sync); those live in the calendar capability.
+   * The substrate stores the canonical record + lifecycle.
+   *
+   * Capability that owns calendar event creation: capability-wedding-calendar.
+   */
+  CalendarEvent: {
+    concrete: "CalendarEvent",
+    tier1: "Resource",
+    requiredFields: [
+      "title",
+      "kind",
+      "startAt",
+      "endAt",
+      "timezone",
+      "state",
+    ],
+    optionalFields: [
+      "description",
+      "location",
+      "sourceType",
+      "externalRef",
+    ],
+    schemaVersion: 1,
+  },
 };
 
 export const WEDDING_PROFILE: ProfileDefinition = {
   name: "wedding",
-  version: 2,  // v2: added BudgetCategory entity + vendor_budget_category edge (P2.1b)
+  version: 3,  // v3: added PlannerTask + CalendarEvent entities and contract_task + task_calendar_event edges (G5 cross-tool E2E).
   description:
-    "The wedding industry profile. Specializes Engagement→Wedding (with exactly-2-principals constraint), Counterparty→{Couple,Guest,Vendor}, Transaction→{Contract,Payment,Invoice}. Identity primacy = Wedding.",
+    "The wedding industry profile. Specializes Engagement→{Wedding,PlannerTask}, Counterparty→{Couple,Guest,Vendor}, Transaction→{Contract,Payment,Invoice}, Resource→{BudgetCategory,CalendarEvent}. Identity primacy = Wedding.",
   entityTypes: ENTITY_TYPES,
   edgeTypes: EDGE_CATALOG,
   lifecycles: {

@@ -1,0 +1,37 @@
+{
+  "name": "@pm/capability-wedding-calendar",
+  "version": "0.1.0",
+  "private": true,
+  "description": "wedding.calendar capability — materializes a CalendarEvent for each new PlannerTask. Subscribes to wedding.task.created; writes a CalendarEvent graph node + PlannerTask→CalendarEvent edge; emits wedding.calendar.event_created. Provider-neutral (Aurinko-style); substrate doesn't know which downstream provider syncs the event.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/profile-wedding": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@pm/capability-wedding-contracts": "workspace:*",
+    "@pm/capability-wedding-tasks": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}
