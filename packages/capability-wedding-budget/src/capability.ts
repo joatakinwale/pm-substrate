@@ -14,23 +14,60 @@ import type { CapabilityId } from "@pm/types";
  * `vendor_contracts.budget_category_id` was hardcoded `None` at create,
  * making the rollup at `vendor_service.record_payment:3129` silently
  * unreachable. See docs/adr/0010-budget-applied-payments-idempotency.md.
+ *
+ * G6 reference migration: this is the first capability migrated from V1
+ * string-array contracts to V2 typed/versioned contracts (ADR-0013). Use this
+ * descriptor as the canonical template for the remaining capability migrations.
  */
 export const WEDDING_BUDGET_CAPABILITY = {
   id: "cap_wedding_budget_v1" as CapabilityId,
   name: "wedding.budget",
   version: 1,
   readsInterfaces: [
-    "Counterparty[name,category]",
-    "Transaction[state,amountMinor,currency]",
-    "Resource[name,kind,allocatedMinor,currency,actualSpentMinor]",
+    {
+      interface: "Counterparty",
+      fields: ["name", "category"],
+      cardinality: "exactly-one",
+      required: true,
+    },
+    {
+      interface: "Transaction",
+      fields: ["state", "amountMinor", "currency"],
+      cardinality: "exactly-one",
+      required: true,
+    },
+    {
+      interface: "Resource",
+      fields: ["name", "kind", "allocatedMinor", "currency", "actualSpentMinor"],
+      cardinality: "exactly-one",
+      required: true,
+    },
   ],
   writesInterfaces: [
-    "Resource[actualSpentMinor]",
+    {
+      interface: "Resource",
+      fields: ["actualSpentMinor"],
+      ownership: "owner",
+    },
   ],
   readsEdges: ["wedding/contract_vendor", "wedding/vendor_budget_category"],
   writesEdges: [],
-  emits: ["wedding.budget.actual_spent_updated"],
-  subscribesTo: ["wedding.contract.payment_recorded"],
+  emits: [
+    {
+      schema: {
+        type: "wedding.budget.actual_spent_updated",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/actual-spent-updated.v1.json",
+      },
+      affectsEntities: ["Resource"],
+    },
+  ],
+  subscribesTo: [
+    {
+      pattern: "wedding.contract.payment_recorded",
+      accepts: { minMajor: 1, maxMajor: 1 },
+    },
+  ],
   requiredPermissions: ["wedding.budget.write"],
   description:
     "Owns BudgetCategory.actualSpentMinor rollup for the wedding profile. " +

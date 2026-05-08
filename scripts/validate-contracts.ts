@@ -61,11 +61,61 @@ const extractArrayLiteral = (source: string, field: string): string | null => {
   return null;
 };
 
-const hasStringLiteralEntry = (arrayLiteral: string): boolean => {
-  // Good enough for descriptors: if the top-level array contains any quoted
-  // string, this is still a V1 declaration. Typed contracts use objects.
-  // We don't need a full TS parser until descriptors get complicated.
-  return /["'`][^"'`]+["'`]/.test(arrayLiteral);
+const hasTopLevelStringLiteralEntry = (arrayLiteral: string): boolean => {
+  // Detect top-level array entries that begin with a string literal, without
+  // flagging strings nested inside typed object entries (e.g.
+  // `{ schema: { type: "wedding.task.created" } }`). This is intentionally a
+  // tiny scanner, not a TypeScript parser.
+  let depth = 0;
+  let inString: '"' | "'" | "`" | null = null;
+  let escaped = false;
+  let atEntryStart = true;
+
+  for (let i = 0; i < arrayLiteral.length; i++) {
+    const ch = arrayLiteral[i]!;
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === inString) inString = null;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'" || ch === "`") {
+      if (depth === 1 && atEntryStart) return true;
+      inString = ch;
+      continue;
+    }
+
+    if (ch === "[" || ch === "{") {
+      depth++;
+      atEntryStart = ch === "[" && depth === 1;
+      continue;
+    }
+    if (ch === "]" || ch === "}") {
+      depth--;
+      atEntryStart = false;
+      continue;
+    }
+    if (depth === 1 && ch === ",") {
+      atEntryStart = true;
+      continue;
+    }
+    if (depth === 1 && /\S/.test(ch)) {
+      // Top-level entry starts with something other than a quote (typed object,
+      // identifier, spread, etc.). Treat it as non-legacy for this migration
+      // guard; typecheck catches invalid descriptors.
+      atEntryStart = false;
+    }
+  }
+
+  return false;
 };
 
 const scanFile = (file: string): Finding[] => {
@@ -75,7 +125,7 @@ const scanFile = (file: string): Finding[] => {
   for (const field of ["emits", "subscribesTo", "readsInterfaces", "writesInterfaces"] as const) {
     const arr = extractArrayLiteral(source, field);
     if (!arr) continue;
-    if (hasStringLiteralEntry(arr)) {
+    if (hasTopLevelStringLiteralEntry(arr)) {
       findings.push({
         file: relative(ROOT, file),
         field,
