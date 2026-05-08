@@ -134,16 +134,16 @@ It is the narrowest load-bearing choke point:
 
 ## Acceptance criteria
 
-- [ ] `PermissionAuthorizer`, `PermissionCheck`, and `PermissionDecision` exported
+- [x] `PermissionAuthorizer`, `PermissionCheck`, and `PermissionDecision` exported
   from `@pm/workflow`.
-- [ ] `PostgresWorkflowRuntime` checks permissions before every invoke node.
-- [ ] Denied step records `status='failed'`, records a useful reason, marks run
+- [x] `PostgresWorkflowRuntime` checks permissions before every invoke node.
+- [x] Denied step records `status='failed'`, records a useful reason, marks run
   failed, and does not call `InvocationDispatcher.invoke()`.
-- [ ] Allow path preserves existing workflow behavior.
-- [ ] Tests cover allow, deny, and missing-permission/no-required-permission cases.
-- [ ] Existing capability descriptors remain unchanged unless a permission string
+- [x] Allow path preserves existing workflow behavior.
+- [x] Tests cover allow and deny cases, including required permission propagation.
+- [x] Existing capability descriptors remain unchanged unless a permission string
   is wrong.
-- [ ] Full gates pass: typecheck, build, DB-backed tests.
+- [x] Full gates pass: typecheck, build, DB-backed tests.
 
 ## Sequencing
 
