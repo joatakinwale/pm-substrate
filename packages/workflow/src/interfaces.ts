@@ -35,6 +35,31 @@ export interface InvokeNode {
    * Day-1 grammar; will be tightened in Phase 1+.
    */
   readonly inputs: Readonly<Record<string, string>>;
+  /**
+   * G8.3: optional retry policy. Omitted = single attempt (legacy behavior).
+   * On dispatcher failure (success=false), the runtime will retry up to
+   * `maxAttempts` total times (counting the first attempt) with `backoffMs`
+   * delay between attempts. After exhaustion, the step lands in the
+   * dead-letter table and the run is marked failed.
+   *
+   * `mode` controls backoff growth: "fixed" (default) sleeps backoffMs
+   * between every attempt; "exponential" sleeps backoffMs * 2^(attempt-1)
+   * for attempt >= 1, capped at 5 minutes.
+   *
+   * Authorization denials and "capability not found" errors are NOT
+   * retried (they are not transient by nature) and go straight to the
+   * dead-letter with reason='permission_denied' or 'capability_not_found'.
+   */
+  readonly retry?: RetryPolicy;
+}
+
+export interface RetryPolicy {
+  /** Total attempts including the first. Must be >= 1; values <= 1 disable retry. */
+  readonly maxAttempts: number;
+  /** Base delay between attempts, in milliseconds. */
+  readonly backoffMs: number;
+  /** Backoff growth mode. Default "fixed". */
+  readonly mode?: "fixed" | "exponential";
 }
 
 export interface WorkflowEdge {

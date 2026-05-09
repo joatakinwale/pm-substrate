@@ -566,4 +566,142 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     const map = Object.fromEntries(steps.rows.map((r) => [r.node_id, r.status]));
     expect(map.guarded).toBe("skipped");
   });
+
+  // ===== G8.3: retry policy + dead-letter =====
+
+  it("retries failing dispatcher up to maxAttempts and succeeds (G8.3)", async () => {
+    const tenantId = await makeTenant();
+    // FlakyDispatcher: fails first N invocations then succeeds.
+    let calls = 0;
+    const flaky: InvocationDispatcher = {
+      async invoke() {
+        calls++;
+        if (calls < 2) return { success: false, result: {}, error: "transient" };
+        return { success: true, result: { ok: true } };
+      },
+    };
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher: flaky });
+    await registerCap(tenantId, "flaky/cap");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "retry-success", version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "r.fire" },
+        {
+          nodeId: "a", kind: "invoke", capability: "flaky/cap", inputs: {},
+          retry: { maxAttempts: 3, backoffMs: 1, mode: "fixed" },
+        },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId, type: "r.fire", entityId: "e", emittedBy: "x",
+      payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+    expect(calls).toBe(2);
+    const step = await pool.query<{ status: string; attempts: number }>(
+      `SELECT status, attempts FROM workflow.run_steps
+         WHERE node_id = 'a' AND run_id IN (SELECT id FROM workflow.runs WHERE tenant_id=$1)`,
+      [tenantId],
+    );
+    expect(step.rows[0]!.status).toBe("completed");
+    expect(step.rows[0]!.attempts).toBe(2);
+    const dl = await pool.query(
+      `SELECT count(*)::int AS c FROM workflow.dead_letter WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect((dl.rows[0]! as { c: number }).c).toBe(0);
+  });
+
+  it("exhausts retries then writes a dead-letter row with reason='retry_exhausted' (G8.3)", async () => {
+    const tenantId = await makeTenant();
+    const alwaysFail: InvocationDispatcher = {
+      async invoke() {
+        return { success: false, result: {}, error: "upstream-down" };
+      },
+    };
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher: alwaysFail });
+    await registerCap(tenantId, "down/cap");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "retry-exhausted", version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "r.fire" },
+        {
+          nodeId: "a", kind: "invoke", capability: "down/cap", inputs: {},
+          retry: { maxAttempts: 3, backoffMs: 1 },
+        },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId, type: "r.fire", entityId: "e", emittedBy: "x",
+      payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+    const step = await pool.query<{ status: string; attempts: number }>(
+      `SELECT status, attempts FROM workflow.run_steps
+         WHERE node_id='a' AND run_id IN (SELECT id FROM workflow.runs WHERE tenant_id=$1)`,
+      [tenantId],
+    );
+    expect(step.rows[0]!.status).toBe("failed");
+    expect(step.rows[0]!.attempts).toBe(3);
+    const dl = await pool.query<{ reason: string; attempts: number; capability: string; error: unknown }>(
+      `SELECT reason, attempts, capability, error FROM workflow.dead_letter WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect(dl.rowCount).toBe(1);
+    expect(dl.rows[0]!.reason).toBe("retry_exhausted");
+    expect(dl.rows[0]!.attempts).toBe(3);
+    expect(dl.rows[0]!.capability).toBe("down/cap");
+    // Run is failed.
+    const run = await pool.query<{ status: string }>(
+      `SELECT status FROM workflow.runs WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect(run.rows[0]!.status).toBe("failed");
+  });
+
+  it("permission_denied is non-retryable and goes straight to dead-letter (G8.3)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const denyAuthorizer: PermissionAuthorizer = {
+      async authorize() {
+        return { allowed: false, reason: "missing scope tasks:write" };
+      },
+    };
+    const runtime = new PostgresWorkflowRuntime({
+      pool, registry, events, dispatcher, authorizer: denyAuthorizer,
+    });
+    await registerCap(tenantId, "protected/cap", ["tasks:write"]);
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "deny-flow", version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "d.fire" },
+        {
+          nodeId: "a", kind: "invoke", capability: "protected/cap", inputs: {},
+          retry: { maxAttempts: 99, backoffMs: 1 },
+        },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId, type: "d.fire", entityId: "e", emittedBy: "x",
+      payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+    expect(dispatcher.calls.length).toBe(0);  // never reached the dispatcher
+    const dl = await pool.query<{ reason: string; attempts: number }>(
+      `SELECT reason, attempts FROM workflow.dead_letter WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect(dl.rowCount).toBe(1);
+    expect(dl.rows[0]!.reason).toBe("permission_denied");
+    expect(dl.rows[0]!.attempts).toBe(1);
+  });
 });
