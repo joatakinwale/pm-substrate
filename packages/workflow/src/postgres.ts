@@ -44,6 +44,25 @@ import type {
   WorkflowRuntime,
 } from "./interfaces.js";
 
+/**
+ * G8.2: deep equality check for workflow docs. Used at install time to
+ * decide whether a re-install of an existing (tenant, name, version) is
+ * a no-op (same doc) or a violation (different doc). We canonicalize via
+ * JSON.stringify; doc fields are simple enough (strings/numbers/arrays/
+ * plain objects) that key-order is the only canonicalization concern,
+ * and we deal with that by sorting keys recursively.
+ */
+function docsEqual(a: unknown, b: unknown): boolean {
+  return canonicalize(a) === canonicalize(b);
+}
+function canonicalize(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(canonicalize).join(",") + "]";
+  const obj = v as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalize(obj[k])).join(",") + "}";
+}
+
 interface WorkflowRow {
   id: string;
   tenant_id: string;
@@ -150,11 +169,38 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       { strict: this.#strictContracts },
     );
 
+    // G8.2: workflow versions are immutable. Re-installing the same
+    // (tenant_id, name, version) with a different doc would silently
+    // rewrite history for any prior runs that referenced this row
+    // (since runs FK on workflow_id, which doesn't change). Reject
+    // mutation; require a new version for any change. The only legal
+    // "upsert" here is re-enabling a previously-disabled doc with the
+    // exact same content.
+    const existing = await this.#pool.query<{ doc: WorkflowDoc; enabled: boolean }>(
+      `SELECT doc, enabled FROM workflow.workflows
+         WHERE tenant_id = $1 AND name = $2 AND version = $3`,
+      [doc.tenantId, doc.name, doc.version],
+    );
+    if (existing.rowCount && existing.rowCount > 0) {
+      const prior = existing.rows[0]!;
+      if (!docsEqual(prior.doc, doc)) {
+        throw new WorkflowValidationError(
+          `workflow "${doc.name}" v${doc.version} already installed with a different doc; ` +
+            `bump the version field to upgrade. Workflow versions are immutable per ADR-0016.`,
+        );
+      }
+      // Same content; just ensure it's enabled and we're idempotent.
+      await this.#pool.query(
+        `UPDATE workflow.workflows SET enabled = true
+           WHERE tenant_id = $1 AND name = $2 AND version = $3`,
+        [doc.tenantId, doc.name, doc.version],
+      );
+      return;
+    }
     await this.#pool.query(
       `INSERT INTO workflow.workflows (id, tenant_id, name, version, doc, enabled)
        VALUES ($1, $2, $3, $4, $5::jsonb, true)
-       ON CONFLICT (tenant_id, name, version) DO UPDATE
-         SET doc = EXCLUDED.doc, enabled = true`,
+       ON CONFLICT (tenant_id, name, version) DO NOTHING`,
       [doc.id, doc.tenantId, doc.name, doc.version, JSON.stringify(doc)],
     );
   }
@@ -201,12 +247,17 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     event: PMEvent,
   ): Promise<void> {
     const runId = `wfr_${randomUUID()}`;
+    // G8.2: snapshot the workflow's exact version + full doc onto the run
+    // row at creation time. Even if the runtime later allowed overwrites
+    // (it doesn't, post-G8.2), the run history is self-contained.
     const inserted = await this.#pool.query(
-      `INSERT INTO workflow.runs (id, tenant_id, workflow_id, triggered_by, status)
-       VALUES ($1, $2, $3, $4, 'running')
+      `INSERT INTO workflow.runs
+         (id, tenant_id, workflow_id, triggered_by, status,
+          workflow_version, workflow_doc)
+       VALUES ($1, $2, $3, $4, 'running', $5, $6::jsonb)
        ON CONFLICT DO NOTHING
        RETURNING id`,
-      [runId, doc.tenantId, doc.id, event.id],
+      [runId, doc.tenantId, doc.id, event.id, doc.version, JSON.stringify(doc)],
     );
     // If a row already exists for (workflow_id, triggered_by) — i.e. the
     // same event already triggered this workflow once — silently skip. This
