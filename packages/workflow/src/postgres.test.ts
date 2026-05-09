@@ -184,6 +184,114 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     await expect(runtime.install(cyclic)).rejects.toThrow(/cycle/);
   });
 
+  it("install is idempotent for the same (tenant,name,version,doc) (G8.2)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher });
+    await registerCap(tenantId, "test/cap");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "idem",
+      version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "x.created" },
+        { nodeId: "a", kind: "invoke", capability: "test/cap", inputs: {} },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    // Same doc, second install — must succeed silently and leave the row enabled.
+    await runtime.install(doc);
+    const r = await pool.query(
+      `SELECT enabled, doc FROM workflow.workflows
+        WHERE tenant_id=$1 AND name=$2 AND version=$3`,
+      [tenantId, "idem", 1],
+    );
+    expect(r.rowCount).toBe(1);
+    expect(r.rows[0]!.enabled).toBe(true);
+  });
+
+  it("install rejects mutating an existing (tenant,name,version) with a different doc (G8.2)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher });
+    await registerCap(tenantId, "test/cap");
+    const v1: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "immut",
+      version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "x.created" },
+        { nodeId: "a", kind: "invoke", capability: "test/cap", inputs: {} },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(v1);
+    // Same name+version, different doc (extra node). Must reject.
+    const v1Mutated: WorkflowDoc = {
+      ...v1,
+      id: `wf_${randomUUID()}` as WorkflowId,
+      nodes: [
+        ...v1.nodes,
+        { nodeId: "b", kind: "invoke", capability: "test/cap", inputs: {} },
+      ],
+      edges: [...v1.edges, { from: "a", to: "b" }],
+    };
+    await expect(runtime.install(v1Mutated)).rejects.toBeInstanceOf(
+      WorkflowValidationError,
+    );
+    await expect(runtime.install(v1Mutated)).rejects.toThrow(/immutable/);
+    // Bumping the version is the legal path.
+    const v2: WorkflowDoc = { ...v1Mutated, version: 2 };
+    await expect(runtime.install(v2)).resolves.toBeUndefined();
+  });
+
+  it("runs are pinned to the workflow version + doc snapshot at creation (G8.2)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher });
+    await registerCap(tenantId, "test/cap");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "pinned",
+      version: 7,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "x.created" },
+        { nodeId: "a", kind: "invoke", capability: "test/cap", inputs: {} },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    // Emit a triggering event.
+    const ev = await events.publish({
+      tenantId,
+      type: "x.created",
+      entityId: "ent_x_1",
+      emittedBy: "test/harness",
+      payloadSchema: "x.created/v1",
+      payload: { hello: "world" },
+    });
+    await runtime.onEvent(tenantId, ev.id);
+    // Inspect the run row.
+    const r = await pool.query(
+      `SELECT workflow_version, workflow_doc
+         FROM workflow.runs
+        WHERE tenant_id=$1 AND workflow_id=$2`,
+      [tenantId, doc.id],
+    );
+    expect(r.rowCount).toBe(1);
+    expect(r.rows[0]!.workflow_version).toBe(7);
+    // workflow_doc snapshot must equal the installed doc.
+    expect(r.rows[0]!.workflow_doc).toMatchObject({
+      name: "pinned",
+      version: 7,
+    });
+    expect((r.rows[0]!.workflow_doc as WorkflowDoc).nodes.length).toBe(2);
+  });
+
   it("walks the DAG and records run + steps when an event matches a trigger", async () => {
     const tenantId = await makeTenant();
     const dispatcher = new RecordingDispatcher();
