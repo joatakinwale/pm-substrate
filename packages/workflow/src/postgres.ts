@@ -34,6 +34,7 @@ import type { Capability, Registry } from "@pm/registry";
 import { matchesPattern } from "@pm/registry";
 import pg from "pg";
 import { WorkflowValidationError } from "./errors.js";
+import { assertWorkflowAcyclic } from "./cycle-detection.js";
 import { validateCapabilityContracts } from "./contract-validation.js";
 import { allowAllAuthorizer, type PermissionAuthorizer } from "./permissions.js";
 import type {
@@ -124,6 +125,11 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         );
       }
     }
+
+    // G8.1: workflow docs must be acyclic. Day-1 grammar implied this but
+    // never enforced it; an installed cycle would manifest at runtime as
+    // unbounded recursion through the DFS walker.
+    assertWorkflowAcyclic(doc);
 
     // G6: typed-contract validation. Gather all capabilities the workflow
     // references, normalize their contracts, and verify cross-capability

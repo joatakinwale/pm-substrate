@@ -32,3 +32,8 @@ export {
   type PermissionCheck,
   type PermissionDecision,
 } from "./permissions.js";
+export {
+  assertAcyclic,
+  assertWorkflowAcyclic,
+  type CycleDetectionInput,
+} from "./cycle-detection.js";
