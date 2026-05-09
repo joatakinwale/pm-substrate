@@ -156,6 +156,34 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     await expect(runtime.install(dangling)).rejects.toBeInstanceOf(WorkflowValidationError);
   });
 
+  it("install rejects workflows whose edges form a cycle (G8.1)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher });
+    await registerCap(tenantId, "test/cap");
+
+    const cyclic: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "cyclic",
+      version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "x.created" },
+        { nodeId: "a", kind: "invoke", capability: "test/cap", inputs: {} },
+        { nodeId: "b", kind: "invoke", capability: "test/cap", inputs: {} },
+      ],
+      edges: [
+        { from: "trig", to: "a" },
+        { from: "a", to: "b" },
+        { from: "b", to: "a" },
+      ],
+    };
+    await expect(runtime.install(cyclic)).rejects.toBeInstanceOf(
+      WorkflowValidationError,
+    );
+    await expect(runtime.install(cyclic)).rejects.toThrow(/cycle/);
+  });
+
   it("walks the DAG and records run + steps when an event matches a trigger", async () => {
     const tenantId = await makeTenant();
     const dispatcher = new RecordingDispatcher();
