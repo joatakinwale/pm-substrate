@@ -39,10 +39,25 @@ import { validateCapabilityContracts } from "./contract-validation.js";
 import { allowAllAuthorizer, type PermissionAuthorizer } from "./permissions.js";
 import type {
   InvocationDispatcher,
+  InvocationResult,
+  RetryPolicy,
   WorkflowDoc,
   WorkflowNode,
   WorkflowRuntime,
 } from "./interfaces.js";
+
+/** G8.3: backoff delay for attempt N (1-based). Caps at 5 minutes. */
+function backoffDelay(policy: RetryPolicy, attempt: number): number {
+  const base = policy.backoffMs;
+  if ((policy.mode ?? "fixed") === "fixed") return base;
+  // Exponential: base * 2^(attempt-1), capped.
+  const cap = 5 * 60 * 1000;
+  return Math.min(cap, base * Math.pow(2, Math.max(0, attempt - 1)));
+}
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((res) => setTimeout(res, ms));
+}
 
 /**
  * G8.2: deep equality check for workflow docs. Used at install time to
@@ -308,8 +323,13 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
 
         const capability = await this.#registry.get(doc.tenantId, node.capability);
         if (!capability) {
-          await this.#recordStep(runId, node.nodeId, node.capability, "failed", {
-            error: `capability not found at runtime: ${node.capability}`,
+          // G8.3: non-retryable; goes straight to dead-letter.
+          const errPayload = { error: `capability not found at runtime: ${node.capability}` };
+          await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+          await this.#writeDeadLetter({
+            tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+            nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+            inputs, attempts: 1, error: errPayload, reason: "capability_not_found",
           });
           runStatus = "failed";
           return;
@@ -326,36 +346,67 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
           triggerEvent: event,
         });
         if (!decision.allowed) {
-          await this.#recordStep(runId, node.nodeId, node.capability, "failed", {
+          // G8.3: non-retryable; goes straight to dead-letter.
+          const errPayload = {
             error: "permission_denied",
             reason: decision.reason,
             requiredPermissions: capability.requiredPermissions,
+          };
+          await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+          await this.#writeDeadLetter({
+            tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+            nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+            inputs, attempts: 1, error: errPayload, reason: "permission_denied",
           });
           runStatus = "failed";
           return;
         }
 
-        const inv = await this.#dispatcher.invoke({
-          tenantId: doc.tenantId,
-          capability: node.capability,
-          inputs,
-          triggerEvent: event,
-          workflowId: doc.id,
-          nodeId: node.nodeId,
-        });
+        // G8.3: retry loop. Default policy is single attempt (legacy).
+        const policy = node.retry;
+        const maxAttempts = policy && policy.maxAttempts > 0 ? policy.maxAttempts : 1;
+        let inv: InvocationResult | null = null;
+        let attempt = 0;
+        while (attempt < maxAttempts) {
+          attempt++;
+          inv = await this.#dispatcher.invoke({
+            tenantId: doc.tenantId,
+            capability: node.capability,
+            inputs,
+            triggerEvent: event,
+            workflowId: doc.id,
+            nodeId: node.nodeId,
+          });
+          if (inv.success) break;
+          if (attempt < maxAttempts && policy) {
+            const delay = backoffDelay(policy, attempt);
+            await sleep(delay);
+          }
+        }
+        // After the loop, inv is non-null because maxAttempts >= 1.
+        const finalInv = inv!;
         await this.#recordStep(
           runId,
           node.nodeId,
           node.capability,
-          inv.success ? "completed" : "failed",
-          inv.result ?? null,
+          finalInv.success ? "completed" : "failed",
+          finalInv.result ?? (finalInv.error ? { error: finalInv.error } : null),
+          attempt,
         );
 
-        if (!inv.success) {
+        if (!finalInv.success) {
+          // G8.3: dead-letter the step after retry exhaustion.
+          await this.#writeDeadLetter({
+            tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+            nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+            inputs, attempts: attempt,
+            error: { error: finalInv.error ?? "dispatcher reported success=false", result: finalInv.result },
+            reason: "retry_exhausted",
+          });
           runStatus = "failed";
-          return; // stop the run; no retries day-1
+          return;
         }
-        results.set(node.nodeId, inv.result);
+        results.set(node.nodeId, finalInv.result);
         await visit(node.nodeId);
       }
     };
@@ -376,19 +427,51 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     capability: string | null,
     status: "running" | "completed" | "failed" | "skipped",
     result: Readonly<Record<string, unknown>> | null,
+    attempts?: number,
   ): Promise<void> {
+    // G8.3: `attempts` is 1 for non-invoke steps and for the initial 'running'
+    // record; the final completion/failure record carries the actual count.
+    const attemptsVal = attempts && attempts >= 1 ? attempts : 1;
     await this.#pool.query(
       `INSERT INTO workflow.run_steps
-         (run_id, node_id, capability, status, result, started_at, completed_at)
-       VALUES ($1, $2, $3, $4, $5::jsonb, now(),
+         (run_id, node_id, capability, status, result, attempts, started_at, completed_at)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, now(),
                CASE WHEN $4 IN ('completed','failed','skipped') THEN now() ELSE NULL END)
        ON CONFLICT (run_id, node_id) DO UPDATE
          SET status = EXCLUDED.status,
              result = COALESCE(EXCLUDED.result, workflow.run_steps.result),
+             attempts = GREATEST(EXCLUDED.attempts, workflow.run_steps.attempts),
              completed_at = CASE WHEN EXCLUDED.status IN ('completed','failed','skipped')
                                  THEN now()
                                  ELSE workflow.run_steps.completed_at END`,
-      [runId, nodeId, capability, status, result ? JSON.stringify(result) : null],
+      [runId, nodeId, capability, status, result ? JSON.stringify(result) : null, attemptsVal],
+    );
+  }
+
+  async #writeDeadLetter(d: {
+    tenantId: string;
+    runId: string;
+    workflowId: string;
+    workflowVersion: number;
+    nodeId: string;
+    capability: string;
+    triggeredBy: string;
+    inputs: Readonly<Record<string, unknown>>;
+    attempts: number;
+    error: Readonly<Record<string, unknown>>;
+    reason: "retry_exhausted" | "permission_denied" | "capability_not_found";
+  }): Promise<void> {
+    const id = `dl_${randomUUID()}`;
+    await this.#pool.query(
+      `INSERT INTO workflow.dead_letter
+         (id, tenant_id, run_id, workflow_id, workflow_version, node_id,
+          capability, triggered_by, inputs, attempts, error, reason)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12)`,
+      [
+        id, d.tenantId, d.runId, d.workflowId, d.workflowVersion, d.nodeId,
+        d.capability, d.triggeredBy, JSON.stringify(d.inputs), d.attempts,
+        JSON.stringify(d.error), d.reason,
+      ],
     );
   }
 
