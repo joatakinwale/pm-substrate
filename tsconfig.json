@@ -7,6 +7,7 @@
     { "path": "./packages/registry" },
     { "path": "./packages/workflow" },
     { "path": "./packages/projections" },
-    { "path": "./packages/capability-kit" }
+    { "path": "./packages/capability-kit" },
+    { "path": "./packages/entity-mapping" }
   ]
 }

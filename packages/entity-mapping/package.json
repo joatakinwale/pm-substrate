@@ -1,0 +1,28 @@
+{
+  "name": "@pm/entity-mapping",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Declarative entity-mapping format. An app declares how its existing entities (SQLAlchemy/Prisma/whatever) map onto Tier-1 primitives + a profile, and the substrate validates + drives ingestion. G11 phase 1 ships the format + structural validator only; phase 2 adds profile-aware semantic validation, ingestion adapters, and TS codegen.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}
