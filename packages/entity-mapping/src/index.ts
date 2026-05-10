@@ -6,9 +6,11 @@
  * entities map onto Tier-1 primitives + a profile. The substrate
  * structurally validates the mapping with `validateEntityMapping`.
  *
- * Phase 2 (deferred):
+ * Phase 2 surface:
  *   - Profile-aware semantic validation (entity concrete types + edge
- *     types resolve against an installed `ProfileDefinition`).
+ *     types resolve against a `ProfileDefinition`).
+ *
+ * Still deferred:
  *   - Ingestion adapter — `applyMapping(mapping, row)` produces a
  *     `CreateNodeInput` directly callable on `Graph.createNode`.
  *   - TS codegen — emit per-entity types so the app gets compile-time
@@ -36,3 +38,8 @@ export {
   type ValidationResult,
   type ValidationIssue,
 } from "./validate.js";
+
+export {
+  validateEntityMappingAgainstProfile,
+  toEdgeCardinality,
+} from "./semantic.js";
