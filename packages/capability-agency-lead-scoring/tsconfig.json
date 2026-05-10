@@ -12,6 +12,7 @@
     { "path": "../events" },
     { "path": "../graph" },
     { "path": "../profile-agency" },
-    { "path": "../registry" }
+    { "path": "../registry" },
+    { "path": "../capability-kit" }
   ]
 }

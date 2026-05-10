@@ -52,6 +52,22 @@ const SUBSTRATE_PACKAGES = new Set([
   "@pm/projections",
   "@pm/workflow",
   "@pm/profile-registry",
+  // @pm/capability-kit is the substrate-side authoring helper for capabilities
+  // (G10 / ADR-0019). It is named with the `capability-` prefix because it
+  // belongs to the same conceptual surface, but it is NOT itself a capability
+  // — capabilities depend ON it. Treat it as a substrate primitive for
+  // isolation purposes.
+  "@pm/capability-kit",
+]);
+
+/**
+ * Package directory names that match the `capability-*` glob but are NOT
+ * registered capabilities for isolation purposes — they are substrate-side
+ * helpers that capability authors *depend on*. Keep this list tight; the
+ * default for a `capability-foo` directory is still "a capability."
+ */
+const NON_CAPABILITY_HELPERS = new Set([
+  "capability-kit",
 ]);
 
 interface ImportSite {
@@ -75,6 +91,7 @@ function listCapabilityPackages(): CapabilityPackage[] {
   const out: CapabilityPackage[] = [];
   for (const name of entries) {
     if (!name.startsWith("capability-")) continue;
+    if (NON_CAPABILITY_HELPERS.has(name)) continue;
     const dir = join(PACKAGES_DIR, name);
     const pkgPath = join(dir, "package.json");
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {

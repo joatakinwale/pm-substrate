@@ -19,6 +19,7 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
+    "@pm/capability-kit": "workspace:*",
     "@pm/events": "workspace:*",
     "@pm/graph": "workspace:*",
     "@pm/profile-agency": "workspace:*",

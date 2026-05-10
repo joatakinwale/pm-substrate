@@ -29,6 +29,9 @@ importers:
 
   packages/capability-agency-lead-scoring:
     dependencies:
+      '@pm/capability-kit':
+        specifier: workspace:*
+        version: link:../capability-kit
       '@pm/events':
         specifier: workspace:*
         version: link:../events
@@ -122,6 +125,9 @@ importers:
 
   packages/capability-wedding-budget:
     dependencies:
+      '@pm/capability-kit':
+        specifier: workspace:*
+        version: link:../capability-kit
       '@pm/events':
         specifier: workspace:*
         version: link:../events
