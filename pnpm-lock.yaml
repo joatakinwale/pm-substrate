@@ -95,6 +95,31 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/capability-kit:
+    dependencies:
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/capability-wedding-budget:
     dependencies:
       '@pm/events':

@@ -6,6 +6,7 @@
     { "path": "./packages/events" },
     { "path": "./packages/registry" },
     { "path": "./packages/workflow" },
-    { "path": "./packages/projections" }
+    { "path": "./packages/projections" },
+    { "path": "./packages/capability-kit" }
   ]
 }
