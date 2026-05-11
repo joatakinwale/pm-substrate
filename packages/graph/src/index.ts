@@ -24,3 +24,12 @@ export {
   InvalidIdError,
   NodeConflictError,
 } from "./errors.js";
+
+export {
+  readStalenessOf,
+  withNodeStaleness,
+  withEdgeStaleness,
+  withEdgeListStaleness,
+  isStale,
+  type ReadStaleness,
+} from "./staleness.js";
