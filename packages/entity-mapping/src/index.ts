@@ -10,9 +10,14 @@
  *   - Profile-aware semantic validation (entity concrete types + edge
  *     types resolve against a `ProfileDefinition`).
  *
+ * Phase 3 surface:
+ *   - Ingestion adapter — `applyMapping(mapping, sourceName, row, ctx)`
+ *     produces a node input directly assignable to `Graph.createNode`.
+ *   - Edge adapter — `applyEdgeMapping(mapping, sourceName, edgeKey,
+ *     ids, ctx)` produces an edge input directly assignable to
+ *     `Graph.createEdge`.
+ *
  * Still deferred:
- *   - Ingestion adapter — `applyMapping(mapping, row)` produces a
- *     `CreateNodeInput` directly callable on `Graph.createNode`.
  *   - TS codegen — emit per-entity types so the app gets compile-time
  *     safety on its mapped fields.
  *
@@ -43,3 +48,11 @@ export {
   validateEntityMappingAgainstProfile,
   toEdgeCardinality,
 } from "./semantic.js";
+
+export {
+  applyMapping,
+  applyEdgeMapping,
+  EntityMappingApplyError,
+  type MappingNodeInput,
+  type MappingEdgeInput,
+} from "./apply.js";
