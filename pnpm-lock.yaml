@@ -277,6 +277,9 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@pm/profile-agency':
+        specifier: workspace:*
+        version: link:../profile-agency
       '@pm/profile-wedding':
         specifier: workspace:*
         version: link:../profile-wedding

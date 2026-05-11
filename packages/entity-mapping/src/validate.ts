@@ -81,10 +81,12 @@ const isStringArray = (v: unknown): v is string[] =>
  *   - entities is a non-empty record
  *   - each entity entry:
  *     - tier1 ∈ Tier1TypeName
- *     - concrete is a non-empty string and equals the map key
+ *     - concrete is a non-empty string
  *     - schemaVersion is a positive integer
- *     - identityFields is a non-empty string[] with no duplicates
- *     - optionalFields, if present, is string[] disjoint from identityFields
+ *     - identityFields is a string[] with no duplicates
+ *     - fieldMap, if present, is a record of non-empty string → non-empty string
+ *     - identityFields or fieldMap must contain at least one field
+ *     - optionalFields, if present, is string[] disjoint from identityFields and fieldMap keys
  *     - edges, if present:
  *       - is a record
  *       - each edge entry: target is a string and matches another entity
@@ -171,15 +173,11 @@ function validateEntity(
     );
   }
 
-  // concrete must be a string and must equal the map key
+  // concrete is the profile concrete type. The map key is the source-app
+  // entity/model name, which may differ (e.g. Organization → ClientOrg).
   const concrete = e["concrete"];
   if (typeof concrete !== "string" || concrete.length === 0) {
     push(`${at}/concrete`, "expected non-empty string");
-  } else if (concrete !== key) {
-    push(
-      `${at}/concrete`,
-      `must equal the map key "${key}"; got "${concrete}"`,
-    );
   }
 
   // schemaVersion
@@ -190,10 +188,33 @@ function validateEntity(
 
   // identityFields
   const id = e["identityFields"];
-  if (!isStringArray(id) || id.length === 0) {
-    push(`${at}/identityFields`, "expected non-empty string[]");
+  if (!isStringArray(id)) {
+    push(`${at}/identityFields`, "expected string[]");
   } else if (new Set(id).size !== id.length) {
     push(`${at}/identityFields`, "duplicate field names not allowed");
+  }
+
+  // fieldMap (optional): profile field -> source field alias.
+  const fieldMap = e["fieldMap"];
+  const fieldMapKeys: string[] = [];
+  if (fieldMap !== undefined) {
+    if (!isObj(fieldMap)) {
+      push(`${at}/fieldMap`, "expected object when present");
+    } else {
+      for (const [profileField, sourceField] of Object.entries(fieldMap)) {
+        if (profileField.length === 0) {
+          push(`${at}/fieldMap`, "profile field names must be non-empty");
+        }
+        if (typeof sourceField !== "string" || sourceField.length === 0) {
+          push(`${at}/fieldMap/${profileField}`, "expected non-empty source field string");
+        }
+        fieldMapKeys.push(profileField);
+      }
+    }
+  }
+
+  if (isStringArray(id) && id.length === 0 && fieldMapKeys.length === 0) {
+    push(`${at}/identityFields`, "expected at least one identityFields entry or fieldMap alias");
   }
 
   // optionalFields (optional)
@@ -204,11 +225,12 @@ function validateEntity(
     } else if (new Set(opt).size !== opt.length) {
       push(`${at}/optionalFields`, "duplicate field names not allowed");
     } else if (isStringArray(id)) {
-      const overlap = opt.filter((f) => id.includes(f));
+      const requiredProfileFields = new Set([...id, ...fieldMapKeys]);
+      const overlap = opt.filter((f) => requiredProfileFields.has(f));
       if (overlap.length > 0) {
         push(
           `${at}/optionalFields`,
-          `must be disjoint from identityFields; overlapping: ${JSON.stringify(overlap)}`,
+          `must be disjoint from identityFields and fieldMap keys; overlapping: ${JSON.stringify(overlap)}`,
         );
       }
     }
