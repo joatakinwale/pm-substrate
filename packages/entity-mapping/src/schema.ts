@@ -73,13 +73,23 @@ export interface EntityMappingEntry {
   readonly concrete: ConcreteTypeName;
 
   /**
-   * Required identity-bag fields. The substrate validates presence at
+   * Required identity-bag fields whose source field name already equals
+   * the profile identity field name. The substrate validates presence at
    * write time. Subset of the source entity's columns/attrs.
    */
   readonly identityFields: readonly FieldName[];
 
   /**
-   * Optional identity-bag fields. Documented for completeness; not
+   * Source-field aliases for profile identity fields whose names do not
+   * match the source app. Key = profile identity field, value = source
+   * field/column/attribute name. Example: `{ name: "full_name" }` maps
+   * app field `full_name` into profile field `name`.
+   */
+  readonly fieldMap?: Readonly<Record<FieldName, FieldName>>;
+
+  /**
+   * Optional identity-bag fields whose source field name already equals
+   * the profile identity field name. Documented for completeness; not
    * enforced.
    */
   readonly optionalFields?: readonly FieldName[];
@@ -126,8 +136,8 @@ export interface EntityMapping {
   readonly mappingVersion: 1;
 
   /**
-   * Entities, keyed by concrete type name. The key MUST equal each
-   * entry's `concrete` field; the validator enforces this.
+   * Entities, keyed by source-app entity/model name. The key may differ
+   * from each entry's profile `concrete` field (e.g. Organization → ClientOrg).
    */
   readonly entities: Readonly<Record<ConcreteTypeName, EntityMappingEntry>>;
 

@@ -128,13 +128,12 @@ describe("validateEntityMapping (G11 phase 1)", () => {
     expect(r.issues.some((i) => i.path === "/entities/Lead/tier1")).toBe(true);
   });
 
-  it("rejects mismatch between map key and concrete", () => {
+  it("accepts source-app keys that differ from profile concrete type names", () => {
     const m = clone(goldenAgency);
-    m.entities.Lead.concrete = "Prospect";
+    m.entities.Organization.concrete = "ClientOrg";
     const r = validateEntityMapping(m);
-    expect(r.valid).toBe(false);
-    const issue = r.issues.find((i) => i.path === "/entities/Lead/concrete");
-    expect(issue?.message).toMatch(/must equal the map key "Lead"/);
+    expect(r.valid).toBe(true);
+    expect(r.issues).toEqual([]);
   });
 
   it("rejects empty identityFields", () => {
@@ -145,6 +144,16 @@ describe("validateEntityMapping (G11 phase 1)", () => {
     expect(
       r.issues.some((i) => i.path === "/entities/Lead/identityFields"),
     ).toBe(true);
+  });
+
+  it("accepts empty identityFields when fieldMap supplies profile identity aliases", () => {
+    const m = clone(goldenAgency);
+    m.entities.Lead.identityFields = [];
+    // @ts-expect-error fixture mutation for new optional property
+    m.entities.Lead.fieldMap = { name: "full_name" };
+    const r = validateEntityMapping(m);
+    expect(r.valid).toBe(true);
+    expect(r.issues).toEqual([]);
   });
 
   it("rejects duplicate identityFields", () => {

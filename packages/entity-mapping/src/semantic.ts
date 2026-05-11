@@ -54,14 +54,15 @@ export function validateEntityMappingAgainstProfile(
     });
   }
 
-  for (const [concreteName, entry] of Object.entries(mapping.entities)) {
-    const at = `/entities/${concreteName}`;
-    const def = profile.entityTypes[concreteName];
+  for (const [sourceName, entry] of Object.entries(mapping.entities)) {
+    const at = `/entities/${sourceName}`;
+    const profileConcrete = entry.concrete;
+    const def = profile.entityTypes[profileConcrete];
 
     if (!def) {
       issues.push({
         path: `${at}/concrete`,
-        message: `concrete type "${concreteName}" is not declared by profile "${profile.name}"`,
+        message: `concrete type "${profileConcrete}" is not declared by profile "${profile.name}"`,
       });
       // Edge checks may still be meaningful for other entities, but this
       // entity cannot be checked against entity-specific def fields.
@@ -75,7 +76,7 @@ export function validateEntityMappingAgainstProfile(
       if (def.tier1 !== entry.tier1) {
         issues.push({
           path: `${at}/tier1`,
-          message: `profile maps "${concreteName}" to tier1 "${def.tier1}", mapping says "${entry.tier1}"`,
+          message: `profile maps "${profileConcrete}" to tier1 "${def.tier1}", mapping says "${entry.tier1}"`,
         });
       }
       if (def.schemaVersion !== entry.schemaVersion) {
@@ -85,7 +86,10 @@ export function validateEntityMappingAgainstProfile(
         });
       }
 
-      const mappedRequired = new Set(entry.identityFields);
+      const mappedRequired = new Set([
+        ...entry.identityFields,
+        ...Object.keys(entry.fieldMap ?? {}),
+      ]);
       for (const required of def.requiredFields) {
         if (!mappedRequired.has(required)) {
           issues.push({
@@ -98,6 +102,8 @@ export function validateEntityMappingAgainstProfile(
 
     for (const [edgeKey, edge] of Object.entries(entry.edges ?? {})) {
       const edgeAt = `${at}/edges/${edgeKey}`;
+      const targetEntry = mapping.entities[edge.target];
+      const targetConcrete = targetEntry?.concrete ?? edge.target;
       const localEdgeName = localName(edge.type, profile.name);
       if (!localEdgeName) {
         issues.push({
@@ -116,17 +122,17 @@ export function validateEntityMappingAgainstProfile(
         continue;
       }
 
-      if (!edgeDef.fromTypes.includes(concreteName)) {
+      if (!edgeDef.fromTypes.includes(profileConcrete)) {
         issues.push({
           path: edgeAt,
-          message: `edge "${edge.type}" cannot start at "${concreteName}"; declared from-types: ${edgeDef.fromTypes.join(", ")}`,
+          message: `edge "${edge.type}" cannot start at "${profileConcrete}"; declared from-types: ${edgeDef.fromTypes.join(", ")}`,
         });
       }
 
-      if (!edgeDef.toTypes.includes(edge.target)) {
+      if (!edgeDef.toTypes.includes(targetConcrete)) {
         issues.push({
           path: `${edgeAt}/target`,
-          message: `edge "${edge.type}" cannot target "${edge.target}"; declared to-types: ${edgeDef.toTypes.join(", ")}`,
+          message: `edge "${edge.type}" cannot target "${targetConcrete}"; declared to-types: ${edgeDef.toTypes.join(", ")}`,
         });
       }
 
