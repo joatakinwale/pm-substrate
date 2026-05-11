@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@pm/capability-audit": "workspace:*",
+    "@pm/entity-mapping": "workspace:*",
     "@pm/events": "workspace:*",
     "@pm/graph": "workspace:*",
     "@pm/profile-registry": "workspace:*",
