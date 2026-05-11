@@ -37,6 +37,10 @@ import { WorkflowValidationError } from "./errors.js";
 import { assertWorkflowAcyclic } from "./cycle-detection.js";
 import { validateCapabilityContracts } from "./contract-validation.js";
 import { allowAllAuthorizer, type PermissionAuthorizer } from "./permissions.js";
+import {
+  acceptAllInputValidator,
+  type InputValidator,
+} from "./input-validation.js";
 import type {
   InvocationDispatcher,
   InvocationResult,
@@ -103,6 +107,13 @@ export interface RuntimeDeps {
    * explicit allow-all authorizer for migration/backward compatibility.
    */
   readonly authorizer?: PermissionAuthorizer;
+  /**
+   * G12 / ADR-0026: validates resolved inputs against the capability's
+   * declared `inputSchema` before dispatch. If omitted, uses an explicit
+   * accept-all validator (legacy behavior). Capabilities without an
+   * `inputSchema` are unaffected regardless of which validator is wired.
+   */
+  readonly inputValidator?: InputValidator;
 }
 
 export class PostgresWorkflowRuntime implements WorkflowRuntime {
@@ -112,6 +123,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
   readonly #dispatcher: InvocationDispatcher;
   readonly #strictContracts: boolean;
   readonly #authorizer: PermissionAuthorizer;
+  readonly #inputValidator: InputValidator;
 
   constructor(deps: RuntimeDeps) {
     this.#pool = deps.pool;
@@ -120,6 +132,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     this.#dispatcher = deps.dispatcher;
     this.#strictContracts = deps.strictContracts ?? false;
     this.#authorizer = deps.authorizer ?? allowAllAuthorizer();
+    this.#inputValidator = deps.inputValidator ?? acceptAllInputValidator();
   }
 
   // -------------------------------------------------------------------------
@@ -335,6 +348,34 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
           return;
         }
 
+        // G12 / ADR-0026: input validation gate. Runs BEFORE permission
+        // check so we don't waste the authorizer on garbage. Non-retryable.
+        const inputDecision = await this.#inputValidator.validate({
+          capability: node.capability,
+          inputs,
+          ...(capability.inputSchema ? { inputSchema: capability.inputSchema } : {}),
+          tenantId: doc.tenantId,
+          workflowId: doc.id,
+          nodeId: node.nodeId,
+        });
+        if (!inputDecision.valid) {
+          const errPayload: Record<string, unknown> = {
+            error: "input_invalid",
+            reason: inputDecision.reason,
+          };
+          if (inputDecision.issues && inputDecision.issues.length > 0) {
+            errPayload["issues"] = inputDecision.issues;
+          }
+          await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+          await this.#writeDeadLetter({
+            tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+            nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+            inputs, attempts: 1, error: errPayload, reason: "input_invalid",
+          });
+          runStatus = "failed";
+          return;
+        }
+
         const decision = await this.#authorizer.authorize({
           tenantId: doc.tenantId,
           workflowId: doc.id,
@@ -459,7 +500,11 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     inputs: Readonly<Record<string, unknown>>;
     attempts: number;
     error: Readonly<Record<string, unknown>>;
-    reason: "retry_exhausted" | "permission_denied" | "capability_not_found";
+    reason:
+      | "retry_exhausted"
+      | "permission_denied"
+      | "capability_not_found"
+      | "input_invalid";
   }): Promise<void> {
     const id = `dl_${randomUUID()}`;
     await this.#pool.query(

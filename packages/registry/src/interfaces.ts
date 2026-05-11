@@ -66,6 +66,15 @@ export interface Capability {
   /** Permission strings (grammar in G7 / ADR-0014). */
   readonly requiredPermissions: readonly string[];
 
+  /**
+   * Optional JSON-Schema-shaped input contract (G12 / ADR-0026). When
+   * declared, the workflow runtime calls the installed `InputValidator`
+   * before dispatch. Validation failure produces a non-retryable
+   * `input_invalid` dead-letter (same class as `permission_denied`).
+   * Capabilities that omit this field keep legacy behavior.
+   */
+  readonly inputSchema?: Readonly<Record<string, unknown>>;
+
   readonly description: string;
 }
 
@@ -93,6 +102,8 @@ export interface NormalizedCapability {
   readonly readsEdges: readonly string[];
   readonly writesEdges: readonly string[];
   readonly requiredPermissions: readonly string[];
+  /** Mirror of `Capability.inputSchema` (G12 / ADR-0026). */
+  readonly inputSchema?: Readonly<Record<string, unknown>>;
   readonly description: string;
   /** True if any field was V1 (string) at normalization time. */
   readonly untyped: boolean;
@@ -178,6 +189,7 @@ export const normalizeCapability = (cap: Capability): NormalizedCapability => {
     readsEdges: cap.readsEdges,
     writesEdges: cap.writesEdges,
     requiredPermissions: cap.requiredPermissions,
+    ...(cap.inputSchema ? { inputSchema: cap.inputSchema } : {}),
     description: cap.description,
     untyped,
   };
