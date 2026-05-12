@@ -45,6 +45,7 @@ interface Row {
   emits: EmitDecl[];
   subscribes_to: SubscribeDecl[];
   required_permissions: string[];
+  input_schema: Readonly<Record<string, unknown>> | null;
   description: string;
   registered_at: Date;
 }
@@ -60,6 +61,7 @@ const rowToCapability = (r: Row): Capability => ({
   emits: r.emits ?? [],
   subscribesTo: r.subscribes_to ?? [],
   requiredPermissions: r.required_permissions ?? [],
+  ...(r.input_schema ? { inputSchema: r.input_schema } : {}),
   description: r.description ?? "",
 });
 
@@ -75,7 +77,7 @@ type Querier = Pick<pg.ClientBase, "query"> | pg.Pool;
 const SELECT_COLS = `
   id, tenant_id, name, version,
   reads_interfaces, writes_interfaces, reads_edges, writes_edges,
-  emits, subscribes_to, required_permissions, description, registered_at
+  emits, subscribes_to, required_permissions, input_schema, description, registered_at
 `;
 
 export class PostgresRegistry implements Registry {
@@ -103,12 +105,12 @@ export class PostgresRegistry implements Registry {
       `INSERT INTO registry.capabilities (
          id, tenant_id, name, version,
          reads_interfaces, writes_interfaces, reads_edges, writes_edges,
-         emits, subscribes_to, required_permissions, description
+         emits, subscribes_to, required_permissions, input_schema, description
        )
        VALUES (
          $1,$2,$3,$4,
          $5::jsonb,$6::jsonb,$7::jsonb,$8::jsonb,
-         $9::jsonb,$10::jsonb,$11::jsonb,$12
+         $9::jsonb,$10::jsonb,$11::jsonb,$12::jsonb,$13
        )
        ON CONFLICT (tenant_id, name, version) DO UPDATE SET
          reads_interfaces     = EXCLUDED.reads_interfaces,
@@ -118,6 +120,7 @@ export class PostgresRegistry implements Registry {
          emits                = EXCLUDED.emits,
          subscribes_to        = EXCLUDED.subscribes_to,
          required_permissions = EXCLUDED.required_permissions,
+         input_schema         = EXCLUDED.input_schema,
          description          = EXCLUDED.description,
          registered_at        = now()`,
       [
@@ -132,6 +135,7 @@ export class PostgresRegistry implements Registry {
         JSON.stringify(cap.emits ?? []),
         JSON.stringify(cap.subscribesTo ?? []),
         JSON.stringify(cap.requiredPermissions ?? []),
+        cap.inputSchema ? JSON.stringify(cap.inputSchema) : null,
         cap.description ?? "",
       ],
     );

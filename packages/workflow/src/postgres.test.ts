@@ -26,6 +26,11 @@ import type {
   PermissionCheck,
   PermissionDecision,
 } from "./permissions.js";
+import {
+  builtinInputValidator,
+  rejectAllInputValidator,
+  type InputValidator,
+} from "./input-validation.js";
 
 const DATABASE_URL = process.env["PM_DATABASE_URL"];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
@@ -80,6 +85,7 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     tenantId: TenantId,
     name: string,
     requiredPermissions: readonly string[] = [],
+    inputSchema?: Readonly<Record<string, unknown>>,
   ): Promise<void> => {
     await registry.register(tenantId, {
       id: `cap_${randomUUID()}` as CapabilityId,
@@ -88,6 +94,7 @@ describeIfDb("PostgresWorkflowRuntime", () => {
       readsInterfaces: [], writesInterfaces: [],
       readsEdges: [], writesEdges: [],
       emits: [], subscribesTo: [], requiredPermissions,
+      ...(inputSchema ? { inputSchema } : {}),
       description: "",
     });
   };
@@ -101,6 +108,7 @@ describeIfDb("PostgresWorkflowRuntime", () => {
   afterAll(async () => {
     await events.close();
     for (const t of tenants) {
+      await pool.query(`DELETE FROM workflow.dead_letter WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM workflow.run_steps WHERE run_id IN (SELECT id FROM workflow.runs WHERE tenant_id = $1)`, [t]);
       await pool.query(`DELETE FROM workflow.runs WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM workflow.workflows WHERE tenant_id = $1`, [t]);
@@ -703,5 +711,112 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     expect(dl.rowCount).toBe(1);
     expect(dl.rows[0]!.reason).toBe("permission_denied");
     expect(dl.rows[0]!.attempts).toBe(1);
+  });
+
+  it("input_invalid is non-retryable and dead-letters before dispatch (G12 / ADR-0026)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const validator: InputValidator = rejectAllInputValidator("forced for test");
+    const runtime = new PostgresWorkflowRuntime({
+      pool, registry, events, dispatcher, inputValidator: validator,
+    });
+    await registerCap(tenantId, "strict/cap");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "input-gate-flow", version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "g.fire" },
+        {
+          nodeId: "a", kind: "invoke", capability: "strict/cap", inputs: {},
+          retry: { maxAttempts: 99, backoffMs: 1 },
+        },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId, type: "g.fire", entityId: "e", emittedBy: "x",
+      payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+    // Dispatcher was never called — input gate blocked before permission.
+    expect(dispatcher.calls.length).toBe(0);
+    const dl = await pool.query<{ reason: string; attempts: number; error: Record<string, unknown> }>(
+      `SELECT reason, attempts, error FROM workflow.dead_letter WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect(dl.rowCount).toBe(1);
+    expect(dl.rows[0]!.reason).toBe("input_invalid");
+    // Single attempt: non-retryable, like permission_denied.
+    expect(dl.rows[0]!.attempts).toBe(1);
+    expect(dl.rows[0]!.error["error"]).toBe("input_invalid");
+  });
+
+  it("builtinInputValidator + capability.inputSchema rejects missing required fields (G12 / ADR-0026)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({
+      pool, registry, events, dispatcher,
+      inputValidator: builtinInputValidator(),
+    });
+    await registerCap(tenantId, "schemaful/cap", [], {
+      type: "object",
+      required: ["amount"],
+      properties: { amount: { type: "number" } },
+    });
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "schemaful-flow", version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "h.fire" },
+        {
+          // Inputs are empty — builtinInputValidator should reject because `amount` is required.
+          nodeId: "a", kind: "invoke", capability: "schemaful/cap", inputs: {},
+        },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId, type: "h.fire", entityId: "e", emittedBy: "x",
+      payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+    expect(dispatcher.calls.length).toBe(0);
+    const dl = await pool.query<{ reason: string; error: Record<string, unknown> }>(
+      `SELECT reason, error FROM workflow.dead_letter WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect(dl.rowCount).toBe(1);
+    expect(dl.rows[0]!.reason).toBe("input_invalid");
+    const issues = dl.rows[0]!.error["issues"] as Array<{ path: string }> | undefined;
+    expect(issues?.some((i) => i.path === "/amount")).toBe(true);
+  });
+
+  it("acceptAll validator is the default and preserves legacy dispatch (G12 / ADR-0026)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    dispatcher.setResponse("legacy/cap", { success: true, result: { ok: true } });
+    // No inputValidator wired — default is acceptAll.
+    const runtime = new PostgresWorkflowRuntime({
+      pool, registry, events, dispatcher,
+    });
+    await registerCap(tenantId, "legacy/cap");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId, name: "legacy-flow", version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "k.fire" },
+        { nodeId: "a", kind: "invoke", capability: "legacy/cap", inputs: {} },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId, type: "k.fire", entityId: "e", emittedBy: "x",
+      payloadSchema: "v1", payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+    expect(dispatcher.calls.length).toBe(1);
   });
 });
