@@ -164,6 +164,47 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     await expect(runtime.install(dangling)).rejects.toBeInstanceOf(WorkflowValidationError);
   });
 
+  it("install rejects workflows with unreachable invoke nodes (ADR-0029)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher });
+    await registerCap(tenantId, "test/cap");
+
+    const unsound: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "unsound-unreachable",
+      version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "x.created" },
+        { nodeId: "a", kind: "invoke", capability: "test/cap", inputs: {} },
+        { nodeId: "orphan", kind: "invoke", capability: "test/cap", inputs: {} },
+      ],
+      edges: [{ from: "trig", to: "a" }],
+    };
+
+    await expect(runtime.install(unsound)).rejects.toBeInstanceOf(WorkflowValidationError);
+    await expect(runtime.install(unsound)).rejects.toThrow(/unreachable nodes: orphan/);
+  });
+
+  it("install rejects workflows with no reachable terminal invoke node (ADR-0029)", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({ pool, registry, events, dispatcher });
+
+    const triggerOnly: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "trigger-only",
+      version: 1,
+      nodes: [{ nodeId: "trig", kind: "trigger", on: "x.created" }],
+      edges: [],
+    };
+
+    await expect(runtime.install(triggerOnly)).rejects.toBeInstanceOf(WorkflowValidationError);
+    await expect(runtime.install(triggerOnly)).rejects.toThrow(/no reachable terminal invoke node/);
+  });
+
   it("install rejects workflows whose edges form a cycle (G8.1)", async () => {
     const tenantId = await makeTenant();
     const dispatcher = new RecordingDispatcher();

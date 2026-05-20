@@ -41,10 +41,9 @@ Workflow authors now have a direct analyzer for the design-level failure modes
 that show up as runtime confusion: orphan nodes, dead branches, and no terminal
 completion path.
 
-The check is currently exported but not enforced during `install()`. That is
-intentional for this commit: existing workflows may rely on DAG-only validation.
-The next hardening step is to run the analyzer against real workflow docs and
-then decide whether install-time enforcement should be default or opt-in.
+The check is enforced during `PostgresWorkflowRuntime.install()`. A workflow that
+does not preserve the completion invariant is rejected before it can become
+tenant runtime state.
 
 ## Validation
 
@@ -52,4 +51,4 @@ then decide whether install-time enforcement should be default or opt-in.
 - `PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate pnpm test`
 - `pnpm build`
 
-As of implementation: 37 test files passed, 294 tests passed.
+As of install-enforcement: 37 test files passed, 296 tests passed.

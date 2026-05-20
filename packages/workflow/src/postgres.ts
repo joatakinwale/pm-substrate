@@ -35,6 +35,7 @@ import { matchesPattern } from "@pm/registry";
 import pg from "pg";
 import { WorkflowValidationError } from "./errors.js";
 import { assertWorkflowAcyclic } from "./cycle-detection.js";
+import { assertWorkflowSound } from "./soundness.js";
 import { validateCapabilityContracts } from "./contract-validation.js";
 import { allowAllAuthorizer, type PermissionAuthorizer } from "./permissions.js";
 import {
@@ -177,6 +178,11 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     // never enforced it; an installed cycle would manifest at runtime as
     // unbounded recursion through the DFS walker.
     assertWorkflowAcyclic(doc);
+
+    // ADR-0029: enforce the completion invariant at install time. This is the
+    // substrate-native form of the workflow-net/cell-checkpoint bridge: every
+    // installed workflow must be reachable from a trigger and able to complete.
+    assertWorkflowSound(doc);
 
     // G6: typed-contract validation. Gather all capabilities the workflow
     // references, normalize their contracts, and verify cross-capability
