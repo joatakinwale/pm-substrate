@@ -9,6 +9,7 @@
 export type {
   EventPublisher,
   EventReader,
+  EventChainVerifier,
   SubscriptionRouter,
   PublishInput,
   ReadQuery,

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type {
   EventPublisher,
   EventReader,
+  EventChainVerifier,
   PublishInput,
   ReadQuery,
 } from "@pm/events";
@@ -11,7 +12,7 @@ export type DomainEventHandler = (input: PublishInput) => Promise<void>;
 import { toHTTPException } from "../errors.js";
 
 export const eventRoutes = (
-  events: EventPublisher & EventReader,
+  events: EventPublisher & EventReader & Partial<EventChainVerifier>,
   handlers: Readonly<Record<string, DomainEventHandler>> = {},
 ): Hono => {
   const app = new Hono();
@@ -58,6 +59,14 @@ export const eventRoutes = (
     if (q["limit"]) (query as ReadQuery & { limit: number }).limit = Number(q["limit"]);
     const result = await events.read(query);
     return c.json({ events: result });
+  });
+
+  // GET /tenants/:tenantId/events/verify-chain
+  app.get("/verify-chain", async (c) => {
+    const tenantId = c.req.param("tenantId") as TenantId;
+    if (!events.verifyChain) return c.json({ error: "event chain verification unavailable" }, 501);
+    const report = await events.verifyChain(tenantId);
+    return c.json({ report });
   });
 
   // GET /tenants/:tenantId/events/:id

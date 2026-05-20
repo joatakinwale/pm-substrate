@@ -23,6 +23,10 @@ export interface EventReader {
   getById(tenantId: TenantId, id: EventId): Promise<PMEvent | null>;
 }
 
+export interface EventChainVerifier {
+  verifyChain(tenantId: TenantId): Promise<import("./provenance.js").EventChainVerificationReport>;
+}
+
 /**
  * Declarative subscription registry + routing. Subscribers register what they
  * care about; the router fans out only matching events. Day-1 backed by

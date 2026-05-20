@@ -237,7 +237,7 @@ describeIfDb("substrate HTTP", () => {
     expect(err.error).toMatch(/exactly:2/);
   });
 
-  it("publish events + read + getById", async () => {
+  it("publish events + read + getById + verify chain", async () => {
     const tenantId = await makeTenant();
     let r = await call("POST", `/tenants/${tenantId}/events`, {
       type: "test.created",
@@ -259,6 +259,12 @@ describeIfDb("substrate HTTP", () => {
     expect(r.status).toBe(200);
     const single = (await r.json()) as { id: string; payload: { foo: string } };
     expect(single.payload).toEqual({ foo: "bar" });
+
+    r = await call("GET", `/tenants/${tenantId}/events/verify-chain`);
+    expect(r.status).toBe(200);
+    const verify = (await r.json()) as { report: { valid: boolean; checked: number } };
+    expect(verify.report.valid).toBe(true);
+    expect(verify.report.checked).toBeGreaterThanOrEqual(1);
   });
 
   it("projection catch-up + getState end-to-end through HTTP", async () => {
