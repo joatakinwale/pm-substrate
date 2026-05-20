@@ -19,7 +19,9 @@ export {
   admissibilityOf,
   eventContentHash,
   sha256Hex,
+  verifyEventChain,
   type EventAdmissibilityReport,
+  type EventChainVerificationReport,
   type EventProvenanceEnvelope,
 } from "./provenance.js";
 export { matchesPattern } from "./pattern.js";

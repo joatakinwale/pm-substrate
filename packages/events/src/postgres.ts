@@ -44,7 +44,7 @@ import type {
 } from "./interfaces.js";
 import { patternToSqlLike } from "./pattern.js";
 import { ensureMonthPartition } from "./partitions.js";
-import { eventContentHash } from "./provenance.js";
+import { eventContentHash, verifyEventChain, type EventChainVerificationReport } from "./provenance.js";
 
 /**
  * Tenant id sanitization for use in NOTIFY channel names. Channel identifiers
@@ -309,6 +309,19 @@ export class PostgresEventStore
       [tenantId, id],
     );
     return r.rows[0] ? rowToEvent(r.rows[0]) : null;
+  }
+
+  async verifyChain(tenantId: TenantId): Promise<EventChainVerificationReport> {
+    const r = await this.#pool.query<RowShape>(
+      `SELECT id, tenant_id, type, entity_id, emitted_by, payload_schema,
+              payload, occurred_at, recorded_at, caused_by, schema_version,
+              authority, content_hash, prior_event_hash
+         FROM events.events
+        WHERE tenant_id = $1
+        ORDER BY recorded_at ASC, id ASC`,
+      [tenantId],
+    );
+    return verifyEventChain(tenantId, r.rows.map(rowToEvent));
   }
 
   // -------------------------------------------------------------------------

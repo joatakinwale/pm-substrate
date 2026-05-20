@@ -145,6 +145,43 @@ describeIfDb("PostgresEventStore", () => {
     expect(admissibilityOf(second).admissible).toBe(true);
   });
 
+  it("verifies the tenant event hash chain and detects tampering", async () => {
+    const chainTenant = `tnt_chain_${randomUUID().slice(0, 8)}` as TenantId;
+    const a = await store.publish({
+      tenantId: chainTenant,
+      type: "chain.a",
+      entityId: "ent_chain_a",
+      emittedBy: "cap.chain",
+      authority: "perm:chain.write",
+      payloadSchema: "chain.a/v1",
+      payload: { n: 1 },
+    });
+    const b = await store.publish({
+      tenantId: chainTenant,
+      type: "chain.b",
+      entityId: "ent_chain_b",
+      emittedBy: "cap.chain",
+      authority: "perm:chain.write",
+      payloadSchema: "chain.b/v1",
+      payload: { n: 2 },
+    });
+
+    let report = await store.verifyChain(chainTenant);
+    expect(report.valid).toBe(true);
+    expect(report.checked).toBe(2);
+
+    await pool.query(
+      `UPDATE events.events SET payload = $3::jsonb WHERE tenant_id = $1 AND id = $2`,
+      [chainTenant, b.id, JSON.stringify({ n: 999 })],
+    );
+    report = await store.verifyChain(chainTenant);
+    expect(report.valid).toBe(false);
+    expect(report.brokenEventIds).toContain(b.id);
+
+    await pool.query(`DELETE FROM events.events WHERE tenant_id = $1`, [chainTenant]);
+    expect(a.contentHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it("preserves causation chain", async () => {
     const cause = await store.publish({
       tenantId,

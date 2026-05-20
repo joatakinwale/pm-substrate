@@ -25,6 +25,14 @@ export interface EventAdmissibilityReport {
   readonly actualContentHash: string | null;
 }
 
+export interface EventChainVerificationReport {
+  readonly tenantId: string;
+  readonly valid: boolean;
+  readonly checked: number;
+  readonly brokenEventIds: readonly string[];
+  readonly errors: readonly string[];
+}
+
 const canonicalize = (value: unknown): string => {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
@@ -77,5 +85,36 @@ export const admissibilityOf = (event: PMEvent): EventAdmissibilityReport => {
     missing,
     expectedContentHash,
     actualContentHash: event.contentHash,
+  };
+};
+
+
+export const verifyEventChain = (
+  tenantId: string,
+  events: readonly PMEvent[],
+): EventChainVerificationReport => {
+  const brokenEventIds: string[] = [];
+  const errors: string[] = [];
+  let previousHash: string | null = null;
+
+  for (const event of events) {
+    const admissibility = admissibilityOf(event);
+    if (!admissibility.admissible) {
+      brokenEventIds.push(event.id);
+      errors.push(`${event.id}: ${admissibility.missing.join(",")}`);
+    }
+    if (event.priorEventHash !== previousHash) {
+      brokenEventIds.push(event.id);
+      errors.push(`${event.id}: priorEventHash mismatch expected=${previousHash ?? "null"} actual=${event.priorEventHash ?? "null"}`);
+    }
+    previousHash = event.contentHash;
+  }
+
+  return {
+    tenantId,
+    valid: errors.length === 0,
+    checked: events.length,
+    brokenEventIds: [...new Set(brokenEventIds)],
+    errors,
   };
 };
