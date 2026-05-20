@@ -9,3 +9,10 @@ export type {
 } from "./interfaces.js";
 export { checkpointHash, sha256Hex } from "./hash.js";
 export { PostgresContinuityLedger } from "./postgres.js";
+
+export {
+  buildContinuityContext,
+  findContinuityContradictions,
+  type ContinuityContext,
+  type ContradictionFinding,
+} from "./context.js";
