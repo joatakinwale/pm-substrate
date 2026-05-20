@@ -38,6 +38,11 @@ export {
   type CycleDetectionInput,
 } from "./cycle-detection.js";
 export {
+  analyzeWorkflowSoundness,
+  assertWorkflowSound,
+  type WorkflowSoundnessReport,
+} from "./soundness.js";
+export {
   acceptAllInputValidator,
   rejectAllInputValidator,
   builtinInputValidator,
