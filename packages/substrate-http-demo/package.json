@@ -23,7 +23,8 @@
     "@pm/registry": "workspace:*",
     "@pm/substrate-http": "workspace:*",
     "@pm/types": "workspace:*",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "@pm/tenants": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",

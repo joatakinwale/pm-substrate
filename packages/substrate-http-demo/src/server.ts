@@ -34,6 +34,7 @@ import { PostgresGraph } from "@pm/graph";
 import { PostgresProfileRegistry } from "@pm/profile-registry";
 import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresRegistry } from "@pm/registry";
+import { PostgresTenantDirectory } from "@pm/tenants";
 import { BudgetRollupHandler } from "@pm/capability-wedding-budget";
 
 import { createSubstrateApp } from "@pm/substrate-http";
@@ -59,6 +60,7 @@ const PORT = parseInt(env["PORT"] ?? "4000", 10);
 const pool = new pg.Pool({ connectionString: DATABASE_URL });
 
 const events = new PostgresEventStore(pool);
+const tenants = new PostgresTenantDirectory(pool);
 const profileRegistry = new PostgresProfileRegistry(pool);
 const graph = new PostgresGraph(pool, {
   validatorFactory: (t) => profileRegistry.validator(t),
@@ -73,6 +75,7 @@ const budgetRollup = new BudgetRollupHandler({
 });
 
 const app = createSubstrateApp({
+  tenants,
   profileRegistry,
   capabilityRegistry,
   graph,

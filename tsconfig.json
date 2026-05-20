@@ -1,13 +1,32 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/types" },
-    { "path": "./packages/graph" },
-    { "path": "./packages/events" },
-    { "path": "./packages/registry" },
-    { "path": "./packages/workflow" },
-    { "path": "./packages/projections" },
-    { "path": "./packages/capability-kit" },
-    { "path": "./packages/entity-mapping" }
+    {
+      "path": "./packages/types"
+    },
+    {
+      "path": "./packages/tenants"
+    },
+    {
+      "path": "./packages/graph"
+    },
+    {
+      "path": "./packages/events"
+    },
+    {
+      "path": "./packages/registry"
+    },
+    {
+      "path": "./packages/workflow"
+    },
+    {
+      "path": "./packages/projections"
+    },
+    {
+      "path": "./packages/capability-kit"
+    },
+    {
+      "path": "./packages/entity-mapping"
+    }
   ]
 }

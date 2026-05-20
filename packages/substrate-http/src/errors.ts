@@ -6,6 +6,11 @@ import {
   OptimisticConcurrencyError,
 } from "@pm/graph";
 import { ProfileValidationError } from "@pm/profile-registry";
+import {
+  InvalidTenantIdError,
+  TenantConflictError,
+  TenantNotFoundError,
+} from "@pm/tenants";
 
 /**
  * Translate substrate domain errors into HTTP status codes. Only documented
@@ -21,6 +26,9 @@ import { ProfileValidationError } from "@pm/profile-registry";
  *   NodeConflictError        → 409 Conflict   [P2.3a]
  *   InvalidIdError           → 400 Bad Request [P2.3a]
  *   NotFoundError            → 404 Not Found
+ *   TenantNotFoundError      → 404 Not Found
+ *   TenantConflictError      → 409 Conflict
+ *   InvalidTenantIdError     → 400 Bad Request
  *   everything else          → 500 Internal Server Error
  */
 export const toHTTPException = (err: unknown): HTTPException => {
@@ -29,6 +37,24 @@ export const toHTTPException = (err: unknown): HTTPException => {
     return new HTTPException(422, {
       message: err.message,
       cause: { kind: "profile_validation", subject: err.subject },
+    });
+  }
+  if (err instanceof TenantConflictError) {
+    return new HTTPException(409, {
+      message: err.message,
+      cause: { kind: "tenant_conflict" },
+    });
+  }
+  if (err instanceof TenantNotFoundError) {
+    return new HTTPException(404, {
+      message: err.message,
+      cause: { kind: "tenant_not_found" },
+    });
+  }
+  if (err instanceof InvalidTenantIdError) {
+    return new HTTPException(400, {
+      message: err.message,
+      cause: { kind: "invalid_tenant_id" },
     });
   }
   if (err instanceof NodeConflictError) {

@@ -20,6 +20,7 @@ import { PostgresGraph } from "@pm/graph";
 import { PostgresProfileRegistry } from "@pm/profile-registry";
 import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresRegistry } from "@pm/registry";
+import { PostgresTenantDirectory } from "@pm/tenants";
 import { WEDDING_PROFILE } from "@pm/profile-wedding";
 import { auditProjection, AUDIT_CAPABILITY } from "@pm/capability-audit";
 import type { TenantId } from "@pm/types";
@@ -32,6 +33,7 @@ describeIfDb("substrate HTTP", () => {
   let pool: pg.Pool;
   let events: PostgresEventStore;
   let graph: PostgresGraph;
+  let tenantsDirectory: PostgresTenantDirectory;
   let profileRegistry: PostgresProfileRegistry;
   let capRegistry: PostgresRegistry;
   let projections: PostgresProjectionRunner;
@@ -40,11 +42,7 @@ describeIfDb("substrate HTTP", () => {
   const tenants: TenantId[] = [];
   const makeTenant = async (): Promise<TenantId> => {
     const id = `tnt_http_${randomUUID().slice(0, 8)}` as TenantId;
-    await pool.query(
-      `INSERT INTO substrate.tenants(id, display_name) VALUES ($1, $1)
-       ON CONFLICT DO NOTHING`,
-      [id],
-    );
+    await tenantsDirectory.create({ id, displayName: id });
     tenants.push(id);
     return id;
   };
@@ -52,6 +50,7 @@ describeIfDb("substrate HTTP", () => {
   beforeAll(async () => {
     pool = new pg.Pool({ connectionString: DATABASE_URL });
     events = new PostgresEventStore(pool);
+    tenantsDirectory = new PostgresTenantDirectory(pool);
     profileRegistry = new PostgresProfileRegistry(pool);
     graph = new PostgresGraph(pool, {
       validatorFactory: (t) => profileRegistry.validator(t),
@@ -61,6 +60,7 @@ describeIfDb("substrate HTTP", () => {
     await projections.register(auditProjection);
 
     app = createSubstrateApp({
+      tenants: tenantsDirectory,
       profileRegistry,
       capabilityRegistry: capRegistry,
       graph,
@@ -103,6 +103,52 @@ describeIfDb("substrate HTTP", () => {
     const r = await call("GET", "/healthz");
     expect(r.status).toBe(200);
     expect(await r.json()).toEqual({ status: "ok" });
+  });
+
+  it("G9: onboards, updates, archives, and restores a tenant through HTTP", async () => {
+    const tenantId = `tnt_http_onboard_${randomUUID().slice(0, 8)}` as TenantId;
+    tenants.push(tenantId);
+
+    let r = await call("POST", "/tenants", {
+      id: tenantId,
+      displayName: "Acme Operations",
+      metadata: { source: "api", externalCustomerId: "cus_test" },
+    });
+    expect(r.status).toBe(201);
+    let body = (await r.json()) as { tenant: { id: string; displayName: string; metadata: Record<string, unknown>; archivedAt: string | null } };
+    expect(body.tenant.id).toBe(tenantId);
+    expect(body.tenant.metadata).toMatchObject({ source: "api" });
+    expect(body.tenant.archivedAt).toBeNull();
+
+    r = await call("GET", `/tenants/${tenantId}`);
+    expect(r.status).toBe(200);
+
+    r = await call("PATCH", `/tenants/${tenantId}`, {
+      displayName: "Acme Ops Updated",
+      metadata: { source: "api", plan: "pilot" },
+    });
+    expect(r.status).toBe(200);
+    body = (await r.json()) as typeof body;
+    expect(body.tenant.displayName).toBe("Acme Ops Updated");
+    expect(body.tenant.metadata).toMatchObject({ plan: "pilot" });
+
+    r = await call("POST", `/tenants/${tenantId}/archive`);
+    expect(r.status).toBe(200);
+    body = (await r.json()) as typeof body;
+    expect(body.tenant.archivedAt).toBeTruthy();
+
+    r = await call("GET", "/tenants");
+    const active = (await r.json()) as { tenants: Array<{ id: string }> };
+    expect(active.tenants.map((t) => t.id)).not.toContain(tenantId);
+
+    r = await call("GET", "/tenants?includeArchived=true");
+    const all = (await r.json()) as { tenants: Array<{ id: string }> };
+    expect(all.tenants.map((t) => t.id)).toContain(tenantId);
+
+    r = await call("POST", `/tenants/${tenantId}/restore`);
+    expect(r.status).toBe(200);
+    body = (await r.json()) as typeof body;
+    expect(body.tenant.archivedAt).toBeNull();
   });
 
   it("install profile + list + get + delete", async () => {

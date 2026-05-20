@@ -12,8 +12,10 @@ import type { Graph } from "@pm/graph";
 import type { ProfileRegistry } from "@pm/profile-registry";
 import type { ProjectionRunner } from "@pm/projections";
 import type { Registry } from "@pm/registry";
+import type { TenantDirectory } from "@pm/tenants";
 import { toHTTPException } from "./errors.js";
 import { profileRoutes } from "./routes/profiles.js";
+import { tenantRoutes } from "./routes/tenants.js";
 import { capabilityRoutes } from "./routes/capabilities.js";
 import { graphRoutes } from "./routes/graph.js";
 import { eventRoutes } from "./routes/events.js";
@@ -21,6 +23,7 @@ import type { DomainEventHandler } from "./routes/events.js";
 import { projectionRoutes } from "./routes/projections.js";
 
 export interface SubstrateAppDeps {
+  readonly tenants: TenantDirectory;
   readonly profileRegistry: ProfileRegistry;
   readonly capabilityRegistry: Registry;
   readonly graph: Graph;
@@ -34,6 +37,7 @@ export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
 
   app.get("/healthz", (c) => c.json({ status: "ok" }));
 
+  app.route("/tenants", tenantRoutes(deps.tenants));
   app.route("/tenants/:tenantId/profiles", profileRoutes(deps.profileRegistry));
   app.route("/tenants/:tenantId/capabilities", capabilityRoutes(deps.capabilityRegistry));
   app.route("/tenants/:tenantId", graphRoutes(deps.graph));

@@ -473,6 +473,9 @@ importers:
       '@pm/registry':
         specifier: workspace:*
         version: link:../registry
+      '@pm/tenants':
+        specifier: workspace:*
+        version: link:../tenants
       '@pm/types':
         specifier: workspace:*
         version: link:../types
@@ -525,6 +528,9 @@ importers:
       '@pm/substrate-http':
         specifier: workspace:*
         version: link:../substrate-http
+      '@pm/tenants':
+        specifier: workspace:*
+        version: link:../tenants
       '@pm/types':
         specifier: workspace:*
         version: link:../types
@@ -541,6 +547,25 @@ importers:
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
+
+  packages/tenants:
+    dependencies:
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
 
   packages/types:
     devDependencies:
