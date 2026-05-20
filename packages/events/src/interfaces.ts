@@ -42,6 +42,12 @@ export interface PublishInput {
   readonly emittedBy: string;
   readonly payloadSchema: string;
   readonly payload: Readonly<Record<string, unknown>>;
+  /**
+   * Chain-of-custody authority: permission grant, capability, operator, or
+   * external trigger that made this event admissible. Defaults to emittedBy
+   * for legacy callers, but real integrations should pass the specific grant.
+   */
+  readonly authority?: string | null;
   readonly occurredAt?: Timestamp;
   readonly causedBy?: EventId | null;
 }

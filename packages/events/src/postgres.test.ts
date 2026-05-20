@@ -11,6 +11,7 @@ import pg from "pg";
 import type { TenantId } from "@pm/types";
 import { PostgresEventStore } from "./postgres.js";
 import { matchesPattern } from "./pattern.js";
+import { admissibilityOf } from "./provenance.js";
 
 const DATABASE_URL = process.env["PM_DATABASE_URL"];
 
@@ -113,6 +114,35 @@ describeIfDb("PostgresEventStore", () => {
       entityId: "ent_ms_1",
     });
     expect(byEntity.every((e) => e.entityId === "ent_ms_1")).toBe(true);
+  });
+
+  it("adds chain-of-custody provenance metadata and hashes", async () => {
+    const first = await store.publish({
+      tenantId,
+      type: "audit.first",
+      entityId: "ent_audit_1",
+      emittedBy: "cap.audit",
+      authority: "perm:audit.write",
+      payloadSchema: "audit.first/v1",
+      payload: { n: 1 },
+    });
+    const second = await store.publish({
+      tenantId,
+      type: "audit.second",
+      entityId: "ent_audit_2",
+      emittedBy: "cap.audit",
+      authority: "perm:audit.write",
+      payloadSchema: "audit.second/v1",
+      payload: { n: 2 },
+      causedBy: first.id,
+    });
+
+    expect(first.schemaVersion).toBe(1);
+    expect(first.authority).toBe("perm:audit.write");
+    expect(first.contentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(second.priorEventHash).toBe(first.contentHash);
+    expect(second.contentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(admissibilityOf(second).admissible).toBe(true);
   });
 
   it("preserves causation chain", async () => {

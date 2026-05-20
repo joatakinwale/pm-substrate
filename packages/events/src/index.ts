@@ -15,5 +15,12 @@ export type {
 } from "./interfaces.js";
 
 export { PostgresEventStore } from "./postgres.js";
+export {
+  admissibilityOf,
+  eventContentHash,
+  sha256Hex,
+  type EventAdmissibilityReport,
+  type EventProvenanceEnvelope,
+} from "./provenance.js";
 export { matchesPattern } from "./pattern.js";
 export { ensureMonthPartition, monthRange } from "./partitions.js";

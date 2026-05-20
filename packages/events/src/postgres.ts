@@ -44,6 +44,7 @@ import type {
 } from "./interfaces.js";
 import { patternToSqlLike } from "./pattern.js";
 import { ensureMonthPartition } from "./partitions.js";
+import { eventContentHash } from "./provenance.js";
 
 /**
  * Tenant id sanitization for use in NOTIFY channel names. Channel identifiers
@@ -80,6 +81,10 @@ interface RowShape {
   occurred_at: Date;
   recorded_at: Date;
   caused_by: string | null;
+  schema_version: number;
+  authority: string | null;
+  content_hash: string | null;
+  prior_event_hash: string | null;
 }
 
 const rowToEvent = (row: RowShape): PMEvent => ({
@@ -90,6 +95,10 @@ const rowToEvent = (row: RowShape): PMEvent => ({
   emittedBy: row.emitted_by,
   payloadSchema: row.payload_schema,
   payload: row.payload ?? {},
+  schemaVersion: row.schema_version,
+  authority: row.authority,
+  contentHash: row.content_hash,
+  priorEventHash: row.prior_event_hash,
   occurredAt: row.occurred_at.toISOString() as Timestamp,
   recordedAt: row.recorded_at.toISOString() as Timestamp,
   causedBy: (row.caused_by ?? null) as EventId | null,
@@ -165,13 +174,26 @@ export class PostgresEventStore
     const occurredAt =
       input.occurredAt ?? (new Date().toISOString() as Timestamp);
 
+    const prior = await client.query<{ content_hash: string | null }>(
+      `SELECT content_hash
+         FROM events.events
+        WHERE tenant_id = $1
+        ORDER BY recorded_at DESC, id DESC
+        LIMIT 1`,
+      [input.tenantId],
+    );
+    const priorEventHash = prior.rows[0]?.content_hash ?? null;
+    const authority = input.authority ?? input.emittedBy;
+
     const result = await client.query<RowShape>(
       `INSERT INTO events.events
         (id, tenant_id, type, entity_id, emitted_by, payload_schema,
-         payload, occurred_at, caused_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)
+         payload, occurred_at, caused_by, schema_version, authority,
+         prior_event_hash)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,1,$10,$11)
        RETURNING id, tenant_id, type, entity_id, emitted_by, payload_schema,
-                 payload, occurred_at, recorded_at, caused_by`,
+                 payload, occurred_at, recorded_at, caused_by, schema_version,
+                 authority, content_hash, prior_event_hash`,
       [
         id,
         input.tenantId,
@@ -182,10 +204,38 @@ export class PostgresEventStore
         JSON.stringify(input.payload ?? {}),
         occurredAt,
         input.causedBy ?? null,
+        authority,
+        priorEventHash,
       ],
     );
 
-    const event = rowToEvent(result.rows[0]!);
+    const inserted = rowToEvent(result.rows[0]!);
+    const contentHash = eventContentHash({
+      id: inserted.id,
+      tenantId: inserted.tenantId,
+      type: inserted.type,
+      entityId: inserted.entityId,
+      emittedBy: inserted.emittedBy,
+      authority: inserted.authority,
+      payloadSchema: inserted.payloadSchema,
+      payload: inserted.payload,
+      occurredAt: inserted.occurredAt,
+      recordedAt: inserted.recordedAt,
+      causedBy: inserted.causedBy,
+      schemaVersion: inserted.schemaVersion,
+      priorEventHash: inserted.priorEventHash,
+    });
+    const hashed = await client.query<RowShape>(
+      `UPDATE events.events
+          SET content_hash = $3
+        WHERE tenant_id = $1 AND id = $2
+        RETURNING id, tenant_id, type, entity_id, emitted_by, payload_schema,
+                  payload, occurred_at, recorded_at, caused_by, schema_version,
+                  authority, content_hash, prior_event_hash`,
+      [input.tenantId, inserted.id, contentHash],
+    );
+
+    const event = rowToEvent(hashed.rows[0]!);
 
     // pg_notify is transactional: if the caller rolls back, this is undone.
     const msg: NotifyMsg = {
@@ -234,7 +284,8 @@ export class PostgresEventStore
 
     const rows = await this.#pool.query<RowShape>(
       `SELECT id, tenant_id, type, entity_id, emitted_by, payload_schema,
-              payload, occurred_at, recorded_at, caused_by
+              payload, occurred_at, recorded_at, caused_by, schema_version,
+              authority, content_hash, prior_event_hash
          FROM events.events
         WHERE ${where.join(" AND ")}
         ORDER BY recorded_at ASC, id ASC
@@ -250,7 +301,8 @@ export class PostgresEventStore
   ): Promise<PMEvent | null> {
     const r = await this.#pool.query<RowShape>(
       `SELECT id, tenant_id, type, entity_id, emitted_by, payload_schema,
-              payload, occurred_at, recorded_at, caused_by
+              payload, occurred_at, recorded_at, caused_by, schema_version,
+              authority, content_hash, prior_event_hash
          FROM events.events
         WHERE tenant_id = $1 AND id = $2
         LIMIT 1`,
@@ -359,7 +411,8 @@ export class PostgresEventStore
 
     const catchup = await this.#pool.query<RowShape>(
       `SELECT id, tenant_id, type, entity_id, emitted_by, payload_schema,
-              payload, occurred_at, recorded_at, caused_by
+              payload, occurred_at, recorded_at, caused_by, schema_version,
+              authority, content_hash, prior_event_hash
          FROM events.events
         WHERE tenant_id = $1 AND (${likeClause}) ${watermarkClause}
         ORDER BY recorded_at ASC, id ASC`,

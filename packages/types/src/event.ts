@@ -48,6 +48,21 @@ export interface PMEvent {
   readonly payloadSchema: string;
   readonly payload: Readonly<Record<string, unknown>>;
 
+  /**
+   * Event-envelope schema version. Distinct from payloadSchema: this versions
+   * the substrate's chain-of-custody metadata, not the capability payload.
+   */
+  readonly schemaVersion: number;
+
+  /** Capability/permission/external authority under which the event was admitted. */
+  readonly authority: string | null;
+
+  /** sha256 over canonical event envelope fields. */
+  readonly contentHash: string | null;
+
+  /** contentHash of the immediately prior recorded tenant event, if one exists. */
+  readonly priorEventHash: string | null;
+
   /** Wall-clock time the event was recorded. */
   readonly occurredAt: Timestamp;
   readonly recordedAt: Timestamp;
