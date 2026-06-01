@@ -98,6 +98,25 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/capability-finance-research-ingest:
+    dependencies:
+      '@pm/profile-finance-research':
+        specifier: workspace:*
+        version: link:../profile-finance-research
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/capability-kit:
     dependencies:
       '@pm/events':
@@ -309,6 +328,19 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/evals:
+    dependencies:
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/events:
     dependencies:
       '@pm/types':
@@ -392,6 +424,19 @@ importers:
       pg:
         specifier: ^8.13.0
         version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
+  packages/profile-finance-research:
+    dependencies:
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

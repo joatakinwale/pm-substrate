@@ -30,6 +30,15 @@
     },
     {
       "path": "./packages/entity-mapping"
+    },
+    {
+      "path": "./packages/evals"
+    },
+    {
+      "path": "./packages/profile-finance-research"
+    },
+    {
+      "path": "./packages/capability-finance-research-ingest"
     }
   ]
 }

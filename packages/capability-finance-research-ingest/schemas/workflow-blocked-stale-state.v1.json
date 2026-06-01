@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finance-research/workflow-blocked-stale-state.v1.json",
+  "type": "object",
+  "required": ["researchRunId", "blockedEntityId", "reason", "occurredAt"],
+  "properties": {
+    "researchRunId": { "type": "string" },
+    "blockedEntityId": { "type": "string" },
+    "reason": { "type": "string" },
+    "invalidatingEventId": { "type": ["string", "null"] },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": true
+}

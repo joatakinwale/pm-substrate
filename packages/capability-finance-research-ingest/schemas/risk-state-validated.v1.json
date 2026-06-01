@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finance-research/risk-state-validated.v1.json",
+  "type": "object",
+  "required": ["researchRunId", "tickerId", "riskStateId", "occurredAt"],
+  "properties": {
+    "researchRunId": { "type": "string" },
+    "tickerId": { "type": "string" },
+    "riskStateId": { "type": "string" },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "bindingConstraint": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}
