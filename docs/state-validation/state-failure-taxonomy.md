@@ -8,6 +8,8 @@ This taxonomy names the state failures pm-substrate must be able to create, dete
 
 The taxonomy is deliberately cross-domain. A failure is only useful if it can be tested in more than one environment and tied back to substrate primitives: graph state, event history, provenance, workflow position, capability contracts, freshness, source authority, and continuity checkpoints.
 
+Research grounding: `arrowsmith-state-substrate-research.md` maps these classes to adjacent domains including partial observability, agent memory, distributed systems, process mining, provenance, semantic interoperability, state estimation, and team cognition.
+
 ## Evaluation Rule
 
 Every failure scenario must produce at least one `EvalEvent` from `@pm/evals`.

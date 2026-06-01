@@ -4,6 +4,8 @@
 
 The schema is intentionally small. It is not a replacement for the substrate event log. It is the measurement wrapper around an experiment run: what scenario ran, which failure class it tested, what evidence exists, which substrate records are relevant, and whether the system passed, failed, or was blocked.
 
+Research grounding: `arrowsmith-state-substrate-research.md` explains why eval events measure state as a cross-domain systems problem rather than as generic LLM memory quality.
+
 ## TypeScript Surface
 
 Source: `packages/evals/src/schema.ts`.
