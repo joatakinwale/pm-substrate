@@ -241,11 +241,13 @@ Document whether each eval event should point to graph node ids, event ids, work
 
 ### Task 3: Define Controlled Local Lab Scenarios
 
+**Status:** Completed on 2026-06-01.
+
 **Files:**
 
-- Create: `docs/state-validation/local-agent-lab-scenarios.md`
+- Created: `docs/state-validation/local-agent-lab-scenarios.md`
 
-- [ ] **Step 1: Define single-agent scenarios**
+- [x] **Step 1: Define single-agent scenarios**
 
 Include:
 
@@ -255,7 +257,7 @@ Include:
 - invalid workflow step;
 - hallucinated mapping rejected by validator.
 
-- [ ] **Step 2: Define parallel-agent scenarios**
+- [x] **Step 2: Define parallel-agent scenarios**
 
 Include:
 
@@ -264,7 +266,7 @@ Include:
 - one agent invalidates another agent's plan;
 - two agents claim different authoritative facts.
 
-- [ ] **Step 3: Define multi-module scenarios**
+- [x] **Step 3: Define multi-module scenarios**
 
 Include:
 
