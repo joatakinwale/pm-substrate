@@ -95,7 +95,7 @@ This is not yet proof that pm-substrate beats external memory systems. It is pro
 
 ## Gaps Exposed
 
-1. `state_bench_category`, `memory_benchmark_bridge`, and `mast_category` are currently encoded in `EvalEvent.notes`; the next schema revision should make them structured optional fields.
+1. `stateBenchCategory`, `memoryBenchmarkBridge`, `mastCategory`, and `coordinationClass` are now structured `EvalEvent` fields. The next schema revision should add actual agent-trace replay inputs instead of deterministic-only fixture observations.
 2. The first local-lab suite is deterministic and hand-authored. The next version should replay actual agent traces or fixture transcripts.
 3. The suite does not yet include StructMemEval-style ledgers/trees or G-Memory-style multi-agent collaboration trajectories.
 4. STATE-Bench is useful and current, but it is not treated here as peer-reviewed evidence. It remains the best external harness to target, not a peer-reviewed proof source.

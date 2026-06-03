@@ -32,8 +32,12 @@ export class PostgresEvalEventStore {
          result,
          run_arm,
          paired_run_group,
+         state_bench_category,
+         memory_benchmark_bridge,
+         mast_category,
+         coordination_class,
          event
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9, $10, $11, $12::jsonb)`,
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb)`,
       [
         validEvent.tenantId,
         validEvent.axis,
@@ -46,6 +50,10 @@ export class PostgresEvalEventStore {
         validEvent.result,
         validEvent.runArm,
         validEvent.pairedRunGroup,
+        validEvent.stateBenchCategory,
+        validEvent.memoryBenchmarkBridge,
+        validEvent.mastCategory,
+        validEvent.coordinationClass,
         validEvent,
       ],
     );

@@ -34,6 +34,23 @@ export interface EvalEvent {
   readonly substrateRefs: readonly EvalEvidenceRef[];
   readonly runArm?: "baseline" | "substrate";
   readonly pairedRunGroup?: string;
+  readonly stateBenchCategory?:
+    | "stateful"
+    | "procedural_execution"
+    | "user_experience";
+  readonly memoryBenchmarkBridge?:
+    | "knowledge_update"
+    | "abstention"
+    | "workflow_rebase";
+  readonly mastCategory?:
+    | "system_design"
+    | "inter_agent_misalignment"
+    | "task_verification";
+  readonly coordinationClass?:
+    | "append_only_observation"
+    | "convergent_update"
+    | "authority_gated_transition"
+    | "derived_projection";
   readonly confidenceBand?: {
     readonly low: number;
     readonly high: number;
@@ -87,6 +104,10 @@ Rules:
 - `evidenceRefs` and `substrateRefs` must be arrays of valid refs.
 - `runArm`, when present, must be `baseline` or `substrate`.
 - `pairedRunGroup`, when present, must be a non-empty string.
+- `stateBenchCategory`, when present, must be a supported STATE-Bench-style category.
+- `memoryBenchmarkBridge`, when present, must be a supported memory-benchmark bridge label.
+- `mastCategory`, when present, must be a supported MAST-style multi-agent failure category.
+- `coordinationClass`, when present, must be one of the cross-disciplinary coordination classes: append-only observation, convergent update, authority-gated transition, or derived projection.
 - Finance-axis events require both `runArm` and `pairedRunGroup` so paired baseline/substrate runs can be analyzed without changing marketing or local-lab compatibility.
 - `confidenceBand`, when present, must include finite `low` and `high` numbers plus one supported method.
 - `pass` and `fail` events require at least one `evidenceRef` and at least one `substrateRef`.
@@ -132,6 +153,10 @@ evalEvent({
   ],
   runArm: "baseline",
   pairedRunGroup: "pair_stale_price_seed_001",
+  stateBenchCategory: "stateful",
+  memoryBenchmarkBridge: "knowledge_update",
+  mastCategory: "task_verification",
+  coordinationClass: "authority_gated_transition",
   result: "fail",
   notes: "Portfolio decision used an analyst signal created before the price refresh.",
 });
@@ -175,10 +200,25 @@ evalEvent({
     evalEvidenceRef("event", "evt_conflict_detected"),
     evalEvidenceRef("projection", "projection_entity_state"),
   ],
+  stateBenchCategory: "procedural_execution",
+  memoryBenchmarkBridge: "workflow_rebase",
+  mastCategory: "system_design",
+  coordinationClass: "authority_gated_transition",
   result: "pass",
   notes: "Substrate rejected the second write because its read snapshot was invalidated by the first accepted event.",
 });
 ```
+
+## Research Taxonomy Fields
+
+The optional taxonomy fields keep benchmark and cross-disciplinary labels queryable instead of hiding them in prose notes.
+
+| Field | Purpose |
+| --- | --- |
+| `stateBenchCategory` | Maps a scenario to STATE-Bench-style behavioral categories. |
+| `memoryBenchmarkBridge` | Preserves the agent-memory competency being tested. |
+| `mastCategory` | Maps multi-agent failures to MAST-style system design, inter-agent misalignment, or task-verification categories. |
+| `coordinationClass` | Implements the cross-disciplinary CRDT-vs-gate classification: append-only observation, convergent update, authority-gated transition, or derived projection. |
 
 ## Metric Mapping
 
@@ -187,6 +227,7 @@ evalEvent({
 | `state_disagreement_rate` | Count `source_authority_conflict`, `parallel_write_conflict`, and `memory_drift` failures per run. |
 | `stale_action_rate` | Count `stale_observation` failures where the action occurred after an invalidating event. |
 | `evidence_coverage` | Ratio of pass/fail events with non-empty evidence refs and substrate refs. |
+| `conflict_auto_resolution_rate` | Compare `convergent_update` events against authority-gated conflict outcomes. |
 | `contradiction_rate` | Count `memory_drift`, `source_authority_conflict`, and `continuity_break` failures with contradiction notes. |
 | `resume_success_rate` | Ratio of continuity scenarios that pass over all continuity scenarios not blocked. |
 | `replay_fidelity` | Ratio of replay scenarios that pass over all replay scenarios not blocked. |
@@ -196,9 +237,9 @@ evalEvent({
 
 ## Persistence
 
-`@pm/evals` owns harness persistence under `packages/evals/src/persistence/` with migrations under `packages/evals/migrations/`. This is intentionally not a root substrate migration: eval persistence records measurements, while source-of-truth authority stays in substrate graph/events/workflow/capability packages.
+`@pm/evals` owns harness persistence under `packages/evals/src/persistence/` with migrations under `packages/evals/migrations/`. The root runner also applies `db/migrations/0017_eval_events.sql` and `db/migrations/0018_eval_event_taxonomy.sql` for local integrated runs. Eval persistence records measurements, while source-of-truth authority stays in substrate graph/events/workflow/capability packages.
 
-The first table is `evals.eval_events`, indexed by tenant, axis, run, scenario, and paired-run grouping.
+The first table is `evals.eval_events`, indexed by tenant, axis, run, scenario, paired-run grouping, taxonomy labels, and coordination class.
 
 ## Design Boundary
 

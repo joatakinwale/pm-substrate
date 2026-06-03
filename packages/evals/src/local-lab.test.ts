@@ -21,13 +21,18 @@ describe("local-lab paired evals", () => {
     expect(pair.events.map((e) => e.result)).toEqual(["fail", "pass"]);
     expect(pair.events.every((e) => e.axis === "local_lab")).toBe(true);
     expect(pair.events.every((e) => e.pairedRunGroup === pair.pairedRunGroup)).toBe(true);
-    expect(pair.events.every((e) => e.notes.includes("state_bench_category=stateful"))).toBe(true);
-    expect(pair.events.every((e) => e.notes.includes("memory_benchmark_bridge=knowledge_update"))).toBe(true);
+    expect(pair.events.every((e) => e.stateBenchCategory === "stateful")).toBe(true);
+    expect(pair.events.every((e) => e.memoryBenchmarkBridge === "knowledge_update")).toBe(true);
+    expect(pair.events.every((e) => e.mastCategory === "system_design")).toBe(true);
+    expect(pair.events.every((e) => e.coordinationClass === "derived_projection")).toBe(true);
+    expect(pair.events.every((e) => !e.notes.includes("state_bench_category="))).toBe(true);
     expect(pair.summary).toMatchObject({
       scenarioId: "stale-memory-after-source-update",
       failureClass: "memory_drift",
       stateBenchCategory: "stateful",
       memoryBenchmarkBridge: "knowledge_update",
+      mastCategory: "system_design",
+      coordinationClass: "derived_projection",
       baselineResult: "fail",
       substrateResult: "pass",
       improvement: 1,
@@ -42,6 +47,12 @@ describe("local-lab paired evals", () => {
     expect(suite.baselineFailures).toBe(LOCAL_LAB_SCENARIOS.length);
     expect(suite.substrateFailures).toBe(0);
     expect(suite.failureReduction).toBe(LOCAL_LAB_SCENARIOS.length);
+    expect(suite.metrics.failureReduction).toBe(LOCAL_LAB_SCENARIOS.length);
+    expect(suite.metrics.authorityGatePassRate).toBe(1);
+    expect(suite.metrics.byCoordinationClass["authority_gated_transition"]).toMatchObject({
+      pairedGroups: 2,
+      failureReduction: 2,
+    });
     expect(suite.stateBenchCategories).toEqual([
       "procedural_execution",
       "stateful",

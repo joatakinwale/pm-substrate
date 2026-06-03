@@ -2,32 +2,16 @@ import type { TenantId, Timestamp } from "@pm/types";
 import {
   evalEvidenceRef,
   evalEvent,
+  type CoordinationClass,
   type EvalEvent,
   type EvalResult,
   type FailureClass,
+  type MastCategory,
+  type MemoryBenchmarkBridge,
   type RunArm,
+  type StateBenchCategory,
 } from "./schema.js";
-
-export const STATE_BENCH_CATEGORIES = [
-  "stateful",
-  "procedural_execution",
-  "user_experience",
-] as const;
-
-export type StateBenchCategory = (typeof STATE_BENCH_CATEGORIES)[number];
-
-export const MEMORY_BENCHMARK_BRIDGES = [
-  "knowledge_update",
-  "abstention",
-  "workflow_rebase",
-] as const;
-
-export type MemoryBenchmarkBridge = (typeof MEMORY_BENCHMARK_BRIDGES)[number];
-
-export type MastCategory =
-  | "system_design"
-  | "inter_agent_misalignment"
-  | "task_verification";
+import { analyzeEvalEvents, type EvalEventMetrics } from "./metrics.js";
 
 export interface LocalLabScenario {
   readonly scenarioId: string;
@@ -36,6 +20,7 @@ export interface LocalLabScenario {
   readonly stateBenchCategory: StateBenchCategory;
   readonly memoryBenchmarkBridge: MemoryBenchmarkBridge;
   readonly mastCategory: MastCategory;
+  readonly coordinationClass: CoordinationClass;
   readonly source: string;
   readonly evidenceId: string;
   readonly substrateId: string;
@@ -48,6 +33,8 @@ export interface LocalLabPairSummary {
   readonly failureClass: FailureClass;
   readonly stateBenchCategory: StateBenchCategory;
   readonly memoryBenchmarkBridge: MemoryBenchmarkBridge;
+  readonly mastCategory: MastCategory;
+  readonly coordinationClass: CoordinationClass;
   readonly baselineResult: EvalResult;
   readonly substrateResult: EvalResult;
   readonly improvement: number;
@@ -62,6 +49,7 @@ export interface LocalLabPairedResult {
 export interface LocalLabSuiteResult {
   readonly events: readonly EvalEvent[];
   readonly summaries: readonly LocalLabPairSummary[];
+  readonly metrics: EvalEventMetrics;
   readonly baselineFailures: number;
   readonly substrateFailures: number;
   readonly failureReduction: number;
@@ -79,6 +67,7 @@ export const LOCAL_LAB_SCENARIOS = [
     stateBenchCategory: "stateful",
     memoryBenchmarkBridge: "knowledge_update",
     mastCategory: "system_design",
+    coordinationClass: "derived_projection",
     source: "local-lab/fixtures/stale-memory",
     evidenceId: "fixture_stale_memory_after_update",
     substrateId: "chk_authoritative_update_v2",
@@ -92,6 +81,7 @@ export const LOCAL_LAB_SCENARIOS = [
     stateBenchCategory: "user_experience",
     memoryBenchmarkBridge: "abstention",
     mastCategory: "task_verification",
+    coordinationClass: "authority_gated_transition",
     source: "local-lab/fixtures/source-authority",
     evidenceId: "fixture_conflicting_sources",
     substrateId: "event_authority_rule_binding",
@@ -105,6 +95,7 @@ export const LOCAL_LAB_SCENARIOS = [
     stateBenchCategory: "procedural_execution",
     memoryBenchmarkBridge: "workflow_rebase",
     mastCategory: "system_design",
+    coordinationClass: "authority_gated_transition",
     source: "local-lab/fixtures/workflow-invalidation",
     evidenceId: "fixture_invalidated_plan",
     substrateId: "workflow_run_rebased_current_step",
@@ -155,6 +146,8 @@ export function runLocalLabPairedScenario(
       failureClass: scenario.failureClass,
       stateBenchCategory: scenario.stateBenchCategory,
       memoryBenchmarkBridge: scenario.memoryBenchmarkBridge,
+      mastCategory: scenario.mastCategory,
+      coordinationClass: scenario.coordinationClass,
       baselineResult: baseline.result,
       substrateResult: substrate.result,
       improvement: score(baseline.result) - score(substrate.result),
@@ -169,19 +162,15 @@ export function runLocalLabPairedEvals(
   const events = pairs.flatMap((pair) => pair.events);
   assertCompleteLocalLabPairs(events);
   const summaries = pairs.map((pair) => pair.summary);
-  const baselineFailures = events.filter(
-    (event) => event.runArm === "baseline" && event.result === "fail",
-  ).length;
-  const substrateFailures = events.filter(
-    (event) => event.runArm === "substrate" && event.result === "fail",
-  ).length;
+  const metrics = analyzeEvalEvents(events);
 
   return {
     events,
     summaries,
-    baselineFailures,
-    substrateFailures,
-    failureReduction: baselineFailures - substrateFailures,
+    metrics,
+    baselineFailures: metrics.baselineFailures,
+    substrateFailures: metrics.substrateFailures,
+    failureReduction: metrics.failureReduction,
     stateBenchCategories: [...new Set(summaries.map((s) => s.stateBenchCategory))].sort(),
   };
 }
@@ -233,13 +222,12 @@ function buildEvent(input: {
     substrateRefs: [evalEvidenceRef("continuity_checkpoint", scenario.substrateId)],
     runArm: input.runArm,
     pairedRunGroup: input.pairedRunGroup,
+    stateBenchCategory: scenario.stateBenchCategory,
+    memoryBenchmarkBridge: scenario.memoryBenchmarkBridge,
+    mastCategory: scenario.mastCategory,
+    coordinationClass: scenario.coordinationClass,
     result: input.result,
-    notes: [
-      `state_bench_category=${scenario.stateBenchCategory}`,
-      `memory_benchmark_bridge=${scenario.memoryBenchmarkBridge}`,
-      `mast_category=${scenario.mastCategory}`,
-      input.observation,
-    ].join("; "),
+    notes: input.observation,
   });
 }
 

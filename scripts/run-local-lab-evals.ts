@@ -15,6 +15,10 @@ console.log(JSON.stringify({
   substrateFailures: suite.substrateFailures,
   failureReduction: suite.failureReduction,
   stateBenchCategories: suite.stateBenchCategories,
+  coordinationClasses: suite.metrics.coordinationClasses,
+  authorityGatePassRate: suite.metrics.authorityGatePassRate,
+  convergentUpdateAutoResolutionRate: suite.metrics.convergentUpdateAutoResolutionRate,
+  byCoordinationClass: suite.metrics.byCoordinationClass,
 }, null, 2));
 
 const databaseUrl = env["PM_DATABASE_URL"];

@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { TenantId, Timestamp } from "@pm/types";
 
 import {
+  COORDINATION_CLASSES,
   EVAL_AXES,
   FAILURE_CLASSES,
+  MAST_CATEGORIES,
+  MEMORY_BENCHMARK_BRIDGES,
   RUN_ARMS,
+  STATE_BENCH_CATEGORIES,
   assertEvalEvent,
   evalEvidenceRef,
   evalEvent,
@@ -31,6 +35,10 @@ const baseEvent = {
   ],
   runArm: "baseline",
   pairedRunGroup: "pair_stale_price_seed_001",
+  stateBenchCategory: "stateful",
+  memoryBenchmarkBridge: "knowledge_update",
+  mastCategory: "system_design",
+  coordinationClass: "authority_gated_transition",
   result: "fail",
   notes: "Portfolio decision used an analyst signal created before the price refresh.",
 } as const;
@@ -41,6 +49,19 @@ describe("eval event schema", () => {
     expect(RUN_ARMS).toEqual(["baseline", "substrate"]);
     expect(FAILURE_CLASSES).toContain("partial_observation");
     expect(FAILURE_CLASSES).toContain("continuity_break");
+    expect(STATE_BENCH_CATEGORIES).toEqual([
+      "stateful",
+      "procedural_execution",
+      "user_experience",
+    ]);
+    expect(MEMORY_BENCHMARK_BRIDGES).toContain("workflow_rebase");
+    expect(MAST_CATEGORIES).toContain("task_verification");
+    expect(COORDINATION_CLASSES).toEqual([
+      "append_only_observation",
+      "convergent_update",
+      "authority_gated_transition",
+      "derived_projection",
+    ]);
   });
 
   it("accepts a valid state-failure eval event", () => {
@@ -58,6 +79,10 @@ describe("eval event schema", () => {
       failureClass: "generic_bug",
       observedAt: "not-a-date",
       result: "maybe",
+      stateBenchCategory: "spreadsheet",
+      memoryBenchmarkBridge: "memo",
+      mastCategory: "coordination_bug",
+      coordinationClass: "eventually_consistent_magic",
       evidenceRefs: [{ kind: "event", id: "" }],
       substrateRefs: [{ kind: "bad_ref", id: "x" }],
       notes: "",
@@ -71,6 +96,10 @@ describe("eval event schema", () => {
         "/failureClass",
         "/observedAt",
         "/result",
+        "/stateBenchCategory",
+        "/memoryBenchmarkBridge",
+        "/mastCategory",
+        "/coordinationClass",
         "/evidenceRefs/0/id",
         "/substrateRefs/0/kind",
         "/notes",

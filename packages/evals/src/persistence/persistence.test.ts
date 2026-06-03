@@ -17,6 +17,10 @@ const event: EvalEvent = {
   substrateRefs: [evalEvidenceRef("event", "evt_price_refresh")],
   runArm: "substrate",
   pairedRunGroup: "pair_stale_price_seed_001",
+  stateBenchCategory: "stateful",
+  memoryBenchmarkBridge: "knowledge_update",
+  mastCategory: "task_verification",
+  coordinationClass: "authority_gated_transition",
   result: "pass",
   notes: "Substrate rejected the stale decision before acceptance.",
 };
@@ -48,6 +52,10 @@ describe("PostgresEvalEventStore", () => {
       event.result,
       event.runArm,
       event.pairedRunGroup,
+      event.stateBenchCategory,
+      event.memoryBenchmarkBridge,
+      event.mastCategory,
+      event.coordinationClass,
       event,
     ]);
   });

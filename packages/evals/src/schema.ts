@@ -27,6 +27,39 @@ export const RUN_ARMS = ["baseline", "substrate"] as const;
 
 export type RunArm = (typeof RUN_ARMS)[number];
 
+export const STATE_BENCH_CATEGORIES = [
+  "stateful",
+  "procedural_execution",
+  "user_experience",
+] as const;
+
+export type StateBenchCategory = (typeof STATE_BENCH_CATEGORIES)[number];
+
+export const MEMORY_BENCHMARK_BRIDGES = [
+  "knowledge_update",
+  "abstention",
+  "workflow_rebase",
+] as const;
+
+export type MemoryBenchmarkBridge = (typeof MEMORY_BENCHMARK_BRIDGES)[number];
+
+export const MAST_CATEGORIES = [
+  "system_design",
+  "inter_agent_misalignment",
+  "task_verification",
+] as const;
+
+export type MastCategory = (typeof MAST_CATEGORIES)[number];
+
+export const COORDINATION_CLASSES = [
+  "append_only_observation",
+  "convergent_update",
+  "authority_gated_transition",
+  "derived_projection",
+] as const;
+
+export type CoordinationClass = (typeof COORDINATION_CLASSES)[number];
+
 export const CONFIDENCE_BAND_METHODS = [
   "paired_t",
   "wilcoxon",
@@ -77,6 +110,10 @@ export interface EvalEvent {
   readonly substrateRefs: readonly EvalEvidenceRef[];
   readonly runArm?: RunArm;
   readonly pairedRunGroup?: string;
+  readonly stateBenchCategory?: StateBenchCategory;
+  readonly memoryBenchmarkBridge?: MemoryBenchmarkBridge;
+  readonly mastCategory?: MastCategory;
+  readonly coordinationClass?: CoordinationClass;
   readonly confidenceBand?: ConfidenceBand;
   readonly result: EvalResult;
   readonly notes: string;
@@ -103,6 +140,10 @@ const AXES = new Set<string>(EVAL_AXES);
 const FAILURE_CLASS_SET = new Set<string>(FAILURE_CLASSES);
 const RESULT_SET = new Set<string>(EVAL_RESULTS);
 const RUN_ARM_SET = new Set<string>(RUN_ARMS);
+const STATE_BENCH_CATEGORY_SET = new Set<string>(STATE_BENCH_CATEGORIES);
+const MEMORY_BENCHMARK_BRIDGE_SET = new Set<string>(MEMORY_BENCHMARK_BRIDGES);
+const MAST_CATEGORY_SET = new Set<string>(MAST_CATEGORIES);
+const COORDINATION_CLASS_SET = new Set<string>(COORDINATION_CLASSES);
 const CONFIDENCE_BAND_METHOD_SET = new Set<string>(CONFIDENCE_BAND_METHODS);
 const REF_KIND_SET = new Set<string>(EVAL_REF_KINDS);
 
@@ -155,6 +196,34 @@ export function validateEvalEvent(input: unknown): ValidationResult {
   validateOptionalPairedRunGroup(
     input["pairedRunGroup"],
     "/pairedRunGroup",
+    issues,
+  );
+  validateOptionalEnum(
+    input["stateBenchCategory"],
+    "/stateBenchCategory",
+    STATE_BENCH_CATEGORY_SET,
+    STATE_BENCH_CATEGORIES,
+    issues,
+  );
+  validateOptionalEnum(
+    input["memoryBenchmarkBridge"],
+    "/memoryBenchmarkBridge",
+    MEMORY_BENCHMARK_BRIDGE_SET,
+    MEMORY_BENCHMARK_BRIDGES,
+    issues,
+  );
+  validateOptionalEnum(
+    input["mastCategory"],
+    "/mastCategory",
+    MAST_CATEGORY_SET,
+    MAST_CATEGORIES,
+    issues,
+  );
+  validateOptionalEnum(
+    input["coordinationClass"],
+    "/coordinationClass",
+    COORDINATION_CLASS_SET,
+    COORDINATION_CLASSES,
     issues,
   );
   validateOptionalConfidenceBand(input["confidenceBand"], issues);
@@ -218,6 +287,25 @@ function validateOptionalPairedRunGroup(
   }
   if (!isNonEmptyString(value)) {
     push(issues, path, "expected non-empty string when present");
+  }
+}
+
+function validateOptionalEnum<T extends readonly string[]>(
+  value: unknown,
+  path: string,
+  allowed: ReadonlySet<string>,
+  labels: T,
+  issues: ValidationIssue[],
+): void {
+  if (value === undefined) {
+    return;
+  }
+  if (typeof value !== "string" || !allowed.has(value)) {
+    push(
+      issues,
+      path,
+      `expected one of ${JSON.stringify([...labels])}; got ${JSON.stringify(value)}`,
+    );
   }
 }
 

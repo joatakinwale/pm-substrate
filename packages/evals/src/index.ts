@@ -4,7 +4,11 @@ export {
   EVAL_RESULTS,
   FAILURE_CLASSES,
   CONFIDENCE_BAND_METHODS,
+  COORDINATION_CLASSES,
+  MAST_CATEGORIES,
+  MEMORY_BENCHMARK_BRIDGES,
   RUN_ARMS,
+  STATE_BENCH_CATEGORIES,
   EvalEventValidationError,
   assertEvalEvent,
   evalEvent,
@@ -13,13 +17,17 @@ export {
   validateEvalEvent,
   type ConfidenceBand,
   type ConfidenceBandMethod,
+  type CoordinationClass,
   type EvalAxis,
   type EvalEvent,
   type EvalEvidenceRef,
   type EvalRefKind,
   type EvalResult,
   type FailureClass,
+  type MastCategory,
+  type MemoryBenchmarkBridge,
   type RunArm,
+  type StateBenchCategory,
   type ValidationIssue,
   type ValidationResult,
 } from "./schema.js";
@@ -29,9 +37,13 @@ export {
   type EvalEventQueryResult,
 } from "./persistence/index.js";
 export {
+  analyzeEvalEvents,
+  type CoordinationClassMetrics,
+  type EvalEventMetrics,
+  type IncompletePairedGroup,
+} from "./metrics.js";
+export {
   LOCAL_LAB_SCENARIOS,
-  MEMORY_BENCHMARK_BRIDGES,
-  STATE_BENCH_CATEGORIES,
   assertCompleteLocalLabPairs,
   runLocalLabPairedEvals,
   runLocalLabPairedScenario,
@@ -39,7 +51,4 @@ export {
   type LocalLabScenario,
   type LocalLabSuiteResult,
   type LocalLabPairSummary,
-  type MastCategory,
-  type MemoryBenchmarkBridge,
-  type StateBenchCategory,
 } from "./local-lab.js";
