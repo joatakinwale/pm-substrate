@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   applyEdgeMapping,
   planEntityIngestion,
@@ -175,6 +176,11 @@ export interface ArrowHedgeValidationIssue {
   readonly message: string;
 }
 
+export interface ArrowHedgePayloadValidationResult {
+  readonly valid: boolean;
+  readonly issues: readonly ArrowHedgeValidationIssue[];
+}
+
 export interface ParsedArrowHedgeSnapshot {
   readonly snapshotId: string;
   readonly observedAt: Timestamp;
@@ -262,6 +268,48 @@ export interface ArrowHedgeExecutionPorts<TTx = unknown> {
     publishWith(tx: TTx, input: MappingEventInput): Promise<PMEvent>;
   };
 }
+
+type JsonSchemaType =
+  | "array"
+  | "boolean"
+  | "integer"
+  | "null"
+  | "number"
+  | "object"
+  | "string";
+
+interface PayloadJsonSchema {
+  readonly type?: JsonSchemaType | readonly JsonSchemaType[];
+  readonly required?: readonly string[];
+  readonly properties?: Readonly<Record<string, PayloadJsonSchema>>;
+  readonly items?: PayloadJsonSchema;
+  readonly enum?: readonly unknown[];
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly format?: string;
+  readonly additionalProperties?: boolean;
+}
+
+const ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMA_FILES = {
+  "finance-research/analyst-signal-created.v1": "analyst-signal-created.v1.json",
+  "finance-research/risk-state-validated.v1": "risk-state-validated.v1.json",
+  "finance-research/portfolio-decision-proposed.v1":
+    "portfolio-decision-proposed.v1.json",
+  "finance-research/portfolio-decision-accepted.v1":
+    "portfolio-decision-accepted.v1.json",
+  "finance-research/workflow-blocked-stale-state.v1":
+    "workflow-blocked-stale-state.v1.json",
+} as const;
+
+const ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMAS: Readonly<
+  Record<string, PayloadJsonSchema>
+> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMA_FILES).map(
+      ([schemaId, filename]) => [schemaId, loadPayloadSchema(filename)],
+    ),
+  ),
+);
 
 export function parseArrowHedgeSnapshot(input: unknown): ArrowHedgeParseResult {
   const issues: ArrowHedgeValidationIssue[] = [];
@@ -476,6 +524,23 @@ export function buildArrowHedgeIngestionPlan(
 
   const edges = buildEdges(ctx.tenantId, parsed.records);
   const typedEvents = buildTypedEvents(ctx.tenantId, emittedBy, parsed.snapshot, mapping.items);
+  const typedPayloadIssues = validateTypedEventPayloads(typedEvents);
+  if (typedPayloadIssues.length > 0) {
+    return {
+      valid: false,
+      issues: typedPayloadIssues,
+      mapping,
+      edges: [],
+      typedEvents: [],
+      operationalSample: {
+        adapterStartedAt: ctx.adapterStartedAt,
+        mappingAttempts: parsed.records.length,
+        mappingRejections: 0,
+        stateComparisons: 1,
+        stateDisagreements: hasStateDisagreement(parsed.snapshot) ? 1 : 0,
+      },
+    };
+  }
   return {
     valid: true,
     issues: [],
@@ -499,6 +564,14 @@ export async function executeArrowHedgeIngestionPlan<TTx>(
 ): Promise<ArrowHedgeExecutionResult> {
   if (!plan.valid) {
     throw new Error(`cannot execute invalid ArrowHedge plan: ${plan.issues[0]?.message ?? "invalid"}`);
+  }
+
+  const typedPayloadIssues = validateTypedEventPayloads(plan.typedEvents);
+  if (typedPayloadIssues.length > 0) {
+    const first = typedPayloadIssues[0]!;
+    throw new Error(
+      `invalid ArrowHedge typed event payload: ${first.path} ${first.message}`,
+    );
   }
 
   return ports.withTransaction(async (tx) => {
@@ -601,6 +674,29 @@ export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
   };
 }
 
+export function validateArrowHedgeTypedEventPayload(
+  event: MappingEventInput,
+): ArrowHedgePayloadValidationResult {
+  const schema = payloadSchemaFor(event.payloadSchema);
+  if (!schema) {
+    return {
+      valid: false,
+      issues: [
+        {
+          path: "/payloadSchema",
+          message: `unknown ArrowHedge payload schema: ${event.payloadSchema}`,
+        },
+      ],
+    };
+  }
+
+  const issues: ArrowHedgeValidationIssue[] = [];
+  validateSchemaValue(event.payload, schema, "", issues);
+  return issues.length === 0
+    ? { valid: true, issues: [] }
+    : { valid: false, issues };
+}
+
 function buildEdges(
   tenantId: TenantId,
   records: readonly SourceEntityRecord[],
@@ -659,10 +755,23 @@ function buildTypedEvents(
   items: readonly EntityIngestionPlanItem[],
 ): readonly MappingEventInput[] {
   const bySource = new Map(items.map((item) => [item.sourceName, item]));
+  const research = bySource.get("ResearchRunSource")!;
+  const ticker = bySource.get("TickerSource")!;
   const signal = bySource.get("AnalystSignalSource")!;
   const risk = bySource.get("RiskStateSource")!;
   const decision = bySource.get("PortfolioDecisionSource")!;
+  const researchRunId = research.event.entityId;
+  const tickerId = ticker.event.entityId;
+  const decisionId = decision.event.entityId;
+  const riskStateId = risk.event.entityId;
+  const evidenceDocumentIds = items
+    .filter((item) => item.sourceName === "EvidenceDocumentSource")
+    .map((item) => item.event.entityId);
   const decisionPayload = {
+    researchRunId,
+    tickerId,
+    decisionId,
+    riskStateId,
     sourceSnapshotId: snapshot.snapshotId,
     tickerSymbol: snapshot.tickerSymbol,
     action: decision.node.identity["action"],
@@ -685,12 +794,15 @@ function buildTypedEvents(
       occurredAt: snapshot.observedAt,
       payloadSchema: "finance-research/analyst-signal-created.v1",
       payload: {
+        researchRunId,
+        tickerId,
         sourceSnapshotId: snapshot.snapshotId,
         tickerSymbol: snapshot.tickerSymbol,
         signal: signal.node.identity["signal"],
         confidence: signal.node.identity["confidence"],
         agentId: signal.node.identity["agentId"],
         occurredAt: snapshot.observedAt,
+        evidenceDocumentIds,
       },
     }),
     typedEvent({
@@ -702,11 +814,15 @@ function buildTypedEvents(
       occurredAt: snapshot.observedAt,
       payloadSchema: "finance-research/risk-state-validated.v1",
       payload: {
+        researchRunId,
+        tickerId,
+        riskStateId,
         sourceSnapshotId: snapshot.snapshotId,
         tickerSymbol: snapshot.tickerSymbol,
         currentPrice: risk.node.identity["currentPrice"],
         remainingPositionLimit: risk.node.identity["remainingPositionLimit"],
         maxShares: risk.node.identity["maxShares"],
+        bindingConstraint: risk.node.identity["bindingConstraint"] ?? null,
         freshnessExpiresAt: snapshot.riskFreshnessExpiresAt,
         occurredAt: snapshot.observedAt,
       },
@@ -749,6 +865,10 @@ function buildTypedEvents(
         occurredAt: snapshot.observedAt,
         payloadSchema: "finance-research/workflow-blocked-stale-state.v1",
         payload: {
+          researchRunId,
+          blockedEntityId: decisionId,
+          reason: blockedReason(snapshot),
+          invalidatingEventId: null,
           sourceSnapshotId: snapshot.snapshotId,
           tickerSymbol: snapshot.tickerSymbol,
           riskSourceSnapshotId: snapshot.decisionRiskSourceSnapshotId,
@@ -866,6 +986,141 @@ function invalidPlan(
 
 function typedEvent(input: MappingEventInput): MappingEventInput {
   return input;
+}
+
+function loadPayloadSchema(filename: string): PayloadJsonSchema {
+  const url = new URL(`../schemas/${filename}`, import.meta.url);
+  return JSON.parse(readFileSync(url, "utf8")) as PayloadJsonSchema;
+}
+
+function payloadSchemaFor(schemaId: string): PayloadJsonSchema | undefined {
+  const normalized = schemaId.endsWith(".json") ? schemaId.slice(0, -5) : schemaId;
+  return ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMAS[normalized];
+}
+
+function validateTypedEventPayloads(
+  events: readonly MappingEventInput[],
+): readonly ArrowHedgeValidationIssue[] {
+  return events.flatMap((event, index) =>
+    validateArrowHedgeTypedEventPayload(event).issues.map((issue) => ({
+      path: `/typedEvents/${index}${issue.path}`,
+      message: issue.message,
+    })),
+  );
+}
+
+function validateSchemaValue(
+  value: unknown,
+  schema: PayloadJsonSchema,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): void {
+  const expectedTypes = normalizeSchemaTypes(schema.type);
+  if (expectedTypes.length > 0 && !expectedTypes.some((type) => matchesType(value, type))) {
+    issues.push({
+      path,
+      message: `expected type ${expectedTypes.join(" or ")}, got ${actualSchemaType(value)}`,
+    });
+    return;
+  }
+
+  if (schema.enum && !schema.enum.some((candidate) => Object.is(candidate, value))) {
+    issues.push({
+      path,
+      message: `expected one of ${schema.enum.map((candidate) => JSON.stringify(candidate)).join(", ")}`,
+    });
+  }
+
+  if (typeof value === "number") {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      issues.push({ path, message: `expected number >= ${schema.minimum}` });
+    }
+    if (schema.maximum !== undefined && value > schema.maximum) {
+      issues.push({ path, message: `expected number <= ${schema.maximum}` });
+    }
+  }
+
+  if (
+    schema.format === "date-time" &&
+    typeof value === "string" &&
+    Number.isNaN(Date.parse(value))
+  ) {
+    issues.push({ path, message: "expected format date-time" });
+  }
+
+  if (isRecord(value)) {
+    validateObjectSchema(value, schema, path, issues);
+  } else if (Array.isArray(value) && schema.items) {
+    value.forEach((item, index) => {
+      validateSchemaValue(item, schema.items!, `${path}/${index}`, issues);
+    });
+  }
+}
+
+function validateObjectSchema(
+  value: Readonly<Record<string, unknown>>,
+  schema: PayloadJsonSchema,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): void {
+  const properties = schema.properties ?? {};
+  for (const field of schema.required ?? []) {
+    if (value[field] === undefined || value[field] === null) {
+      issues.push({
+        path: `${path}/${field}`,
+        message: "required field missing or null",
+      });
+    }
+  }
+
+  for (const [field, fieldSchema] of Object.entries(properties)) {
+    if (!(field in value)) continue;
+    validateSchemaValue(value[field], fieldSchema, `${path}/${field}`, issues);
+  }
+
+  if (schema.additionalProperties === false) {
+    const declared = new Set(Object.keys(properties));
+    for (const field of Object.keys(value)) {
+      if (!declared.has(field)) {
+        issues.push({
+          path: `${path}/${field}`,
+          message: "unknown field (additionalProperties: false)",
+        });
+      }
+    }
+  }
+}
+
+function normalizeSchemaTypes(
+  type: PayloadJsonSchema["type"],
+): readonly JsonSchemaType[] {
+  if (!type) return [];
+  if (typeof type === "string") return [type];
+  return type;
+}
+
+function matchesType(value: unknown, expected: JsonSchemaType): boolean {
+  if (expected === "array") return Array.isArray(value);
+  if (expected === "integer") return typeof value === "number" && Number.isInteger(value);
+  if (expected === "null") return value === null;
+  if (expected === "object") return isRecord(value);
+  return typeof value === expected;
+}
+
+function actualSchemaType(value: unknown): JsonSchemaType {
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  if (Number.isInteger(value)) return "integer";
+  if (typeof value === "number") return "number";
+  if (isRecord(value)) return "object";
+  return typeof value as JsonSchemaType;
+}
+
+function blockedReason(snapshot: ParsedArrowHedgeSnapshot): string {
+  const reasons: string[] = [];
+  if (hasStateDisagreement(snapshot)) reasons.push("state_disagreement");
+  if (isStale(snapshot)) reasons.push("stale_observation");
+  return reasons.length === 0 ? "state_blocked" : reasons.join("+");
 }
 
 function stableEntityId(input: string): EntityId {

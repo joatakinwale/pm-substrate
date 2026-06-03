@@ -93,11 +93,11 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     scenarioId: "arrowhedge-capability-contract-violation",
     failureClass: "capability_contract_violation",
     coordinationClass: "authority_gated_transition",
-    substrateResult: "fail",
+    substrateResult: "pass",
     baselineNotes:
       "Baseline payload can omit required finance capability fields without a typed rejection surface.",
     substrateNotes:
-      "Substrate still needs runtime JSON-schema payload validation at this adapter boundary; measured as remaining debt.",
+      "Substrate runtime payload validation rejects malformed typed finance events before publication.",
   },
 ];
 

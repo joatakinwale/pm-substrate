@@ -5,7 +5,9 @@ import { tenantId, timestamp } from "@pm/types";
 import {
   buildArrowHedgeIngestionPlan,
   createArrowHedgeCommonOperatingPictureProjection,
+  executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
+  validateArrowHedgeTypedEventPayload,
 } from "./arrowhedge.js";
 
 const snapshot = {
@@ -142,6 +144,8 @@ describe("ArrowHedge snapshot adapter", () => {
       authority: "arrowhedge:backtest:bt_aapl_breakout",
       payloadSchema: "finance-research/analyst-signal-created.v1",
       payload: {
+        researchRunId: expect.any(String),
+        tickerId: expect.any(String),
         sourceSnapshotId: "snap_aapl_2026_06_03_1400",
         tickerSymbol: "AAPL",
         signal: "buy",
@@ -156,6 +160,100 @@ describe("ArrowHedge snapshot adapter", () => {
       adapterStartedAt: "2026-06-03T13:59:58.500Z",
       firstValidEventAt: "2026-06-03T14:00:00.000Z",
     });
+    expect(
+      plan.typedEvents.map((event) => validateArrowHedgeTypedEventPayload(event)),
+    ).toEqual([
+      { valid: true, issues: [] },
+      { valid: true, issues: [] },
+      { valid: true, issues: [] },
+      { valid: true, issues: [] },
+    ]);
+  });
+
+  it("rejects typed finance events that violate their payload schema", () => {
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenantId("tnt_arrowhedge_contract"),
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const malformed = {
+      ...plan.typedEvents[0]!,
+      payload: {
+        ...plan.typedEvents[0]!.payload,
+        confidence: "high",
+      },
+    };
+
+    expect(validateArrowHedgeTypedEventPayload(malformed)).toEqual({
+      valid: false,
+      issues: [
+        {
+          path: "/confidence",
+          message: "expected type number, got string",
+        },
+      ],
+    });
+
+    const { researchRunId: _researchRunId, ...missingRequiredPayload } =
+      plan.typedEvents[0]!.payload;
+    expect(
+      validateArrowHedgeTypedEventPayload({
+        ...plan.typedEvents[0]!,
+        payload: missingRequiredPayload,
+      }),
+    ).toEqual({
+      valid: false,
+      issues: [
+        {
+          path: "/researchRunId",
+          message: "required field missing or null",
+        },
+      ],
+    });
+  });
+
+  it("refuses to execute a plan with invalid typed finance payloads", async () => {
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenantId("tnt_arrowhedge_execute_contract"),
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const invalidPlan = {
+      ...plan,
+      typedEvents: [
+        {
+          ...plan.typedEvents[0]!,
+          payload: {
+            ...plan.typedEvents[0]!.payload,
+            confidence: "high",
+          },
+        },
+        ...plan.typedEvents.slice(1),
+      ],
+    };
+
+    await expect(
+      executeArrowHedgeIngestionPlan(invalidPlan, {
+        withTransaction: async (fn) => fn({}),
+        graph: {
+          createNode: async (input) => ({
+            created: true,
+            node: {
+              id: input.id!,
+              identity: input.identity,
+              schemaVersion: input.schemaVersion,
+            },
+          }),
+          updateNode: async () => undefined,
+          createEdge: async () => undefined,
+        },
+        events: {
+          publishWith: async () => {
+            throw new Error("publish should not be reached");
+          },
+        },
+      }),
+    ).rejects.toThrow("invalid ArrowHedge typed event payload");
   });
 
   it("rejects malformed source snapshots before mapping", () => {

@@ -53,14 +53,15 @@ describe("ArrowHedge state eval suite", () => {
       pairedGroups: 5,
       completePairedGroups: 5,
       baselineFailures: 5,
-      substrateFailures: 1,
-      failureReduction: 4,
-      authorityGatePassRate: 0.75,
+      substrateFailures: 0,
+      failureReduction: 5,
+      authorityGatePassRate: 1,
     });
     expect(metrics.byFailureClass["capability_contract_violation"]).toMatchObject({
       baselineFailures: 1,
-      substrateFailures: 1,
-      failureReduction: 0,
+      substrateFailures: 0,
+      failureReduction: 1,
+      substratePasses: 1,
     });
     expect(metrics.byFailureClass["representation_loss"]).toMatchObject({
       failureReduction: 1,
@@ -75,9 +76,9 @@ describe("ArrowHedge state eval suite", () => {
       adapterTimeToFirstValidEventMs: 2000,
       mappingRejectionRate: 1 / 9,
       stateDisagreementRate: 1 / 3,
-      authorityGatePassRate: 0.75,
-      authorityGatePasses: 3,
-      authorityGateFailures: 1,
+      authorityGatePassRate: 1,
+      authorityGatePasses: 4,
+      authorityGateFailures: 0,
     });
   });
 });
