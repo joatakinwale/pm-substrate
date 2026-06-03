@@ -37,7 +37,10 @@ export {
   type EvalEventQueryResult,
 } from "./persistence/index.js";
 export {
+  analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
+  type AdapterOperationalMetrics,
+  type AdapterOperationalSample,
   type CoordinationClassMetrics,
   type EvalEventMetrics,
   type FailureClassMetrics,
@@ -60,3 +63,9 @@ export {
   type AdapterStateProofSourceRecord,
   type AdapterStateProofSummary,
 } from "./adapter-proof.js";
+export {
+  buildArrowHedgeStateEvalSuite,
+  type ArrowHedgeScenarioSummary,
+  type ArrowHedgeStateEvalInput,
+  type ArrowHedgeStateEvalSuite,
+} from "./arrowhedge.js";

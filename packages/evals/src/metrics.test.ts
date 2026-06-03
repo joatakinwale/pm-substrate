@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { TenantId, Timestamp } from "@pm/types";
 
 import { evalEvidenceRef, type EvalEvent } from "./schema.js";
-import { analyzeEvalEvents } from "./metrics.js";
+import {
+  analyzeAdapterOperationalMetrics,
+  analyzeEvalEvents,
+} from "./metrics.js";
 
 const tenantId = "tnt_metrics" as TenantId;
 const observedAt = "2026-06-03T15:00:00.000Z" as Timestamp;
@@ -187,5 +190,58 @@ describe("eval event metrics", () => {
       },
     ]);
     expect(metrics.authorityGatePassRate).toBeNull();
+  });
+
+  it("measures adapter operational rates from samples plus eval outcomes", () => {
+    const events = [
+      event({
+        scenarioId: "authority-pass",
+        runArm: "baseline",
+        pairedRunGroup: "pair_authority_pass",
+        result: "fail",
+        coordinationClass: "authority_gated_transition",
+      }),
+      event({
+        scenarioId: "authority-pass",
+        runArm: "substrate",
+        pairedRunGroup: "pair_authority_pass",
+        result: "pass",
+        coordinationClass: "authority_gated_transition",
+      }),
+      event({
+        scenarioId: "authority-fail",
+        runArm: "baseline",
+        pairedRunGroup: "pair_authority_fail",
+        result: "fail",
+        coordinationClass: "authority_gated_transition",
+      }),
+      event({
+        scenarioId: "authority-fail",
+        runArm: "substrate",
+        pairedRunGroup: "pair_authority_fail",
+        result: "fail",
+        coordinationClass: "authority_gated_transition",
+      }),
+    ];
+
+    const metrics = analyzeAdapterOperationalMetrics(events, [
+      {
+        adapterStartedAt: "2026-06-03T13:59:58.500Z" as Timestamp,
+        firstValidEventAt: "2026-06-03T14:00:00.000Z" as Timestamp,
+        mappingAttempts: 10,
+        mappingRejections: 2,
+        stateComparisons: 4,
+        stateDisagreements: 1,
+      },
+    ]);
+
+    expect(metrics).toEqual({
+      adapterTimeToFirstValidEventMs: 1500,
+      mappingRejectionRate: 0.2,
+      stateDisagreementRate: 0.25,
+      authorityGatePassRate: 0.5,
+      authorityGatePasses: 1,
+      authorityGateFailures: 1,
+    });
   });
 });

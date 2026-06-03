@@ -59,6 +59,24 @@ export interface EvalEventMetrics {
   readonly convergentUpdateAutoResolutionRate: number | null;
 }
 
+export interface AdapterOperationalSample {
+  readonly adapterStartedAt: string;
+  readonly firstValidEventAt?: string;
+  readonly mappingAttempts: number;
+  readonly mappingRejections: number;
+  readonly stateComparisons: number;
+  readonly stateDisagreements: number;
+}
+
+export interface AdapterOperationalMetrics {
+  readonly adapterTimeToFirstValidEventMs: number | null;
+  readonly mappingRejectionRate: number | null;
+  readonly stateDisagreementRate: number | null;
+  readonly authorityGatePassRate: number | null;
+  readonly authorityGatePasses: number;
+  readonly authorityGateFailures: number;
+}
+
 interface MutableCoordinationClassMetrics {
   events: number;
   pairedGroups: Set<string>;
@@ -193,6 +211,27 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
   };
 }
 
+export function analyzeAdapterOperationalMetrics(
+  events: readonly EvalEvent[],
+  samples: readonly AdapterOperationalSample[],
+): AdapterOperationalMetrics {
+  const evalMetrics = analyzeEvalEvents(events);
+  const attempts = sum(samples, (sample) => sample.mappingAttempts);
+  const rejections = sum(samples, (sample) => sample.mappingRejections);
+  const comparisons = sum(samples, (sample) => sample.stateComparisons);
+  const disagreements = sum(samples, (sample) => sample.stateDisagreements);
+  const authority = evalMetrics.byCoordinationClass["authority_gated_transition"];
+
+  return {
+    adapterTimeToFirstValidEventMs: firstValidEventLatency(samples),
+    mappingRejectionRate: attempts === 0 ? null : rejections / attempts,
+    stateDisagreementRate: comparisons === 0 ? null : disagreements / comparisons,
+    authorityGatePassRate: evalMetrics.authorityGatePassRate,
+    authorityGatePasses: authority.substratePasses,
+    authorityGateFailures: authority.substrateFailures,
+  };
+}
+
 function makeCoordinationMetrics(): Record<CoordinationClass, MutableCoordinationClassMetrics> {
   return Object.fromEntries(
     COORDINATION_CLASSES.map((coordinationClass) => [
@@ -275,6 +314,29 @@ function countResult(
   result: EvalResult,
 ): number {
   return events.filter((event) => event.runArm === runArm && event.result === result).length;
+}
+
+function firstValidEventLatency(
+  samples: readonly AdapterOperationalSample[],
+): number | null {
+  const durations = samples
+    .flatMap((sample) => {
+      if (!sample.firstValidEventAt) return [];
+      const start = Date.parse(sample.adapterStartedAt);
+      const first = Date.parse(sample.firstValidEventAt);
+      if (!Number.isFinite(start) || !Number.isFinite(first)) return [];
+      return [first - start];
+    })
+    .filter((duration) => duration >= 0);
+  if (durations.length === 0) return null;
+  return Math.min(...durations);
+}
+
+function sum<T>(
+  values: readonly T[],
+  getValue: (value: T) => number,
+): number {
+  return values.reduce((acc, value) => acc + getValue(value), 0);
 }
 
 function uniqueByCanonicalOrder<T extends string>(

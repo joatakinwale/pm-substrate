@@ -54,11 +54,13 @@ const CARDINALITIES: ReadonlySet<EdgeCardinality> = new Set([
 
 /**
  * Identifier convention used by edge `type`. Substrate convention is
- * `<profile>/<verb>` or `<profile>/<verb>_<noun>` (lowercase, snake_case
- * for the right-hand side, slash separator). Conservative regex —
- * rejects double slashes, leading/trailing slashes, uppercase, dots.
+ * `<profile>/<verb>` or `<profile>/<verb>_<noun>` (lowercase profile
+ * prefix, snake_case for the right-hand side, slash separator).
+ * Conservative regex — rejects double slashes, leading/trailing slashes,
+ * uppercase, dots. The profile prefix allows hyphens because the existing
+ * finance-research profile uses one.
  */
-const EDGE_TYPE_RE = /^[a-z][a-z0-9_]*\/[a-z][a-z0-9_]*$/;
+const EDGE_TYPE_RE = /^[a-z][a-z0-9_-]*\/[a-z][a-z0-9_]*$/;
 
 /* -------------------------- helpers -------------------------- */
 

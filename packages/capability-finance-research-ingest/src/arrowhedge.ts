@@ -1,0 +1,1100 @@
+import { createHash } from "node:crypto";
+import {
+  applyEdgeMapping,
+  planEntityIngestion,
+  type EntityIngestionPlan,
+  type EntityIngestionPlanItem,
+  type EntityMapping,
+  type MappingEdgeInput,
+  type MappingEventInput,
+  type SourceEntityRecord,
+} from "@pm/entity-mapping";
+import type {
+  EntityId,
+  PMEvent,
+  ProfileDefinition,
+  TenantId,
+  Timestamp,
+} from "@pm/types";
+
+import { FINANCE_RESEARCH_EVENT_TYPES } from "./capability.js";
+
+export const ARROWHEDGE_ENTITY_MAPPING: EntityMapping = {
+  profile: "finance-research",
+  mappingVersion: 1,
+  entities: {
+    BacktestRunSource: {
+      tier1: "Engagement",
+      concrete: "BacktestRun",
+      identityFields: ["title", "scopeStart", "scopeEnd", "state", "datasetRef", "seed"],
+      schemaVersion: 1,
+      edges: {
+        researchRun: {
+          target: "ResearchRunSource",
+          type: "finance-research/backtest_has_research_run",
+          cardinality: "many",
+        },
+      },
+    },
+    ResearchRunSource: {
+      tier1: "Engagement",
+      concrete: "ResearchRun",
+      identityFields: ["title", "scopeStart", "scopeEnd", "state"],
+      optionalFields: ["strategy", "modelLock", "seed"],
+      schemaVersion: 1,
+      edges: {
+        ticker: {
+          target: "TickerSource",
+          type: "finance-research/research_run_tracks_ticker",
+          cardinality: "many",
+        },
+        signal: {
+          target: "AnalystSignalSource",
+          type: "finance-research/research_run_has_signal",
+          cardinality: "many",
+        },
+        riskState: {
+          target: "RiskStateSource",
+          type: "finance-research/research_run_has_risk_state",
+          cardinality: "many",
+        },
+        portfolioState: {
+          target: "PortfolioStateSource",
+          type: "finance-research/research_run_has_portfolio_state",
+          cardinality: "many",
+        },
+        decision: {
+          target: "PortfolioDecisionSource",
+          type: "finance-research/research_run_has_decision",
+          cardinality: "many",
+        },
+      },
+    },
+    TickerSource: {
+      tier1: "Resource",
+      concrete: "Ticker",
+      identityFields: ["name", "kind", "symbol", "assetClass", "currency"],
+      optionalFields: ["exchange", "externalRef"],
+      schemaVersion: 1,
+    },
+    EvidenceDocumentSource: {
+      tier1: "Document",
+      concrete: "EvidenceDocument",
+      identityFields: ["sha256", "mimeType", "filename"],
+      optionalFields: ["sourceUri", "retrievedAt", "freshnessExpiresAt"],
+      schemaVersion: 1,
+    },
+    PortfolioStateSource: {
+      tier1: "Resource",
+      concrete: "PortfolioState",
+      identityFields: ["name", "kind", "cash", "equity", "marginRequirement", "marginUsed"],
+      optionalFields: ["sourceSnapshotId"],
+      schemaVersion: 1,
+    },
+    AnalystSignalSource: {
+      tier1: "Event",
+      concrete: "AnalystSignal",
+      identityFields: ["kind", "occurredAt", "agentId", "signal", "confidence"],
+      optionalFields: ["evidenceWindowStart", "evidenceWindowEnd", "sourceSnapshotId"],
+      schemaVersion: 1,
+      edges: {
+        ticker: {
+          target: "TickerSource",
+          type: "finance-research/signal_for_ticker",
+          cardinality: "exactly_one",
+        },
+        evidence: {
+          target: "EvidenceDocumentSource",
+          type: "finance-research/signal_supported_by_evidence",
+          cardinality: "many",
+        },
+      },
+    },
+    RiskStateSource: {
+      tier1: "Event",
+      concrete: "RiskState",
+      identityFields: [
+        "kind",
+        "occurredAt",
+        "currentPrice",
+        "remainingPositionLimit",
+        "maxShares",
+      ],
+      optionalFields: ["volatility", "bindingConstraint", "sourceSnapshotId"],
+      schemaVersion: 1,
+      edges: {
+        ticker: {
+          target: "TickerSource",
+          type: "finance-research/risk_state_for_ticker",
+          cardinality: "exactly_one",
+        },
+        evidence: {
+          target: "EvidenceDocumentSource",
+          type: "finance-research/risk_state_supported_by_evidence",
+          cardinality: "many",
+        },
+      },
+    },
+    PortfolioDecisionSource: {
+      tier1: "Event",
+      concrete: "PortfolioDecision",
+      identityFields: [
+        "kind",
+        "occurredAt",
+        "action",
+        "quantity",
+        "confidence",
+        "reasoning",
+        "accepted",
+      ],
+      optionalFields: ["rejectionReason"],
+      schemaVersion: 1,
+      edges: {
+        ticker: {
+          target: "TickerSource",
+          type: "finance-research/decision_for_ticker",
+          cardinality: "exactly_one",
+        },
+        riskState: {
+          target: "RiskStateSource",
+          type: "finance-research/decision_uses_risk_state",
+          cardinality: "zero_or_one",
+        },
+        signal: {
+          target: "AnalystSignalSource",
+          type: "finance-research/decision_uses_signal",
+          cardinality: "many",
+        },
+      },
+    },
+  },
+};
+
+export interface ArrowHedgeValidationIssue {
+  readonly path: string;
+  readonly message: string;
+}
+
+export interface ParsedArrowHedgeSnapshot {
+  readonly snapshotId: string;
+  readonly observedAt: Timestamp;
+  readonly authority: string;
+  readonly tickerSymbol: string;
+  readonly riskFreshnessExpiresAt: Timestamp | null;
+  readonly decisionRiskSourceSnapshotId: string | null;
+  readonly decisionSignalSourceSnapshotId: string | null;
+  readonly records: readonly SourceEntityRecord[];
+}
+
+export interface ArrowHedgeParseResult {
+  readonly valid: boolean;
+  readonly issues: readonly ArrowHedgeValidationIssue[];
+  readonly records: readonly SourceEntityRecord[];
+  readonly snapshot?: ParsedArrowHedgeSnapshot;
+}
+
+export interface ArrowHedgeOperationalSample {
+  readonly adapterStartedAt: Timestamp;
+  readonly firstValidEventAt?: Timestamp;
+  readonly mappingAttempts: number;
+  readonly mappingRejections: number;
+  readonly stateComparisons: number;
+  readonly stateDisagreements: number;
+}
+
+export interface ArrowHedgeEdgePlan {
+  readonly sourceName: string;
+  readonly edgeKey: string;
+  readonly fromSourceRecordId: string;
+  readonly toSourceRecordId: string;
+  readonly edge: MappingEdgeInput;
+}
+
+export interface ArrowHedgeIngestionPlan {
+  readonly valid: boolean;
+  readonly issues: readonly ArrowHedgeValidationIssue[];
+  readonly mapping: EntityIngestionPlan;
+  readonly edges: readonly ArrowHedgeEdgePlan[];
+  readonly typedEvents: readonly MappingEventInput[];
+  readonly operationalSample: ArrowHedgeOperationalSample;
+}
+
+export interface ArrowHedgePlanContext {
+  readonly tenantId: TenantId;
+  readonly profile: ProfileDefinition;
+  readonly adapterStartedAt: Timestamp;
+  readonly emittedBy?: string;
+}
+
+export interface ArrowHedgeExecutionResult {
+  readonly nodesCreated: number;
+  readonly nodesUpdated: number;
+  readonly edgesCreated: number;
+  readonly eventsPublished: readonly PMEvent[];
+}
+
+export interface ArrowHedgeExecutionPorts<TTx = unknown> {
+  readonly withTransaction: <T>(fn: (tx: TTx) => Promise<T>) => Promise<T>;
+  readonly graph: {
+    createNode(
+      input: EntityIngestionPlanItem["node"],
+      tx: TTx,
+    ): Promise<{
+      readonly created: boolean;
+      readonly node: {
+        readonly id: EntityId;
+        readonly identity: Readonly<Record<string, unknown>>;
+        readonly schemaVersion: number;
+      };
+    }>;
+    updateNode(
+      input: {
+        readonly tenantId: TenantId;
+        readonly id: EntityId;
+        readonly identity: Readonly<Record<string, unknown>>;
+        readonly expectedSchemaVersion: number;
+      },
+      tx: TTx,
+    ): Promise<unknown>;
+    createEdge(input: MappingEdgeInput, tx: TTx): Promise<unknown>;
+  };
+  readonly events: {
+    publishWith(tx: TTx, input: MappingEventInput): Promise<PMEvent>;
+  };
+}
+
+export function parseArrowHedgeSnapshot(input: unknown): ArrowHedgeParseResult {
+  const issues: ArrowHedgeValidationIssue[] = [];
+  if (!isRecord(input)) {
+    return {
+      valid: false,
+      issues: [{ path: "", message: "expected object" }],
+      records: [],
+    };
+  }
+
+  const snapshotId = stringAt(input, "/snapshotId", issues);
+  const observedAt = timestampAt(input, "/observedAt", issues);
+  const authority = stringAt(input, "/authority", issues);
+  const backtestRun = objectAt(input, "/backtestRun", issues);
+  const researchRun = objectAt(input, "/researchRun", issues);
+  const ticker = objectAt(input, "/ticker", issues);
+  const signal = objectAt(input, "/signal", issues);
+  const risk = objectAt(input, "/risk", issues);
+  const portfolio = objectAt(input, "/portfolio", issues);
+  const decision = objectAt(input, "/decision", issues);
+  const evidence = arrayAt(input, "/evidence", issues);
+
+  if (issues.length > 0) {
+    return { valid: false, issues, records: [] };
+  }
+
+  const tickerSymbol = stringAt(ticker!, "/ticker/symbol", issues);
+  const riskFreshnessExpiresAt = optionalTimestampAt(
+    risk!,
+    "/risk/freshnessExpiresAt",
+    issues,
+  );
+  const decisionRiskSourceSnapshotId = optionalStringAt(
+    decision!,
+    "/decision/riskSourceSnapshotId",
+    issues,
+  );
+  const decisionSignalSourceSnapshotId = optionalStringAt(
+    decision!,
+    "/decision/signalSourceSnapshotId",
+    issues,
+  );
+
+  const records: SourceEntityRecord[] = [];
+  const pushRecord = (
+    sourceName: string,
+    sourceRecordId: string,
+    row: Readonly<Record<string, unknown>>,
+  ): void => {
+    records.push({
+      sourceName,
+      sourceRecordId,
+      id: stableEntityId(sourceRecordId),
+      observedAt: observedAt!,
+      row,
+    });
+  };
+
+  if (issues.length === 0) {
+    pushRecord("BacktestRunSource", `backtest:${stringAt(backtestRun!, "/backtestRun/id", issues)}`, {
+      title: stringAt(backtestRun!, "/backtestRun/title", issues),
+      scopeStart: stringAt(backtestRun!, "/backtestRun/scopeStart", issues),
+      scopeEnd: stringAt(backtestRun!, "/backtestRun/scopeEnd", issues),
+      state: stringAt(backtestRun!, "/backtestRun/state", issues),
+      datasetRef: stringAt(backtestRun!, "/backtestRun/datasetRef", issues),
+      seed: stringAt(backtestRun!, "/backtestRun/seed", issues),
+    });
+    pushRecord("ResearchRunSource", `research:${stringAt(researchRun!, "/researchRun/id", issues)}`, {
+      title: stringAt(researchRun!, "/researchRun/title", issues),
+      scopeStart: stringAt(researchRun!, "/researchRun/scopeStart", issues),
+      scopeEnd: stringAt(researchRun!, "/researchRun/scopeEnd", issues),
+      state: stringAt(researchRun!, "/researchRun/state", issues),
+      strategy: optionalStringAt(researchRun!, "/researchRun/strategy", issues),
+      modelLock: optionalStringAt(researchRun!, "/researchRun/modelLock", issues),
+      seed: optionalStringAt(researchRun!, "/researchRun/seed", issues),
+    });
+    pushRecord("TickerSource", `ticker:${tickerSymbol}`, {
+      name: tickerSymbol,
+      kind: "ticker",
+      symbol: tickerSymbol,
+      assetClass: stringAt(ticker!, "/ticker/assetClass", issues),
+      exchange: optionalStringAt(ticker!, "/ticker/exchange", issues),
+      currency: stringAt(ticker!, "/ticker/currency", issues),
+      externalRef: tickerSymbol,
+    });
+
+    for (const [index, rawEvidence] of evidence!.entries()) {
+      const at = `/evidence/${index}`;
+      if (!isRecord(rawEvidence)) {
+        issues.push({ path: at, message: "expected object" });
+        continue;
+      }
+      const evidenceId = stringAt(rawEvidence, `${at}/id`, issues);
+      pushRecord("EvidenceDocumentSource", `evidence:${evidenceId}`, {
+        sha256: stringAt(rawEvidence, `${at}/sha256`, issues),
+        mimeType: stringAt(rawEvidence, `${at}/mimeType`, issues),
+        filename: stringAt(rawEvidence, `${at}/filename`, issues),
+        sourceUri: optionalStringAt(rawEvidence, `${at}/sourceUri`, issues),
+        retrievedAt: optionalTimestampAt(rawEvidence, `${at}/retrievedAt`, issues),
+        freshnessExpiresAt: optionalTimestampAt(
+          rawEvidence,
+          `${at}/freshnessExpiresAt`,
+          issues,
+        ),
+      });
+    }
+
+    pushRecord("PortfolioStateSource", `portfolio:${stringAt(portfolio!, "/portfolio/id", issues)}`, {
+      name: `Portfolio ${snapshotId}`,
+      kind: "portfolio_state",
+      cash: numberAt(portfolio!, "/portfolio/cash", issues),
+      equity: numberAt(portfolio!, "/portfolio/equity", issues),
+      marginRequirement: numberAt(portfolio!, "/portfolio/marginRequirement", issues),
+      marginUsed: numberAt(portfolio!, "/portfolio/marginUsed", issues),
+      sourceSnapshotId: snapshotId,
+    });
+    pushRecord("AnalystSignalSource", `signal:${stringAt(signal!, "/signal/id", issues)}`, {
+      kind: "analyst_signal",
+      occurredAt: observedAt,
+      agentId: stringAt(signal!, "/signal/agentId", issues),
+      signal: stringAt(signal!, "/signal/signal", issues),
+      confidence: numberAt(signal!, "/signal/confidence", issues),
+      evidenceWindowStart: optionalTimestampAt(
+        signal!,
+        "/signal/evidenceWindowStart",
+        issues,
+      ),
+      evidenceWindowEnd: optionalTimestampAt(signal!, "/signal/evidenceWindowEnd", issues),
+      sourceSnapshotId: snapshotId,
+    });
+    pushRecord("RiskStateSource", `risk:${stringAt(risk!, "/risk/id", issues)}`, {
+      kind: "risk_state",
+      occurredAt: observedAt,
+      currentPrice: numberAt(risk!, "/risk/currentPrice", issues),
+      remainingPositionLimit: numberAt(risk!, "/risk/remainingPositionLimit", issues),
+      maxShares: numberAt(risk!, "/risk/maxShares", issues),
+      volatility: optionalNumberAt(risk!, "/risk/volatility", issues),
+      bindingConstraint: optionalStringAt(risk!, "/risk/bindingConstraint", issues),
+      sourceSnapshotId: snapshotId,
+    });
+    pushRecord("PortfolioDecisionSource", `decision:${stringAt(decision!, "/decision/id", issues)}`, {
+      kind: "portfolio_decision",
+      occurredAt: observedAt,
+      action: stringAt(decision!, "/decision/action", issues),
+      quantity: numberAt(decision!, "/decision/quantity", issues),
+      confidence: numberAt(decision!, "/decision/confidence", issues),
+      reasoning: stringAt(decision!, "/decision/reasoning", issues),
+      accepted: booleanAt(decision!, "/decision/accepted", issues),
+      rejectionReason: optionalStringAt(decision!, "/decision/rejectionReason", issues),
+    });
+  }
+
+  if (issues.length > 0) {
+    return { valid: false, issues, records: [] };
+  }
+
+  return {
+    valid: true,
+    issues: [],
+    records,
+    snapshot: {
+      snapshotId: snapshotId!,
+      observedAt: observedAt!,
+      authority: authority!,
+      tickerSymbol: tickerSymbol!,
+      riskFreshnessExpiresAt,
+      decisionRiskSourceSnapshotId,
+      decisionSignalSourceSnapshotId,
+      records,
+    },
+  };
+}
+
+export function buildArrowHedgeIngestionPlan(
+  input: unknown,
+  ctx: ArrowHedgePlanContext,
+): ArrowHedgeIngestionPlan {
+  const parsed = parseArrowHedgeSnapshot(input);
+  if (!parsed.valid || !parsed.snapshot) {
+    return invalidPlan(parsed.issues, ctx, parsed.records.length || 1);
+  }
+
+  const emittedBy = ctx.emittedBy ?? "finance-research.ingest";
+  const mapping = planEntityIngestion(
+    ARROWHEDGE_ENTITY_MAPPING,
+    ctx.profile,
+    parsed.records,
+    {
+      tenantId: ctx.tenantId,
+      emittedBy,
+      authority: parsed.snapshot.authority,
+      occurredAt: parsed.snapshot.observedAt,
+    },
+  );
+  if (!mapping.valid) {
+    return {
+      valid: false,
+      issues: mapping.issues,
+      mapping,
+      edges: [],
+      typedEvents: [],
+      operationalSample: {
+        adapterStartedAt: ctx.adapterStartedAt,
+        mappingAttempts: parsed.records.length,
+        mappingRejections: mapping.issues.length,
+        stateComparisons: 0,
+        stateDisagreements: 0,
+      },
+    };
+  }
+
+  const edges = buildEdges(ctx.tenantId, parsed.records);
+  const typedEvents = buildTypedEvents(ctx.tenantId, emittedBy, parsed.snapshot, mapping.items);
+  return {
+    valid: true,
+    issues: [],
+    mapping,
+    edges,
+    typedEvents,
+    operationalSample: {
+      adapterStartedAt: ctx.adapterStartedAt,
+      ...(typedEvents[0]?.occurredAt ? { firstValidEventAt: typedEvents[0].occurredAt } : {}),
+      mappingAttempts: parsed.records.length,
+      mappingRejections: 0,
+      stateComparisons: 1,
+      stateDisagreements: hasStateDisagreement(parsed.snapshot) ? 1 : 0,
+    },
+  };
+}
+
+export async function executeArrowHedgeIngestionPlan<TTx>(
+  plan: ArrowHedgeIngestionPlan,
+  ports: ArrowHedgeExecutionPorts<TTx>,
+): Promise<ArrowHedgeExecutionResult> {
+  if (!plan.valid) {
+    throw new Error(`cannot execute invalid ArrowHedge plan: ${plan.issues[0]?.message ?? "invalid"}`);
+  }
+
+  return ports.withTransaction(async (tx) => {
+    let nodesCreated = 0;
+    let nodesUpdated = 0;
+    let edgesCreated = 0;
+    const eventsPublished: PMEvent[] = [];
+
+    for (const item of plan.mapping.items) {
+      const result = await ports.graph.createNode(item.node, tx);
+      if (result.created) {
+        nodesCreated += 1;
+      } else if (!sameIdentity(result.node.identity, item.node.identity)) {
+        await ports.graph.updateNode(
+          {
+            tenantId: item.node.tenantId,
+            id: result.node.id,
+            identity: item.node.identity,
+            expectedSchemaVersion: result.node.schemaVersion,
+          },
+          tx,
+        );
+        nodesUpdated += 1;
+      }
+      eventsPublished.push(await ports.events.publishWith(tx, item.event));
+    }
+
+    for (const edge of plan.edges) {
+      await ports.graph.createEdge(edge.edge, tx);
+      edgesCreated += 1;
+    }
+
+    for (const event of plan.typedEvents) {
+      eventsPublished.push(await ports.events.publishWith(tx, event));
+    }
+
+    return {
+      nodesCreated,
+      nodesUpdated,
+      edgesCreated,
+      eventsPublished,
+    };
+  });
+}
+
+export interface ArrowHedgeTickerCop {
+  readonly symbol: string;
+  readonly latestSignal?: {
+    readonly signal: string;
+    readonly confidence: number;
+    readonly sourceSnapshotId: string;
+  };
+  readonly latestRiskState?: {
+    readonly currentPrice: number;
+    readonly maxShares: number;
+    readonly sourceSnapshotId: string;
+    readonly freshnessExpiresAt: string | null;
+  };
+  readonly latestDecision?: {
+    readonly action: string;
+    readonly quantity: number;
+    readonly accepted: boolean;
+    readonly riskSourceSnapshotId: string | null;
+    readonly signalSourceSnapshotId: string | null;
+  };
+  readonly authorityGate: {
+    readonly passes: number;
+    readonly failures: number;
+  };
+  readonly stateDisagreements: number;
+  readonly staleBlocks: number;
+}
+
+export interface ArrowHedgeCommonOperatingPictureState {
+  readonly tickers: Readonly<Record<string, ArrowHedgeTickerCop>>;
+  readonly summary: {
+    readonly validEventCount: number;
+    readonly authorityGatePassRate: number | null;
+    readonly stateDisagreementRate: number | null;
+  };
+}
+
+export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
+  return {
+    name,
+    version: 1,
+    consumes: [...FINANCE_RESEARCH_EVENT_TYPES],
+    initial: (): ArrowHedgeCommonOperatingPictureState => ({
+      tickers: {},
+      summary: {
+        validEventCount: 0,
+        authorityGatePassRate: null,
+        stateDisagreementRate: null,
+      },
+    }),
+    apply: (
+      state: ArrowHedgeCommonOperatingPictureState,
+      event: PMEvent,
+    ): ArrowHedgeCommonOperatingPictureState => updateCop(state, event),
+  };
+}
+
+function buildEdges(
+  tenantId: TenantId,
+  records: readonly SourceEntityRecord[],
+): readonly ArrowHedgeEdgePlan[] {
+  const bySourceName = groupRecords(records);
+  const backtest = one(bySourceName, "BacktestRunSource");
+  const research = one(bySourceName, "ResearchRunSource");
+  const ticker = one(bySourceName, "TickerSource");
+  const signal = one(bySourceName, "AnalystSignalSource");
+  const risk = one(bySourceName, "RiskStateSource");
+  const portfolio = one(bySourceName, "PortfolioStateSource");
+  const decision = one(bySourceName, "PortfolioDecisionSource");
+  const evidence = bySourceName.get("EvidenceDocumentSource") ?? [];
+
+  const edgeSpecs = [
+    spec("BacktestRunSource", "researchRun", backtest, research),
+    spec("ResearchRunSource", "ticker", research, ticker),
+    spec("ResearchRunSource", "signal", research, signal),
+    spec("ResearchRunSource", "riskState", research, risk),
+    spec("ResearchRunSource", "portfolioState", research, portfolio),
+    spec("ResearchRunSource", "decision", research, decision),
+    spec("AnalystSignalSource", "ticker", signal, ticker),
+    ...evidence.map((item) => spec("AnalystSignalSource", "evidence", signal, item)),
+    spec("RiskStateSource", "ticker", risk, ticker),
+    ...evidence.map((item) => spec("RiskStateSource", "evidence", risk, item)),
+    spec("PortfolioDecisionSource", "ticker", decision, ticker),
+    spec("PortfolioDecisionSource", "riskState", decision, risk),
+    spec("PortfolioDecisionSource", "signal", decision, signal),
+  ];
+
+  return edgeSpecs.map((edgeSpec) => ({
+    sourceName: edgeSpec.sourceName,
+    edgeKey: edgeSpec.edgeKey,
+    fromSourceRecordId: edgeSpec.from.sourceRecordId!,
+    toSourceRecordId: edgeSpec.to.sourceRecordId!,
+    edge: applyEdgeMapping(
+      ARROWHEDGE_ENTITY_MAPPING,
+      edgeSpec.sourceName,
+      edgeSpec.edgeKey,
+      { fromId: edgeSpec.from.id!, toId: edgeSpec.to.id! },
+      {
+        tenantId,
+        attrs: {
+          fromSourceRecordId: edgeSpec.from.sourceRecordId,
+          toSourceRecordId: edgeSpec.to.sourceRecordId,
+        },
+      },
+    ),
+  }));
+}
+
+function buildTypedEvents(
+  tenantId: TenantId,
+  emittedBy: string,
+  snapshot: ParsedArrowHedgeSnapshot,
+  items: readonly EntityIngestionPlanItem[],
+): readonly MappingEventInput[] {
+  const bySource = new Map(items.map((item) => [item.sourceName, item]));
+  const signal = bySource.get("AnalystSignalSource")!;
+  const risk = bySource.get("RiskStateSource")!;
+  const decision = bySource.get("PortfolioDecisionSource")!;
+  const decisionPayload = {
+    sourceSnapshotId: snapshot.snapshotId,
+    tickerSymbol: snapshot.tickerSymbol,
+    action: decision.node.identity["action"],
+    quantity: decision.node.identity["quantity"],
+    confidence: decision.node.identity["confidence"],
+    reasoning: decision.node.identity["reasoning"],
+    accepted: decision.node.identity["accepted"],
+    riskSourceSnapshotId: snapshot.decisionRiskSourceSnapshotId,
+    signalSourceSnapshotId: snapshot.decisionSignalSourceSnapshotId,
+    currentPrice: risk.node.identity["currentPrice"],
+    occurredAt: snapshot.observedAt,
+  };
+  const events: MappingEventInput[] = [
+    typedEvent({
+      tenantId,
+      type: "analyst.signal.created",
+      entityId: signal.event.entityId,
+      emittedBy,
+      authority: snapshot.authority,
+      occurredAt: snapshot.observedAt,
+      payloadSchema: "finance-research/analyst-signal-created.v1",
+      payload: {
+        sourceSnapshotId: snapshot.snapshotId,
+        tickerSymbol: snapshot.tickerSymbol,
+        signal: signal.node.identity["signal"],
+        confidence: signal.node.identity["confidence"],
+        agentId: signal.node.identity["agentId"],
+        occurredAt: snapshot.observedAt,
+      },
+    }),
+    typedEvent({
+      tenantId,
+      type: "risk.state.validated",
+      entityId: risk.event.entityId,
+      emittedBy,
+      authority: snapshot.authority,
+      occurredAt: snapshot.observedAt,
+      payloadSchema: "finance-research/risk-state-validated.v1",
+      payload: {
+        sourceSnapshotId: snapshot.snapshotId,
+        tickerSymbol: snapshot.tickerSymbol,
+        currentPrice: risk.node.identity["currentPrice"],
+        remainingPositionLimit: risk.node.identity["remainingPositionLimit"],
+        maxShares: risk.node.identity["maxShares"],
+        freshnessExpiresAt: snapshot.riskFreshnessExpiresAt,
+        occurredAt: snapshot.observedAt,
+      },
+    }),
+    typedEvent({
+      tenantId,
+      type: "portfolio.decision.proposed",
+      entityId: decision.event.entityId,
+      emittedBy,
+      authority: snapshot.authority,
+      occurredAt: snapshot.observedAt,
+      payloadSchema: "finance-research/portfolio-decision-proposed.v1",
+      payload: decisionPayload,
+    }),
+  ];
+
+  if (decision.node.identity["accepted"] === true && !hasStateDisagreement(snapshot)) {
+    events.push(
+      typedEvent({
+        tenantId,
+        type: "portfolio.decision.accepted",
+        entityId: decision.event.entityId,
+        emittedBy,
+        authority: snapshot.authority,
+        occurredAt: snapshot.observedAt,
+        payloadSchema: "finance-research/portfolio-decision-accepted.v1",
+        payload: decisionPayload,
+      }),
+    );
+  }
+
+  if (hasStateDisagreement(snapshot) || isStale(snapshot)) {
+    events.push(
+      typedEvent({
+        tenantId,
+        type: "workflow.blocked.stale_state",
+        entityId: bySource.get("ResearchRunSource")!.event.entityId,
+        emittedBy,
+        authority: snapshot.authority,
+        occurredAt: snapshot.observedAt,
+        payloadSchema: "finance-research/workflow-blocked-stale-state.v1",
+        payload: {
+          sourceSnapshotId: snapshot.snapshotId,
+          tickerSymbol: snapshot.tickerSymbol,
+          riskSourceSnapshotId: snapshot.decisionRiskSourceSnapshotId,
+          signalSourceSnapshotId: snapshot.decisionSignalSourceSnapshotId,
+          riskFreshnessExpiresAt: snapshot.riskFreshnessExpiresAt,
+          occurredAt: snapshot.observedAt,
+        },
+      }),
+    );
+  }
+
+  return events;
+}
+
+function updateCop(
+  state: ArrowHedgeCommonOperatingPictureState,
+  event: PMEvent,
+): ArrowHedgeCommonOperatingPictureState {
+  const payload = event.payload;
+  const symbol = typeof payload["tickerSymbol"] === "string" ? payload["tickerSymbol"] : null;
+  if (!symbol) return state;
+  const current = state.tickers[symbol] ?? emptyTicker(symbol);
+  let next = current;
+
+  if (event.type === "analyst.signal.created") {
+    next = {
+      ...current,
+      latestSignal: {
+        signal: String(payload["signal"]),
+        confidence: Number(payload["confidence"]),
+        sourceSnapshotId: String(payload["sourceSnapshotId"]),
+      },
+    };
+  } else if (event.type === "risk.state.validated") {
+    next = {
+      ...current,
+      latestRiskState: {
+        currentPrice: Number(payload["currentPrice"]),
+        maxShares: Number(payload["maxShares"]),
+        sourceSnapshotId: String(payload["sourceSnapshotId"]),
+        freshnessExpiresAt:
+          typeof payload["freshnessExpiresAt"] === "string"
+            ? payload["freshnessExpiresAt"]
+            : null,
+      },
+    };
+  } else if (event.type === "portfolio.decision.proposed") {
+    const disagrees =
+      current.latestRiskState !== undefined &&
+      typeof payload["riskSourceSnapshotId"] === "string" &&
+      payload["riskSourceSnapshotId"] !== current.latestRiskState.sourceSnapshotId;
+    next = {
+      ...current,
+      latestDecision: {
+        action: String(payload["action"]),
+        quantity: Number(payload["quantity"]),
+        accepted: Boolean(payload["accepted"]),
+        riskSourceSnapshotId:
+          typeof payload["riskSourceSnapshotId"] === "string"
+            ? payload["riskSourceSnapshotId"]
+            : null,
+        signalSourceSnapshotId:
+          typeof payload["signalSourceSnapshotId"] === "string"
+            ? payload["signalSourceSnapshotId"]
+            : null,
+      },
+      stateDisagreements: current.stateDisagreements + (disagrees ? 1 : 0),
+    };
+  } else if (event.type === "portfolio.decision.accepted") {
+    next = {
+      ...current,
+      authorityGate: {
+        ...current.authorityGate,
+        passes: current.authorityGate.passes + 1,
+      },
+    };
+  } else if (event.type === "workflow.blocked.stale_state") {
+    next = {
+      ...current,
+      staleBlocks: current.staleBlocks + 1,
+      authorityGate: {
+        ...current.authorityGate,
+        failures: current.authorityGate.failures + 1,
+      },
+    };
+  }
+
+  const tickers = { ...state.tickers, [symbol]: next };
+  return {
+    tickers,
+    summary: summarizeCop(tickers),
+  };
+}
+
+function invalidPlan(
+  issues: readonly ArrowHedgeValidationIssue[],
+  ctx: ArrowHedgePlanContext,
+  attempts: number,
+): ArrowHedgeIngestionPlan {
+  return {
+    valid: false,
+    issues,
+    mapping: { valid: false, issues, items: [] },
+    edges: [],
+    typedEvents: [],
+    operationalSample: {
+      adapterStartedAt: ctx.adapterStartedAt,
+      mappingAttempts: attempts,
+      mappingRejections: issues.length,
+      stateComparisons: 0,
+      stateDisagreements: 0,
+    },
+  };
+}
+
+function typedEvent(input: MappingEventInput): MappingEventInput {
+  return input;
+}
+
+function stableEntityId(input: string): EntityId {
+  const hex = createHash("sha256").update(`arrowhedge:${input}`).digest("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `4${hex.slice(13, 16)}`,
+    `${((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hex.slice(18, 20)}`,
+    hex.slice(20, 32),
+  ].join("-") as EntityId;
+}
+
+function groupRecords(
+  records: readonly SourceEntityRecord[],
+): Map<string, readonly SourceEntityRecord[]> {
+  const out = new Map<string, SourceEntityRecord[]>();
+  for (const record of records) {
+    const group = out.get(record.sourceName) ?? [];
+    group.push(record);
+    out.set(record.sourceName, group);
+  }
+  return out;
+}
+
+function one(
+  groups: ReadonlyMap<string, readonly SourceEntityRecord[]>,
+  sourceName: string,
+): SourceEntityRecord {
+  const record = groups.get(sourceName)?.[0];
+  if (!record) throw new Error(`missing parsed source record: ${sourceName}`);
+  return record;
+}
+
+function spec(
+  sourceName: string,
+  edgeKey: string,
+  from: SourceEntityRecord,
+  to: SourceEntityRecord,
+) {
+  return { sourceName, edgeKey, from, to };
+}
+
+function hasStateDisagreement(snapshot: ParsedArrowHedgeSnapshot): boolean {
+  return (
+    (snapshot.decisionRiskSourceSnapshotId !== null &&
+      snapshot.decisionRiskSourceSnapshotId !== snapshot.snapshotId) ||
+    (snapshot.decisionSignalSourceSnapshotId !== null &&
+      snapshot.decisionSignalSourceSnapshotId !== snapshot.snapshotId)
+  );
+}
+
+function isStale(snapshot: ParsedArrowHedgeSnapshot): boolean {
+  if (!snapshot.riskFreshnessExpiresAt) return false;
+  return Date.parse(snapshot.riskFreshnessExpiresAt) < Date.parse(snapshot.observedAt);
+}
+
+function sameIdentity(
+  a: Readonly<Record<string, unknown>>,
+  b: Readonly<Record<string, unknown>>,
+): boolean {
+  return JSON.stringify(sortObject(a)) === JSON.stringify(sortObject(b));
+}
+
+function sortObject(input: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function emptyTicker(symbol: string): ArrowHedgeTickerCop {
+  return {
+    symbol,
+    authorityGate: { passes: 0, failures: 0 },
+    stateDisagreements: 0,
+    staleBlocks: 0,
+  };
+}
+
+function summarizeCop(
+  tickers: Readonly<Record<string, ArrowHedgeTickerCop>>,
+): ArrowHedgeCommonOperatingPictureState["summary"] {
+  const values = Object.values(tickers);
+  const validEventCount = values.reduce(
+    (acc, ticker) =>
+      acc +
+      (ticker.latestSignal ? 1 : 0) +
+      (ticker.latestRiskState ? 1 : 0) +
+      (ticker.latestDecision ? 1 : 0) +
+      ticker.authorityGate.passes +
+      ticker.authorityGate.failures,
+    0,
+  );
+  const passes = values.reduce((acc, ticker) => acc + ticker.authorityGate.passes, 0);
+  const failures = values.reduce((acc, ticker) => acc + ticker.authorityGate.failures, 0);
+  const comparisons = values.reduce(
+    (acc, ticker) => acc + (ticker.latestDecision && ticker.latestRiskState ? 1 : 0),
+    0,
+  );
+  const disagreements = values.reduce(
+    (acc, ticker) => acc + ticker.stateDisagreements,
+    0,
+  );
+  return {
+    validEventCount,
+    authorityGatePassRate: passes + failures === 0 ? null : passes / (passes + failures),
+    stateDisagreementRate: comparisons === 0 ? null : disagreements / comparisons,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function objectAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): Record<string, unknown> | null {
+  const value = input[path.slice(1)];
+  if (!isRecord(value)) {
+    issues.push({ path, message: "expected object" });
+    return null;
+  }
+  return value;
+}
+
+function arrayAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): readonly unknown[] | null {
+  const value = input[path.slice(1)];
+  if (!Array.isArray(value)) {
+    issues.push({ path, message: "expected array" });
+    return null;
+  }
+  return value;
+}
+
+function stringAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): string | null {
+  const value = input[path.split("/").at(-1)!];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    issues.push({ path, message: "expected non-empty string" });
+    return null;
+  }
+  return value;
+}
+
+function optionalStringAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): string | null {
+  const value = input[path.split("/").at(-1)!];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") {
+    issues.push({ path, message: "expected string when present" });
+    return null;
+  }
+  return value;
+}
+
+function numberAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): number | null {
+  const value = input[path.split("/").at(-1)!];
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    issues.push({ path, message: "expected finite number" });
+    return null;
+  }
+  return value;
+}
+
+function optionalNumberAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): number | null {
+  const value = input[path.split("/").at(-1)!];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    issues.push({ path, message: "expected finite number when present" });
+    return null;
+  }
+  return value;
+}
+
+function booleanAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): boolean | null {
+  const value = input[path.split("/").at(-1)!];
+  if (typeof value !== "boolean") {
+    issues.push({ path, message: "expected boolean" });
+    return null;
+  }
+  return value;
+}
+
+function timestampAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): Timestamp | null {
+  const value = stringAt(input, path, issues);
+  if (value === null) return null;
+  if (Number.isNaN(Date.parse(value))) {
+    issues.push({ path, message: "expected ISO timestamp" });
+    return null;
+  }
+  return value as Timestamp;
+}
+
+function optionalTimestampAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): Timestamp | null {
+  const value = optionalStringAt(input, path, issues);
+  if (value === null) return null;
+  if (Number.isNaN(Date.parse(value))) {
+    issues.push({ path, message: "expected ISO timestamp when present" });
+    return null;
+  }
+  return value as Timestamp;
+}

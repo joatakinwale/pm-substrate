@@ -208,6 +208,15 @@ describe("validateEntityMapping (G11 phase 1)", () => {
     expect(i?.message).toMatch(/<profile>/);
   });
 
+  it("accepts lowercase hyphenated profile prefixes in edge types", () => {
+    const m = clone(goldenAgency);
+    m.profile = "finance-research";
+    m.entities.Lead.edges!.assignedTo.type = "finance-research/lead_assigned_to_user";
+    const r = validateEntityMapping(m);
+    expect(r.valid).toBe(true);
+    expect(r.issues).toEqual([]);
+  });
+
   it("rejects unknown edge cardinality", () => {
     const m = clone(goldenAgency);
     // @ts-expect-error — testing rejection

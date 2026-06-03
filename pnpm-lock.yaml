@@ -100,9 +100,9 @@ importers:
 
   packages/capability-finance-research-ingest:
     dependencies:
-      '@pm/profile-finance-research':
+      '@pm/entity-mapping':
         specifier: workspace:*
-        version: link:../profile-finance-research
+        version: link:../entity-mapping
       '@pm/registry':
         specifier: workspace:*
         version: link:../registry
@@ -110,6 +110,30 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@pm/evals':
+        specifier: workspace:*
+        version: link:../evals
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/profile-finance-research':
+        specifier: workspace:*
+        version: link:../profile-finance-research
+      '@pm/profile-registry':
+        specifier: workspace:*
+        version: link:../profile-registry
+      '@pm/projections':
+        specifier: workspace:*
+        version: link:../projections
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

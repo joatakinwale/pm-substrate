@@ -9,7 +9,7 @@
   "exclude": ["**/*.test.ts", "dist"],
   "references": [
     { "path": "../types" },
-    { "path": "../registry" },
-    { "path": "../profile-finance-research" }
+    { "path": "../entity-mapping" },
+    { "path": "../registry" }
   ]
 }
