@@ -28,3 +28,18 @@ export {
   type EvalEventDbClient,
   type EvalEventQueryResult,
 } from "./persistence/index.js";
+export {
+  LOCAL_LAB_SCENARIOS,
+  MEMORY_BENCHMARK_BRIDGES,
+  STATE_BENCH_CATEGORIES,
+  assertCompleteLocalLabPairs,
+  runLocalLabPairedEvals,
+  runLocalLabPairedScenario,
+  type LocalLabPairedResult,
+  type LocalLabScenario,
+  type LocalLabSuiteResult,
+  type LocalLabPairSummary,
+  type MastCategory,
+  type MemoryBenchmarkBridge,
+  type StateBenchCategory,
+} from "./local-lab.js";
