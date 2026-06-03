@@ -1,5 +1,6 @@
 import {
   COORDINATION_CLASSES,
+  FAILURE_CLASSES,
   MAST_CATEGORIES,
   MEMORY_BENCHMARK_BRIDGES,
   RUN_ARMS,
@@ -8,6 +9,7 @@ import {
   type CoordinationClass,
   type EvalEvent,
   type EvalResult,
+  type FailureClass,
   type MastCategory,
   type MemoryBenchmarkBridge,
   type RunArm,
@@ -20,6 +22,16 @@ export interface IncompletePairedGroup {
 }
 
 export interface CoordinationClassMetrics {
+  readonly events: number;
+  readonly pairedGroups: number;
+  readonly baselineFailures: number;
+  readonly substrateFailures: number;
+  readonly failureReduction: number;
+  readonly substratePasses: number;
+  readonly substrateBlocked: number;
+}
+
+export interface FailureClassMetrics {
   readonly events: number;
   readonly pairedGroups: number;
   readonly baselineFailures: number;
@@ -42,6 +54,7 @@ export interface EvalEventMetrics {
   readonly mastCategories: readonly MastCategory[];
   readonly coordinationClasses: readonly CoordinationClass[];
   readonly byCoordinationClass: Readonly<Record<CoordinationClass, CoordinationClassMetrics>>;
+  readonly byFailureClass: Readonly<Record<FailureClass, FailureClassMetrics>>;
   readonly authorityGatePassRate: number | null;
   readonly convergentUpdateAutoResolutionRate: number | null;
 }
@@ -55,16 +68,40 @@ interface MutableCoordinationClassMetrics {
   substrateBlocked: number;
 }
 
+interface MutableFailureClassMetrics {
+  events: number;
+  pairedGroups: Set<string>;
+  baselineFailures: number;
+  substrateFailures: number;
+  substratePasses: number;
+  substrateBlocked: number;
+}
+
 export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetrics {
   const validEvents = events.map((event) => assertEvalEvent(event));
   const pairedGroups = new Map<string, EvalEvent[]>();
   const byCoordinationClass = makeCoordinationMetrics();
+  const byFailureClass = makeFailureClassMetrics();
 
   for (const event of validEvents) {
     if (event.pairedRunGroup) {
       const group = pairedGroups.get(event.pairedRunGroup) ?? [];
       group.push(event);
       pairedGroups.set(event.pairedRunGroup, group);
+    }
+
+    const failureBucket = byFailureClass[event.failureClass];
+    failureBucket.events += 1;
+    if (event.pairedRunGroup) {
+      failureBucket.pairedGroups.add(event.pairedRunGroup);
+    }
+    if (event.runArm === "baseline" && event.result === "fail") {
+      failureBucket.baselineFailures += 1;
+    }
+    if (event.runArm === "substrate") {
+      if (event.result === "fail") failureBucket.substrateFailures += 1;
+      if (event.result === "pass") failureBucket.substratePasses += 1;
+      if (event.result === "blocked") failureBucket.substrateBlocked += 1;
     }
 
     if (event.coordinationClass) {
@@ -146,6 +183,7 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
       (event) => event.coordinationClass,
     ),
     byCoordinationClass: freezeCoordinationMetrics(byCoordinationClass),
+    byFailureClass: freezeFailureClassMetrics(byFailureClass),
     authorityGatePassRate:
       authorityGateDecisions === 0
         ? null
@@ -171,6 +209,22 @@ function makeCoordinationMetrics(): Record<CoordinationClass, MutableCoordinatio
   ) as Record<CoordinationClass, MutableCoordinationClassMetrics>;
 }
 
+function makeFailureClassMetrics(): Record<FailureClass, MutableFailureClassMetrics> {
+  return Object.fromEntries(
+    FAILURE_CLASSES.map((failureClass) => [
+      failureClass,
+      {
+        events: 0,
+        pairedGroups: new Set<string>(),
+        baselineFailures: 0,
+        substrateFailures: 0,
+        substratePasses: 0,
+        substrateBlocked: 0,
+      },
+    ]),
+  ) as Record<FailureClass, MutableFailureClassMetrics>;
+}
+
 function freezeCoordinationMetrics(
   input: Record<CoordinationClass, MutableCoordinationClassMetrics>,
 ): Record<CoordinationClass, CoordinationClassMetrics> {
@@ -191,6 +245,28 @@ function freezeCoordinationMetrics(
       ];
     }),
   ) as Record<CoordinationClass, CoordinationClassMetrics>;
+}
+
+function freezeFailureClassMetrics(
+  input: Record<FailureClass, MutableFailureClassMetrics>,
+): Record<FailureClass, FailureClassMetrics> {
+  return Object.fromEntries(
+    FAILURE_CLASSES.map((failureClass) => {
+      const metrics = input[failureClass];
+      return [
+        failureClass,
+        {
+          events: metrics.events,
+          pairedGroups: metrics.pairedGroups.size,
+          baselineFailures: metrics.baselineFailures,
+          substrateFailures: metrics.substrateFailures,
+          failureReduction: metrics.baselineFailures - metrics.substrateFailures,
+          substratePasses: metrics.substratePasses,
+          substrateBlocked: metrics.substrateBlocked,
+        },
+      ];
+    }),
+  ) as Record<FailureClass, FailureClassMetrics>;
 }
 
 function countResult(

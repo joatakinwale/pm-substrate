@@ -56,3 +56,14 @@ export {
   type MappingNodeInput,
   type MappingEdgeInput,
 } from "./apply.js";
+
+export {
+  ADAPTER_ENTITY_MAPPED_EVENT_TYPE,
+  ADAPTER_ENTITY_MAPPED_PAYLOAD_SCHEMA,
+  planEntityIngestion,
+  type SourceEntityRecord,
+  type MappingEventInput,
+  type EntityIngestionPlanItem,
+  type EntityIngestionPlan,
+  type EntityIngestionPlanContext,
+} from "./ingestion-plan.js";

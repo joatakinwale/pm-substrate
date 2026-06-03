@@ -40,6 +40,7 @@ export {
   analyzeEvalEvents,
   type CoordinationClassMetrics,
   type EvalEventMetrics,
+  type FailureClassMetrics,
   type IncompletePairedGroup,
 } from "./metrics.js";
 export {
@@ -52,3 +53,10 @@ export {
   type LocalLabSuiteResult,
   type LocalLabPairSummary,
 } from "./local-lab.js";
+export {
+  buildAdapterStateProofEvalPair,
+  type AdapterStateProofEvalInput,
+  type AdapterStateProofPairedResult,
+  type AdapterStateProofSourceRecord,
+  type AdapterStateProofSummary,
+} from "./adapter-proof.js";

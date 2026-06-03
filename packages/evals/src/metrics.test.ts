@@ -149,6 +149,22 @@ describe("eval event metrics", () => {
       failureReduction: 1,
       substratePasses: 1,
     });
+    expect(metrics.byFailureClass["parallel_write_conflict"]).toMatchObject({
+      events: 6,
+      pairedGroups: 3,
+      baselineFailures: 3,
+      substrateFailures: 0,
+      failureReduction: 3,
+      substratePasses: 3,
+    });
+    expect(metrics.byFailureClass["representation_loss"]).toMatchObject({
+      events: 0,
+      pairedGroups: 0,
+      baselineFailures: 0,
+      substrateFailures: 0,
+      failureReduction: 0,
+      substratePasses: 0,
+    });
   });
 
   it("reports incomplete paired groups without counting them as complete", () => {
