@@ -11,9 +11,13 @@ import {
   type SourceEntityRecord,
 } from "@pm/entity-mapping";
 import {
+  buildObservationContractFromCurrentStateView,
+  evaluateObservationContract,
   stateRef,
   type AllowedAction,
   type CurrentStateView,
+  type ObservationContract,
+  type ObservationContractEvaluation,
   type StateConflict,
   type StateRef,
 } from "@pm/agent-state";
@@ -689,6 +693,17 @@ export interface ArrowHedgeCurrentStateViewsInput {
   readonly state: ArrowHedgeCommonOperatingPictureState;
 }
 
+export interface ArrowHedgeObservationReportInput
+  extends ArrowHedgeCurrentStateViewInput {
+  readonly evaluatedAt?: Timestamp;
+}
+
+export interface ArrowHedgeObservationReport {
+  readonly currentStateView: CurrentStateView;
+  readonly observationContract: ObservationContract;
+  readonly evaluation: ObservationContractEvaluation;
+}
+
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
   return {
     name,
@@ -756,6 +771,27 @@ export function buildArrowHedgeCurrentStateView(
     missingSources,
     conflicts,
     allowedActions,
+  };
+}
+
+export function buildArrowHedgeObservationReport(
+  input: ArrowHedgeObservationReportInput,
+): ArrowHedgeObservationReport | null {
+  const currentStateView = buildArrowHedgeCurrentStateView(input);
+  if (!currentStateView) return null;
+
+  const observationContract =
+    buildObservationContractFromCurrentStateView(currentStateView);
+  const evaluation = evaluateObservationContract(
+    observationContract,
+    currentStateView,
+    input.evaluatedAt ?? currentStateView.observedAt,
+  );
+
+  return {
+    currentStateView,
+    observationContract,
+    evaluation,
   };
 }
 

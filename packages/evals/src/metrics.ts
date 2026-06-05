@@ -77,6 +77,21 @@ export interface AdapterOperationalMetrics {
   readonly authorityGateFailures: number;
 }
 
+export interface StateAssertionSample {
+  readonly code: string;
+  readonly passed: boolean;
+  readonly severity: string;
+}
+
+export interface StateAssertionMetrics {
+  readonly totalAssertions: number;
+  readonly passedAssertions: number;
+  readonly failedAssertions: number;
+  readonly passRate: number | null;
+  readonly failedByCode: Readonly<Record<string, number>>;
+  readonly failedBySeverity: Readonly<Record<string, number>>;
+}
+
 interface MutableCoordinationClassMetrics {
   events: number;
   pairedGroups: Set<string>;
@@ -232,6 +247,22 @@ export function analyzeAdapterOperationalMetrics(
   };
 }
 
+export function analyzeStateAssertions(
+  samples: readonly StateAssertionSample[],
+): StateAssertionMetrics {
+  const failed = samples.filter((sample) => !sample.passed);
+  const passed = samples.length - failed.length;
+
+  return {
+    totalAssertions: samples.length,
+    passedAssertions: passed,
+    failedAssertions: failed.length,
+    passRate: samples.length === 0 ? null : passed / samples.length,
+    failedByCode: countBy(failed, (sample) => sample.code),
+    failedBySeverity: countBy(failed, (sample) => sample.severity),
+  };
+}
+
 function makeCoordinationMetrics(): Record<CoordinationClass, MutableCoordinationClassMetrics> {
   return Object.fromEntries(
     COORDINATION_CLASSES.map((coordinationClass) => [
@@ -337,6 +368,18 @@ function sum<T>(
   getValue: (value: T) => number,
 ): number {
   return values.reduce((acc, value) => acc + getValue(value), 0);
+}
+
+function countBy<T>(
+  values: readonly T[],
+  getValue: (value: T) => string,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const value of values) {
+    const key = getValue(value);
+    out[key] = (out[key] ?? 0) + 1;
+  }
+  return out;
 }
 
 function uniqueByCanonicalOrder<T extends string>(

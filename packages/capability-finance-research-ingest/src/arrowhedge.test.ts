@@ -9,6 +9,7 @@ import { tenantId, timestamp } from "@pm/types";
 import {
   buildArrowHedgeIngestionPlan,
   buildArrowHedgeCurrentStateView,
+  buildArrowHedgeObservationReport,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
@@ -453,6 +454,44 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(decision.issues.map((issue) => issue.code)).toContain(
       "workflow_position_mismatch",
     );
+  });
+
+  it("builds an observation report with assertion outcomes from ArrowHedge COP", async () => {
+    const tenant = tenantId("tnt_arrowhedge_observation_report");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_report");
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const report = buildArrowHedgeObservationReport({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    });
+
+    expect(report).toMatchObject({
+      currentStateView: {
+        viewId: "arrowhedge_cop_report:AAPL:current_state_view",
+      },
+      observationContract: {
+        contractId: "arrowhedge_cop_report:AAPL:current_state_view:observation_contract",
+        authorityRule: "arrowhedge:backtest:bt_aapl_breakout",
+      },
+      evaluation: {
+        valid: true,
+        currentStateViewId: "arrowhedge_cop_report:AAPL:current_state_view",
+      },
+    });
+    expect(report?.evaluation.assertions.every((assertion) => assertion.passed)).toBe(
+      true,
+    );
+    expect(report?.evaluation.assertions).toHaveLength(7);
   });
 });
 

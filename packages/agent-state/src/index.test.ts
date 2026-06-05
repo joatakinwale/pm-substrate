@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { tenantId, timestamp } from "@pm/types";
 
 import {
+  buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
+  evaluateObservationContract,
   stateRef,
   validateProposedActionReadSet,
   type CurrentStateView,
@@ -137,6 +139,73 @@ describe("@pm/agent-state read-set validation", () => {
       "projection_version_mismatch",
       "projection_version_mismatch",
       "workflow_position_mismatch",
+    ]);
+  });
+
+  it("builds an observation contract from a current-state view", () => {
+    expect(
+      buildObservationContractFromCurrentStateView(
+        baseView({
+          missingSources: ["risk_state_refresh"],
+          conflicts: [
+            {
+              conflictType: "stale_observation",
+              refs: [riskRef],
+              message: "risk state expired",
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      tenantId: t,
+      contractId: "view_aapl:observation_contract",
+      subject: stateRef("projection", "arrowhedge_cop:AAPL", "AAPL COP"),
+      issuedAt: "2026-06-03T14:00:00.000Z",
+      observedAt: "2026-06-03T14:00:00.000Z",
+      validUntil: "2026-06-03T14:10:00.000Z",
+      authorityRule: "arrowhedge:backtest:bt_aapl_breakout",
+      projectionVersion: 1,
+      workflowPosition: "decision_pending",
+      requiredSourceRefs: [signalRef, riskRef, decisionRef],
+      declaredMissingSources: ["risk_state_refresh"],
+      declaredConflictCount: 1,
+    });
+  });
+
+  it("evaluates observation contracts into state assertions", () => {
+    const contract = buildObservationContractFromCurrentStateView(baseView());
+    const changedView = baseView({
+      authorityRule: "arrowhedge:paper_quote:latest",
+      projectionVersion: 2,
+      workflowPosition: "blocked_stale_state",
+      sourceRefs: [signalRef, decisionRef],
+      missingSources: ["risk_state"],
+      conflicts: [
+        {
+          conflictType: "state_disagreement",
+          refs: [riskRef, decisionRef],
+          message: "risk snapshot no longer matches",
+        },
+      ],
+    });
+
+    expect(
+      evaluateObservationContract(
+        contract,
+        changedView,
+        timestamp("2026-06-03T14:11:00.000Z"),
+      ).assertions.map((assertion) => ({
+        code: assertion.code,
+        passed: assertion.passed,
+      })),
+    ).toEqual([
+      { code: "required_source_refs_present", passed: false },
+      { code: "authority_rule_matches", passed: false },
+      { code: "freshness_window_current", passed: false },
+      { code: "projection_version_matches", passed: false },
+      { code: "workflow_position_matches", passed: false },
+      { code: "conflicts_declared", passed: false },
+      { code: "missing_sources_declared", passed: false },
     ]);
   });
 });

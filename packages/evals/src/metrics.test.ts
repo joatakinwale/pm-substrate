@@ -5,6 +5,7 @@ import { evalEvidenceRef, type EvalEvent } from "./schema.js";
 import {
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
+  analyzeStateAssertions,
 } from "./metrics.js";
 
 const tenantId = "tnt_metrics" as TenantId;
@@ -242,6 +243,45 @@ describe("eval event metrics", () => {
       authorityGatePassRate: 0.5,
       authorityGatePasses: 1,
       authorityGateFailures: 1,
+    });
+  });
+
+  it("summarizes state assertion pass/fail metrics by code and severity", () => {
+    expect(
+      analyzeStateAssertions([
+        {
+          code: "required_source_refs_present",
+          passed: true,
+          severity: "fail",
+        },
+        {
+          code: "freshness_window_current",
+          passed: false,
+          severity: "warn",
+        },
+        {
+          code: "workflow_position_matches",
+          passed: false,
+          severity: "warn",
+        },
+        {
+          code: "authority_rule_matches",
+          passed: true,
+          severity: "fail",
+        },
+      ]),
+    ).toEqual({
+      totalAssertions: 4,
+      passedAssertions: 2,
+      failedAssertions: 2,
+      passRate: 0.5,
+      failedByCode: {
+        freshness_window_current: 1,
+        workflow_position_matches: 1,
+      },
+      failedBySeverity: {
+        warn: 2,
+      },
     });
   });
 });

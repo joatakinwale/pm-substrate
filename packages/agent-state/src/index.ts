@@ -90,6 +90,48 @@ export interface ReadSetValidationDecision {
   readonly issues: readonly ReadSetValidationIssue[];
 }
 
+export interface ObservationContract {
+  readonly tenantId: TenantId;
+  readonly contractId: string;
+  readonly subject: StateRef;
+  readonly issuedAt: Timestamp;
+  readonly observedAt: Timestamp;
+  readonly validUntil?: Timestamp;
+  readonly authorityRule: string;
+  readonly projectionVersion?: number;
+  readonly workflowPosition?: string;
+  readonly requiredSourceRefs: readonly StateRef[];
+  readonly declaredMissingSources: readonly string[];
+  readonly declaredConflictCount: number;
+}
+
+export type StateAssertionCode =
+  | "required_source_refs_present"
+  | "authority_rule_matches"
+  | "freshness_window_current"
+  | "projection_version_matches"
+  | "workflow_position_matches"
+  | "conflicts_declared"
+  | "missing_sources_declared";
+
+export type StateAssertionSeverity = "info" | "warn" | "fail";
+
+export interface StateAssertion {
+  readonly code: StateAssertionCode;
+  readonly passed: boolean;
+  readonly severity: StateAssertionSeverity;
+  readonly message: string;
+  readonly refs: readonly StateRef[];
+}
+
+export interface ObservationContractEvaluation {
+  readonly valid: boolean;
+  readonly contractId: string;
+  readonly currentStateViewId: string;
+  readonly evaluatedAt: Timestamp;
+  readonly assertions: readonly StateAssertion[];
+}
+
 export interface EvidenceLinkedContinuityPayload
   extends Readonly<Record<string, unknown>> {
   readonly sourceRefs: readonly StateRef[];
@@ -120,6 +162,135 @@ export function buildReadSetFromCurrentStateView(
     };
     return entry;
   });
+}
+
+export function buildObservationContractFromCurrentStateView(
+  view: CurrentStateView,
+  issuedAt: Timestamp = view.observedAt,
+): ObservationContract {
+  return {
+    tenantId: view.tenantId,
+    contractId: `${view.viewId}:observation_contract`,
+    subject: view.subject,
+    issuedAt,
+    observedAt: view.observedAt,
+    ...(view.validUntil !== undefined ? { validUntil: view.validUntil } : {}),
+    authorityRule: view.authorityRule,
+    ...(view.projectionVersion !== undefined
+      ? { projectionVersion: view.projectionVersion }
+      : {}),
+    ...(view.workflowPosition !== undefined
+      ? { workflowPosition: view.workflowPosition }
+      : {}),
+    requiredSourceRefs: view.sourceRefs,
+    declaredMissingSources: view.missingSources,
+    declaredConflictCount: view.conflicts.length,
+  };
+}
+
+export function evaluateObservationContract(
+  contract: ObservationContract,
+  view: CurrentStateView,
+  evaluatedAt: Timestamp,
+): ObservationContractEvaluation {
+  const missingRefs = contract.requiredSourceRefs.filter(
+    (ref) => !view.sourceRefs.some((candidate) => sameStateRef(candidate, ref)),
+  );
+  const missingSourcesChanged = !sameStringSet(
+    contract.declaredMissingSources,
+    view.missingSources,
+  );
+  const conflictCountMatches =
+    contract.declaredConflictCount === view.conflicts.length;
+  const assertions: StateAssertion[] = [
+    assertion({
+      code: "required_source_refs_present",
+      passed: missingRefs.length === 0 && view.missingSources.length === 0,
+      severity: "fail",
+      refs: missingRefs,
+      message:
+        missingRefs.length === 0 && view.missingSources.length === 0
+          ? "All required observation source refs are present."
+          : `Observation is missing ${missingRefs.length} required refs and ${view.missingSources.length} source declarations.`,
+    }),
+    assertion({
+      code: "authority_rule_matches",
+      passed: contract.authorityRule === view.authorityRule,
+      severity: "fail",
+      refs: [view.subject],
+      message:
+        contract.authorityRule === view.authorityRule
+          ? "Observation authority still matches the current state view."
+          : `Observation authority ${contract.authorityRule} differs from current authority ${view.authorityRule}.`,
+    }),
+    assertion({
+      code: "freshness_window_current",
+      passed:
+        contract.validUntil === undefined || !isAfter(evaluatedAt, contract.validUntil),
+      severity: "warn",
+      refs: contract.requiredSourceRefs,
+      message:
+        contract.validUntil === undefined || !isAfter(evaluatedAt, contract.validUntil)
+          ? "Observation freshness window is still current."
+          : `Observation freshness expired at ${contract.validUntil}.`,
+    }),
+    assertion({
+      code: "projection_version_matches",
+      passed:
+        contract.projectionVersion === undefined ||
+        view.projectionVersion === undefined ||
+        contract.projectionVersion === view.projectionVersion,
+      severity: "warn",
+      refs: [view.subject],
+      message:
+        contract.projectionVersion === undefined ||
+        view.projectionVersion === undefined ||
+        contract.projectionVersion === view.projectionVersion
+          ? "Projection version still matches the observation contract."
+          : `Observation projection version ${contract.projectionVersion} differs from current version ${view.projectionVersion}.`,
+    }),
+    assertion({
+      code: "workflow_position_matches",
+      passed:
+        contract.workflowPosition === undefined ||
+        view.workflowPosition === undefined ||
+        contract.workflowPosition === view.workflowPosition,
+      severity: "warn",
+      refs: [view.subject],
+      message:
+        contract.workflowPosition === undefined ||
+        view.workflowPosition === undefined ||
+        contract.workflowPosition === view.workflowPosition
+          ? "Workflow position still matches the observation contract."
+          : `Observation workflow position ${contract.workflowPosition} differs from current position ${view.workflowPosition}.`,
+    }),
+    assertion({
+      code: "conflicts_declared",
+      passed: conflictCountMatches,
+      severity: "warn",
+      refs: view.conflicts.flatMap((conflict) => conflict.refs),
+      message: conflictCountMatches
+        ? "Current conflicts match the observation contract declaration."
+        : `Observation declared ${contract.declaredConflictCount} conflicts; current view has ${view.conflicts.length}.`,
+    }),
+    assertion({
+      code: "missing_sources_declared",
+      passed: !missingSourcesChanged,
+      severity: "warn",
+      refs: [],
+      message: !missingSourcesChanged
+        ? "Missing-source declarations still match the observation contract."
+        : "Current missing-source declarations differ from the observation contract.",
+    }),
+  ];
+
+  return {
+    valid: assertions.every((item) => item.passed),
+    contractId: contract.contractId,
+    currentStateViewId: view.viewId,
+    evaluatedAt,
+    assertions,
+  };
 }
 
 export function validateProposedActionReadSet(
@@ -231,6 +402,16 @@ export function validateProposedActionReadSet(
 
 function sameStateRef(left: StateRef, right: StateRef): boolean {
   return left.kind === right.kind && left.id === right.id;
+}
+
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right);
+  return left.every((item) => rightSet.has(item));
+}
+
+function assertion(input: StateAssertion): StateAssertion {
+  return input;
 }
 
 function formatStateRef(ref: StateRef): string {
