@@ -10,6 +10,7 @@ import {
   buildArrowHedgeIngestionPlan,
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeObservationReport,
+  buildArrowHedgeProposalReview,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
@@ -492,6 +493,67 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       true,
     );
     expect(report?.evaluation.assertions).toHaveLength(7);
+  });
+
+  it("builds an ArrowHedge proposal review artifact from ticker COP state", async () => {
+    const staleSnapshot = {
+      ...snapshot,
+      snapshotId: "snap_aapl_2026_06_03_1412",
+      observedAt: "2026-06-03T14:12:00.000Z",
+      risk: {
+        ...snapshot.risk,
+        id: "risk_aapl_1412",
+        freshnessExpiresAt: "2026-06-03T14:10:00.000Z",
+      },
+      decision: {
+        ...snapshot.decision,
+        id: "dec_aapl_buy_stale",
+        riskSourceSnapshotId: "snap_aapl_2026_06_03_1400",
+        signalSourceSnapshotId: "snap_aapl_2026_06_03_1400",
+      },
+    };
+    const tenant = tenantId("tnt_arrowhedge_proposal_review");
+    const plan = buildArrowHedgeIngestionPlan(staleSnapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T14:11:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_review");
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const review = buildArrowHedgeProposalReview({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId: "dec_aapl_buy_stale" },
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+    });
+
+    expect(review).toMatchObject({
+      reviewId: "arrowhedge_cop_review:AAPL:current_state_view:portfolio.decision.accept:proposal_review",
+      mode: "warn",
+      valid: false,
+      execution: {
+        allowed: true,
+        blocking: false,
+        reason: "warn_first_v1",
+      },
+      currentStateView: {
+        workflowPosition: "blocked_stale_state",
+      },
+    });
+    expect(review?.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining([
+        "current_view_conflict",
+        "stale_read_ref",
+        "freshness_window_current",
+        "workflow_position_mismatch",
+      ]),
+    );
   });
 });
 

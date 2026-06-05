@@ -37,10 +37,14 @@ export {
   type EvalEventQueryResult,
 } from "./persistence/index.js";
 export {
+  analyzeActionProposalReviews,
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
   type AdapterOperationalMetrics,
   type AdapterOperationalSample,
+  type ActionProposalReviewMetrics,
+  type ActionProposalReviewSample,
+  type ActionProposalReviewWarningSample,
   type CoordinationClassMetrics,
   type EvalEventMetrics,
   type FailureClassMetrics,

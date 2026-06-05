@@ -5,6 +5,7 @@ import {
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
   evaluateObservationContract,
+  reviewProposedActionAgainstCurrentState,
   stateRef,
   validateProposedActionReadSet,
   type CurrentStateView,
@@ -206,6 +207,67 @@ describe("@pm/agent-state read-set validation", () => {
       { code: "workflow_position_matches", passed: false },
       { code: "conflicts_declared", passed: false },
       { code: "missing_sources_declared", passed: false },
+    ]);
+  });
+
+  it("reviews a proposed action as a warn-first pre-execution artifact", () => {
+    const view = baseView();
+
+    expect(
+      reviewProposedActionAgainstCurrentState(actionFrom(view), view),
+    ).toMatchObject({
+      tenantId: t,
+      reviewId: "view_aapl:portfolio.decision.accept:proposal_review",
+      mode: "warn",
+      valid: true,
+      execution: {
+        allowed: true,
+        blocking: false,
+        reason: "warn_first_v1",
+        warningCount: 0,
+      },
+      readSetValidation: {
+        valid: true,
+        issues: [],
+      },
+      observationEvaluation: {
+        valid: true,
+        currentStateViewId: "view_aapl",
+      },
+      warnings: [],
+    });
+  });
+
+  it("keeps stale proposed actions warn-first while surfacing read-set and observation warnings", () => {
+    const view = baseView();
+
+    const review = reviewProposedActionAgainstCurrentState(
+      actionFrom(view, {
+        proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+      }),
+      view,
+    );
+
+    expect(review).toMatchObject({
+      mode: "warn",
+      valid: false,
+      execution: {
+        allowed: true,
+        blocking: false,
+        reason: "warn_first_v1",
+      },
+    });
+    expect(review.warnings.map((warning) => warning.source)).toEqual([
+      "read_set",
+      "read_set",
+      "read_set",
+      "observation_contract",
+    ]);
+    expect(review.warnings.map((warning) => warning.code)).toEqual([
+      "stale_read_ref",
+      "stale_read_ref",
+      "stale_read_ref",
+      "freshness_window_current",
     ]);
   });
 });

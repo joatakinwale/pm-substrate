@@ -132,6 +132,38 @@ export interface ObservationContractEvaluation {
   readonly assertions: readonly StateAssertion[];
 }
 
+export type ActionProposalReviewMode = "warn";
+export type ActionProposalWarningSource = "read_set" | "observation_contract";
+
+export interface ActionProposalWarning {
+  readonly source: ActionProposalWarningSource;
+  readonly code: string;
+  readonly severity: StateAssertionSeverity;
+  readonly message: string;
+  readonly refs: readonly StateRef[];
+}
+
+export interface ActionProposalExecutionDisposition {
+  readonly allowed: boolean;
+  readonly blocking: boolean;
+  readonly reason: "warn_first_v1";
+  readonly warningCount: number;
+}
+
+export interface ActionProposalReview {
+  readonly tenantId: TenantId;
+  readonly reviewId: string;
+  readonly mode: ActionProposalReviewMode;
+  readonly valid: boolean;
+  readonly proposedAction: ProposedAction;
+  readonly currentStateView: CurrentStateView;
+  readonly observationContract: ObservationContract;
+  readonly observationEvaluation: ObservationContractEvaluation;
+  readonly readSetValidation: ReadSetValidationDecision;
+  readonly warnings: readonly ActionProposalWarning[];
+  readonly execution: ActionProposalExecutionDisposition;
+}
+
 export interface EvidenceLinkedContinuityPayload
   extends Readonly<Record<string, unknown>> {
   readonly sourceRefs: readonly StateRef[];
@@ -290,6 +322,57 @@ export function evaluateObservationContract(
     currentStateViewId: view.viewId,
     evaluatedAt,
     assertions,
+  };
+}
+
+export function reviewProposedActionAgainstCurrentState(
+  action: ProposedAction,
+  view: CurrentStateView,
+  evaluatedAt: Timestamp = action.proposedAt,
+): ActionProposalReview {
+  const observationContract = buildObservationContractFromCurrentStateView(view);
+  const observationEvaluation = evaluateObservationContract(
+    observationContract,
+    view,
+    evaluatedAt,
+  );
+  const readSetValidation = validateProposedActionReadSet(action, view);
+  const warnings = [
+    ...readSetValidation.issues.map((issue): ActionProposalWarning => ({
+      source: "read_set",
+      code: issue.code,
+      severity: "warn",
+      message: issue.message,
+      refs: issue.ref ? [issue.ref] : [],
+    })),
+    ...observationEvaluation.assertions
+      .filter((assertion) => !assertion.passed)
+      .map((assertion): ActionProposalWarning => ({
+        source: "observation_contract",
+        code: assertion.code,
+        severity: assertion.severity,
+        message: assertion.message,
+        refs: assertion.refs,
+      })),
+  ] as const;
+
+  return {
+    tenantId: action.tenantId,
+    reviewId: `${view.viewId}:${action.actionType}:proposal_review`,
+    mode: "warn",
+    valid: readSetValidation.valid && observationEvaluation.valid,
+    proposedAction: action,
+    currentStateView: view,
+    observationContract,
+    observationEvaluation,
+    readSetValidation,
+    warnings,
+    execution: {
+      allowed: true,
+      blocking: false,
+      reason: "warn_first_v1",
+      warningCount: warnings.length,
+    },
   };
 }
 

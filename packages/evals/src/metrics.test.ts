@@ -5,6 +5,7 @@ import { evalEvidenceRef, type EvalEvent } from "./schema.js";
 import {
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
+  analyzeActionProposalReviews,
   analyzeStateAssertions,
 } from "./metrics.js";
 
@@ -281,6 +282,53 @@ describe("eval event metrics", () => {
       },
       failedBySeverity: {
         warn: 2,
+      },
+    });
+  });
+
+  it("summarizes action proposal review warnings and warn-first disposition", () => {
+    expect(
+      analyzeActionProposalReviews([
+        {
+          valid: true,
+          mode: "warn",
+          execution: { allowed: true, blocking: false },
+          warnings: [],
+        },
+        {
+          valid: false,
+          mode: "warn",
+          execution: { allowed: true, blocking: false },
+          warnings: [
+            { source: "read_set", code: "stale_read_ref", severity: "warn" },
+            {
+              source: "observation_contract",
+              code: "freshness_window_current",
+              severity: "warn",
+            },
+            { source: "read_set", code: "workflow_position_mismatch", severity: "warn" },
+          ],
+        },
+      ]),
+    ).toEqual({
+      totalReviews: 2,
+      validReviews: 1,
+      invalidReviews: 1,
+      allowedReviews: 2,
+      blockedReviews: 0,
+      warnModeReviews: 2,
+      totalWarnings: 3,
+      warningsBySource: {
+        observation_contract: 1,
+        read_set: 2,
+      },
+      warningsByCode: {
+        freshness_window_current: 1,
+        stale_read_ref: 1,
+        workflow_position_mismatch: 1,
+      },
+      warningsBySeverity: {
+        warn: 3,
       },
     });
   });

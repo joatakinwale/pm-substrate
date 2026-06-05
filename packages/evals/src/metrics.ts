@@ -92,6 +92,35 @@ export interface StateAssertionMetrics {
   readonly failedBySeverity: Readonly<Record<string, number>>;
 }
 
+export interface ActionProposalReviewWarningSample {
+  readonly source: string;
+  readonly code: string;
+  readonly severity: string;
+}
+
+export interface ActionProposalReviewSample {
+  readonly valid: boolean;
+  readonly mode: string;
+  readonly execution: {
+    readonly allowed: boolean;
+    readonly blocking: boolean;
+  };
+  readonly warnings: readonly ActionProposalReviewWarningSample[];
+}
+
+export interface ActionProposalReviewMetrics {
+  readonly totalReviews: number;
+  readonly validReviews: number;
+  readonly invalidReviews: number;
+  readonly allowedReviews: number;
+  readonly blockedReviews: number;
+  readonly warnModeReviews: number;
+  readonly totalWarnings: number;
+  readonly warningsBySource: Readonly<Record<string, number>>;
+  readonly warningsByCode: Readonly<Record<string, number>>;
+  readonly warningsBySeverity: Readonly<Record<string, number>>;
+}
+
 interface MutableCoordinationClassMetrics {
   events: number;
   pairedGroups: Set<string>;
@@ -260,6 +289,25 @@ export function analyzeStateAssertions(
     passRate: samples.length === 0 ? null : passed / samples.length,
     failedByCode: countBy(failed, (sample) => sample.code),
     failedBySeverity: countBy(failed, (sample) => sample.severity),
+  };
+}
+
+export function analyzeActionProposalReviews(
+  reviews: readonly ActionProposalReviewSample[],
+): ActionProposalReviewMetrics {
+  const warnings = reviews.flatMap((review) => review.warnings);
+
+  return {
+    totalReviews: reviews.length,
+    validReviews: reviews.filter((review) => review.valid).length,
+    invalidReviews: reviews.filter((review) => !review.valid).length,
+    allowedReviews: reviews.filter((review) => review.execution.allowed).length,
+    blockedReviews: reviews.filter((review) => review.execution.blocking).length,
+    warnModeReviews: reviews.filter((review) => review.mode === "warn").length,
+    totalWarnings: warnings.length,
+    warningsBySource: countBy(warnings, (warning) => warning.source),
+    warningsByCode: countBy(warnings, (warning) => warning.code),
+    warningsBySeverity: countBy(warnings, (warning) => warning.severity),
   };
 }
 

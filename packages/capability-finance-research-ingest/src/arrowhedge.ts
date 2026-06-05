@@ -12,8 +12,11 @@ import {
 } from "@pm/entity-mapping";
 import {
   buildObservationContractFromCurrentStateView,
+  buildReadSetFromCurrentStateView,
   evaluateObservationContract,
+  reviewProposedActionAgainstCurrentState,
   stateRef,
+  type ActionProposalReview,
   type AllowedAction,
   type CurrentStateView,
   type ObservationContract,
@@ -704,6 +707,14 @@ export interface ArrowHedgeObservationReport {
   readonly evaluation: ObservationContractEvaluation;
 }
 
+export interface ArrowHedgeProposalReviewInput
+  extends ArrowHedgeCurrentStateViewInput {
+  readonly actionType: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly proposedBy: string;
+  readonly proposedAt: Timestamp;
+}
+
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
   return {
     name,
@@ -793,6 +804,30 @@ export function buildArrowHedgeObservationReport(
     observationContract,
     evaluation,
   };
+}
+
+export function buildArrowHedgeProposalReview(
+  input: ArrowHedgeProposalReviewInput,
+): ActionProposalReview | null {
+  const currentStateView = buildArrowHedgeCurrentStateView(input);
+  if (!currentStateView) return null;
+
+  return reviewProposedActionAgainstCurrentState(
+    {
+      tenantId: input.tenantId,
+      actionType: input.actionType,
+      subject: currentStateView.subject,
+      payload: input.payload,
+      readSet: buildReadSetFromCurrentStateView(
+        currentStateView,
+        currentStateView.authorityRule,
+      ),
+      proposedBy: input.proposedBy,
+      proposedAt: input.proposedAt,
+    },
+    currentStateView,
+    input.proposedAt,
+  );
 }
 
 export function validateArrowHedgeTypedEventPayload(
