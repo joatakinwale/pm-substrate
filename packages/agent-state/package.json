@@ -1,8 +1,8 @@
 {
-  "name": "@pm/continuity",
+  "name": "@pm/agent-state",
   "version": "0.1.0",
   "private": true,
-  "description": "Agent continuity ledger: verifiable checkpoints for compounding AI work.",
+  "description": "Agent-facing current-state views and warn-first read-set validation helpers.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,12 +19,9 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
-    "@pm/types": "workspace:*",
-    "pg": "^8.13.0"
+    "@pm/types": "workspace:*"
   },
   "devDependencies": {
-    "@pm/agent-state": "workspace:*",
-    "@types/pg": "^8.11.10",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"
   }

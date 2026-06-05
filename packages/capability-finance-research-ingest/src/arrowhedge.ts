@@ -10,6 +10,13 @@ import {
   type MappingEventInput,
   type SourceEntityRecord,
 } from "@pm/entity-mapping";
+import {
+  stateRef,
+  type AllowedAction,
+  type CurrentStateView,
+  type StateConflict,
+  type StateRef,
+} from "@pm/agent-state";
 import type {
   EntityId,
   PMEvent,
@@ -620,22 +627,35 @@ export async function executeArrowHedgeIngestionPlan<TTx>(
 export interface ArrowHedgeTickerCop {
   readonly symbol: string;
   readonly latestSignal?: {
+    readonly eventId: string;
+    readonly signalId: string;
     readonly signal: string;
     readonly confidence: number;
     readonly sourceSnapshotId: string;
+    readonly evidenceDocumentIds: readonly string[];
+    readonly observedAt: Timestamp;
+    readonly authority: string;
   };
   readonly latestRiskState?: {
+    readonly eventId: string;
+    readonly riskStateId: string;
     readonly currentPrice: number;
     readonly maxShares: number;
     readonly sourceSnapshotId: string;
     readonly freshnessExpiresAt: string | null;
+    readonly observedAt: Timestamp;
+    readonly authority: string;
   };
   readonly latestDecision?: {
+    readonly eventId: string;
+    readonly decisionId: string;
     readonly action: string;
     readonly quantity: number;
     readonly accepted: boolean;
     readonly riskSourceSnapshotId: string | null;
     readonly signalSourceSnapshotId: string | null;
+    readonly observedAt: Timestamp;
+    readonly authority: string;
   };
   readonly authorityGate: {
     readonly passes: number;
@@ -652,6 +672,21 @@ export interface ArrowHedgeCommonOperatingPictureState {
     readonly authorityGatePassRate: number | null;
     readonly stateDisagreementRate: number | null;
   };
+}
+
+export interface ArrowHedgeCurrentStateViewInput {
+  readonly tenantId: TenantId;
+  readonly projectionName: string;
+  readonly projectionVersion?: number;
+  readonly symbol: string;
+  readonly state: ArrowHedgeCommonOperatingPictureState;
+}
+
+export interface ArrowHedgeCurrentStateViewsInput {
+  readonly tenantId: TenantId;
+  readonly projectionName: string;
+  readonly projectionVersion?: number;
+  readonly state: ArrowHedgeCommonOperatingPictureState;
 }
 
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
@@ -671,6 +706,56 @@ export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
       state: ArrowHedgeCommonOperatingPictureState,
       event: PMEvent,
     ): ArrowHedgeCommonOperatingPictureState => updateCop(state, event),
+  };
+}
+
+export function buildArrowHedgeCurrentStateViews(
+  input: ArrowHedgeCurrentStateViewsInput,
+): readonly CurrentStateView[] {
+  return Object.keys(input.state.tickers).flatMap((symbol) => {
+    const view = buildArrowHedgeCurrentStateView({ ...input, symbol });
+    return view ? [view] : [];
+  });
+}
+
+export function buildArrowHedgeCurrentStateView(
+  input: ArrowHedgeCurrentStateViewInput,
+): CurrentStateView | null {
+  const ticker = input.state.tickers[input.symbol];
+  if (!ticker) return null;
+
+  const observedAt = latestTickerTimestamp(ticker);
+  const authorityRule = latestTickerAuthority(ticker);
+  if (!observedAt || !authorityRule) return null;
+
+  const sourceRefs = tickerSourceRefs(ticker);
+  const missingSources = tickerMissingSources(ticker);
+  const conflicts = tickerConflicts(ticker, observedAt);
+  const workflowPosition = tickerWorkflowPosition(ticker, conflicts, observedAt);
+  const allowedActions = tickerAllowedActions(sourceRefs);
+  const validUntil = ticker.latestRiskState?.freshnessExpiresAt;
+
+  return {
+    tenantId: input.tenantId,
+    viewId: `${input.projectionName}:${input.symbol}:current_state_view`,
+    subject: stateRef(
+      "projection",
+      `${input.projectionName}:${input.symbol}`,
+      `ArrowHedge COP ${input.symbol}`,
+    ),
+    observedAt,
+    ...(validUntil !== undefined && validUntil !== null
+      ? { validUntil: validUntil as Timestamp }
+      : {}),
+    authorityRule,
+    ...(input.projectionVersion !== undefined
+      ? { projectionVersion: input.projectionVersion }
+      : {}),
+    workflowPosition,
+    sourceRefs,
+    missingSources,
+    conflicts,
+    allowedActions,
   };
 }
 
@@ -897,15 +982,22 @@ function updateCop(
     next = {
       ...current,
       latestSignal: {
+        eventId: event.id,
+        signalId: event.entityId,
         signal: String(payload["signal"]),
         confidence: Number(payload["confidence"]),
         sourceSnapshotId: String(payload["sourceSnapshotId"]),
+        evidenceDocumentIds: stringArray(payload["evidenceDocumentIds"]),
+        observedAt: event.occurredAt,
+        authority: eventAuthority(event),
       },
     };
   } else if (event.type === "risk.state.validated") {
     next = {
       ...current,
       latestRiskState: {
+        eventId: event.id,
+        riskStateId: String(payload["riskStateId"]),
         currentPrice: Number(payload["currentPrice"]),
         maxShares: Number(payload["maxShares"]),
         sourceSnapshotId: String(payload["sourceSnapshotId"]),
@@ -913,16 +1005,24 @@ function updateCop(
           typeof payload["freshnessExpiresAt"] === "string"
             ? payload["freshnessExpiresAt"]
             : null,
+        observedAt: event.occurredAt,
+        authority: eventAuthority(event),
       },
     };
   } else if (event.type === "portfolio.decision.proposed") {
-    const disagrees =
+    const riskDisagrees =
       current.latestRiskState !== undefined &&
       typeof payload["riskSourceSnapshotId"] === "string" &&
       payload["riskSourceSnapshotId"] !== current.latestRiskState.sourceSnapshotId;
+    const signalDisagrees =
+      current.latestSignal !== undefined &&
+      typeof payload["signalSourceSnapshotId"] === "string" &&
+      payload["signalSourceSnapshotId"] !== current.latestSignal.sourceSnapshotId;
     next = {
       ...current,
       latestDecision: {
+        eventId: event.id,
+        decisionId: String(payload["decisionId"]),
         action: String(payload["action"]),
         quantity: Number(payload["quantity"]),
         accepted: Boolean(payload["accepted"]),
@@ -934,8 +1034,11 @@ function updateCop(
           typeof payload["signalSourceSnapshotId"] === "string"
             ? payload["signalSourceSnapshotId"]
             : null,
+        observedAt: event.occurredAt,
+        authority: eventAuthority(event),
       },
-      stateDisagreements: current.stateDisagreements + (disagrees ? 1 : 0),
+      stateDisagreements:
+        current.stateDisagreements + (riskDisagrees || signalDisagrees ? 1 : 0),
     };
   } else if (event.type === "portfolio.decision.accepted") {
     next = {
@@ -961,6 +1064,199 @@ function updateCop(
     tickers,
     summary: summarizeCop(tickers),
   };
+}
+
+function tickerSourceRefs(ticker: ArrowHedgeTickerCop): readonly StateRef[] {
+  return uniqueStateRefs([
+    ticker.latestSignal
+      ? stateRef("event", ticker.latestSignal.eventId, "analyst.signal.created")
+      : null,
+    ticker.latestRiskState
+      ? stateRef("event", ticker.latestRiskState.eventId, "risk.state.validated")
+      : null,
+    ticker.latestDecision
+      ? stateRef(
+          "event",
+          ticker.latestDecision.eventId,
+          "portfolio.decision.proposed",
+        )
+      : null,
+    ...(ticker.latestSignal?.evidenceDocumentIds.map((id) =>
+      stateRef("document", id, "evidence_document"),
+    ) ?? []),
+  ]);
+}
+
+function tickerMissingSources(ticker: ArrowHedgeTickerCop): readonly string[] {
+  const missing: string[] = [];
+  if (!ticker.latestSignal) missing.push("analyst_signal");
+  if (!ticker.latestRiskState) missing.push("risk_state");
+  if (!ticker.latestDecision) missing.push("portfolio_decision");
+  return missing;
+}
+
+function tickerConflicts(
+  ticker: ArrowHedgeTickerCop,
+  observedAt: Timestamp,
+): readonly StateConflict[] {
+  const conflicts: StateConflict[] = [];
+
+  if (
+    ticker.latestDecision?.riskSourceSnapshotId !== null &&
+    ticker.latestDecision?.riskSourceSnapshotId !== undefined &&
+    ticker.latestRiskState !== undefined &&
+    ticker.latestDecision.riskSourceSnapshotId !== ticker.latestRiskState.sourceSnapshotId
+  ) {
+    conflicts.push({
+      conflictType: "state_disagreement",
+      refs: presentStateRefs([
+        ticker.latestDecision
+          ? stateRef(
+              "event",
+              ticker.latestDecision.eventId,
+              "portfolio.decision.proposed",
+            )
+          : null,
+        stateRef("event", ticker.latestRiskState.eventId, "risk.state.validated"),
+      ]),
+      message:
+        "Decision risk snapshot does not match the current ArrowHedge risk state.",
+    });
+  }
+
+  if (
+    ticker.latestDecision?.signalSourceSnapshotId !== null &&
+    ticker.latestDecision?.signalSourceSnapshotId !== undefined &&
+    ticker.latestSignal !== undefined &&
+    ticker.latestDecision.signalSourceSnapshotId !== ticker.latestSignal.sourceSnapshotId
+  ) {
+    conflicts.push({
+      conflictType: "state_disagreement",
+      refs: presentStateRefs([
+        ticker.latestDecision
+          ? stateRef(
+              "event",
+              ticker.latestDecision.eventId,
+              "portfolio.decision.proposed",
+            )
+          : null,
+        stateRef("event", ticker.latestSignal.eventId, "analyst.signal.created"),
+      ]),
+      message:
+        "Decision signal snapshot does not match the current ArrowHedge analyst signal.",
+    });
+  }
+
+  if (tickerRiskStateIsStale(ticker, observedAt)) {
+    conflicts.push({
+      conflictType: "stale_observation",
+      refs: presentStateRefs([
+        ticker.latestRiskState
+          ? stateRef("event", ticker.latestRiskState.eventId, "risk.state.validated")
+          : null,
+      ]),
+      message:
+        "Current ArrowHedge risk state is past its freshness window for this proposal.",
+    });
+  }
+
+  return conflicts;
+}
+
+function tickerWorkflowPosition(
+  ticker: ArrowHedgeTickerCop,
+  conflicts: readonly StateConflict[],
+  observedAt: Timestamp,
+): string {
+  if (ticker.staleBlocks > 0 || conflicts.length > 0 || tickerRiskStateIsStale(ticker, observedAt)) {
+    return "blocked_stale_state";
+  }
+  if (ticker.latestDecision?.accepted === true && ticker.authorityGate.passes > 0) {
+    return "accepted";
+  }
+  return "decision_pending";
+}
+
+function tickerAllowedActions(sourceRefs: readonly StateRef[]): readonly AllowedAction[] {
+  return [
+    {
+      actionType: "portfolio.decision.accept",
+      label: "Accept portfolio decision",
+      requiredRefs: sourceRefs,
+      requiredWorkflowPosition: "decision_pending",
+    },
+    {
+      actionType: "workflow.block",
+      label: "Block workflow",
+      requiredRefs: sourceRefs,
+      requiredWorkflowPosition: "blocked_stale_state",
+    },
+    {
+      actionType: "risk.refresh",
+      label: "Refresh risk state",
+      requiredRefs: [],
+    },
+  ];
+}
+
+function latestTickerTimestamp(ticker: ArrowHedgeTickerCop): Timestamp | null {
+  return maxTimestamp([
+    ticker.latestSignal?.observedAt,
+    ticker.latestRiskState?.observedAt,
+    ticker.latestDecision?.observedAt,
+  ]);
+}
+
+function latestTickerAuthority(ticker: ArrowHedgeTickerCop): string | null {
+  return (
+    ticker.latestDecision?.authority ??
+    ticker.latestRiskState?.authority ??
+    ticker.latestSignal?.authority ??
+    null
+  );
+}
+
+function tickerRiskStateIsStale(
+  ticker: ArrowHedgeTickerCop,
+  observedAt: Timestamp,
+): boolean {
+  const validUntil = ticker.latestRiskState?.freshnessExpiresAt;
+  return typeof validUntil === "string" && Date.parse(validUntil) < Date.parse(observedAt);
+}
+
+function uniqueStateRefs(refs: readonly (StateRef | null)[]): readonly StateRef[] {
+  const seen = new Set<string>();
+  const out: StateRef[] = [];
+  for (const ref of refs) {
+    if (!ref) continue;
+    const key = `${ref.kind}:${ref.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(ref);
+  }
+  return out;
+}
+
+function presentStateRefs(refs: readonly (StateRef | null)[]): readonly StateRef[] {
+  return refs.filter((ref): ref is StateRef => ref !== null);
+}
+
+function maxTimestamp(values: readonly (Timestamp | undefined)[]): Timestamp | null {
+  const present = values.filter((value): value is Timestamp => value !== undefined);
+  if (present.length === 0) return null;
+  return present.reduce((latest, candidate) =>
+    Date.parse(candidate) > Date.parse(latest) ? candidate : latest,
+  );
+}
+
+function eventAuthority(event: PMEvent): string {
+  return event.authority ?? event.emittedBy;
+}
+
+function stringArray(value: unknown): readonly string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function invalidPlan(

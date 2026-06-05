@@ -3,6 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
 import {
+  buildReadSetFromCurrentStateView,
+  validateProposedActionReadSet,
+} from "@pm/agent-state";
+import {
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
   buildArrowHedgeStateEvalSuite,
@@ -15,6 +19,7 @@ import { PostgresProjectionRunner } from "@pm/projections";
 import { timestamp, type TenantId } from "@pm/types";
 
 import {
+  buildArrowHedgeCurrentStateView,
   buildArrowHedgeIngestionPlan,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
@@ -223,6 +228,32 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
       authorityGatePassRate: 1,
       stateDisagreementRate: 0,
     });
+    const currentStateView = buildArrowHedgeCurrentStateView({
+      tenantId,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state: cop!,
+    })!;
+    const readSetValidation = validateProposedActionReadSet(
+      {
+        tenantId,
+        actionType: "portfolio.decision.accept",
+        subject: currentStateView.subject,
+        payload: { decisionId: "dec_aapl_buy_120" },
+        readSet: buildReadSetFromCurrentStateView(
+          currentStateView,
+          currentStateView.authorityRule,
+        ),
+        proposedBy: "agent:portfolio-manager",
+        proposedAt: timestamp("2026-06-03T16:30:00.000Z"),
+      },
+      currentStateView,
+    );
+    expect(readSetValidation.mode).toBe("warn");
+    expect(readSetValidation.issues.map((issue) => issue.code)).toContain(
+      "stale_read_ref",
+    );
 
     const emittedEventIds = result.eventsPublished.map((event) => event.id);
     const evalSuite = buildArrowHedgeStateEvalSuite({
@@ -235,6 +266,11 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
         eventIds: emittedEventIds,
         projectionIds: [projection.name],
       },
+      readSetValidation: {
+        currentStateViewId: currentStateView.viewId,
+        mode: readSetValidation.mode,
+        issueCodes: readSetValidation.issues.map((issue) => issue.code),
+      },
       operationalSamples: [plan.operationalSample],
     });
     const metrics = analyzeEvalEvents(evalSuite.events);
@@ -243,8 +279,8 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
       substratePasses: 1,
     });
     expect(metrics.byFailureClass["capability_contract_violation"]).toMatchObject({
-      substrateFailures: 1,
-      failureReduction: 0,
+      substrateFailures: 0,
+      failureReduction: 1,
     });
 
     const operational = analyzeAdapterOperationalMetrics(
@@ -255,9 +291,9 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
       adapterTimeToFirstValidEventMs: 1500,
       mappingRejectionRate: 0,
       stateDisagreementRate: 0,
-      authorityGatePassRate: 0.75,
-      authorityGatePasses: 3,
-      authorityGateFailures: 1,
+      authorityGatePassRate: 1,
+      authorityGatePasses: 5,
+      authorityGateFailures: 0,
     });
   });
 });

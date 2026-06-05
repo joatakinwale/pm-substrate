@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
+import {
+  buildReadSetFromCurrentStateView,
+  validateProposedActionReadSet,
+} from "@pm/agent-state";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgeIngestionPlan,
+  buildArrowHedgeCurrentStateView,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
   validateArrowHedgeTypedEventPayload,
+  type ArrowHedgeCommonOperatingPictureState,
 } from "./arrowhedge.js";
 
 const snapshot = {
@@ -337,4 +343,143 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       stateDisagreementRate: 0,
     });
   });
+
+  it("builds an agent-facing current state view from ticker COP state", async () => {
+    const tenant = tenantId("tnt_arrowhedge_current_state");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_test");
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const view = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+    });
+
+    expect(view).toMatchObject({
+      tenantId: tenant,
+      viewId: "arrowhedge_cop_test:AAPL:current_state_view",
+      subject: {
+        kind: "projection",
+        id: "arrowhedge_cop_test:AAPL",
+        label: "ArrowHedge COP AAPL",
+      },
+      observedAt: "2026-06-03T14:00:00.000Z",
+      validUntil: "2026-06-03T14:10:00.000Z",
+      authorityRule: "arrowhedge:backtest:bt_aapl_breakout",
+      projectionVersion: 1,
+      workflowPosition: "accepted",
+      missingSources: [],
+      conflicts: [],
+    });
+    expect(view?.sourceRefs).toEqual(
+      expect.arrayContaining([
+        { kind: "event", id: "evt_0", label: "analyst.signal.created" },
+        { kind: "event", id: "evt_1", label: "risk.state.validated" },
+        { kind: "event", id: "evt_2", label: "portfolio.decision.proposed" },
+        expect.objectContaining({ kind: "document" }),
+      ]),
+    );
+    expect(view?.allowedActions.map((action) => action.actionType)).toEqual([
+      "portfolio.decision.accept",
+      "workflow.block",
+      "risk.refresh",
+    ]);
+  });
+
+  it("warns before action when a proposed ArrowHedge decision relies on stale or conflicted state", async () => {
+    const staleSnapshot = {
+      ...snapshot,
+      snapshotId: "snap_aapl_2026_06_03_1412",
+      observedAt: "2026-06-03T14:12:00.000Z",
+      risk: {
+        ...snapshot.risk,
+        id: "risk_aapl_1412",
+        freshnessExpiresAt: "2026-06-03T14:10:00.000Z",
+      },
+      decision: {
+        ...snapshot.decision,
+        id: "dec_aapl_buy_stale",
+        riskSourceSnapshotId: "snap_aapl_2026_06_03_1400",
+        signalSourceSnapshotId: "snap_aapl_2026_06_03_1400",
+      },
+    };
+    const tenant = tenantId("tnt_arrowhedge_stale_view");
+    const plan = buildArrowHedgeIngestionPlan(staleSnapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T14:11:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_stale");
+    const state = await foldPlanIntoCop(projection, plan);
+    const view = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+    })!;
+
+    const decision = validateProposedActionReadSet(
+      {
+        tenantId: tenant,
+        actionType: "portfolio.decision.accept",
+        subject: view.subject,
+        payload: { decisionId: "dec_aapl_buy_stale" },
+        readSet: buildReadSetFromCurrentStateView(view, view.authorityRule),
+        proposedBy: "agent:portfolio-manager",
+        proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      },
+      view,
+    );
+
+    expect(view.workflowPosition).toBe("blocked_stale_state");
+    expect(state.tickers["AAPL"]?.stateDisagreements).toBe(1);
+    expect(view.conflicts.map((conflict) => conflict.conflictType)).toEqual([
+      "state_disagreement",
+      "state_disagreement",
+      "stale_observation",
+    ]);
+    expect(decision.mode).toBe("warn");
+    expect(decision.valid).toBe(false);
+    expect(decision.issues.map((issue) => issue.code)).toContain("stale_read_ref");
+    expect(decision.issues.map((issue) => issue.code)).toContain("current_view_conflict");
+    expect(decision.issues.map((issue) => issue.code)).toContain(
+      "workflow_position_mismatch",
+    );
+  });
 });
+
+async function foldPlanIntoCop(
+  projection: ReturnType<typeof createArrowHedgeCommonOperatingPictureProjection>,
+  plan: ReturnType<typeof buildArrowHedgeIngestionPlan>,
+): Promise<ArrowHedgeCommonOperatingPictureState> {
+  let state = projection.initial();
+
+  for (const event of plan.typedEvents.map((event, index) => ({
+    id: `evt_${index}`,
+    tenantId: event.tenantId,
+    type: event.type,
+    entityId: event.entityId,
+    emittedBy: event.emittedBy,
+    payloadSchema: event.payloadSchema,
+    payload: event.payload,
+    schemaVersion: 1,
+    authority: event.authority ?? event.emittedBy,
+    contentHash: "hash",
+    priorEventHash: null,
+    occurredAt: event.occurredAt!,
+    recordedAt: event.occurredAt!,
+    causedBy: null,
+  } as const))) {
+    state = await projection.apply(state, event);
+  }
+
+  return state;
+}

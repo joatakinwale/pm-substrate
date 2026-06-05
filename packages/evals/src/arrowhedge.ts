@@ -19,6 +19,11 @@ export interface ArrowHedgeStateEvalInput {
     readonly eventIds: readonly string[];
     readonly projectionIds: readonly string[];
   };
+  readonly readSetValidation?: {
+    readonly currentStateViewId: string;
+    readonly mode: "warn";
+    readonly issueCodes: readonly string[];
+  };
   readonly operationalSamples: readonly AdapterOperationalSample[];
   readonly runIdPrefix?: string;
   readonly agentId?: string;
@@ -44,6 +49,7 @@ interface ScenarioSpec {
   readonly failureClass: FailureClass;
   readonly coordinationClass: CoordinationClass;
   readonly substrateResult: EvalResult;
+  readonly requiredReadSetWarningCodes?: readonly string[];
   readonly baselineNotes: string;
   readonly substrateNotes: string;
 }
@@ -80,6 +86,17 @@ const SCENARIOS: readonly ScenarioSpec[] = [
       "Substrate arm blocks stale-state workflow progress until a current risk event exists.",
   },
   {
+    scenarioId: "arrowhedge-distribution-currentness-mismatch",
+    failureClass: "stale_observation",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    requiredReadSetWarningCodes: ["stale_read_ref"],
+    baselineNotes:
+      "Baseline prompt/RAG action proceeds from stale or incomplete distribution-currentness context.",
+    substrateNotes:
+      "Substrate arm supplies current_state_view and emits warn-first read-set validation before action; v1 does not claim mutation blocking.",
+  },
+  {
     scenarioId: "arrowhedge-workflow-invalidation",
     failureClass: "workflow_invalidation",
     coordinationClass: "authority_gated_transition",
@@ -112,6 +129,15 @@ export function buildArrowHedgeStateEvalSuite(
     ...input.substrateRefs.projectionIds.map((id) =>
       evalEvidenceRef("projection", id, "ArrowHedge Common Operating Picture"),
     ),
+    ...(input.readSetValidation
+      ? [
+          evalEvidenceRef(
+            "projection",
+            input.readSetValidation.currentStateViewId,
+            "ArrowHedge CurrentStateView",
+          ),
+        ]
+      : []),
   ];
   const evidenceRefs = input.sourceRecordIds.map((id) =>
     evalEvidenceRef("source_record", id),
@@ -145,6 +171,7 @@ export function buildArrowHedgeStateEvalSuite(
       result: "fail",
       notes: scenario.baselineNotes,
     });
+    const substrateResult = substrateResultForScenario(scenario, input);
     const substrate = evalEvent({
       tenantId: input.tenantId,
       axis: "finance",
@@ -168,8 +195,8 @@ export function buildArrowHedgeStateEvalSuite(
           ? "task_verification"
           : "system_design",
       coordinationClass: scenario.coordinationClass,
-      result: scenario.substrateResult,
-      notes: scenario.substrateNotes,
+      result: substrateResult,
+      notes: substrateNotesForScenario(scenario, input),
     });
     return {
       events: [baseline, substrate] as const,
@@ -178,7 +205,7 @@ export function buildArrowHedgeStateEvalSuite(
         failureClass: scenario.failureClass,
         coordinationClass: scenario.coordinationClass,
         baselineResult: baseline.result,
-        substrateResult: substrate.result,
+        substrateResult,
         improvement: score(baseline.result) - score(substrate.result),
       } satisfies ArrowHedgeScenarioSummary,
     };
@@ -193,4 +220,28 @@ export function buildArrowHedgeStateEvalSuite(
 
 function score(result: EvalResult): number {
   return result === "fail" ? 1 : 0;
+}
+
+function substrateResultForScenario(
+  scenario: ScenarioSpec,
+  input: ArrowHedgeStateEvalInput,
+): EvalResult {
+  if (!scenario.requiredReadSetWarningCodes) return scenario.substrateResult;
+  const validation = input.readSetValidation;
+  if (!validation || validation.mode !== "warn") return "fail";
+  const issueCodes = new Set(validation.issueCodes);
+  return scenario.requiredReadSetWarningCodes.every((code) => issueCodes.has(code))
+    ? scenario.substrateResult
+    : "fail";
+}
+
+function substrateNotesForScenario(
+  scenario: ScenarioSpec,
+  input: ArrowHedgeStateEvalInput,
+): string {
+  if (!scenario.requiredReadSetWarningCodes || !input.readSetValidation) {
+    return scenario.substrateNotes;
+  }
+
+  return `${scenario.substrateNotes} Warning codes: ${input.readSetValidation.issueCodes.join(", ")}.`;
 }

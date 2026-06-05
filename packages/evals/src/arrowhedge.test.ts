@@ -8,7 +8,7 @@ import {
 } from "./metrics.js";
 
 describe("ArrowHedge state eval suite", () => {
-  it("emits paired evals for the five ArrowHedge adapter failure scenarios", () => {
+  it("emits paired evals for the six ArrowHedge adapter and agent-state scenarios", () => {
     const suite = buildArrowHedgeStateEvalSuite({
       tenantId: tenantId("tnt_arrowhedge_eval"),
       observedAt: timestamp("2026-06-03T16:30:00.000Z"),
@@ -27,6 +27,11 @@ describe("ArrowHedge state eval suite", () => {
         eventIds: ["evt_signal", "evt_risk", "evt_decision"],
         projectionIds: ["arrowhedge_cop"],
       },
+      readSetValidation: {
+        currentStateViewId: "arrowhedge_cop:AAPL:current_state_view",
+        mode: "warn",
+        issueCodes: ["stale_read_ref", "workflow_position_mismatch"],
+      },
       operationalSamples: [
         {
           adapterStartedAt: timestamp("2026-06-03T16:29:58.000Z"),
@@ -43,19 +48,29 @@ describe("ArrowHedge state eval suite", () => {
       "representation_loss",
       "source_authority_conflict",
       "stale_observation",
+      "stale_observation",
       "workflow_invalidation",
       "capability_contract_violation",
     ]);
-    expect(suite.events).toHaveLength(10);
+    expect(suite.summaries.map((summary) => summary.scenarioId)).toContain(
+      "arrowhedge-distribution-currentness-mismatch",
+    );
+    expect(suite.events).toHaveLength(12);
 
     const metrics = analyzeEvalEvents(suite.events);
     expect(metrics).toMatchObject({
-      pairedGroups: 5,
-      completePairedGroups: 5,
-      baselineFailures: 5,
+      pairedGroups: 6,
+      completePairedGroups: 6,
+      baselineFailures: 6,
       substrateFailures: 0,
-      failureReduction: 5,
+      failureReduction: 6,
       authorityGatePassRate: 1,
+    });
+    expect(metrics.byFailureClass["stale_observation"]).toMatchObject({
+      baselineFailures: 2,
+      substrateFailures: 0,
+      failureReduction: 2,
+      substratePasses: 2,
     });
     expect(metrics.byFailureClass["capability_contract_violation"]).toMatchObject({
       baselineFailures: 1,
@@ -77,8 +92,34 @@ describe("ArrowHedge state eval suite", () => {
       mappingRejectionRate: 1 / 9,
       stateDisagreementRate: 1 / 3,
       authorityGatePassRate: 1,
-      authorityGatePasses: 4,
+      authorityGatePasses: 5,
       authorityGateFailures: 0,
+    });
+  });
+
+  it("fails the distribution-currentness substrate arm when no read-set warning was emitted", () => {
+    const suite = buildArrowHedgeStateEvalSuite({
+      tenantId: tenantId("tnt_arrowhedge_eval_no_warning"),
+      observedAt: timestamp("2026-06-03T16:30:00.000Z"),
+      source: "packages/capability-finance-research-ingest/src/arrowhedge.test.ts",
+      sourceRecordIds: ["ticker:AAPL"],
+      substrateRefs: {
+        graphNodeIds: [],
+        eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+        projectionIds: ["arrowhedge_cop"],
+      },
+      operationalSamples: [],
+    });
+
+    expect(
+      suite.summaries.find(
+        (summary) =>
+          summary.scenarioId === "arrowhedge-distribution-currentness-mismatch",
+      ),
+    ).toMatchObject({
+      baselineResult: "fail",
+      substrateResult: "fail",
+      improvement: 0,
     });
   });
 });

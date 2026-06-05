@@ -5,12 +5,16 @@ export {
 } from "./capability.js";
 export {
   ARROWHEDGE_ENTITY_MAPPING,
+  buildArrowHedgeCurrentStateView,
+  buildArrowHedgeCurrentStateViews,
   buildArrowHedgeIngestionPlan,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
   validateArrowHedgeTypedEventPayload,
   type ArrowHedgeCommonOperatingPictureState,
+  type ArrowHedgeCurrentStateViewInput,
+  type ArrowHedgeCurrentStateViewsInput,
   type ArrowHedgeEdgePlan,
   type ArrowHedgeExecutionPorts,
   type ArrowHedgeExecutionResult,
