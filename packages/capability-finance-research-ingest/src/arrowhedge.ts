@@ -16,11 +16,13 @@ import {
   evaluateObservationContract,
   reviewProposedActionAgainstCurrentState,
   stateRef,
+  type ActionProposalReviewEnforcementMode,
   type ActionProposalReview,
   type AllowedAction,
   type CurrentStateView,
   type ObservationContract,
   type ObservationContractEvaluation,
+  type ReadSetEntry,
   type StateConflict,
   type StateRef,
 } from "@pm/agent-state";
@@ -687,6 +689,7 @@ export interface ArrowHedgeCurrentStateViewInput {
   readonly projectionVersion?: number;
   readonly symbol: string;
   readonly state: ArrowHedgeCommonOperatingPictureState;
+  readonly evaluatedAt?: Timestamp;
 }
 
 export interface ArrowHedgeCurrentStateViewsInput {
@@ -713,6 +716,9 @@ export interface ArrowHedgeProposalReviewInput
   readonly payload: Readonly<Record<string, unknown>>;
   readonly proposedBy: string;
   readonly proposedAt: Timestamp;
+  readonly readSet?: readonly ReadSetEntry[];
+  readonly observationContract?: ObservationContract;
+  readonly enforcementMode?: ActionProposalReviewEnforcementMode;
 }
 
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
@@ -754,10 +760,11 @@ export function buildArrowHedgeCurrentStateView(
   const authorityRule = latestTickerAuthority(ticker);
   if (!observedAt || !authorityRule) return null;
 
+  const asOf = input.evaluatedAt ?? observedAt;
   const sourceRefs = tickerSourceRefs(ticker);
   const missingSources = tickerMissingSources(ticker);
-  const conflicts = tickerConflicts(ticker, observedAt);
-  const workflowPosition = tickerWorkflowPosition(ticker, conflicts, observedAt);
+  const conflicts = tickerConflicts(ticker, asOf);
+  const workflowPosition = tickerWorkflowPosition(ticker, conflicts, asOf);
   const allowedActions = tickerAllowedActions(sourceRefs);
   const validUntil = ticker.latestRiskState?.freshnessExpiresAt;
 
@@ -809,7 +816,10 @@ export function buildArrowHedgeObservationReport(
 export function buildArrowHedgeProposalReview(
   input: ArrowHedgeProposalReviewInput,
 ): ActionProposalReview | null {
-  const currentStateView = buildArrowHedgeCurrentStateView(input);
+  const currentStateView = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.evaluatedAt ?? input.proposedAt,
+  });
   if (!currentStateView) return null;
 
   return reviewProposedActionAgainstCurrentState(
@@ -818,15 +828,26 @@ export function buildArrowHedgeProposalReview(
       actionType: input.actionType,
       subject: currentStateView.subject,
       payload: input.payload,
-      readSet: buildReadSetFromCurrentStateView(
-        currentStateView,
-        currentStateView.authorityRule,
-      ),
+      readSet:
+        input.readSet ??
+        buildReadSetFromCurrentStateView(
+          currentStateView,
+          currentStateView.authorityRule,
+        ),
+      ...(input.observationContract !== undefined
+        ? { observationContract: input.observationContract }
+        : {}),
       proposedBy: input.proposedBy,
       proposedAt: input.proposedAt,
     },
     currentStateView,
-    input.proposedAt,
+    {
+      evaluatedAt: input.proposedAt,
+      ...(input.observationContract !== undefined
+        ? { observationContract: input.observationContract }
+        : {}),
+      enforcementMode: input.enforcementMode ?? "advisory",
+    },
   );
 }
 
@@ -1168,7 +1189,7 @@ function tickerMissingSources(ticker: ArrowHedgeTickerCop): readonly string[] {
 
 function tickerConflicts(
   ticker: ArrowHedgeTickerCop,
-  observedAt: Timestamp,
+  asOf: Timestamp,
 ): readonly StateConflict[] {
   const conflicts: StateConflict[] = [];
 
@@ -1218,7 +1239,7 @@ function tickerConflicts(
     });
   }
 
-  if (tickerRiskStateIsStale(ticker, observedAt)) {
+  if (tickerRiskStateIsStale(ticker, asOf)) {
     conflicts.push({
       conflictType: "stale_observation",
       refs: presentStateRefs([
@@ -1237,9 +1258,9 @@ function tickerConflicts(
 function tickerWorkflowPosition(
   ticker: ArrowHedgeTickerCop,
   conflicts: readonly StateConflict[],
-  observedAt: Timestamp,
+  asOf: Timestamp,
 ): string {
-  if (ticker.staleBlocks > 0 || conflicts.length > 0 || tickerRiskStateIsStale(ticker, observedAt)) {
+  if (ticker.staleBlocks > 0 || conflicts.length > 0 || tickerRiskStateIsStale(ticker, asOf)) {
     return "blocked_stale_state";
   }
   if (ticker.latestDecision?.accepted === true && ticker.authorityGate.passes > 0) {

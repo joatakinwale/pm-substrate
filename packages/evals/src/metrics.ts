@@ -1,5 +1,6 @@
 import {
   COORDINATION_CLASSES,
+  EVAL_EVIDENCE_STAGES,
   FAILURE_CLASSES,
   MAST_CATEGORIES,
   MEMORY_BENCHMARK_BRIDGES,
@@ -7,6 +8,7 @@ import {
   STATE_BENCH_CATEGORIES,
   assertEvalEvent,
   type CoordinationClass,
+  type EvalEvidenceStage,
   type EvalEvent,
   type EvalResult,
   type FailureClass,
@@ -27,6 +29,17 @@ export interface CoordinationClassMetrics {
   readonly baselineFailures: number;
   readonly substrateFailures: number;
   readonly failureReduction: number;
+  readonly allStageFailureReduction: number;
+  readonly substratePasses: number;
+  readonly substrateBlocked: number;
+}
+
+export interface EvidenceStageMetrics {
+  readonly events: number;
+  readonly pairedGroups: number;
+  readonly baselineFailures: number;
+  readonly substrateFailures: number;
+  readonly failureReduction: number;
   readonly substratePasses: number;
   readonly substrateBlocked: number;
 }
@@ -37,6 +50,7 @@ export interface FailureClassMetrics {
   readonly baselineFailures: number;
   readonly substrateFailures: number;
   readonly failureReduction: number;
+  readonly allStageFailureReduction: number;
   readonly substratePasses: number;
   readonly substrateBlocked: number;
 }
@@ -49,11 +63,14 @@ export interface EvalEventMetrics {
   readonly baselineFailures: number;
   readonly substrateFailures: number;
   readonly failureReduction: number;
+  readonly allStageFailureReduction: number;
   readonly stateBenchCategories: readonly StateBenchCategory[];
   readonly memoryBenchmarkBridges: readonly MemoryBenchmarkBridge[];
   readonly mastCategories: readonly MastCategory[];
   readonly coordinationClasses: readonly CoordinationClass[];
+  readonly evidenceStages: readonly EvalEvidenceStage[];
   readonly byCoordinationClass: Readonly<Record<CoordinationClass, CoordinationClassMetrics>>;
+  readonly byEvidenceStage: Readonly<Record<EvalEvidenceStage, EvidenceStageMetrics>>;
   readonly byFailureClass: Readonly<Record<FailureClass, FailureClassMetrics>>;
   readonly authorityGatePassRate: number | null;
   readonly convergentUpdateAutoResolutionRate: number | null;
@@ -104,6 +121,7 @@ export interface ActionProposalReviewSample {
   readonly execution: {
     readonly allowed: boolean;
     readonly blocking: boolean;
+    readonly enforcementMode?: string;
   };
   readonly warnings: readonly ActionProposalReviewWarningSample[];
 }
@@ -115,6 +133,8 @@ export interface ActionProposalReviewMetrics {
   readonly allowedReviews: number;
   readonly blockedReviews: number;
   readonly warnModeReviews: number;
+  readonly advisoryReviews: number;
+  readonly blockingModeReviews: number;
   readonly totalWarnings: number;
   readonly warningsBySource: Readonly<Record<string, number>>;
   readonly warningsByCode: Readonly<Record<string, number>>;
@@ -122,6 +142,17 @@ export interface ActionProposalReviewMetrics {
 }
 
 interface MutableCoordinationClassMetrics {
+  events: number;
+  pairedGroups: Set<string>;
+  baselineFailures: number;
+  substrateFailures: number;
+  matureBaselineFailures: number;
+  matureSubstrateFailures: number;
+  substratePasses: number;
+  substrateBlocked: number;
+}
+
+interface MutableEvidenceStageMetrics {
   events: number;
   pairedGroups: Set<string>;
   baselineFailures: number;
@@ -135,6 +166,8 @@ interface MutableFailureClassMetrics {
   pairedGroups: Set<string>;
   baselineFailures: number;
   substrateFailures: number;
+  matureBaselineFailures: number;
+  matureSubstrateFailures: number;
   substratePasses: number;
   substrateBlocked: number;
 }
@@ -143,13 +176,31 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
   const validEvents = events.map((event) => assertEvalEvent(event));
   const pairedGroups = new Map<string, EvalEvent[]>();
   const byCoordinationClass = makeCoordinationMetrics();
+  const byEvidenceStage = makeEvidenceStageMetrics();
   const byFailureClass = makeFailureClassMetrics();
 
   for (const event of validEvents) {
+    const evidenceStage = evidenceStageFor(event);
+    const countsAsFailureReduction = countsTowardFailureReduction(event);
+
     if (event.pairedRunGroup) {
       const group = pairedGroups.get(event.pairedRunGroup) ?? [];
       group.push(event);
       pairedGroups.set(event.pairedRunGroup, group);
+    }
+
+    const evidenceBucket = byEvidenceStage[evidenceStage];
+    evidenceBucket.events += 1;
+    if (event.pairedRunGroup) {
+      evidenceBucket.pairedGroups.add(event.pairedRunGroup);
+    }
+    if (event.runArm === "baseline" && event.result === "fail") {
+      evidenceBucket.baselineFailures += 1;
+    }
+    if (event.runArm === "substrate") {
+      if (event.result === "fail") evidenceBucket.substrateFailures += 1;
+      if (event.result === "pass") evidenceBucket.substratePasses += 1;
+      if (event.result === "blocked") evidenceBucket.substrateBlocked += 1;
     }
 
     const failureBucket = byFailureClass[event.failureClass];
@@ -159,9 +210,15 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
     }
     if (event.runArm === "baseline" && event.result === "fail") {
       failureBucket.baselineFailures += 1;
+      if (countsAsFailureReduction) {
+        failureBucket.matureBaselineFailures += 1;
+      }
     }
     if (event.runArm === "substrate") {
       if (event.result === "fail") failureBucket.substrateFailures += 1;
+      if (event.result === "fail" && countsAsFailureReduction) {
+        failureBucket.matureSubstrateFailures += 1;
+      }
       if (event.result === "pass") failureBucket.substratePasses += 1;
       if (event.result === "blocked") failureBucket.substrateBlocked += 1;
     }
@@ -174,9 +231,15 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
       }
       if (event.runArm === "baseline" && event.result === "fail") {
         bucket.baselineFailures += 1;
+        if (countsAsFailureReduction) {
+          bucket.matureBaselineFailures += 1;
+        }
       }
       if (event.runArm === "substrate") {
         if (event.result === "fail") bucket.substrateFailures += 1;
+        if (event.result === "fail" && countsAsFailureReduction) {
+          bucket.matureSubstrateFailures += 1;
+        }
         if (event.result === "pass") bucket.substratePasses += 1;
         if (event.result === "blocked") bucket.substrateBlocked += 1;
       }
@@ -210,6 +273,9 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
 
   const baselineFailures = countResult(validEvents, "baseline", "fail");
   const substrateFailures = countResult(validEvents, "substrate", "fail");
+  const matureEvents = validEvents.filter(countsTowardFailureReduction);
+  const matureBaselineFailures = countResult(matureEvents, "baseline", "fail");
+  const matureSubstrateFailures = countResult(matureEvents, "substrate", "fail");
   const authorityGate = byCoordinationClass["authority_gated_transition"];
   const authorityGateDecisions =
     authorityGate.substratePasses + authorityGate.substrateFailures;
@@ -223,7 +289,8 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
     ),
     baselineFailures,
     substrateFailures,
-    failureReduction: baselineFailures - substrateFailures,
+    failureReduction: matureBaselineFailures - matureSubstrateFailures,
+    allStageFailureReduction: baselineFailures - substrateFailures,
     stateBenchCategories: uniqueByCanonicalOrder(
       validEvents,
       STATE_BENCH_CATEGORIES,
@@ -244,7 +311,13 @@ export function analyzeEvalEvents(events: readonly EvalEvent[]): EvalEventMetric
       COORDINATION_CLASSES,
       (event) => event.coordinationClass,
     ),
+    evidenceStages: uniqueByCanonicalOrder(
+      validEvents,
+      EVAL_EVIDENCE_STAGES,
+      (event) => evidenceStageFor(event),
+    ),
     byCoordinationClass: freezeCoordinationMetrics(byCoordinationClass),
+    byEvidenceStage: freezeEvidenceStageMetrics(byEvidenceStage),
     byFailureClass: freezeFailureClassMetrics(byFailureClass),
     authorityGatePassRate:
       authorityGateDecisions === 0
@@ -304,6 +377,12 @@ export function analyzeActionProposalReviews(
     allowedReviews: reviews.filter((review) => review.execution.allowed).length,
     blockedReviews: reviews.filter((review) => review.execution.blocking).length,
     warnModeReviews: reviews.filter((review) => review.mode === "warn").length,
+    advisoryReviews: reviews.filter(
+      (review) => review.execution.enforcementMode === "advisory",
+    ).length,
+    blockingModeReviews: reviews.filter(
+      (review) => review.execution.enforcementMode === "blocking",
+    ).length,
     totalWarnings: warnings.length,
     warningsBySource: countBy(warnings, (warning) => warning.source),
     warningsByCode: countBy(warnings, (warning) => warning.code),
@@ -320,11 +399,29 @@ function makeCoordinationMetrics(): Record<CoordinationClass, MutableCoordinatio
         pairedGroups: new Set<string>(),
         baselineFailures: 0,
         substrateFailures: 0,
+        matureBaselineFailures: 0,
+        matureSubstrateFailures: 0,
         substratePasses: 0,
         substrateBlocked: 0,
       },
     ]),
   ) as Record<CoordinationClass, MutableCoordinationClassMetrics>;
+}
+
+function makeEvidenceStageMetrics(): Record<EvalEvidenceStage, MutableEvidenceStageMetrics> {
+  return Object.fromEntries(
+    EVAL_EVIDENCE_STAGES.map((evidenceStage) => [
+      evidenceStage,
+      {
+        events: 0,
+        pairedGroups: new Set<string>(),
+        baselineFailures: 0,
+        substrateFailures: 0,
+        substratePasses: 0,
+        substrateBlocked: 0,
+      },
+    ]),
+  ) as Record<EvalEvidenceStage, MutableEvidenceStageMetrics>;
 }
 
 function makeFailureClassMetrics(): Record<FailureClass, MutableFailureClassMetrics> {
@@ -336,6 +433,8 @@ function makeFailureClassMetrics(): Record<FailureClass, MutableFailureClassMetr
         pairedGroups: new Set<string>(),
         baselineFailures: 0,
         substrateFailures: 0,
+        matureBaselineFailures: 0,
+        matureSubstrateFailures: 0,
         substratePasses: 0,
         substrateBlocked: 0,
       },
@@ -356,13 +455,37 @@ function freezeCoordinationMetrics(
           pairedGroups: metrics.pairedGroups.size,
           baselineFailures: metrics.baselineFailures,
           substrateFailures: metrics.substrateFailures,
-          failureReduction: metrics.baselineFailures - metrics.substrateFailures,
+          failureReduction:
+            metrics.matureBaselineFailures - metrics.matureSubstrateFailures,
+          allStageFailureReduction: metrics.baselineFailures - metrics.substrateFailures,
           substratePasses: metrics.substratePasses,
           substrateBlocked: metrics.substrateBlocked,
         },
       ];
     }),
   ) as Record<CoordinationClass, CoordinationClassMetrics>;
+}
+
+function freezeEvidenceStageMetrics(
+  input: Record<EvalEvidenceStage, MutableEvidenceStageMetrics>,
+): Record<EvalEvidenceStage, EvidenceStageMetrics> {
+  return Object.fromEntries(
+    EVAL_EVIDENCE_STAGES.map((evidenceStage) => {
+      const metrics = input[evidenceStage];
+      return [
+        evidenceStage,
+        {
+          events: metrics.events,
+          pairedGroups: metrics.pairedGroups.size,
+          baselineFailures: metrics.baselineFailures,
+          substrateFailures: metrics.substrateFailures,
+          failureReduction: metrics.baselineFailures - metrics.substrateFailures,
+          substratePasses: metrics.substratePasses,
+          substrateBlocked: metrics.substrateBlocked,
+        },
+      ];
+    }),
+  ) as Record<EvalEvidenceStage, EvidenceStageMetrics>;
 }
 
 function freezeFailureClassMetrics(
@@ -378,7 +501,9 @@ function freezeFailureClassMetrics(
           pairedGroups: metrics.pairedGroups.size,
           baselineFailures: metrics.baselineFailures,
           substrateFailures: metrics.substrateFailures,
-          failureReduction: metrics.baselineFailures - metrics.substrateFailures,
+          failureReduction:
+            metrics.matureBaselineFailures - metrics.matureSubstrateFailures,
+          allStageFailureReduction: metrics.baselineFailures - metrics.substrateFailures,
           substratePasses: metrics.substratePasses,
           substrateBlocked: metrics.substrateBlocked,
         },
@@ -393,6 +518,18 @@ function countResult(
   result: EvalResult,
 ): number {
   return events.filter((event) => event.runArm === runArm && event.result === result).length;
+}
+
+function evidenceStageFor(event: EvalEvent): EvalEvidenceStage {
+  return event.evidenceStage ?? "scaffolded_scenario";
+}
+
+function countsTowardFailureReduction(event: EvalEvent): boolean {
+  const stage = evidenceStageFor(event);
+  return (
+    stage === "blocked_mutation" ||
+    stage === "paired_behavioral_improvement"
+  );
 }
 
 function firstValidEventLatency(

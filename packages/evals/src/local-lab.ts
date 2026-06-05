@@ -53,6 +53,7 @@ export interface LocalLabSuiteResult {
   readonly baselineFailures: number;
   readonly substrateFailures: number;
   readonly failureReduction: number;
+  readonly allStageFailureReduction: number;
   readonly stateBenchCategories: readonly StateBenchCategory[];
 }
 
@@ -171,6 +172,7 @@ export function runLocalLabPairedEvals(
     baselineFailures: metrics.baselineFailures,
     substrateFailures: metrics.substrateFailures,
     failureReduction: metrics.failureReduction,
+    allStageFailureReduction: metrics.allStageFailureReduction,
     stateBenchCategories: [...new Set(summaries.map((s) => s.stateBenchCategory))].sort(),
   };
 }
@@ -226,6 +228,7 @@ function buildEvent(input: {
     memoryBenchmarkBridge: scenario.memoryBenchmarkBridge,
     mastCategory: scenario.mastCategory,
     coordinationClass: scenario.coordinationClass,
+    evidenceStage: "scaffolded_scenario",
     result: input.result,
     notes: input.observation,
   });

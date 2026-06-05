@@ -63,23 +63,37 @@ describe("ArrowHedge state eval suite", () => {
       completePairedGroups: 6,
       baselineFailures: 6,
       substrateFailures: 0,
-      failureReduction: 6,
+      failureReduction: 0,
+      allStageFailureReduction: 6,
       authorityGatePassRate: 1,
+    });
+    expect(metrics.evidenceStages).toEqual([
+      "scaffolded_scenario",
+      "detected_warning",
+    ]);
+    expect(metrics.byEvidenceStage.detected_warning).toMatchObject({
+      events: 2,
+      pairedGroups: 1,
+      failureReduction: 1,
+      substratePasses: 1,
     });
     expect(metrics.byFailureClass["stale_observation"]).toMatchObject({
       baselineFailures: 2,
       substrateFailures: 0,
-      failureReduction: 2,
+      failureReduction: 0,
+      allStageFailureReduction: 2,
       substratePasses: 2,
     });
     expect(metrics.byFailureClass["capability_contract_violation"]).toMatchObject({
       baselineFailures: 1,
       substrateFailures: 0,
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
     expect(metrics.byFailureClass["representation_loss"]).toMatchObject({
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
 

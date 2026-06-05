@@ -4,6 +4,7 @@ import type { TenantId, Timestamp } from "@pm/types";
 import {
   COORDINATION_CLASSES,
   EVAL_AXES,
+  EVAL_EVIDENCE_STAGES,
   FAILURE_CLASSES,
   MAST_CATEGORIES,
   MEMORY_BENCHMARK_BRIDGES,
@@ -62,6 +63,12 @@ describe("eval event schema", () => {
       "authority_gated_transition",
       "derived_projection",
     ]);
+    expect(EVAL_EVIDENCE_STAGES).toEqual([
+      "scaffolded_scenario",
+      "detected_warning",
+      "blocked_mutation",
+      "paired_behavioral_improvement",
+    ]);
   });
 
   it("accepts a valid state-failure eval event", () => {
@@ -83,6 +90,7 @@ describe("eval event schema", () => {
       memoryBenchmarkBridge: "memo",
       mastCategory: "coordination_bug",
       coordinationClass: "eventually_consistent_magic",
+      evidenceStage: "claimed_proof",
       evidenceRefs: [{ kind: "event", id: "" }],
       substrateRefs: [{ kind: "bad_ref", id: "x" }],
       notes: "",
@@ -100,6 +108,7 @@ describe("eval event schema", () => {
         "/memoryBenchmarkBridge",
         "/mastCategory",
         "/coordinationClass",
+        "/evidenceStage",
         "/evidenceRefs/0/id",
         "/substrateRefs/0/kind",
         "/notes",

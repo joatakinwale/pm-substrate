@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
   validateProposedActionReadSet,
 } from "@pm/agent-state";
@@ -393,6 +394,24 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       "workflow.block",
       "risk.refresh",
     ]);
+
+    const staleAsOfView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      evaluatedAt: timestamp("2026-06-03T14:12:00.000Z"),
+    });
+
+    expect(staleAsOfView).toMatchObject({
+      observedAt: "2026-06-03T14:00:00.000Z",
+      validUntil: "2026-06-03T14:10:00.000Z",
+      workflowPosition: "blocked_stale_state",
+    });
+    expect(staleAsOfView?.conflicts.map((conflict) => conflict.conflictType)).toEqual([
+      "stale_observation",
+    ]);
   });
 
   it("warns before action when a proposed ArrowHedge decision relies on stale or conflicted state", async () => {
@@ -495,31 +514,25 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(report?.evaluation.assertions).toHaveLength(7);
   });
 
-  it("builds an ArrowHedge proposal review artifact from ticker COP state", async () => {
-    const staleSnapshot = {
-      ...snapshot,
-      snapshotId: "snap_aapl_2026_06_03_1412",
-      observedAt: "2026-06-03T14:12:00.000Z",
-      risk: {
-        ...snapshot.risk,
-        id: "risk_aapl_1412",
-        freshnessExpiresAt: "2026-06-03T14:10:00.000Z",
-      },
-      decision: {
-        ...snapshot.decision,
-        id: "dec_aapl_buy_stale",
-        riskSourceSnapshotId: "snap_aapl_2026_06_03_1400",
-        signalSourceSnapshotId: "snap_aapl_2026_06_03_1400",
-      },
-    };
+  it("builds an ArrowHedge proposal review artifact from the agent's original observation", async () => {
     const tenant = tenantId("tnt_arrowhedge_proposal_review");
-    const plan = buildArrowHedgeIngestionPlan(staleSnapshot, {
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
       tenantId: tenant,
       profile: FINANCE_RESEARCH_PROFILE,
-      adapterStartedAt: timestamp("2026-06-03T14:11:58.500Z"),
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
     });
     const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_review");
     const state = await foldPlanIntoCop(projection, plan);
+    const originalView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const originalObservation =
+      buildObservationContractFromCurrentStateView(originalView);
 
     const review = buildArrowHedgeProposalReview({
       tenantId: tenant,
@@ -528,9 +541,14 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       symbol: "AAPL",
       state,
       actionType: "portfolio.decision.accept",
-      payload: { decisionId: "dec_aapl_buy_stale" },
+      payload: { decisionId: "dec_aapl_buy_120" },
       proposedBy: "agent:portfolio-manager",
       proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract: originalObservation,
     });
 
     expect(review).toMatchObject({
@@ -540,7 +558,8 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       execution: {
         allowed: true,
         blocking: false,
-        reason: "warn_first_v1",
+        enforcementMode: "advisory",
+        reason: "advisory_warn_first_v1",
       },
       currentStateView: {
         workflowPosition: "blocked_stale_state",
@@ -553,6 +572,10 @@ describe("ArrowHedge Common Operating Picture projection", () => {
         "freshness_window_current",
         "workflow_position_mismatch",
       ]),
+    );
+    expect(review?.observationContract).toEqual(originalObservation);
+    expect(review?.observationEvaluation.currentStateViewId).toBe(
+      "arrowhedge_cop_review:AAPL:current_state_view",
     );
   });
 });

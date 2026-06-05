@@ -23,6 +23,15 @@ export const EVAL_RESULTS = ["pass", "fail", "blocked"] as const;
 
 export type EvalResult = (typeof EVAL_RESULTS)[number];
 
+export const EVAL_EVIDENCE_STAGES = [
+  "scaffolded_scenario",
+  "detected_warning",
+  "blocked_mutation",
+  "paired_behavioral_improvement",
+] as const;
+
+export type EvalEvidenceStage = (typeof EVAL_EVIDENCE_STAGES)[number];
+
 export const RUN_ARMS = ["baseline", "substrate"] as const;
 
 export type RunArm = (typeof RUN_ARMS)[number];
@@ -114,6 +123,7 @@ export interface EvalEvent {
   readonly memoryBenchmarkBridge?: MemoryBenchmarkBridge;
   readonly mastCategory?: MastCategory;
   readonly coordinationClass?: CoordinationClass;
+  readonly evidenceStage?: EvalEvidenceStage;
   readonly confidenceBand?: ConfidenceBand;
   readonly result: EvalResult;
   readonly notes: string;
@@ -139,6 +149,7 @@ export class EvalEventValidationError extends Error {
 const AXES = new Set<string>(EVAL_AXES);
 const FAILURE_CLASS_SET = new Set<string>(FAILURE_CLASSES);
 const RESULT_SET = new Set<string>(EVAL_RESULTS);
+const EVIDENCE_STAGE_SET = new Set<string>(EVAL_EVIDENCE_STAGES);
 const RUN_ARM_SET = new Set<string>(RUN_ARMS);
 const STATE_BENCH_CATEGORY_SET = new Set<string>(STATE_BENCH_CATEGORIES);
 const MEMORY_BENCHMARK_BRIDGE_SET = new Set<string>(MEMORY_BENCHMARK_BRIDGES);
@@ -224,6 +235,13 @@ export function validateEvalEvent(input: unknown): ValidationResult {
     "/coordinationClass",
     COORDINATION_CLASS_SET,
     COORDINATION_CLASSES,
+    issues,
+  );
+  validateOptionalEnum(
+    input["evidenceStage"],
+    "/evidenceStage",
+    EVIDENCE_STAGE_SET,
+    EVAL_EVIDENCE_STAGES,
     issues,
   );
   validateOptionalConfidenceBand(input["confidenceBand"], issues);

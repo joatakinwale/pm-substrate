@@ -21,6 +21,7 @@ function event(input: {
   readonly memoryBenchmarkBridge?: EvalEvent["memoryBenchmarkBridge"];
   readonly mastCategory?: EvalEvent["mastCategory"];
   readonly coordinationClass?: EvalEvent["coordinationClass"];
+  readonly evidenceStage?: EvalEvent["evidenceStage"];
 }): EvalEvent {
   return {
     tenantId,
@@ -39,6 +40,7 @@ function event(input: {
     memoryBenchmarkBridge: input.memoryBenchmarkBridge,
     mastCategory: input.mastCategory,
     coordinationClass: input.coordinationClass,
+    evidenceStage: input.evidenceStage ?? "paired_behavioral_improvement",
     result: input.result,
     notes: "metrics fixture",
   };
@@ -118,6 +120,7 @@ describe("eval event metrics", () => {
       baselineFailures: 3,
       substrateFailures: 0,
       failureReduction: 3,
+      allStageFailureReduction: 3,
       authorityGatePassRate: 1,
       convergentUpdateAutoResolutionRate: 1,
     });
@@ -138,6 +141,7 @@ describe("eval event metrics", () => {
       "authority_gated_transition",
       "derived_projection",
     ]);
+    expect(metrics.evidenceStages).toEqual(["paired_behavioral_improvement"]);
     expect(metrics.byCoordinationClass["authority_gated_transition"]).toMatchObject({
       events: 2,
       pairedGroups: 1,
@@ -169,6 +173,42 @@ describe("eval event metrics", () => {
       substrateFailures: 0,
       failureReduction: 0,
       substratePasses: 0,
+    });
+  });
+
+  it("keeps scaffolded pairs out of the evidence-adjusted failure-reduction metric", () => {
+    const metrics = analyzeEvalEvents([
+      event({
+        scenarioId: "scaffolded",
+        runArm: "baseline",
+        pairedRunGroup: "pair_scaffolded",
+        result: "fail",
+        evidenceStage: "scaffolded_scenario",
+      }),
+      event({
+        scenarioId: "scaffolded",
+        runArm: "substrate",
+        pairedRunGroup: "pair_scaffolded",
+        result: "pass",
+        evidenceStage: "scaffolded_scenario",
+      }),
+    ]);
+
+    expect(metrics).toMatchObject({
+      baselineFailures: 1,
+      substrateFailures: 0,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
+      evidenceStages: ["scaffolded_scenario"],
+    });
+    expect(metrics.byEvidenceStage.scaffolded_scenario).toMatchObject({
+      events: 2,
+      failureReduction: 1,
+      substratePasses: 1,
+    });
+    expect(metrics.byFailureClass.parallel_write_conflict).toMatchObject({
+      failureReduction: 0,
+      allStageFailureReduction: 1,
     });
   });
 
@@ -292,13 +332,13 @@ describe("eval event metrics", () => {
         {
           valid: true,
           mode: "warn",
-          execution: { allowed: true, blocking: false },
+          execution: { allowed: true, blocking: false, enforcementMode: "advisory" },
           warnings: [],
         },
         {
           valid: false,
           mode: "warn",
-          execution: { allowed: true, blocking: false },
+          execution: { allowed: true, blocking: false, enforcementMode: "advisory" },
           warnings: [
             { source: "read_set", code: "stale_read_ref", severity: "warn" },
             {
@@ -317,6 +357,8 @@ describe("eval event metrics", () => {
       allowedReviews: 2,
       blockedReviews: 0,
       warnModeReviews: 2,
+      advisoryReviews: 2,
+      blockingModeReviews: 0,
       totalWarnings: 3,
       warningsBySource: {
         observation_contract: 1,

@@ -113,3 +113,12 @@
 - Added `buildArrowHedgeProposalReview()` so ArrowHedge COP ticker state can produce a proposal-review artifact directly from a portfolio action proposal.
 - Added `analyzeActionProposalReviews()` in `@pm/evals` to measure review validity, allowed/blocking disposition, warning count, and warnings by source, code, and severity.
 - Verification: focused tests pass for action proposal reviews, ArrowHedge proposal-review generation, and proposal-review metrics: 3 files / 23 tests.
+
+## 2026-06-05 — Proposal review hardening and proof maturity labels
+
+- Added `subject_mismatch` read-set validation so an action cannot cite one current-state read-set while targeting another subject.
+- Made proposal review explicitly advisory by default with `enforcementMode: "advisory"` and support for a future `"blocking"` mode, preserving warn-first v1 without implying mutation enforcement.
+- Fixed the observation-contract tautology in the proposal-review path: callers can now pass the agent's original observation contract/read-set, and review compares that prior observation against the current state view.
+- Added ArrowHedge `evaluatedAt`/as-of current-state evaluation so risk freshness, conflicts, and workflow position are computed at proposal time rather than only at latest event time.
+- Added eval evidence maturity stages (`scaffolded_scenario`, `detected_warning`, `blocked_mutation`, `paired_behavioral_improvement`) and evidence-adjusted failure-reduction metrics so scaffolded/pass-by-spec scenarios remain visible without being counted as behavioral proof.
+- Verification: focused agent-state, ArrowHedge, and eval tests pass after rebuilding package outputs; sequential package build and `git diff --check` pass. DB-backed integration execution remains an environment boundary when local Postgres is unavailable.

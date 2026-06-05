@@ -3,6 +3,7 @@ import {
   evalEvent,
   evalEvidenceRef,
   type CoordinationClass,
+  type EvalEvidenceStage,
   type EvalEvent,
   type EvalResult,
   type FailureClass,
@@ -49,6 +50,7 @@ interface ScenarioSpec {
   readonly failureClass: FailureClass;
   readonly coordinationClass: CoordinationClass;
   readonly substrateResult: EvalResult;
+  readonly evidenceStage: EvalEvidenceStage;
   readonly requiredReadSetWarningCodes?: readonly string[];
   readonly baselineNotes: string;
   readonly substrateNotes: string;
@@ -60,6 +62,7 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     failureClass: "representation_loss",
     coordinationClass: "derived_projection",
     substrateResult: "pass",
+    evidenceStage: "scaffolded_scenario",
     baselineNotes:
       "Source-only finance rows lose the graph/event/projection links needed to reconstruct risk-gated state.",
     substrateNotes:
@@ -70,6 +73,7 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     failureClass: "source_authority_conflict",
     coordinationClass: "authority_gated_transition",
     substrateResult: "pass",
+    evidenceStage: "scaffolded_scenario",
     baselineNotes:
       "Baseline agent can choose a newer non-binding quote over the backtest-authoritative risk snapshot.",
     substrateNotes:
@@ -80,6 +84,7 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     failureClass: "stale_observation",
     coordinationClass: "authority_gated_transition",
     substrateResult: "pass",
+    evidenceStage: "scaffolded_scenario",
     baselineNotes:
       "Baseline decision proceeds even though the risk observation freshness window expired.",
     substrateNotes:
@@ -90,6 +95,7 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     failureClass: "stale_observation",
     coordinationClass: "authority_gated_transition",
     substrateResult: "pass",
+    evidenceStage: "detected_warning",
     requiredReadSetWarningCodes: ["stale_read_ref"],
     baselineNotes:
       "Baseline prompt/RAG action proceeds from stale or incomplete distribution-currentness context.",
@@ -101,6 +107,7 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     failureClass: "workflow_invalidation",
     coordinationClass: "authority_gated_transition",
     substrateResult: "pass",
+    evidenceStage: "scaffolded_scenario",
     baselineNotes:
       "Baseline executor continues from an obsolete research workflow position after the risk gate changed.",
     substrateNotes:
@@ -111,6 +118,7 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     failureClass: "capability_contract_violation",
     coordinationClass: "authority_gated_transition",
     substrateResult: "pass",
+    evidenceStage: "scaffolded_scenario",
     baselineNotes:
       "Baseline payload can omit required finance capability fields without a typed rejection surface.",
     substrateNotes:
@@ -168,6 +176,7 @@ export function buildArrowHedgeStateEvalSuite(
           ? "task_verification"
           : "system_design",
       coordinationClass: scenario.coordinationClass,
+      evidenceStage: scenario.evidenceStage,
       result: "fail",
       notes: scenario.baselineNotes,
     });
@@ -195,6 +204,7 @@ export function buildArrowHedgeStateEvalSuite(
           ? "task_verification"
           : "system_design",
       coordinationClass: scenario.coordinationClass,
+      evidenceStage: scenario.evidenceStage,
       result: substrateResult,
       notes: substrateNotesForScenario(scenario, input),
     });

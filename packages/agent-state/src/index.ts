@@ -63,12 +63,14 @@ export interface ProposedAction {
   readonly subject: StateRef;
   readonly payload: Readonly<Record<string, unknown>>;
   readonly readSet: readonly ReadSetEntry[];
+  readonly observationContract?: ObservationContract;
   readonly proposedBy: string;
   readonly proposedAt: Timestamp;
 }
 
 export type ReadSetValidationIssueCode =
   | "tenant_mismatch"
+  | "subject_mismatch"
   | "action_not_allowed"
   | "missing_read_ref"
   | "stale_read_ref"
@@ -133,6 +135,11 @@ export interface ObservationContractEvaluation {
 }
 
 export type ActionProposalReviewMode = "warn";
+export type ActionProposalReviewEnforcementMode = "advisory" | "blocking";
+export type ActionProposalExecutionReason =
+  | "advisory_warn_first_v1"
+  | "blocking_policy_passed"
+  | "blocking_policy_failed";
 export type ActionProposalWarningSource = "read_set" | "observation_contract";
 
 export interface ActionProposalWarning {
@@ -146,8 +153,15 @@ export interface ActionProposalWarning {
 export interface ActionProposalExecutionDisposition {
   readonly allowed: boolean;
   readonly blocking: boolean;
-  readonly reason: "warn_first_v1";
+  readonly enforcementMode: ActionProposalReviewEnforcementMode;
+  readonly reason: ActionProposalExecutionReason;
   readonly warningCount: number;
+}
+
+export interface ActionProposalReviewOptions {
+  readonly evaluatedAt?: Timestamp;
+  readonly observationContract?: ObservationContract;
+  readonly enforcementMode?: ActionProposalReviewEnforcementMode;
 }
 
 export interface ActionProposalReview {
@@ -328,9 +342,18 @@ export function evaluateObservationContract(
 export function reviewProposedActionAgainstCurrentState(
   action: ProposedAction,
   view: CurrentStateView,
-  evaluatedAt: Timestamp = action.proposedAt,
+  optionsOrEvaluatedAt: ActionProposalReviewOptions | Timestamp = {},
 ): ActionProposalReview {
-  const observationContract = buildObservationContractFromCurrentStateView(view);
+  const options =
+    typeof optionsOrEvaluatedAt === "string"
+      ? { evaluatedAt: optionsOrEvaluatedAt }
+      : optionsOrEvaluatedAt;
+  const evaluatedAt = options.evaluatedAt ?? action.proposedAt;
+  const enforcementMode = options.enforcementMode ?? "advisory";
+  const observationContract =
+    options.observationContract ??
+    action.observationContract ??
+    buildObservationContractFromCurrentStateView(view);
   const observationEvaluation = evaluateObservationContract(
     observationContract,
     view,
@@ -353,8 +376,11 @@ export function reviewProposedActionAgainstCurrentState(
         severity: assertion.severity,
         message: assertion.message,
         refs: assertion.refs,
-      })),
+    })),
   ] as const;
+  const blocking =
+    enforcementMode === "blocking" &&
+    (!readSetValidation.valid || !observationEvaluation.valid);
 
   return {
     tenantId: action.tenantId,
@@ -368,9 +394,15 @@ export function reviewProposedActionAgainstCurrentState(
     readSetValidation,
     warnings,
     execution: {
-      allowed: true,
-      blocking: false,
-      reason: "warn_first_v1",
+      allowed: enforcementMode === "advisory" || !blocking,
+      blocking,
+      enforcementMode,
+      reason:
+        enforcementMode === "advisory"
+          ? "advisory_warn_first_v1"
+          : blocking
+            ? "blocking_policy_failed"
+            : "blocking_policy_passed",
       warningCount: warnings.length,
     },
   };
@@ -390,6 +422,15 @@ export function validateProposedActionReadSet(
       code: "tenant_mismatch",
       path: "/tenantId",
       message: `Proposed action tenant ${action.tenantId} does not match current state view tenant ${view.tenantId}.`,
+    });
+  }
+
+  if (!sameStateRef(action.subject, view.subject)) {
+    issues.push({
+      code: "subject_mismatch",
+      path: "/subject",
+      message: `Proposed action subject ${formatStateRef(action.subject)} does not match current state view subject ${formatStateRef(view.subject)}.`,
+      ref: action.subject,
     });
   }
 

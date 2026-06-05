@@ -275,12 +275,14 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
     });
     const metrics = analyzeEvalEvents(evalSuite.events);
     expect(metrics.byFailureClass["representation_loss"]).toMatchObject({
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
     expect(metrics.byFailureClass["capability_contract_violation"]).toMatchObject({
       substrateFailures: 0,
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
     });
 
     const operational = analyzeAdapterOperationalMetrics(

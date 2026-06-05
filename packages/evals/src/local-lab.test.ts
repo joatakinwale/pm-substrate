@@ -25,6 +25,7 @@ describe("local-lab paired evals", () => {
     expect(pair.events.every((e) => e.memoryBenchmarkBridge === "knowledge_update")).toBe(true);
     expect(pair.events.every((e) => e.mastCategory === "system_design")).toBe(true);
     expect(pair.events.every((e) => e.coordinationClass === "derived_projection")).toBe(true);
+    expect(pair.events.every((e) => e.evidenceStage === "scaffolded_scenario")).toBe(true);
     expect(pair.events.every((e) => !e.notes.includes("state_bench_category="))).toBe(true);
     expect(pair.summary).toMatchObject({
       scenarioId: "stale-memory-after-source-update",
@@ -39,19 +40,22 @@ describe("local-lab paired evals", () => {
     });
   });
 
-  it("summarizes a deterministic local-lab suite as behavioral improvement", () => {
+  it("summarizes deterministic local-lab scaffold without overstating proof maturity", () => {
     const suite = runLocalLabPairedEvals();
 
     expect(suite.events).toHaveLength(LOCAL_LAB_SCENARIOS.length * 2);
     expect(suite.summaries).toHaveLength(LOCAL_LAB_SCENARIOS.length);
     expect(suite.baselineFailures).toBe(LOCAL_LAB_SCENARIOS.length);
     expect(suite.substrateFailures).toBe(0);
-    expect(suite.failureReduction).toBe(LOCAL_LAB_SCENARIOS.length);
-    expect(suite.metrics.failureReduction).toBe(LOCAL_LAB_SCENARIOS.length);
+    expect(suite.failureReduction).toBe(0);
+    expect(suite.allStageFailureReduction).toBe(LOCAL_LAB_SCENARIOS.length);
+    expect(suite.metrics.failureReduction).toBe(0);
+    expect(suite.metrics.allStageFailureReduction).toBe(LOCAL_LAB_SCENARIOS.length);
     expect(suite.metrics.authorityGatePassRate).toBe(1);
     expect(suite.metrics.byCoordinationClass["authority_gated_transition"]).toMatchObject({
       pairedGroups: 2,
-      failureReduction: 2,
+      failureReduction: 0,
+      allStageFailureReduction: 2,
     });
     expect(suite.stateBenchCategories).toEqual([
       "procedural_execution",

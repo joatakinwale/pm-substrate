@@ -89,6 +89,24 @@ describe("@pm/agent-state read-set validation", () => {
     });
   });
 
+  it("warns when a proposed action subject differs from the current-state subject", () => {
+    const view = baseView();
+
+    expect(
+      validateProposedActionReadSet(
+        actionFrom(view, {
+          subject: stateRef("projection", "arrowhedge_cop:MSFT", "MSFT COP"),
+        }),
+        view,
+      ).issues,
+    ).toMatchObject([
+      {
+        code: "subject_mismatch",
+        path: "/subject",
+      },
+    ]);
+  });
+
   it("warns without blocking when read-set refs are stale", () => {
     const view = baseView();
 
@@ -223,7 +241,8 @@ describe("@pm/agent-state read-set validation", () => {
       execution: {
         allowed: true,
         blocking: false,
-        reason: "warn_first_v1",
+        enforcementMode: "advisory",
+        reason: "advisory_warn_first_v1",
         warningCount: 0,
       },
       readSetValidation: {
@@ -254,7 +273,8 @@ describe("@pm/agent-state read-set validation", () => {
       execution: {
         allowed: true,
         blocking: false,
-        reason: "warn_first_v1",
+        enforcementMode: "advisory",
+        reason: "advisory_warn_first_v1",
       },
     });
     expect(review.warnings.map((warning) => warning.source)).toEqual([
@@ -269,5 +289,90 @@ describe("@pm/agent-state read-set validation", () => {
       "stale_read_ref",
       "freshness_window_current",
     ]);
+  });
+
+  it("can switch to blocking mode without changing the default advisory contract", () => {
+    const view = baseView();
+
+    const review = reviewProposedActionAgainstCurrentState(
+      actionFrom(view, {
+        proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+      }),
+      view,
+      {
+        evaluatedAt: timestamp("2026-06-03T14:11:00.000Z"),
+        enforcementMode: "blocking",
+      },
+    );
+
+    expect(review.execution).toMatchObject({
+      allowed: false,
+      blocking: true,
+      enforcementMode: "blocking",
+      reason: "blocking_policy_failed",
+    });
+  });
+
+  it("reviews an action against the original observation contract instead of the current view", () => {
+    const originalView = baseView();
+    const originalContract =
+      buildObservationContractFromCurrentStateView(originalView);
+    const changedView = baseView({
+      projectionVersion: 2,
+      workflowPosition: "blocked_stale_state",
+      sourceRefs: [signalRef, decisionRef],
+      missingSources: ["risk_state"],
+      conflicts: [
+        {
+          conflictType: "state_disagreement",
+          refs: [riskRef, decisionRef],
+          message: "risk snapshot no longer matches",
+        },
+      ],
+    });
+
+    const review = reviewProposedActionAgainstCurrentState(
+      actionFrom(originalView, {
+        observationContract: originalContract,
+        proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+      }),
+      changedView,
+      {
+        evaluatedAt: timestamp("2026-06-03T14:11:00.000Z"),
+        observationContract: originalContract,
+      },
+    );
+
+    expect(review.observationContract).toEqual(originalContract);
+    expect(review.valid).toBe(false);
+    expect(review.execution).toMatchObject({
+      allowed: true,
+      blocking: false,
+      enforcementMode: "advisory",
+      reason: "advisory_warn_first_v1",
+    });
+    expect(
+      review.observationEvaluation.assertions
+        .filter((assertion) => !assertion.passed)
+        .map((assertion) => assertion.code),
+    ).toEqual([
+      "required_source_refs_present",
+      "freshness_window_current",
+      "projection_version_matches",
+      "workflow_position_matches",
+      "conflicts_declared",
+      "missing_sources_declared",
+    ]);
+    expect(review.warnings.map((warning) => warning.code)).toEqual(
+      expect.arrayContaining([
+        "current_view_conflict",
+        "missing_read_ref",
+        "stale_read_ref",
+        "projection_version_mismatch",
+        "workflow_position_mismatch",
+        "required_source_refs_present",
+        "freshness_window_current",
+      ]),
+    );
   });
 });

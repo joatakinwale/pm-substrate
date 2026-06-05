@@ -288,12 +288,14 @@ describeIfDb("adapter state proof — mapping plan to graph, events, projections
       pairedGroups: 1,
       baselineFailures: 1,
       substrateFailures: 0,
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
     expect(evalMetrics.byCoordinationClass["derived_projection"]).toMatchObject({
       pairedGroups: 1,
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
   });
