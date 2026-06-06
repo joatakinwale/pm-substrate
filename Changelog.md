@@ -122,3 +122,12 @@
 - Added ArrowHedge `evaluatedAt`/as-of current-state evaluation so risk freshness, conflicts, and workflow position are computed at proposal time rather than only at latest event time.
 - Added eval evidence maturity stages (`scaffolded_scenario`, `detected_warning`, `blocked_mutation`, `paired_behavioral_improvement`) and evidence-adjusted failure-reduction metrics so scaffolded/pass-by-spec scenarios remain visible without being counted as behavioral proof.
 - Verification: focused agent-state, ArrowHedge, and eval tests pass after rebuilding package outputs; sequential package build and `git diff --check` pass. DB-backed integration execution remains an environment boundary when local Postgres is unavailable.
+
+## 2026-06-06 — Daily agent-state Arrowsmith v03
+
+- Added `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-06.md` as the third numbered daily continuation.
+- Audited v02 against the current repo and downgraded several v02 TODOs from open implementation gaps to closed pure primitives: `subject_mismatch`, original-observation proposal review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages.
+- Shifted the next research frontier to durable state-review artifacts: provenance/event envelopes, trace correlation, object-centric refs, artifact replay, benchmark audit, and invariant-class policy gating.
+- Added project-management bridges from socio-technical congruence, transactive memory, ISO 21502, Team Situation Awareness, and human-AI mental-model work, with explicit limits on what each source proves.
+- Updated `research/daily-arrowsmith-agent-state/index.md` with v03, corrected stale claims, new source changes, implementation implications, metrics, and the next-day watchlist.
+- Verification: required-section scan and `git diff --check` pass. No code tests were run because this slice only changes research/changelog Markdown.
