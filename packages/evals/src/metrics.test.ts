@@ -7,6 +7,7 @@ import {
   analyzeEvalEvents,
   analyzeActionProposalReviews,
   analyzeStateAssertions,
+  analyzeStateReviewArtifacts,
 } from "./metrics.js";
 
 const tenantId = "tnt_metrics" as TenantId;
@@ -371,6 +372,100 @@ describe("eval event metrics", () => {
       },
       warningsBySeverity: {
         warn: 3,
+      },
+    });
+  });
+
+  it("summarizes replayable state-review artifact coverage", () => {
+    expect(
+      analyzeStateReviewArtifacts([
+        {
+          artifactHash: "a".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          traceContext: {
+            traceparent:
+              "00-11111111111111111111111111111111-2222222222222222-01",
+          },
+          relatedObjects: [
+            { role: "primary_subject" },
+            { role: "source_ref" },
+            { role: "ticker_symbol" },
+          ],
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              { source: "read_set", code: "stale_read_ref", severity: "warn" },
+            ],
+          },
+        },
+        {
+          artifactHash: "b".repeat(64),
+          hashValid: false,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [],
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: false,
+              blocking: true,
+              enforcementMode: "blocking",
+            },
+            warnings: [
+              {
+                source: "observation_contract",
+                code: "freshness_window_current",
+                severity: "warn",
+              },
+            ],
+          },
+        },
+      ]),
+    ).toEqual({
+      totalArtifacts: 2,
+      hashVerifiedArtifacts: 1,
+      hashMismatchArtifacts: 1,
+      hashVerificationRate: 0.5,
+      traceLinkedArtifacts: 1,
+      traceJoinCoverage: 0.5,
+      artifactsWithRelatedObjects: 1,
+      objectRoleCoverage: 0.5,
+      relatedObjectCount: 3,
+      relatedObjectsByRole: {
+        primary_subject: 1,
+        source_ref: 1,
+        ticker_symbol: 1,
+      },
+      warningCount: 2,
+      warningsBySource: {
+        observation_contract: 1,
+        read_set: 1,
+      },
+      warningsByCode: {
+        freshness_window_current: 1,
+        stale_read_ref: 1,
+      },
+      advisoryArtifacts: 1,
+      blockingModeArtifacts: 1,
+      blockedArtifacts: 1,
+      artifactsBySource: {
+        "arrowhedge/arrowhedge_cop": 2,
+      },
+      artifactsByType: {
+        "pm.agent_state.action_proposal_reviewed.v1": 2,
       },
     });
   });

@@ -141,6 +141,47 @@ export interface ActionProposalReviewMetrics {
   readonly warningsBySeverity: Readonly<Record<string, number>>;
 }
 
+export interface StateReviewArtifactRelatedObjectSample {
+  readonly role: string;
+}
+
+export interface StateReviewArtifactSample {
+  readonly artifactHash: string;
+  readonly hashValid: boolean;
+  readonly eventEnvelope: {
+    readonly source: string;
+    readonly type: string;
+  };
+  readonly traceContext?: {
+    readonly traceparent?: string;
+    readonly spanId?: string;
+    readonly parentReviewId?: string;
+  };
+  readonly relatedObjects: readonly StateReviewArtifactRelatedObjectSample[];
+  readonly review: ActionProposalReviewSample;
+}
+
+export interface StateReviewArtifactMetrics {
+  readonly totalArtifacts: number;
+  readonly hashVerifiedArtifacts: number;
+  readonly hashMismatchArtifacts: number;
+  readonly hashVerificationRate: number | null;
+  readonly traceLinkedArtifacts: number;
+  readonly traceJoinCoverage: number | null;
+  readonly artifactsWithRelatedObjects: number;
+  readonly objectRoleCoverage: number | null;
+  readonly relatedObjectCount: number;
+  readonly relatedObjectsByRole: Readonly<Record<string, number>>;
+  readonly warningCount: number;
+  readonly warningsBySource: Readonly<Record<string, number>>;
+  readonly warningsByCode: Readonly<Record<string, number>>;
+  readonly advisoryArtifacts: number;
+  readonly blockingModeArtifacts: number;
+  readonly blockedArtifacts: number;
+  readonly artifactsBySource: Readonly<Record<string, number>>;
+  readonly artifactsByType: Readonly<Record<string, number>>;
+}
+
 interface MutableCoordinationClassMetrics {
   events: number;
   pairedGroups: Set<string>;
@@ -390,6 +431,53 @@ export function analyzeActionProposalReviews(
   };
 }
 
+export function analyzeStateReviewArtifacts(
+  artifacts: readonly StateReviewArtifactSample[],
+): StateReviewArtifactMetrics {
+  const warnings = artifacts.flatMap((artifact) => artifact.review.warnings);
+  const relatedObjects = artifacts.flatMap((artifact) => artifact.relatedObjects);
+  const traceLinkedArtifacts = artifacts.filter(hasTraceContext).length;
+  const artifactsWithRelatedObjects = artifacts.filter(
+    (artifact) => artifact.relatedObjects.length > 0,
+  ).length;
+  const hashVerifiedArtifacts = artifacts.filter((artifact) => artifact.hashValid).length;
+
+  return {
+    totalArtifacts: artifacts.length,
+    hashVerifiedArtifacts,
+    hashMismatchArtifacts: artifacts.length - hashVerifiedArtifacts,
+    hashVerificationRate:
+      artifacts.length === 0 ? null : hashVerifiedArtifacts / artifacts.length,
+    traceLinkedArtifacts,
+    traceJoinCoverage:
+      artifacts.length === 0 ? null : traceLinkedArtifacts / artifacts.length,
+    artifactsWithRelatedObjects,
+    objectRoleCoverage:
+      artifacts.length === 0
+        ? null
+        : artifactsWithRelatedObjects / artifacts.length,
+    relatedObjectCount: relatedObjects.length,
+    relatedObjectsByRole: countBy(relatedObjects, (object) => object.role),
+    warningCount: warnings.length,
+    warningsBySource: countBy(warnings, (warning) => warning.source),
+    warningsByCode: countBy(warnings, (warning) => warning.code),
+    advisoryArtifacts: artifacts.filter(
+      (artifact) => artifact.review.execution.enforcementMode === "advisory",
+    ).length,
+    blockingModeArtifacts: artifacts.filter(
+      (artifact) => artifact.review.execution.enforcementMode === "blocking",
+    ).length,
+    blockedArtifacts: artifacts.filter(
+      (artifact) => artifact.review.execution.blocking,
+    ).length,
+    artifactsBySource: countBy(
+      artifacts,
+      (artifact) => artifact.eventEnvelope.source,
+    ),
+    artifactsByType: countBy(artifacts, (artifact) => artifact.eventEnvelope.type),
+  };
+}
+
 function makeCoordinationMetrics(): Record<CoordinationClass, MutableCoordinationClassMetrics> {
   return Object.fromEntries(
     COORDINATION_CLASSES.map((coordinationClass) => [
@@ -582,4 +670,14 @@ function isRunArm(value: RunArm | undefined): value is RunArm {
 
 function isPresent<T>(value: T | undefined): value is T {
   return value !== undefined;
+}
+
+function hasTraceContext(artifact: StateReviewArtifactSample): boolean {
+  const traceContext = artifact.traceContext;
+  return (
+    traceContext !== undefined &&
+    (traceContext.traceparent !== undefined ||
+      traceContext.spanId !== undefined ||
+      traceContext.parentReviewId !== undefined)
+  );
 }

@@ -3,6 +3,7 @@ import {
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
   validateProposedActionReadSet,
+  verifyStateReviewArtifactHash,
 } from "@pm/agent-state";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { tenantId, timestamp } from "@pm/types";
@@ -12,6 +13,7 @@ import {
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
+  buildArrowHedgeStateReviewArtifact,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
@@ -576,6 +578,83 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(review?.observationContract).toEqual(originalObservation);
     expect(review?.observationEvaluation.currentStateViewId).toBe(
       "arrowhedge_cop_review:AAPL:current_state_view",
+    );
+  });
+
+  it("builds a replayable ArrowHedge state-review artifact with ticker provenance", async () => {
+    const tenant = tenantId("tnt_arrowhedge_state_review_artifact");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_artifact");
+    const state = await foldPlanIntoCop(projection, plan);
+    const originalView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const originalObservation =
+      buildObservationContractFromCurrentStateView(originalView);
+
+    const artifact = buildArrowHedgeStateReviewArtifact({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId: "dec_aapl_buy_120" },
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      artifact: {
+        artifactId: "arrowhedge_artifact_aapl_review_001",
+        traceContext: {
+          traceparent:
+            "00-11111111111111111111111111111111-2222222222222222-01",
+        },
+      },
+    });
+
+    expect(artifact).toMatchObject({
+      artifactId: "arrowhedge_artifact_aapl_review_001",
+      eventEnvelope: {
+        source: "arrowhedge/arrowhedge_cop_artifact",
+        subject: "projection:arrowhedge_cop_artifact:AAPL",
+      },
+      review: {
+        valid: false,
+        execution: {
+          allowed: true,
+          blocking: false,
+          enforcementMode: "advisory",
+        },
+      },
+    });
+    expect(artifact?.relatedObjects).toEqual(
+      expect.arrayContaining([
+        {
+          role: "ticker_symbol",
+          ref: {
+            kind: "source_record",
+            id: "ticker:AAPL",
+            label: "ArrowHedge ticker AAPL",
+          },
+        },
+      ]),
+    );
+    expect(artifact?.artifactHash).toHaveLength(64);
+    expect(artifact ? verifyStateReviewArtifactHash(artifact).valid : false).toBe(
+      true,
     );
   });
 });

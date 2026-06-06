@@ -131,3 +131,12 @@
 - Added project-management bridges from socio-technical congruence, transactive memory, ISO 21502, Team Situation Awareness, and human-AI mental-model work, with explicit limits on what each source proves.
 - Updated `research/daily-arrowsmith-agent-state/index.md` with v03, corrected stale claims, new source changes, implementation implications, metrics, and the next-day watchlist.
 - Verification: required-section scan and `git diff --check` pass. No code tests were run because this slice only changes research/changelog Markdown.
+
+## 2026-06-06 — Research-to-runtime state-review artifacts
+
+- Reviewed the full `research/` corpus for findings that required code, not documentation, and identified the active runtime gap: proposal reviews existed only as in-memory objects, while the newest Arrowsmith findings require durable, replayable, provenance-linked state-review artifacts.
+- Added `StateReviewArtifact` logic in `@pm/agent-state`: deterministic artifact envelopes, trace context, related object roles, PROV-style links, canonical artifact fingerprinting, and replay hash verification around existing `ActionProposalReview` output.
+- Added ArrowHedge `buildArrowHedgeStateReviewArtifact()` so finance COP proposal reviews can emit the artifact directly with ticker provenance and source-specific event metadata.
+- Added eval metrics for state-review artifacts: hash verification rate, trace-link coverage, object-role coverage, warning buckets, advisory/blocking counts, and artifact source/type counts.
+- Added focused tests for artifact construction, tamper detection, ArrowHedge artifact generation, and artifact metric summaries.
+- Verification: `git diff --check` passes. TypeScript/Vitest runners in this shell hang even on unchanged packages and version/module-load checks, so compile/test execution is recorded as environment-blocked rather than passed.

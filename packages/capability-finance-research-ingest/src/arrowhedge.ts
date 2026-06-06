@@ -13,6 +13,7 @@ import {
 import {
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
+  buildStateReviewArtifact,
   evaluateObservationContract,
   reviewProposedActionAgainstCurrentState,
   stateRef,
@@ -23,6 +24,8 @@ import {
   type ObservationContract,
   type ObservationContractEvaluation,
   type ReadSetEntry,
+  type StateReviewArtifact,
+  type StateReviewArtifactOptions,
   type StateConflict,
   type StateRef,
 } from "@pm/agent-state";
@@ -721,6 +724,11 @@ export interface ArrowHedgeProposalReviewInput
   readonly enforcementMode?: ActionProposalReviewEnforcementMode;
 }
 
+export interface ArrowHedgeStateReviewArtifactInput
+  extends ArrowHedgeProposalReviewInput {
+  readonly artifact?: StateReviewArtifactOptions;
+}
+
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
   return {
     name,
@@ -849,6 +857,32 @@ export function buildArrowHedgeProposalReview(
       enforcementMode: input.enforcementMode ?? "advisory",
     },
   );
+}
+
+export function buildArrowHedgeStateReviewArtifact(
+  input: ArrowHedgeStateReviewArtifactInput,
+): StateReviewArtifact | null {
+  const review = buildArrowHedgeProposalReview(input);
+  if (!review) return null;
+
+  const artifactOptions = input.artifact ?? {};
+  return buildStateReviewArtifact(review, {
+    ...artifactOptions,
+    artifactId:
+      artifactOptions.artifactId ?? `${review.reviewId}:state_review_artifact`,
+    source: artifactOptions.source ?? `arrowhedge/${input.projectionName}`,
+    relatedObjects: [
+      {
+        role: "ticker_symbol",
+        ref: stateRef(
+          "source_record",
+          `ticker:${input.symbol}`,
+          `ArrowHedge ticker ${input.symbol}`,
+        ),
+      },
+      ...(artifactOptions.relatedObjects ?? []),
+    ],
+  });
 }
 
 export function validateArrowHedgeTypedEventPayload(

@@ -4,10 +4,12 @@ import { tenantId, timestamp } from "@pm/types";
 import {
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
+  buildStateReviewArtifact,
   evaluateObservationContract,
   reviewProposedActionAgainstCurrentState,
   stateRef,
   validateProposedActionReadSet,
+  verifyStateReviewArtifactHash,
   type CurrentStateView,
   type ProposedAction,
 } from "./index.js";
@@ -374,5 +376,86 @@ describe("@pm/agent-state read-set validation", () => {
         "freshness_window_current",
       ]),
     );
+  });
+
+  it("turns proposal reviews into provenance-linked state-review artifacts", () => {
+    const view = baseView();
+    const review = reviewProposedActionAgainstCurrentState(
+      actionFrom(view, {
+        proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+      }),
+      view,
+    );
+
+    const artifact = buildStateReviewArtifact(review, {
+      artifactId: "artifact_arrowhedge_review_001",
+      source: "evals/arrowhedge",
+      traceContext: {
+        traceparent:
+          "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        spanId: "00f067aa0ba902b7",
+      },
+      relatedObjects: [
+        {
+          role: "portfolio_decision",
+          ref: stateRef("source_record", "decision:dec_aapl_buy_120"),
+        },
+      ],
+      planId: "portfolio-decision-review-v1",
+      actedOnBehalfOf: "tenant:tnt_agent_state",
+    });
+
+    expect(artifact).toMatchObject({
+      schemaVersion: "state-review-artifact.v1",
+      artifactId: "artifact_arrowhedge_review_001",
+      eventEnvelope: {
+        id: "artifact_arrowhedge_review_001",
+        source: "evals/arrowhedge",
+        type: "pm.agent_state.action_proposal_reviewed.v1",
+        specversion: "1.0",
+        subject: "projection:arrowhedge_cop:AAPL",
+      },
+      provenance: {
+        generatedBy: "view_aapl:portfolio.decision.accept:proposal_review",
+        associatedAgent: "agent:portfolio-manager",
+        actedOnBehalfOf: "tenant:tnt_agent_state",
+        planId: "portfolio-decision-review-v1",
+      },
+    });
+    expect(artifact.relatedObjects.map((object) => object.role)).toEqual(
+      expect.arrayContaining([
+        "primary_subject",
+        "action_subject",
+        "source_ref",
+        "read_set_ref",
+        "warning:stale_read_ref",
+        "warning:freshness_window_current",
+        "portfolio_decision",
+      ]),
+    );
+    expect(artifact.provenance.used).toEqual(
+      expect.arrayContaining([view.subject, signalRef, riskRef, decisionRef]),
+    );
+    expect(artifact.artifactHash).toHaveLength(64);
+    expect(verifyStateReviewArtifactHash(artifact).valid).toBe(true);
+  });
+
+  it("detects tampered state-review artifacts during replay verification", () => {
+    const view = baseView();
+    const artifact = buildStateReviewArtifact(
+      reviewProposedActionAgainstCurrentState(actionFrom(view), view),
+    );
+    const tampered = {
+      ...artifact,
+      review: {
+        ...artifact.review,
+        valid: false,
+      },
+    };
+
+    expect(verifyStateReviewArtifactHash(tampered)).toMatchObject({
+      valid: false,
+      actualHash: artifact.artifactHash,
+    });
   });
 });

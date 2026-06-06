@@ -1,5 +1,11 @@
 import type { TenantId, Timestamp } from "@pm/types";
 
+export const STATE_REVIEW_ARTIFACT_SCHEMA_VERSION =
+  "state-review-artifact.v1" as const;
+export const STATE_REVIEW_EVENT_TYPE =
+  "pm.agent_state.action_proposal_reviewed.v1" as const;
+export const STATE_REVIEW_EVENT_SPEC_VERSION = "1.0" as const;
+
 export type StateRefKind =
   | "event"
   | "graph_node"
@@ -176,6 +182,87 @@ export interface ActionProposalReview {
   readonly readSetValidation: ReadSetValidationDecision;
   readonly warnings: readonly ActionProposalWarning[];
   readonly execution: ActionProposalExecutionDisposition;
+}
+
+export interface StateReviewTraceContext {
+  readonly traceparent?: string;
+  readonly tracestate?: string;
+  readonly spanId?: string;
+  readonly parentReviewId?: string;
+}
+
+export interface StateReviewEventEnvelope {
+  readonly id: string;
+  readonly source: string;
+  readonly type: string;
+  readonly specversion: typeof STATE_REVIEW_EVENT_SPEC_VERSION;
+  readonly time: Timestamp;
+  readonly subject: string;
+}
+
+export interface StateReviewRelatedObject {
+  readonly role: string;
+  readonly ref: StateRef;
+}
+
+export type StateReviewProvenanceRelation =
+  | "used"
+  | "wasDerivedFrom"
+  | "wasGeneratedBy"
+  | "wasAssociatedWith"
+  | "actedOnBehalfOf"
+  | "hadPlan";
+
+export interface StateReviewProvenanceLink {
+  readonly relation: StateReviewProvenanceRelation;
+  readonly id: string;
+  readonly role?: string;
+  readonly ref?: StateRef;
+}
+
+export interface StateReviewProvenance {
+  readonly generatedBy: string;
+  readonly used: readonly StateRef[];
+  readonly derivedFrom: readonly StateRef[];
+  readonly associatedAgent: string;
+  readonly actedOnBehalfOf?: string;
+  readonly planId?: string;
+  readonly links: readonly StateReviewProvenanceLink[];
+}
+
+export interface StateReviewArtifact {
+  readonly schemaVersion: typeof STATE_REVIEW_ARTIFACT_SCHEMA_VERSION;
+  readonly artifactId: string;
+  readonly generatedAt: Timestamp;
+  readonly eventEnvelope: StateReviewEventEnvelope;
+  readonly traceContext?: StateReviewTraceContext;
+  readonly relatedObjects: readonly StateReviewRelatedObject[];
+  readonly provenance: StateReviewProvenance;
+  readonly review: ActionProposalReview;
+  readonly artifactHash: string;
+}
+
+export type StateReviewArtifactHashPayload = Omit<
+  StateReviewArtifact,
+  "artifactHash"
+>;
+
+export interface StateReviewArtifactOptions {
+  readonly artifactId?: string;
+  readonly generatedAt?: Timestamp;
+  readonly source?: string;
+  readonly eventType?: string;
+  readonly traceContext?: StateReviewTraceContext;
+  readonly relatedObjects?: readonly StateReviewRelatedObject[];
+  readonly provenanceLinks?: readonly StateReviewProvenanceLink[];
+  readonly actedOnBehalfOf?: string;
+  readonly planId?: string;
+}
+
+export interface StateReviewArtifactHashValidation {
+  readonly valid: boolean;
+  readonly expectedHash: string;
+  readonly actualHash: string;
 }
 
 export interface EvidenceLinkedContinuityPayload
@@ -408,6 +495,122 @@ export function reviewProposedActionAgainstCurrentState(
   };
 }
 
+export function buildStateReviewArtifact(
+  review: ActionProposalReview,
+  options: StateReviewArtifactOptions = {},
+): StateReviewArtifact {
+  const artifactId = options.artifactId ?? `${review.reviewId}:artifact`;
+  const generatedAt = options.generatedAt ?? review.observationEvaluation.evaluatedAt;
+  const source = options.source ?? "pm-substrate/agent-state";
+  const eventType = options.eventType ?? STATE_REVIEW_EVENT_TYPE;
+  const provenanceLinks: StateReviewProvenanceLink[] = [
+    {
+      relation: "wasGeneratedBy",
+      id: review.reviewId,
+      role: "action_proposal_review",
+    },
+    {
+      relation: "wasAssociatedWith",
+      id: review.proposedAction.proposedBy,
+      role: "proposed_by",
+    },
+  ];
+  if (options.planId !== undefined) {
+    provenanceLinks.push({
+      relation: "hadPlan",
+      id: options.planId,
+      role: "review_plan",
+    });
+  }
+  if (options.actedOnBehalfOf !== undefined) {
+    provenanceLinks.push({
+      relation: "actedOnBehalfOf",
+      id: options.actedOnBehalfOf,
+      role: "delegated_authority",
+    });
+  }
+  provenanceLinks.push(...(options.provenanceLinks ?? []));
+
+  const payload: StateReviewArtifactHashPayload = {
+    schemaVersion: STATE_REVIEW_ARTIFACT_SCHEMA_VERSION,
+    artifactId,
+    generatedAt,
+    eventEnvelope: {
+      id: artifactId,
+      source,
+      type: eventType,
+      specversion: STATE_REVIEW_EVENT_SPEC_VERSION,
+      time: generatedAt,
+      subject: formatStateRef(review.currentStateView.subject),
+    },
+    ...(options.traceContext !== undefined
+      ? { traceContext: options.traceContext }
+      : {}),
+    relatedObjects: dedupeRelatedObjects([
+      { role: "primary_subject", ref: review.currentStateView.subject },
+      { role: "action_subject", ref: review.proposedAction.subject },
+      ...review.currentStateView.sourceRefs.map((ref) => ({
+        role: "source_ref",
+        ref,
+      })),
+      ...review.proposedAction.readSet.map((entry) => ({
+        role: "read_set_ref",
+        ref: entry.ref,
+      })),
+      ...review.warnings.flatMap((warning) =>
+        warning.refs.map((ref) => ({
+          role: `warning:${warning.code}`,
+          ref,
+        })),
+      ),
+      ...(options.relatedObjects ?? []),
+    ]),
+    provenance: {
+      generatedBy: review.reviewId,
+      used: uniqueStateRefs([
+        review.currentStateView.subject,
+        review.proposedAction.subject,
+        ...review.currentStateView.sourceRefs,
+        ...review.proposedAction.readSet.map((entry) => entry.ref),
+      ]),
+      derivedFrom: uniqueStateRefs([
+        ...review.observationContract.requiredSourceRefs,
+      ]),
+      associatedAgent: review.proposedAction.proposedBy,
+      ...(options.actedOnBehalfOf !== undefined
+        ? { actedOnBehalfOf: options.actedOnBehalfOf }
+        : {}),
+      ...(options.planId !== undefined ? { planId: options.planId } : {}),
+      links: provenanceLinks,
+    },
+    review,
+  };
+
+  return {
+    ...payload,
+    artifactHash: computeStateReviewArtifactHash(payload),
+  };
+}
+
+export function computeStateReviewArtifactHash(
+  artifact: StateReviewArtifactHashPayload,
+): string {
+  return fingerprint64(canonicalStringify(artifact));
+}
+
+export function verifyStateReviewArtifactHash(
+  artifact: StateReviewArtifact,
+): StateReviewArtifactHashValidation {
+  const { artifactHash, ...payload } = artifact;
+  const expectedHash = computeStateReviewArtifactHash(payload);
+
+  return {
+    valid: artifactHash === expectedHash,
+    expectedHash,
+    actualHash: artifactHash,
+  };
+}
+
 export function validateProposedActionReadSet(
   action: ProposedAction,
   view: CurrentStateView,
@@ -528,6 +731,36 @@ function sameStateRef(left: StateRef, right: StateRef): boolean {
   return left.kind === right.kind && left.id === right.id;
 }
 
+function uniqueStateRefs(refs: readonly StateRef[]): readonly StateRef[] {
+  const seen = new Set<string>();
+  const out: StateRef[] = [];
+
+  for (const ref of refs) {
+    const key = formatStateRef(ref);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(ref);
+  }
+
+  return out;
+}
+
+function dedupeRelatedObjects(
+  objects: readonly StateReviewRelatedObject[],
+): readonly StateReviewRelatedObject[] {
+  const seen = new Set<string>();
+  const out: StateReviewRelatedObject[] = [];
+
+  for (const object of objects) {
+    const key = `${object.role}:${formatStateRef(object.ref)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(object);
+  }
+
+  return out;
+}
+
 function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
   if (left.length !== right.length) return false;
   const rightSet = new Set(right);
@@ -544,4 +777,44 @@ function formatStateRef(ref: StateRef): string {
 
 function isAfter(left: Timestamp, right: Timestamp): boolean {
   return Date.parse(left) > Date.parse(right);
+}
+
+function canonicalStringify(value: unknown): string {
+  return JSON.stringify(canonicalize(value));
+}
+
+function canonicalize(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => canonicalize(item));
+
+  const record = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(record).sort()) {
+    const item = record[key];
+    if (item !== undefined) {
+      out[key] = canonicalize(item);
+    }
+  }
+  return out;
+}
+
+function fingerprint64(input: string): string {
+  return [
+    fnv1a64("state-review-artifact:v1:0", input),
+    fnv1a64("state-review-artifact:v1:1", input),
+    fnv1a64("state-review-artifact:v1:2", input),
+    fnv1a64("state-review-artifact:v1:3", input),
+  ].join("");
+}
+
+function fnv1a64(seed: string, input: string): string {
+  let hash = 0xcbf29ce484222325n;
+  const text = `${seed}\u0000${input}`;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= BigInt(text.charCodeAt(index));
+    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+  }
+
+  return hash.toString(16).padStart(16, "0");
 }
