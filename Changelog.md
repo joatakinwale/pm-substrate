@@ -140,3 +140,11 @@
 - Added eval metrics for state-review artifacts: hash verification rate, trace-link coverage, object-role coverage, warning buckets, advisory/blocking counts, and artifact source/type counts.
 - Added focused tests for artifact construction, tamper detection, ArrowHedge artifact generation, and artifact metric summaries.
 - Verification: `git diff --check` passes. TypeScript/Vitest runners in this shell hang even on unchanged packages and version/module-load checks, so compile/test execution is recorded as environment-blocked rather than passed.
+
+## 2026-06-07 - Daily agent-state Arrowsmith v04
+
+- Added `research/daily-arrowsmith-agent-state/v04-agent-state-arrowsmith-2026-06-07.md` as the fourth numbered daily continuation.
+- Audited v03 against the current runtime code and downgraded artifact-shape TODOs from open research work to closed pure primitives: `StateReviewArtifact`, ArrowHedge artifact generation, canonical hash replay verification, related object roles, trace context, PROV-style links, and artifact metrics now exist.
+- Shifted the active research frontier to artifact lifecycle and policy use: persisted/exported JSON artifacts, schema validation, artifact-derived eval events, continuity lineage, observed read-set capture, observation-contract integrity/binding fields, and targeted invariant-class blocking.
+- Added new bridge evidence from S-Bus source/formals/benchmark artifacts, Claw-Eval-Live released task/fixture/grader/trace architecture, Silo-Bench coordination-reasoning metrics, the June 2026 agent provenance survey, HTTP/OAuth standards, coordination-requirement scalability, and team situation-awareness measurement.
+- Updated `research/daily-arrowsmith-agent-state/index.md` with v04, source changes, corrected stale claims, new metrics, current implementation implications, next-day watchlist, and the fetch/reconcile/push collaboration protocol for future daily runs.

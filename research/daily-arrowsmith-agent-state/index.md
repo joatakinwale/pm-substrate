@@ -1,11 +1,15 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, and cross-domain Arrowsmith research.
+
+## Collaboration Protocol
+
+Each daily research continuation must begin by fetching `origin/main` and checking whether other developers or automations added research files, index changes, or changelog entries. If new research exists, the next version must read it, reconcile it with the local draft, and update this index as the single research ledger before publishing. The run is not complete until the intended research slice is committed on `main`, pushed to `origin/main`, and the local and remote SHAs are rechecked.
 
 ## Current Strongest Thesis
 
-LLM agents are statistical predictors promoted into actors. The state problem appears when parametric model state, prompt/inference state, memory/RAG state, or tool-observation state is treated as current, sufficient, authoritative operational state. pm-substrate is the governed operational-state layer between statistical prediction and valid action. The immediate primitive now exists as a pure review boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview`. The next proof boundary is durable and policy-bearing: a replayable state-review artifact with provenance links, trace correlation, object roles, evidence maturity, and invariant-class enforcement.
+LLM agents are statistical predictors promoted into actors. The state problem appears when parametric model state, prompt/inference state, memory/RAG state, or tool-observation state is treated as current, sufficient, authoritative operational state. pm-substrate is the governed operational-state layer between statistical prediction and valid action. The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The next proof boundary is artifact lifecycle and policy use: persisted/exported artifacts, schema validation, eval-event linkage, continuity lineage, observed read-set capture, richer observation-contract integrity/binding fields, and invariant-class enforcement.
 
 ## Versions
 
@@ -15,6 +19,7 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 | v01 | 2026-06-05 | `research/daily-arrowsmith-agent-state/v01-agent-state-arrowsmith-2026-06-05.md` | First numbered daily continuation | Added observation contracts, implicit stale-memory invalidation, read-set validation, stateful workflow evals, and PM shared-cognition implications. |
 | v02 | 2026-06-05 | `research/daily-arrowsmith-agent-state/v02-agent-state-arrowsmith-2026-06-05.md` | Repo-grounded correction and implementation bridge | Downgraded synthetic eval pass claims, corrected tautological observation-review path, added subject/read-set binding, and made JSON state-review artifacts the next code slice. |
 | v03 | 2026-06-06 | `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-06.md` | Artifact/provenance and PM-coordination bridge | Marked v02's pure-review TODOs as closed primitives, shifted the frontier to durable replayable artifacts, trace/provenance/object-role metadata, policy gating, and socio-technical coordination metrics. |
+| v04 | 2026-06-07 | `research/daily-arrowsmith-agent-state/v04-agent-state-arrowsmith-2026-06-07.md` | Artifact lifecycle, preconditions, and coordination-state bridge | Marked `StateReviewArtifact`, ArrowHedge artifact generation, hash replay, and artifact metrics as closed pure primitives; shifted the frontier to persisted/exported artifacts, observed read-set capture, observation-contract v2, artifact-derived evals, and targeted invariant policy. |
 
 ## Top Findings
 
@@ -29,6 +34,10 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 9. **Subject identity is part of action validity.** The pure validator now detects `subject_mismatch`; multi-object roles remain the next object-centric gap.
 10. **Provenance, trace, and event standards sharpen artifact shape.** PROV, Trace Context, CloudEvents, and OCEL are not authority systems, but they describe the metadata needed for replayable operational-state evidence.
 11. **Project state should measure coordination fit.** Socio-technical congruence and transactive memory point toward owner/source/dependency/handoff metrics, not just task-status completeness.
+12. **State-review artifacts now exist as code.** The next work is persistence/export, schema validation, eval linkage, continuity lineage, and policy use.
+13. **Read sets should eventually have an observed lane.** S-Bus strengthens the case for reconstructing what agents actually read instead of trusting declared read sets alone.
+14. **Observation contracts need integrity and binding fields.** RFC 9110, DPoP, HTTP Message Signatures, OAuth Token Exchange, and ContractBench sharpen freshness-only contracts into precondition, signature/integrity, holder/request-binding, and delegation questions.
+15. **Coordination is not just communication volume.** Silo-Bench and team-situation-awareness work point toward convergence on correct distributed state as the PM metric.
 
 ## Source Changes
 
@@ -58,6 +67,15 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 - HearthNet and Message Sequence Chart LLM-agent coordination preprints: useful analogies for stale/unauthorized command rejection and protocol-level coordination guarantees, but not enterprise proof.
 - Cataldo/Herbsleb/Carley socio-technical congruence and Lewis transactive memory: stronger PM bridge for dependency-owner coordination and owner/source-of-truth metadata.
 - ISO 21502, human-agentic teaming, and human-AI mental-model work: useful PM/team framing, but only Medium/Low as direct architecture proof.
+
+### Added on 2026-06-07 v04
+
+- S-Bus paper, source repo, and benchmark dataset: implemented read-set reconstruction/ORI bridge, with explicit production-hardening limits.
+- Claw-Eval-Live official site and repo: released tasks, fixtures, mock services, grader scripts, and trace CLI for live workflow evaluation architecture.
+- Silo-Bench paper and repo: communication-reasoning gap, coordination cost, communication density, and distributed-state synthesis as multi-agent metrics.
+- From Agent Traces to Trust: June 2026 provenance survey supporting unified trace schemas, claim/action provenance, recovery-oriented eval, and privacy-aware audit.
+- RFC 9110, RFC 9449, RFC 9421, and RFC 8693: standards vocabulary for preconditions, proof-of-possession, signed-component expiry/integrity, and delegation/actor chains.
+- Coordination-requirement scalability, Team Situation Awareness measurement, and 2021 socio-technical congruence work: PM metrics should be scalable, agreement-based, and outcome-tested rather than overclaimed.
 
 ### Strengthened on 2026-06-05
 
@@ -89,6 +107,14 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 - "Warn-first always allows" is now more precise: default advisory review allows, but a pure `"blocking"` mode exists; policy selection and external side-effect integration remain open.
 - The strongest next implementation language is no longer "add the review fields"; it is "persist and replay state-review artifacts, then derive metrics and enforcement decisions from them."
 
+### Corrected on 2026-06-07 v04
+
+- `StateReviewArtifact` is no longer future work: pure construction, ArrowHedge generation, related objects, PROV-style links, trace context, canonical hash verification, tamper detection, and artifact metrics exist.
+- Persisted/golden JSON artifacts remain open: current tests build artifacts in memory, and no stable artifact export/import path was found.
+- Trace correlation is partial: artifacts carry optional trace context and metrics count coverage, but there is no full join across source reads, projection, proposal review, eval event, and downstream write.
+- Socio-technical congruence was downgraded from broad project-quality predictor to bounded coordination diagnostic after adding mixed/negative longitudinal evidence.
+- ContractBench and STALE source-code/data availability remains a source gap until direct official repo/dataset links are located.
+
 ## Rejected Bridges
 
 1. Model weights as operational memory.
@@ -114,6 +140,11 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 10. Treat the implemented `"blocking"` mode as a policy primitive, not a default; define invariant-class enforcement before connecting it to external side effects.
 11. Link continuity checkpoints and PM handoff summaries to state-review artifact ids.
 12. Add project coordination metrics for dependency-owner gaps, owner/source resolution, stale handoffs, and shared-state convergence.
+13. Persist/export ArrowHedge state-review artifacts and validate them against a schema before claiming artifact-derived eval maturity.
+14. Add observed read-set capture and compare observed vs declared read dependencies.
+15. Extend observation contracts toward integrity, holder/request binding, allowed use, issuer/source invocation, redaction, and revocation metadata.
+16. Compute eval outcomes from artifact evidence where possible rather than scenario labels.
+17. Add distributed-state PM evals that measure convergence on binding source, owner, blocker, and valid next action under partial project shards.
 
 ## Metrics Queue
 
@@ -151,15 +182,30 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 - `coordination_congruence_gap`
 - `dependency_owner_resolution_time`
 - `shared_state_convergence_rate`
+- `persisted_artifact_count`
+- `artifact_schema_validation_rate`
+- `artifact_export_import_fidelity`
+- `artifact_to_eval_event_link_rate`
+- `observed_read_set_coverage`
+- `undeclared_read_dependency_rate`
+- `multi_object_precondition_coverage`
+- `holder_binding_failure_rate`
+- `signature_integrity_failure_rate`
+- `warning_evidence_link_rate`
+- `coordination_cost_per_correct_action`
+- `coordination_requirement_precision`
+- `salient_event_agreement`
+- `artifact_linked_checkpoint_rate`
 
 ## Next-Day Watchlist
 
-1. Inspect source repos for S-Bus, Claw-Eval-Live, ContractBench, STALE, and HearthNet; capture fixture schemas, trace/log formats, and licensing.
-2. Draft the minimal `StateReviewArtifact` JSON schema and decide whether it belongs under `@pm/agent-state`, `@pm/evals`, or a neutral artifact package.
-3. Generate artifact-backed ArrowHedge fixtures for accepted/current, stale risk, authority mismatch, missing source refs, projection drift, workflow mismatch, subject mismatch, multi-object mismatch, and decision snapshot/current risk conflict.
-4. Test whether CloudEvents-like envelope fields and optional W3C Trace Context fields can be adopted without pulling a runtime dependency.
-5. Search API-security/OAuth/presigned-URL/capability-token literature for stronger observation-contract terminology and access-deny/recusal patterns.
-6. Search object-centric process-mining conformance work for multi-object workflow drift metrics.
-7. Search project-management and software-engineering sources for dependency/coordination metrics beyond socio-technical congruence.
-8. Define the first blocking-policy matrix and specify which warning codes remain advisory.
-9. Verify whether DB-backed ArrowHedge projection can emit the same state-review artifact as pure fixtures when local Postgres is available.
+1. Draft and/or implement the persisted `StateReviewArtifact` JSON fixture/export path.
+2. Decide whether artifact JSON schema lives in `@pm/agent-state`, `@pm/evals`, or package-level fixtures.
+3. Add eval-event linkage fields for state-review artifact ids/hashes.
+4. Prototype observed read-set capture and declared-vs-observed comparison.
+5. Search for ContractBench and STALE official code/data repos again; do not cite source availability until primary links are located.
+6. Inspect S-Bus companion repos (`sbus-experiments`, `sbus-formals`) if deeper read-set reconstruction design is needed.
+7. Convert observation-contract v2 fields into a compatibility proposal, not a breaking change.
+8. Define the first invariant-class policy matrix and test advisory vs targeted blocking.
+9. Add at least one PM distributed-state integration eval inspired by Silo-Bench but grounded in project handoff/owner/source state.
+10. Verify whether DB-backed ArrowHedge projection can emit the same state-review artifact as pure fixtures when local Postgres is available.
