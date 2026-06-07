@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-07 — Research ledger and automation sync protocol
+
+- Fetched and fast-forwarded from `origin/main` before continuing local research updates, bringing in the latest state-review artifact implementation and canonical 2026-06-06 v03 research.
+- Reconciled the local daily Arrowsmith v04 research with the fetched `main` state: `StateReviewArtifact` is now treated as an implemented pure primitive, while generated JSON/JSONL artifacts, replay, DB/fixture equivalence, and policy integration remain the next proof boundary.
+- Added `research/index.md` as the top-level research ledger across daily research streams, including run protocol, claim ledger, current implementation frontier, and ledger entries.
+- Resolved the daily Arrowsmith index conflict by preserving the remote canonical v03 and v04, preserving the unsynced local v03 as a superseded local branch artifact, and moving synchronization requirements into the indexes and top-level ledger.
+- Updated the daily research direction so automations must fetch/pull `main`, inspect new research/code, update the chain-specific index and top-level ledger, then commit and push back to `main`.
+
+## 2026-06-05 — Daily agent-state Arrowsmith v03
+
+- Added `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-05.md` as the third numbered daily continuation, building on v02 rather than restarting the agent-state thesis.
+- Added new 24-72 hour bridges from CollabSim, ALMANAC, MAGE, MemGate, PACT, WebMCP tool-surface poisoning, HarnessFix, ToolMaze, TRIAD, and the self-correction role-label paper.
+- Strengthened the implementation direction around replayable JSON state-review artifacts: `currentStateView`, original `observationContract`, assertion evaluation, read-set validation, `ActionProposalReview`, warning policy, source refs, fixture id, and eval maturity.
+- Downgraded semantic-similarity memory, protocolized agent communication, tool metadata, and guardrail feedback as authority unless bound to substrate refs, freshness, source authority, lifecycle, and deterministic validation.
+- Updated `research/daily-arrowsmith-agent-state/index.md` with the v03 version row, source changes, corrected claims, downgraded claims, metrics queue, and next-day implementation watchlist.
+
 ## 2026-06-02 — Codebase review and workspace/agent-state research kickoff
 
 - Reviewed the pm-substrate architecture, validation framework, three-axis state-validation plan, state-failure taxonomy, agent-continuity ADRs, continuity/eval packages, workflow gates, event provenance, graph staleness helpers, and the existing external landscape research draft.
