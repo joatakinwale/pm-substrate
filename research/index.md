@@ -27,7 +27,7 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | Stream | Index | Current status | Next action |
 | --- | --- | --- | --- |
 | Agent-state Arrowsmith | `research/daily-arrowsmith-agent-state/index.md` | Active. Pure state-review primitives and `StateReviewArtifact` exist; durable generated artifacts and DB/fixture equivalence are next. | Generate ArrowHedge state-review JSON/JSONL artifacts and derive metrics from them. |
-| AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Scheduled, first daily run pending. | Create v01 and compare major AI-company releases against the operational-state thesis. |
+| AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Local automation config installed; first daily run pending. | Create v01 and compare major AI-company releases against the operational-state thesis. |
 | First-principles agent-state | `research/agent-from-numbers-to-state-arrowsmith_2026-06-04.md` | Precursor. Established model/prompt/memory state vs operational state. | Use as baseline framing for every agent-state comparison. |
 | Cross-disciplinary state/interoperability | `research/cross-disciplinary-state-interoperability-arrowsmith_2026-06-03.md` | Foundational bridge. | Continue extracting mechanisms only when they map to executable substrate checks. |
 | Local-lab eval bridge | `research/local-lab-state-bench-arrowsmith_2026-06-02.md` | Baseline/substrate paired eval framing exists. | Keep eval claims tied to executable events/artifacts, not scenario prose. |

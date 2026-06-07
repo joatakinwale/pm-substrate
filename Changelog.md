@@ -164,3 +164,9 @@
 - Shifted the active research frontier to artifact lifecycle and policy use: persisted/exported JSON artifacts, schema validation, artifact-derived eval events, continuity lineage, observed read-set capture, observation-contract integrity/binding fields, and targeted invariant-class blocking.
 - Added new bridge evidence from S-Bus source/formals/benchmark artifacts, Claw-Eval-Live released task/fixture/grader/trace architecture, Silo-Bench coordination-reasoning metrics, the June 2026 agent provenance survey, HTTP/OAuth standards, coordination-requirement scalability, and team situation-awareness measurement.
 - Updated `research/daily-arrowsmith-agent-state/index.md` with v04, source changes, corrected stale claims, new metrics, current implementation implications, next-day watchlist, and the fetch/reconcile/push collaboration protocol for future daily runs.
+
+## 2026-06-07 - Daily AI competitive-intelligence automation
+
+- Installed the local Codex automation config for `daily-ai-competitive-intelligence`, scheduled daily at 7:30 AM America/Chicago against `/Users/emmanuelakinwale/Desktop/pm-substrate`.
+- Reconciled the newly fetched research-ledger commit from `origin/main`, which already created `research/daily-ai-competitive-intelligence/index.md` and `research/index.md`, rather than starting a duplicate research stream.
+- Updated the competitive-intelligence index and top-level research ledger to record that the stream has a local automation config installed and that the first versioned run remains pending.

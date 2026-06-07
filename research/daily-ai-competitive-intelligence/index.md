@@ -5,13 +5,14 @@ Scope: major AI companies, workspace AI, enterprise AI, agent platforms, AI codi
 
 ## Current Baseline
 
-The first scheduled run is pending. Each run should compare vendor announcements against the pm-substrate claim that agents need governed operational state before valid action: current state, provenance, authority, invalidation, workflow validity, read-set/action review, and durable artifacts.
+The local Codex automation config was installed on 2026-06-07, and the first scheduled run is pending. Each run should compare vendor announcements against the pm-substrate claim that agents need governed operational state before valid action: current state, provenance, authority, invalidation, workflow validity, read-set/action review, and durable artifacts.
 
 ## Schedule
 
 - Automation id: `daily-ai-competitive-intelligence`
 - Cadence: daily at 7:30 AM America/Chicago
 - Output folder: `research/daily-ai-competitive-intelligence/`
+- Local config: `$CODEX_HOME/automations/daily-ai-competitive-intelligence/automation.toml`
 
 ## Run Protocol
 
@@ -28,7 +29,7 @@ Each run must:
 
 | Version | Date | File | Role | Top delta |
 | --- | --- | --- | --- | --- |
-| Pending | 2026-06-07 | N/A | Scheduled stream created | First run should create `v01-ai-competitive-intelligence-YYYY-MM-DD.md`. |
+| Pending | 2026-06-07 | N/A | Local automation config installed | First run should create `v01-ai-competitive-intelligence-YYYY-MM-DD.md`. |
 
 ## Watchlist
 
