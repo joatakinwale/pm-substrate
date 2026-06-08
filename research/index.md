@@ -27,7 +27,7 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | Stream | Index | Current status | Next action |
 | --- | --- | --- | --- |
 | Agent-state Arrowsmith | `research/daily-arrowsmith-agent-state/index.md` | Active. Pure state-review primitives and `StateReviewArtifact` exist; durable generated artifacts, temporal-misalignment fixture coverage, and DB/fixture equivalence are next. | Generate ArrowHedge state-review JSON/JSONL artifacts and derive metrics from them. |
-| AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Local automation config installed; first daily run pending. | Create v01 and compare major AI-company releases against the operational-state thesis. |
+| AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Active. v01 found major vendors converging on agent control planes, work graphs, managed runtimes, session state, governance, and audit, but no reviewed source exposed pm-substrate's full pre-action `StateReviewArtifact` boundary. | Deepen OpenAI/GitHub/AWS/Atlassian docs and implement persisted ArrowHedge review artifacts so the differentiation is executable. |
 | First-principles agent-state | `research/agent-from-numbers-to-state-arrowsmith_2026-06-04.md` | Precursor. Established model/prompt/memory state vs operational state. | Use as baseline framing for every agent-state comparison. |
 | Cross-disciplinary state/interoperability | `research/cross-disciplinary-state-interoperability-arrowsmith_2026-06-03.md` | Foundational bridge. | Continue extracting mechanisms only when they map to executable substrate checks. |
 | Local-lab eval bridge | `research/local-lab-state-bench-arrowsmith_2026-06-02.md` | Baseline/substrate paired eval framing exists. | Keep eval claims tied to executable events/artifacts, not scenario prose. |
@@ -50,6 +50,8 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | C011 | Temporal state drift has distinct observation-to-action, action-to-feedback, and feedback-to-observation phases. | Confirmed as eval direction | Daily Arrowsmith v05; TIDE temporal state misalignment | Classify ArrowHedge fixtures by temporal phase and avoid overclaiming read-set validation coverage. |
 | C012 | Semantic agreement among agents is sufficient authority. | Downgraded | Daily Arrowsmith v05; H-CSC bridge | Treat semantic commit/abort as provenance/finality evidence only; keep source authority deterministic. |
 | C013 | Memory belief clarity proves operational state validity. | Downgraded | Daily Arrowsmith v05; MMPO and LOCOMO-CONV | Use belief/memory diagnostics as supporting metrics, but require artifact-backed current-state review before action. |
+| C014 | Major AI/workspace vendors are converging on agent control planes, not just chat/RAG. | Confirmed | Daily AI competitive intelligence v01 | Treat OpenAI, GitHub/Microsoft, AWS, Atlassian, Asana, ServiceNow, Google, Slack, Cursor, Anthropic, and Cognition as partial state/workflow competitors. |
+| C015 | Current vendor agent-control products solve pm-substrate's operational-state problem end to end. | Downgraded / still speculative | Daily AI competitive intelligence v01 | Keep differentiation centered on original-observation review, read-set validation, subject binding, as-of review, replayable artifacts, and policy modes. |
 
 ## Current Implementation Frontier
 
@@ -61,6 +63,7 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 6. Link continuity checkpoints and handoff summaries to state-review artifact ids.
 7. Add object-centric related refs and qualified roles for multi-object action validity.
 8. Keep competitive-intelligence research tied to whether vendors solve currentness, authority, provenance, workflow validity, and pre-action review, not just memory/RAG.
+9. Convert competitive-intelligence findings into competitor-inspired artifact fixtures for Slack/CRM writes, GitHub/Cursor coding sessions, AWS workflow agent steps, Atlassian graph writes, Asana work-graph actions, ServiceNow deploys, and Google Workspace shared artifacts.
 
 ## Ledger Entries
 
@@ -75,11 +78,12 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | L007 | 2026-06-06 | `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-06.md` | L005, remote `main` | Audited repo and marked subject mismatch, original-observation review, `evaluatedAt`, advisory/blocking mode, and evidence stages as closed pure primitives. | Shift to durable artifact replay and policy integration. |
 | L008 | 2026-06-07 | `research/daily-arrowsmith-agent-state/v04-agent-state-arrowsmith-2026-06-07.md` | L006 + L007 | Canonical v04 marked `StateReviewArtifact`, ArrowHedge artifact generation, hash replay, and artifact metrics as closed pure primitives; this ledger commit added fetch/merge/push protocol around it. | Generate artifact corpus and enforce daily sync discipline. |
 | L009 | 2026-06-08 | `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` | L008 | Added temporal state misalignment phases, AdaPlanBench progressive constraints, semantic commit/abort limits, cross-step evidence aggregation, and PM accountability/common-understanding mechanisms. | Persist ArrowHedge state-review artifacts, derive eval metrics from artifacts, and classify temporal phases before policy blocking. |
+| L010 | 2026-06-08 | `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` | AI competitive-intelligence baseline; L009 implementation frontier | First competitive-intelligence run escalated OpenAI, GitHub/Microsoft, AWS, Atlassian, Asana, ServiceNow, Google, Slack, Cursor, Anthropic, and Cognition as partial agent-control/work-state competitors; no source showed the full pm-substrate state-review boundary. | Inspect OpenAI/GitHub/AWS/Atlassian technical docs and implement persisted ArrowHedge JSON/JSONL review artifacts. |
 
 ## Open Watchlist
 
-1. First daily AI competitive-intelligence run: create `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-YYYY-MM-DD.md` and index.
-2. Inspect whether OpenAI, Anthropic, Microsoft, Google, or other major vendors are solving currentness, authority, provenance, workflow validity, and pre-action review, or only memory/RAG/context.
+1. Deepen daily AI competitive intelligence into technical docs for OpenAI workspace agents/Codex, GitHub Copilot app/AHP, AWS AgentCore/Step Functions, Atlassian Teamwork Graph/Rovo MCP, Asana Work Graph, ServiceNow Build Agent/AEMC, Google Gemini managed agents, Slackbot MCP/Agentforce, Cursor SDK, and Anthropic Claude Code/Cowork.
+2. Keep testing whether vendors solve currentness, authority, provenance, workflow validity, and pre-action review, or only session/context/workflow/audit around agents.
 3. Generate ArrowHedge state-review artifacts and update this ledger with artifact replay evidence.
 4. Add temporal-misalignment and progressive-constraint fixture metadata before claiming full stale-state coverage.
 5. Treat future merge conflicts or stale local research as evidence for the substrate thesis and record how they were reconciled.

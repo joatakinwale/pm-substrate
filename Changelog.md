@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-08 - Daily AI competitive intelligence v01
+
+- Added `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` as the first numbered competitive-intelligence run after fetching and confirming `main` was current.
+- Reviewed recent official sources from OpenAI, Anthropic, GitHub/Microsoft, Google, AWS, Atlassian, Asana, Slack/Salesforce, ServiceNow, Cursor/Anysphere, and Cognition against the pm-substrate operational-state thesis.
+- Escalated major vendors from generic AI watchlist to partial agent-control/work-state competitors while downgrading any claim that memory, RAG, session sync, audit logs, or work graphs equal pm-substrate's full pre-action `StateReviewArtifact` boundary.
+- Updated `research/daily-ai-competitive-intelligence/index.md` and `research/index.md` with threat-level changes, claim-ledger updates, implementation implications, and the next watchlist.
+
 ## 2026-06-08 - Daily agent-state Arrowsmith v05
 
 - Added `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` as the fifth numbered daily continuation, building on v04 rather than restarting the agent-state thesis.
