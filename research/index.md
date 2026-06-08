@@ -27,7 +27,7 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | Stream | Index | Current status | Next action |
 | --- | --- | --- | --- |
 | Agent-state Arrowsmith | `research/daily-arrowsmith-agent-state/index.md` | Active. Pure state-review primitives and `StateReviewArtifact` exist; durable generated artifacts, temporal-misalignment fixture coverage, and DB/fixture equivalence are next. | Generate ArrowHedge state-review JSON/JSONL artifacts and derive metrics from them. |
-| AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Local automation config installed; first daily run pending. | Create v01 and compare major AI-company releases against the operational-state thesis. |
+| AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Active. v01 baseline-plus-delta run found fast vendor movement in agent control planes, context expansion, enterprise plugin/tool governance, and evaluation, but no fresh proof of portable governed operational-state review artifacts. ServiceNow is the highest direct overlap baseline. | Persist/export pm-substrate state-review artifacts and keep monitoring OpenAI/GitHub/Microsoft/Google/AWS/ServiceNow for pre-action review proof. |
 | First-principles agent-state | `research/agent-from-numbers-to-state-arrowsmith_2026-06-04.md` | Precursor. Established model/prompt/memory state vs operational state. | Use as baseline framing for every agent-state comparison. |
 | Cross-disciplinary state/interoperability | `research/cross-disciplinary-state-interoperability-arrowsmith_2026-06-03.md` | Foundational bridge. | Continue extracting mechanisms only when they map to executable substrate checks. |
 | Local-lab eval bridge | `research/local-lab-state-bench-arrowsmith_2026-06-02.md` | Baseline/substrate paired eval framing exists. | Keep eval claims tied to executable events/artifacts, not scenario prose. |
@@ -50,6 +50,10 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | C011 | Temporal state drift has distinct observation-to-action, action-to-feedback, and feedback-to-observation phases. | Confirmed as eval direction | Daily Arrowsmith v05; TIDE temporal state misalignment | Classify ArrowHedge fixtures by temporal phase and avoid overclaiming read-set validation coverage. |
 | C012 | Semantic agreement among agents is sufficient authority. | Downgraded | Daily Arrowsmith v05; H-CSC bridge | Treat semantic commit/abort as provenance/finality evidence only; keep source authority deterministic. |
 | C013 | Memory belief clarity proves operational state validity. | Downgraded | Daily Arrowsmith v05; MMPO and LOCOMO-CONV | Use belief/memory diagnostics as supporting metrics, but require artifact-backed current-state review before action. |
+| C014 | Vendor agent control planes are converging on the same operational-state problem. | Partly confirmed | Competitive intelligence v01 | Treat OpenAI/GitHub/Microsoft/Google/AWS releases as urgency signals, but do not equate control planes with governed state. |
+| C015 | Enterprise plugin/tool distribution makes agent actions safe. | Downgraded | Competitive intelligence v01; OpenAI/GitHub plugin releases | Add plugin/policy provenance to review artifacts; validate current policy before action. |
+| C016 | More workspace context is equivalent to source authority. | Downgraded | Competitive intelligence v01; Google Workspace and OpenAI memory updates | Add cross-source authority conflict evals where email, files, PRs, and ledgers disagree. |
+| C017 | ServiceNow is the closest current direct vendor threat to pm-substrate. | Confirmed as watch baseline | Competitive intelligence v01; ServiceNow May 2026 vendor context | Use ServiceNow as the governed-action comparator, but require portable artifact proof before marking Critical. |
 
 ## Current Implementation Frontier
 
@@ -61,6 +65,8 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 6. Link continuity checkpoints and handoff summaries to state-review artifact ids.
 7. Add object-centric related refs and qualified roles for multi-object action validity.
 8. Keep competitive-intelligence research tied to whether vendors solve currentness, authority, provenance, workflow validity, and pre-action review, not just memory/RAG.
+9. Add client/plugin/provider/session metadata to state-review artifacts so OpenAI, GitHub, Microsoft, Google, and AWS control-plane changes can be represented in evals.
+10. Add ServiceNow comparator fixtures for governed action completeness.
 
 ## Ledger Entries
 
@@ -75,10 +81,11 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | L007 | 2026-06-06 | `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-06.md` | L005, remote `main` | Audited repo and marked subject mismatch, original-observation review, `evaluatedAt`, advisory/blocking mode, and evidence stages as closed pure primitives. | Shift to durable artifact replay and policy integration. |
 | L008 | 2026-06-07 | `research/daily-arrowsmith-agent-state/v04-agent-state-arrowsmith-2026-06-07.md` | L006 + L007 | Canonical v04 marked `StateReviewArtifact`, ArrowHedge artifact generation, hash replay, and artifact metrics as closed pure primitives; this ledger commit added fetch/merge/push protocol around it. | Generate artifact corpus and enforce daily sync discipline. |
 | L009 | 2026-06-08 | `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` | L008 | Added temporal state misalignment phases, AdaPlanBench progressive constraints, semantic commit/abort limits, cross-step evidence aggregation, and PM accountability/common-understanding mechanisms. | Persist ArrowHedge state-review artifacts, derive eval metrics from artifacts, and classify temporal phases before policy blocking. |
+| L010 | 2026-06-08 | `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` | AI competitive-intelligence pending setup | First competitive-intelligence run found no fresh vendor proof of pm-substrate-equivalent operational-state artifacts; OpenAI/GitHub/Microsoft/Google/AWS are Medium to Medium-high control-plane threats, and ServiceNow is the highest direct overlap baseline. | Add artifact persistence plus client/plugin/provider/session metadata and cross-source authority evals. |
 
 ## Open Watchlist
 
-1. First daily AI competitive-intelligence run: create `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-YYYY-MM-DD.md` and index.
+1. Continue daily AI competitive-intelligence monitoring for fresh primary evidence that vendors expose portable original-observation/read-set/action-review artifacts.
 2. Inspect whether OpenAI, Anthropic, Microsoft, Google, or other major vendors are solving currentness, authority, provenance, workflow validity, and pre-action review, or only memory/RAG/context.
 3. Generate ArrowHedge state-review artifacts and update this ledger with artifact replay evidence.
 4. Add temporal-misalignment and progressive-constraint fixture metadata before claiming full stale-state coverage.
