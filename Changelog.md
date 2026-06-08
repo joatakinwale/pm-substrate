@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-08 - Daily agent-state Arrowsmith v05
+
+- Added `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` as the fifth numbered daily continuation, building on v04 rather than restarting the agent-state thesis.
+- Audited the current repo and kept the active code frontier unchanged: pure `StateReviewArtifact`, ArrowHedge artifact construction, hash replay, and artifact metrics exist, while persisted/exported JSON artifacts, artifact-to-eval-event linkage, observed read sets, DB/fixture equivalence, and invariant-class policy remain open.
+- Added recent bridge evidence from AdaPlanBench, TIDE temporal state misalignment, LOCOMO-CONV, H-CSC, TRACE, DuMate-DeepResearch, Tree-of-Experience, OPENPATH, and encrypted multi-agent control.
+- Added foundational mechanisms from Chandy-Lamport snapshots, optimistic concurrency control, sagas, transactive memory, expertise coordination, organizational coordination, and common operational picture/common situational understanding research.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` so the next code slice is deterministic ArrowHedge JSON state-review artifacts with temporal-misalignment fixture metadata before any mutation-blocking claim.
+
 ## 2026-06-07 — Research ledger and automation sync protocol
 
 - Fetched and fast-forwarded from `origin/main` before continuing local research updates, bringing in the latest state-review artifact implementation and canonical 2026-06-06 v03 research.

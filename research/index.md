@@ -1,6 +1,6 @@
 # pm-substrate Research Ledger
 
-Last updated: 2026-06-07
+Last updated: 2026-06-08
 Purpose: single shared ledger for research produced by humans, Codex runs, and scheduled automations.
 
 This file is the cross-stream research current-state view. Chain-specific indexes still own detailed version history, but this ledger records the main claims, status changes, and implementation implications across all research streams.
@@ -26,7 +26,7 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 
 | Stream | Index | Current status | Next action |
 | --- | --- | --- | --- |
-| Agent-state Arrowsmith | `research/daily-arrowsmith-agent-state/index.md` | Active. Pure state-review primitives and `StateReviewArtifact` exist; durable generated artifacts and DB/fixture equivalence are next. | Generate ArrowHedge state-review JSON/JSONL artifacts and derive metrics from them. |
+| Agent-state Arrowsmith | `research/daily-arrowsmith-agent-state/index.md` | Active. Pure state-review primitives and `StateReviewArtifact` exist; durable generated artifacts, temporal-misalignment fixture coverage, and DB/fixture equivalence are next. | Generate ArrowHedge state-review JSON/JSONL artifacts and derive metrics from them. |
 | AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Local automation config installed; first daily run pending. | Create v01 and compare major AI-company releases against the operational-state thesis. |
 | First-principles agent-state | `research/agent-from-numbers-to-state-arrowsmith_2026-06-04.md` | Precursor. Established model/prompt/memory state vs operational state. | Use as baseline framing for every agent-state comparison. |
 | Cross-disciplinary state/interoperability | `research/cross-disciplinary-state-interoperability-arrowsmith_2026-06-03.md` | Foundational bridge. | Continue extracting mechanisms only when they map to executable substrate checks. |
@@ -47,16 +47,20 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | C008 | Bigger retrieval or context solves stale state. | Downgraded | STALE, CAIS, memory sources | Retrieval can find evidence chains but still needs currentness, authority, and invalidation. |
 | C009 | Project management maps to shared operational cognition. | Confirmed | PM/team cognition sources across v01-v04 | Add source steward, authority owner, escalation owner, handoff preconditions, and coordination metrics. |
 | C010 | Research files are durable shared memory by themselves. | Downgraded | Local/remote v03 divergence resolved on 2026-06-07 | Enforce fetch/pull, ledger update, commit, and push discipline. |
+| C011 | Temporal state drift has distinct observation-to-action, action-to-feedback, and feedback-to-observation phases. | Confirmed as eval direction | Daily Arrowsmith v05; TIDE temporal state misalignment | Classify ArrowHedge fixtures by temporal phase and avoid overclaiming read-set validation coverage. |
+| C012 | Semantic agreement among agents is sufficient authority. | Downgraded | Daily Arrowsmith v05; H-CSC bridge | Treat semantic commit/abort as provenance/finality evidence only; keep source authority deterministic. |
+| C013 | Memory belief clarity proves operational state validity. | Downgraded | Daily Arrowsmith v05; MMPO and LOCOMO-CONV | Use belief/memory diagnostics as supporting metrics, but require artifact-backed current-state review before action. |
 
 ## Current Implementation Frontier
 
 1. Generate deterministic ArrowHedge state-review JSON/JSONL artifacts from existing pure primitives.
 2. Derive `analyzeStateAssertions()`, `analyzeActionProposalReviews()`, and `analyzeStateReviewArtifacts()` inputs from generated artifacts.
-3. Add DB/fixture equivalence for state-review artifact generation when `PM_DATABASE_URL` is available.
-4. Define the first invariant-class blocking-policy matrix.
-5. Link continuity checkpoints and handoff summaries to state-review artifact ids.
-6. Add object-centric related refs and qualified roles for multi-object action validity.
-7. Keep competitive-intelligence research tied to whether vendors solve currentness, authority, provenance, workflow validity, and pre-action review, not just memory/RAG.
+3. Classify generated artifacts by temporal misalignment phase and invariant class.
+4. Add DB/fixture equivalence for state-review artifact generation when `PM_DATABASE_URL` is available.
+5. Define the first invariant-class blocking-policy matrix.
+6. Link continuity checkpoints and handoff summaries to state-review artifact ids.
+7. Add object-centric related refs and qualified roles for multi-object action validity.
+8. Keep competitive-intelligence research tied to whether vendors solve currentness, authority, provenance, workflow validity, and pre-action review, not just memory/RAG.
 
 ## Ledger Entries
 
@@ -70,10 +74,12 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | L006 | 2026-06-05 | `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-05.md` | L005, local branch | Added collaboration, memory execution state, action-state communication, tool-surface drift, and harness repair. | Preserved as superseded local branch artifact; folded into v04. |
 | L007 | 2026-06-06 | `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-06.md` | L005, remote `main` | Audited repo and marked subject mismatch, original-observation review, `evaluatedAt`, advisory/blocking mode, and evidence stages as closed pure primitives. | Shift to durable artifact replay and policy integration. |
 | L008 | 2026-06-07 | `research/daily-arrowsmith-agent-state/v04-agent-state-arrowsmith-2026-06-07.md` | L006 + L007 | Canonical v04 marked `StateReviewArtifact`, ArrowHedge artifact generation, hash replay, and artifact metrics as closed pure primitives; this ledger commit added fetch/merge/push protocol around it. | Generate artifact corpus and enforce daily sync discipline. |
+| L009 | 2026-06-08 | `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` | L008 | Added temporal state misalignment phases, AdaPlanBench progressive constraints, semantic commit/abort limits, cross-step evidence aggregation, and PM accountability/common-understanding mechanisms. | Persist ArrowHedge state-review artifacts, derive eval metrics from artifacts, and classify temporal phases before policy blocking. |
 
 ## Open Watchlist
 
 1. First daily AI competitive-intelligence run: create `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-YYYY-MM-DD.md` and index.
 2. Inspect whether OpenAI, Anthropic, Microsoft, Google, or other major vendors are solving currentness, authority, provenance, workflow validity, and pre-action review, or only memory/RAG/context.
 3. Generate ArrowHedge state-review artifacts and update this ledger with artifact replay evidence.
-4. Treat future merge conflicts or stale local research as evidence for the substrate thesis and record how they were reconciled.
+4. Add temporal-misalignment and progressive-constraint fixture metadata before claiming full stale-state coverage.
+5. Treat future merge conflicts or stale local research as evidence for the substrate thesis and record how they were reconciled.

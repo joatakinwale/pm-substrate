@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-07
+Last updated: 2026-06-08
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -13,7 +13,7 @@ The run is not complete until the intended research slice is committed on `main`
 
 LLM agents are statistical predictors promoted into actors. The state problem appears when parametric model state, prompt/inference state, memory/RAG state, tool-observation state, or inter-agent communication state is treated as current, sufficient, authoritative operational state. pm-substrate is the governed operational-state layer between statistical prediction and valid action.
 
-The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The next proof boundary is artifact lifecycle and policy use: persisted/exported artifacts, schema validation, eval-event linkage, continuity lineage, observed read-set capture, richer observation-contract integrity/binding fields, invariant-class enforcement, and repo-level research-ledger synchronization.
+The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The next proof boundary is artifact lifecycle and policy use: persisted/exported artifacts, schema validation, eval-event linkage, continuity lineage, observed read-set capture, temporal-misalignment phase coverage, richer observation-contract integrity/binding fields, invariant-class enforcement, and repo-level research-ledger synchronization.
 
 ## Versions
 
@@ -25,6 +25,7 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 | v03-local | 2026-06-05 | `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-05.md` | Superseded local branch artifact, preserved for provenance | Added CollabSim/ALMANAC, execution-state memory, action-state communication, HarnessFix, WebMCP tool-surface drift, ToolMaze, and TRIAD before syncing with remote `main`. Folded into the ledger rather than treated as canonical latest v03. |
 | v03 | 2026-06-06 | `research/daily-arrowsmith-agent-state/v03-agent-state-arrowsmith-2026-06-06.md` | Artifact/provenance and PM-coordination bridge | Marked v02's pure-review TODOs as closed primitives, shifted the frontier to durable replayable artifacts, trace/provenance/object-role metadata, policy gating, and socio-technical coordination metrics. |
 | v04 | 2026-06-07 | `research/daily-arrowsmith-agent-state/v04-agent-state-arrowsmith-2026-06-07.md` | Canonical artifact lifecycle, preconditions, and coordination-state bridge | Marked `StateReviewArtifact`, ArrowHedge artifact generation, hash replay, and artifact metrics as closed pure primitives; shifted the frontier to persisted/exported artifacts, observed read-set capture, observation-contract v2, artifact-derived evals, and targeted invariant policy. |
+| v05 | 2026-06-08 | `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` | Temporal-state, progressive-constraint, and PM coordination bridge | Added temporal state misalignment phases, AdaPlanBench progressive constraints, typed semantic commit/abort limits, cross-step evidence aggregation, and PM accountability/common-understanding mechanisms; kept persisted ArrowHedge JSON artifacts as the next code slice. |
 
 ## Top Findings
 
@@ -44,6 +45,10 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 14. **Observation contracts need integrity and binding fields.** RFC 9110, DPoP, HTTP Message Signatures, OAuth Token Exchange, and ContractBench sharpen freshness-only contracts into precondition, signature/integrity, holder/request-binding, and delegation questions.
 15. **Coordination is not just communication volume.** Silo-Bench and team-situation-awareness work point toward convergence on correct distributed state as the PM metric.
 16. **Research itself is now a substrate test.** Multiple developers and automations are producing research and code; every daily run must pull `main`, inspect new research/code, integrate findings into the ledger, and push back to `main`.
+17. **Temporal drift has more than one phase.** Current read-set validation covers observation-to-action stale reads well, but action-to-feedback and feedback-to-observation drift remain open fixture/eval classes.
+18. **Progressively disclosed constraints are a better eval shape than one-shot full specs.** AdaPlanBench-style staged constraints map to authority, freshness, workflow, and user/policy constraints revealed across attempts.
+19. **Semantic consensus is evidence, not authority.** Typed semantic commit/abort protocols are useful provenance vocabulary, but source authority, tenant, subject, workflow, and read-set checks remain deterministic substrate concerns.
+20. **Project COP should produce accountability, predictability, and common understanding.** PM literature supports owner/source/escalation and agreement metrics over richer dashboards alone.
 
 ## Source Changes
 
@@ -92,6 +97,13 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - RFC 9110, RFC 9449, RFC 9421, and RFC 8693: standards vocabulary for preconditions, proof-of-possession, signed-component expiry/integrity, and delegation/actor chains.
 - Coordination-requirement scalability, Team Situation Awareness measurement, and 2021 socio-technical congruence work: PM metrics should be scalable, agreement-based, and outcome-tested rather than overclaimed.
 
+### Added on 2026-06-08 v05
+
+- AdaPlanBench paper, official repo, and dataset: progressive world/user constraint disclosure, repeated violations, valid-plan rate, and run artifacts sharpen ArrowHedge fixture design.
+- TIDE temporal state misalignment and LOCOMO-CONV OpenReview submissions: temporal validity and implicit/composed conversational memory gaps extend v04's stale-read framing.
+- H-CSC, TRACE, DuMate-DeepResearch, Tree-of-Experience, OPENPATH, and encrypted multi-agent control preprints: typed semantic commit/abort, cross-step evidence, auditable tool traces, structured experience validation, deterministic specialist enforcement, and privacy-aware state-estimation bridges.
+- Chandy-Lamport distributed snapshots, Kung/Robinson OCC, Garcia-Molina/Salem sagas, Lewis transactive memory, Faraj/Sproull expertise coordination, Okhuysen/Bechky coordination mechanisms, and COP/common-situational-understanding sources: older mechanisms for consistent snapshots, read validation, long-lived transactions, expertise/authority location, accountability, predictability, and common understanding.
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -101,6 +113,9 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - Socio-technical congruence was downgraded from broad project-quality predictor to bounded coordination diagnostic after adding mixed/negative longitudinal evidence.
 - ContractBench and STALE source-code/data availability remains a source gap until direct official repo/dataset links are located.
 - Research automation must now treat `research/index.md` as the shared ledger and update it after pulling `main`.
+- v05 corrects the temporal-state claim: current ArrowHedge review primitives primarily prove observation-to-action validation; action-to-feedback and feedback-to-observation drift need explicit artifact stages and fixtures.
+- v05 corrects the semantic-consensus bridge: typed commit/abort protocols are useful as provenance and finality vocabulary, not as source authority.
+- v05 keeps v04's artifact-lifecycle gap open: no persisted/exported ArrowHedge JSON artifact corpus or artifact-to-eval-event linkage was found.
 
 ## Downgraded Claims
 
@@ -110,6 +125,9 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - Trace context is downgraded as authority: it provides correlation, not validity or permission.
 - Standards are structure, not proof. PROV, Trace Context, CloudEvents, HTTP/OAuth standards, ISO 21502, and OCEL describe useful metadata, but pm-substrate still needs executable validation.
 - Research files are downgraded as durable shared memory unless backed by fetch/merge/push discipline and the top-level ledger.
+- Semantic consensus is downgraded as an authority mechanism unless backed by substrate source refs, tenant/subject checks, workflow position, and read-set validation.
+- Memory belief-clarity metrics are downgraded as operational-state proof; they diagnose summary quality but do not establish currentness or authority.
+- Proactive hidden-problem discovery is downgraded as direct action; findings should become evidence-linked warnings/proposals first.
 
 ## Rejected Bridges
 
@@ -128,14 +146,15 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 
 1. Persist/export ArrowHedge state-review artifacts and validate them against a schema before claiming artifact-derived eval maturity.
 2. Add eval-event linkage fields for state-review artifact ids/hashes.
-3. Add observed read-set capture and compare observed vs declared read dependencies.
-4. Extend observation contracts toward integrity, holder/request binding, allowed use, issuer/source invocation, redaction, and revocation metadata.
-5. Compute eval outcomes from artifact evidence where possible rather than scenario labels.
-6. Define invariant-class enforcement before connecting `"blocking"` mode to external side effects.
-7. Add distributed-state PM evals that measure convergence on binding source, owner, blocker, and valid next action under partial project shards.
-8. Link continuity checkpoints and PM handoff summaries to state-review artifact ids.
-9. Add object-centric related refs and qualified roles for multi-object action validity.
-10. Make every daily research automation pull `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
+3. Classify artifact fixtures by temporal misalignment phase: observation-to-action, action-to-feedback, feedback-to-observation, or none.
+4. Add observed read-set capture and compare observed vs declared read dependencies.
+5. Extend observation contracts toward integrity, holder/request binding, allowed use, issuer/source invocation, redaction, and revocation metadata.
+6. Compute eval outcomes from artifact evidence where possible rather than scenario labels.
+7. Define invariant-class enforcement before connecting `"blocking"` mode to external side effects.
+8. Add distributed-state PM evals that measure convergence on binding source, owner, blocker, and valid next action under partial project shards.
+9. Link continuity checkpoints and PM handoff summaries to state-review artifact ids.
+10. Add object-centric related refs and qualified roles for multi-object action validity.
+11. Make every daily research automation pull `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
 
 ## Metrics Queue
 
@@ -190,17 +209,27 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - `research_sync_delta_count`
 - `research_claim_ledger_update_count`
 - `research_merge_conflict_resolution_count`
+- `temporal_misalignment_phase_coverage`
+- `observation_to_action_stale_rate`
+- `action_to_feedback_drift_rate`
+- `feedback_to_observation_revalidation_rate`
+- `constraint_repeated_violation_rate`
+- `progressive_constraint_resolution_rate`
+- `common_understanding_delta`
+- `expertise_owner_resolution_rate`
+- `handoff_revalidation_success_rate`
 
 ## Next-Day Watchlist
 
-1. Draft and/or implement the persisted `StateReviewArtifact` JSON fixture/export path.
+1. Implement the persisted `StateReviewArtifact` JSON fixture/export path for ArrowHedge.
 2. Decide whether artifact JSON schema lives in `@pm/agent-state`, `@pm/evals`, or package-level fixtures.
-3. Add eval-event linkage fields for state-review artifact ids/hashes.
-4. Prototype observed read-set capture and declared-vs-observed comparison.
-5. Search for ContractBench and STALE official code/data repos again; do not cite source availability until primary links are located.
-6. Inspect S-Bus companion repos (`sbus-experiments`, `sbus-formals`) if deeper read-set reconstruction design is needed.
-7. Convert observation-contract v2 fields into a compatibility proposal, not a breaking change.
-8. Define the first invariant-class policy matrix and test advisory vs targeted blocking.
-9. Add at least one PM distributed-state integration eval inspired by Silo-Bench but grounded in project handoff/owner/source state.
-10. Verify whether DB-backed ArrowHedge projection can emit the same state-review artifact as pure fixtures when local Postgres is available.
-11. Run every daily research automation through fetch -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
+3. Add temporal misalignment metadata to fixtures before broadening policy claims.
+4. Add eval-event linkage fields for state-review artifact ids/hashes.
+5. Prototype observed read-set capture and declared-vs-observed comparison.
+6. Search for ContractBench and STALE official code/data repos again; do not cite source availability until primary links are located.
+7. Inspect S-Bus companion repos (`sbus-experiments`, `sbus-formals`) if deeper read-set reconstruction design is needed.
+8. Convert observation-contract v2 fields into a compatibility proposal, not a breaking change.
+9. Define the first invariant-class policy matrix and test advisory vs targeted blocking.
+10. Add at least one PM distributed-state integration eval grounded in project handoff/owner/source state and measured by common-understanding deltas.
+11. Verify whether DB-backed ArrowHedge projection can emit the same state-review artifact as pure fixtures when local Postgres is available.
+12. Run every daily research automation through fetch -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
