@@ -1,11 +1,18 @@
 # Changelog
 
-## 2026-06-08 - Daily AI competitive intelligence v01
+## 2026-06-08 - Daily AI competitive-intelligence v02 reconciliation
 
-- Added `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` as the first numbered competitive-intelligence run after fetching and confirming `main` was current.
-- Reviewed recent official sources from OpenAI, Anthropic, GitHub/Microsoft, Google, AWS, Atlassian, Asana, Slack/Salesforce, ServiceNow, Cursor/Anysphere, and Cognition against the pm-substrate operational-state thesis.
-- Escalated major vendors from generic AI watchlist to partial agent-control/work-state competitors while downgrading any claim that memory, RAG, session sync, audit logs, or work graphs equal pm-substrate's full pre-action `StateReviewArtifact` boundary.
-- Updated `research/daily-ai-competitive-intelligence/index.md` and `research/index.md` with threat-level changes, claim-ledger updates, implementation implications, and the next watchlist.
+- Resolved a same-day merge conflict after `origin/main` added `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` while a local competitive-intelligence run was active.
+- Preserved upstream v01 unchanged and added the local broader vendor scan as `research/daily-ai-competitive-intelligence/v02-ai-competitive-intelligence-2026-06-08.md`.
+- Updated `research/daily-ai-competitive-intelligence/index.md` and `research/index.md` with the reconciliation, expanded watchlist, implementation implications, and next sequential continuation point.
+
+## 2026-06-08 - Daily AI competitive-intelligence v01
+
+- Added `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` as the first numbered competitive-intelligence continuation for `pm-substrate`.
+- Reconciled the new upstream daily Arrowsmith v05 research before writing, preserving the current frontier: pure state-review primitives exist, while persisted/exported artifacts, artifact-to-eval linkage, observed read sets, temporal-phase fixtures, and targeted policy remain open.
+- Compared fresh official-source changes from OpenAI, Anthropic, Microsoft/GitHub, Google, AWS, and ServiceNow against the operational-state thesis.
+- Marked OpenAI/GitHub/Microsoft/Google/AWS as active Medium to Medium-high control-plane and context/runtime threats, while keeping ServiceNow as the highest direct overlap baseline because its Action Fabric/Context Engine/AI Control Tower positioning most closely matches governed enterprise action.
+- Updated `research/daily-ai-competitive-intelligence/index.md` and `research/index.md` with v01 deltas, downgraded claims, implementation implications, and next-day watchlist items.
 
 ## 2026-06-08 - Daily agent-state Arrowsmith v05
 
