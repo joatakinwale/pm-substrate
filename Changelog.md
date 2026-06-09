@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-08 - Invariant-class policy matrix
+
+- Added a pure `StateReviewInvariantClass` policy matrix in `@pm/agent-state` with explicit low/medium/high action consequences and advisory-vs-blocking recommendations.
+- Kept `reviewProposedActionAgainstCurrentState()` default behavior advisory-only; policy evaluation is separate and reports `wouldBlock` recommendations without enforcing external mutations.
+- Added eval artifact metrics for `policyWouldBlockArtifacts` and `wouldBlockByInvariantClass`, defaulting analysis to high-consequence policy while supporting explicit consequence and matrix inputs.
+- Verification: TDD red pass failed on the missing policy evaluator and metric fields; green pass completed with focused agent-state/evals vitest coverage and both package typechecks.
+
 ## 2026-06-08 - ArrowHedge temporal fixture expansion
 
 - Added deterministic ArrowHedge state-review artifact fixture cases for `observation_to_action`, `action_to_feedback`, and `feedback_to_observation`, each with distinct scenario ids, fixture metadata, eval ids, warning shapes, and invariant classes.

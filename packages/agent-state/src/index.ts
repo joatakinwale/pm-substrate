@@ -283,6 +283,87 @@ export type StateReviewInvariantClass =
   | "state_conflict"
   | "capability_contract";
 
+export type StateReviewActionConsequence = "low" | "medium" | "high";
+export type InvariantClassPolicyDecision = "advisory" | "blocking";
+
+type CompleteStateReviewInvariantPolicyMatrix = Readonly<
+  Record<
+    StateReviewInvariantClass,
+    Readonly<Record<StateReviewActionConsequence, InvariantClassPolicyDecision>>
+  >
+>;
+
+export type StateReviewInvariantPolicyMatrix = Readonly<
+  Partial<
+    Record<
+      StateReviewInvariantClass,
+      Readonly<Partial<Record<StateReviewActionConsequence, InvariantClassPolicyDecision>>>
+    >
+  >
+>;
+
+export interface StateReviewInvariantPolicyDecisionEntry {
+  readonly invariantClass: StateReviewInvariantClass;
+  readonly consequence: StateReviewActionConsequence;
+  readonly decision: InvariantClassPolicyDecision;
+}
+
+export interface StateReviewInvariantPolicyEvaluation {
+  readonly consequence: StateReviewActionConsequence;
+  readonly wouldBlock: boolean;
+  readonly wouldBlockInvariantClasses: readonly StateReviewInvariantClass[];
+  readonly advisoryInvariantClasses: readonly StateReviewInvariantClass[];
+  readonly decisions: readonly StateReviewInvariantPolicyDecisionEntry[];
+}
+
+export const DEFAULT_STATE_REVIEW_INVARIANT_POLICY_MATRIX = {
+  subject_identity: {
+    low: "advisory",
+    medium: "blocking",
+    high: "blocking",
+  },
+  tenant_boundary: {
+    low: "advisory",
+    medium: "blocking",
+    high: "blocking",
+  },
+  required_evidence: {
+    low: "advisory",
+    medium: "blocking",
+    high: "blocking",
+  },
+  freshness_window: {
+    low: "advisory",
+    medium: "advisory",
+    high: "blocking",
+  },
+  source_authority: {
+    low: "advisory",
+    medium: "blocking",
+    high: "blocking",
+  },
+  projection_version: {
+    low: "advisory",
+    medium: "advisory",
+    high: "blocking",
+  },
+  workflow_position: {
+    low: "advisory",
+    medium: "advisory",
+    high: "blocking",
+  },
+  state_conflict: {
+    low: "advisory",
+    medium: "blocking",
+    high: "blocking",
+  },
+  capability_contract: {
+    low: "advisory",
+    medium: "blocking",
+    high: "blocking",
+  },
+} as const satisfies CompleteStateReviewInvariantPolicyMatrix;
+
 export interface StateReviewArtifactMetadataInput {
   readonly temporalMisalignmentPhase?: StateReviewTemporalMisalignmentPhase;
   readonly invariantClasses?: readonly StateReviewInvariantClass[];
@@ -379,6 +460,37 @@ export interface StateReviewArtifactContinuityPayload
 
 export function stateRef(kind: StateRefKind, id: string, label?: string): StateRef {
   return label === undefined ? { kind, id } : { kind, id, label };
+}
+
+export function evaluateStateReviewInvariantPolicy(
+  invariantClasses: readonly StateReviewInvariantClass[],
+  consequence: StateReviewActionConsequence,
+  matrix: StateReviewInvariantPolicyMatrix =
+    DEFAULT_STATE_REVIEW_INVARIANT_POLICY_MATRIX,
+): StateReviewInvariantPolicyEvaluation {
+  const decisions = uniqueStrings(invariantClasses).map(
+    (invariantClass): StateReviewInvariantPolicyDecisionEntry => ({
+      invariantClass,
+      consequence,
+      decision:
+        matrix[invariantClass]?.[consequence] ??
+        DEFAULT_STATE_REVIEW_INVARIANT_POLICY_MATRIX[invariantClass][consequence],
+    }),
+  );
+  const wouldBlockInvariantClasses = decisions
+    .filter((decision) => decision.decision === "blocking")
+    .map((decision) => decision.invariantClass);
+  const advisoryInvariantClasses = decisions
+    .filter((decision) => decision.decision === "advisory")
+    .map((decision) => decision.invariantClass);
+
+  return {
+    consequence,
+    wouldBlock: wouldBlockInvariantClasses.length > 0,
+    wouldBlockInvariantClasses,
+    advisoryInvariantClasses,
+    decisions,
+  };
 }
 
 export function buildReadSetFromCurrentStateView(

@@ -1,7 +1,10 @@
 import {
+  evaluateStateReviewInvariantPolicy,
   verifyStateReviewArtifactHash,
+  type StateReviewActionConsequence,
   type StateReviewArtifact,
   type StateReviewInvariantClass,
+  type StateReviewInvariantPolicyMatrix,
   type StateReviewTemporalMisalignmentPhase,
 } from "@pm/agent-state";
 import {
@@ -189,6 +192,11 @@ export interface StateReviewTemporalMisalignmentPhaseCoverage {
   readonly coverageRate: number;
 }
 
+export interface StateReviewArtifactPolicyMetricsOptions {
+  readonly actionConsequence?: StateReviewActionConsequence;
+  readonly policyMatrix?: StateReviewInvariantPolicyMatrix;
+}
+
 export interface StateReviewArtifactMetrics {
   readonly totalArtifacts: number;
   readonly hashVerifiedArtifacts: number;
@@ -206,6 +214,9 @@ export interface StateReviewArtifactMetrics {
   readonly advisoryArtifacts: number;
   readonly blockingModeArtifacts: number;
   readonly blockedArtifacts: number;
+  readonly policyActionConsequence: StateReviewActionConsequence;
+  readonly policyWouldBlockArtifacts: number;
+  readonly wouldBlockByInvariantClass: Readonly<Record<string, number>>;
   readonly artifactsBySource: Readonly<Record<string, number>>;
   readonly artifactsByType: Readonly<Record<string, number>>;
   readonly artifactsByTemporalMisalignmentPhase: Readonly<Record<string, number>>;
@@ -550,6 +561,7 @@ export function stateReviewArtifactSamplesFromArtifacts(
 
 export function analyzeStateReviewArtifactEvidence(
   artifacts: readonly StateReviewArtifact[],
+  options: StateReviewArtifactPolicyMetricsOptions = {},
 ): StateReviewArtifactEvidenceMetrics {
   return {
     stateAssertions: analyzeStateAssertions(
@@ -560,12 +572,14 @@ export function analyzeStateReviewArtifactEvidence(
     ),
     stateReviewArtifacts: analyzeStateReviewArtifacts(
       stateReviewArtifactSamplesFromArtifacts(artifacts),
+      options,
     ),
   };
 }
 
 export function analyzeStateReviewArtifacts(
   artifacts: readonly StateReviewArtifactSample[],
+  options: StateReviewArtifactPolicyMetricsOptions = {},
 ): StateReviewArtifactMetrics {
   const warnings = artifacts.flatMap((artifact) => artifact.review.warnings);
   const relatedObjects = artifacts.flatMap((artifact) => artifact.relatedObjects);
@@ -582,6 +596,17 @@ export function analyzeStateReviewArtifacts(
     (artifact) => artifact.relatedObjects.length > 0,
   ).length;
   const hashVerifiedArtifacts = artifacts.filter((artifact) => artifact.hashValid).length;
+  const policyActionConsequence = options.actionConsequence ?? "high";
+  const policyEvaluations = artifacts.map((artifact) =>
+    evaluateStateReviewInvariantPolicy(
+      artifact.metadata?.invariantClasses ?? [],
+      policyActionConsequence,
+      options.policyMatrix,
+    ),
+  );
+  const policyWouldBlockInvariantClasses = policyEvaluations.flatMap(
+    (evaluation) => evaluation.wouldBlockInvariantClasses,
+  );
 
   return {
     totalArtifacts: artifacts.length,
@@ -611,6 +636,14 @@ export function analyzeStateReviewArtifacts(
     blockedArtifacts: artifacts.filter(
       (artifact) => artifact.review.execution.blocking,
     ).length,
+    policyActionConsequence,
+    policyWouldBlockArtifacts: policyEvaluations.filter(
+      (evaluation) => evaluation.wouldBlock,
+    ).length,
+    wouldBlockByInvariantClass: countBy(
+      policyWouldBlockInvariantClasses,
+      (invariantClass) => invariantClass,
+    ),
     artifactsBySource: countBy(
       artifacts,
       (artifact) => artifact.eventEnvelope.source,

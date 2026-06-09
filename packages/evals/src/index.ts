@@ -58,6 +58,7 @@ export {
   type IncompletePairedGroup,
   type RequiredStateReviewTemporalMisalignmentPhase,
   type StateReviewArtifactMetrics,
+  type StateReviewArtifactPolicyMetricsOptions,
   type StateReviewArtifactEvidenceMetrics,
   type StateReviewArtifactRelatedObjectSample,
   type StateReviewArtifactSample,

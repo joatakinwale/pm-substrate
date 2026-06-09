@@ -8,6 +8,7 @@ import {
   buildStateReviewArtifact,
   compareObservedReadSetToDeclared,
   computeStateReviewArtifactHash,
+  evaluateStateReviewInvariantPolicy,
   evaluateObservationContract,
   importStateReviewArtifact,
   importStateReviewArtifactsJsonl,
@@ -406,6 +407,102 @@ describe("@pm/agent-state read-set validation", () => {
       blocking: true,
       enforcementMode: "blocking",
       reason: "blocking_policy_failed",
+    });
+  });
+
+  it("recommends would-block policy decisions for high-consequence invariant classes without changing advisory review defaults", () => {
+    const view = baseView();
+    const review = reviewProposedActionAgainstCurrentState(
+      actionFrom(view, {
+        proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+      }),
+      view,
+    );
+
+    const policy = evaluateStateReviewInvariantPolicy(
+      ["freshness_window", "source_authority"],
+      "high",
+    );
+
+    expect(review.execution).toMatchObject({
+      allowed: true,
+      blocking: false,
+      enforcementMode: "advisory",
+      reason: "advisory_warn_first_v1",
+    });
+    expect(policy).toEqual({
+      consequence: "high",
+      wouldBlock: true,
+      wouldBlockInvariantClasses: ["freshness_window", "source_authority"],
+      advisoryInvariantClasses: [],
+      decisions: [
+        {
+          invariantClass: "freshness_window",
+          consequence: "high",
+          decision: "blocking",
+        },
+        {
+          invariantClass: "source_authority",
+          consequence: "high",
+          decision: "blocking",
+        },
+      ],
+    });
+  });
+
+  it("keeps lower-consequence policy recommendations advisory unless the matrix says otherwise", () => {
+    expect(
+      evaluateStateReviewInvariantPolicy(
+        ["freshness_window", "projection_version"],
+        "low",
+      ),
+    ).toMatchObject({
+      consequence: "low",
+      wouldBlock: false,
+      wouldBlockInvariantClasses: [],
+      advisoryInvariantClasses: ["freshness_window", "projection_version"],
+    });
+
+    expect(
+      evaluateStateReviewInvariantPolicy(
+        ["freshness_window", "source_authority"],
+        "medium",
+      ),
+    ).toMatchObject({
+      consequence: "medium",
+      wouldBlock: true,
+      wouldBlockInvariantClasses: ["source_authority"],
+      advisoryInvariantClasses: ["freshness_window"],
+    });
+
+    expect(
+      evaluateStateReviewInvariantPolicy(["freshness_window"], "low", {
+        freshness_window: {
+          low: "blocking",
+        },
+      }),
+    ).toMatchObject({
+      consequence: "low",
+      wouldBlock: true,
+      wouldBlockInvariantClasses: ["freshness_window"],
+      advisoryInvariantClasses: [],
+    });
+
+    expect(
+      evaluateStateReviewInvariantPolicy(
+        ["freshness_window", "tenant_boundary"],
+        "high",
+        {
+          freshness_window: {
+            high: "advisory",
+          },
+        },
+      ),
+    ).toMatchObject({
+      consequence: "high",
+      wouldBlock: true,
+      wouldBlockInvariantClasses: ["tenant_boundary"],
+      advisoryInvariantClasses: ["freshness_window"],
     });
   });
 

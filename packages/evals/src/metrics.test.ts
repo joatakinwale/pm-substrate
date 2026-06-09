@@ -19,6 +19,7 @@ import {
   actionProposalReviewsFromStateReviewArtifacts,
   stateAssertionsFromStateReviewArtifacts,
   stateReviewArtifactSamplesFromArtifacts,
+  type StateReviewArtifactSample,
 } from "./metrics.js";
 
 const tenantId = "tnt_metrics" as TenantId;
@@ -528,6 +529,9 @@ describe("eval event metrics", () => {
       advisoryArtifacts: 1,
       blockingModeArtifacts: 1,
       blockedArtifacts: 1,
+      policyActionConsequence: "high",
+      policyWouldBlockArtifacts: 0,
+      wouldBlockByInvariantClass: {},
       artifactsBySource: {
         "arrowhedge/arrowhedge_cop": 2,
       },
@@ -550,6 +554,105 @@ describe("eval event metrics", () => {
         coverageRate: 0,
       },
       artifactsByInvariantClass: {},
+    });
+  });
+
+  it("reports policy would-block artifact metrics without claiming actual mutation blocking", () => {
+    const samples: readonly StateReviewArtifactSample[] = [
+      {
+        artifactHash: "a".repeat(64),
+        hashValid: true,
+        eventEnvelope: {
+          source: "arrowhedge/arrowhedge_cop",
+          type: "pm.agent_state.action_proposal_reviewed.v1",
+        },
+        relatedObjects: [],
+        metadata: {
+          temporalMisalignmentPhase: "observation_to_action",
+          invariantClasses: ["freshness_window"],
+        },
+        review: {
+          valid: false,
+          mode: "warn",
+          execution: {
+            allowed: true,
+            blocking: false,
+            enforcementMode: "advisory",
+          },
+          warnings: [
+            { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          ],
+        },
+      },
+      {
+        artifactHash: "b".repeat(64),
+        hashValid: true,
+        eventEnvelope: {
+          source: "arrowhedge/arrowhedge_cop",
+          type: "pm.agent_state.action_proposal_reviewed.v1",
+        },
+        relatedObjects: [],
+        metadata: {
+          temporalMisalignmentPhase: "action_to_feedback",
+          invariantClasses: ["source_authority", "projection_version"],
+        },
+        review: {
+          valid: false,
+          mode: "warn",
+          execution: {
+            allowed: true,
+            blocking: false,
+            enforcementMode: "advisory",
+          },
+          warnings: [
+            { source: "read_set", code: "authority_mismatch", severity: "warn" },
+            {
+              source: "read_set",
+              code: "projection_version_mismatch",
+              severity: "warn",
+            },
+          ],
+        },
+      },
+    ];
+
+    expect(analyzeStateReviewArtifacts(samples)).toMatchObject({
+      blockedArtifacts: 0,
+      policyActionConsequence: "high",
+      policyWouldBlockArtifacts: 2,
+      wouldBlockByInvariantClass: {
+        freshness_window: 1,
+        source_authority: 1,
+        projection_version: 1,
+      },
+    });
+    expect(
+      analyzeStateReviewArtifacts(samples, { actionConsequence: "medium" }),
+    ).toMatchObject({
+      blockedArtifacts: 0,
+      policyActionConsequence: "medium",
+      policyWouldBlockArtifacts: 1,
+      wouldBlockByInvariantClass: {
+        source_authority: 1,
+      },
+    });
+    expect(
+      analyzeStateReviewArtifacts(samples, {
+        actionConsequence: "high",
+        policyMatrix: {
+          freshness_window: {
+            high: "advisory",
+          },
+        },
+      }),
+    ).toMatchObject({
+      blockedArtifacts: 0,
+      policyActionConsequence: "high",
+      policyWouldBlockArtifacts: 1,
+      wouldBlockByInvariantClass: {
+        source_authority: 1,
+        projection_version: 1,
+      },
     });
   });
 
