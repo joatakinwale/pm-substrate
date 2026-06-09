@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-08 - ArrowHedge temporal fixture expansion
+
+- Added deterministic ArrowHedge state-review artifact fixture cases for `observation_to_action`, `action_to_feedback`, and `feedback_to_observation`, each with distinct scenario ids, fixture metadata, eval ids, warning shapes, and invariant classes.
+- Expanded ArrowHedge corpus and equivalence coverage so replayable JSONL, import validity, continuity payloads, warning codes, temporal phases, and invariant classes are checked across all three temporal misalignment phases.
+- Added eval artifact phase coverage metrics with required, covered, missing, and coverage-rate fields while preserving the existing `artifactsByTemporalMisalignmentPhase` bucket counts.
+- Verification: TDD red pass failed on the missing ArrowHedge fixture builder and missing metric coverage field; green pass completed with focused ArrowHedge/eval vitest coverage and both package typechecks.
+
 ## 2026-06-08 - Observed read-set capture
 
 - Added pure observed-read-set comparison in `@pm/agent-state` so declared proposal read sets can be checked against tool/source reads without DB or runtime mutation enforcement.

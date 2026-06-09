@@ -535,7 +535,138 @@ describe("eval event metrics", () => {
         "pm.agent_state.action_proposal_reviewed.v1": 2,
       },
       artifactsByTemporalMisalignmentPhase: {},
+      temporalMisalignmentPhaseCoverage: {
+        requiredPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        coveredPhases: [],
+        missingPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        coverageRate: 0,
+      },
       artifactsByInvariantClass: {},
+    });
+  });
+
+  it("reports complete temporal-misalignment phase coverage across artifact samples", () => {
+    expect(
+      analyzeStateReviewArtifacts([
+        {
+          artifactHash: "a".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [{ role: "ticker_symbol" }],
+          metadata: {
+            temporalMisalignmentPhase: "observation_to_action",
+            invariantClasses: ["freshness_window"],
+          },
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              { source: "read_set", code: "stale_read_ref", severity: "warn" },
+            ],
+          },
+        },
+        {
+          artifactHash: "b".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [{ role: "execution_feedback" }],
+          metadata: {
+            temporalMisalignmentPhase: "action_to_feedback",
+            invariantClasses: ["source_authority", "projection_version"],
+          },
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              { source: "read_set", code: "authority_mismatch", severity: "warn" },
+              {
+                source: "read_set",
+                code: "projection_version_mismatch",
+                severity: "warn",
+              },
+            ],
+          },
+        },
+        {
+          artifactHash: "c".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [{ role: "feedback_observation_gap" }],
+          metadata: {
+            temporalMisalignmentPhase: "feedback_to_observation",
+            invariantClasses: ["required_evidence"],
+          },
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              {
+                source: "observation_contract",
+                code: "required_source_refs_present",
+                severity: "fail",
+              },
+            ],
+          },
+        },
+      ]),
+    ).toMatchObject({
+      artifactsByTemporalMisalignmentPhase: {
+        observation_to_action: 1,
+        action_to_feedback: 1,
+        feedback_to_observation: 1,
+      },
+      artifactsByInvariantClass: {
+        freshness_window: 1,
+        source_authority: 1,
+        projection_version: 1,
+        required_evidence: 1,
+      },
+      temporalMisalignmentPhaseCoverage: {
+        requiredPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        coveredPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        missingPhases: [],
+        coverageRate: 1,
+      },
     });
   });
 
@@ -608,6 +739,11 @@ describe("eval event metrics", () => {
         hashVerifiedArtifacts: 1,
         artifactsByTemporalMisalignmentPhase: {
           observation_to_action: 1,
+        },
+        temporalMisalignmentPhaseCoverage: {
+          coveredPhases: ["observation_to_action"],
+          missingPhases: ["action_to_feedback", "feedback_to_observation"],
+          coverageRate: 1 / 3,
         },
         artifactsByInvariantClass: {
           freshness_window: 1,

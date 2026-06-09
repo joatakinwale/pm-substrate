@@ -740,6 +740,15 @@ export interface ArrowHedgeStateReviewArtifactCorpusInput
   readonly scenarioId: string;
 }
 
+export interface ArrowHedgeTemporalMisalignmentFixtureCasesInput
+  extends ArrowHedgeCurrentStateViewInput {
+  readonly observationCapturedAt: Timestamp;
+  readonly observationToActionProposedAt: Timestamp;
+  readonly actionToFeedbackProposedAt: Timestamp;
+  readonly feedbackToObservationProposedAt: Timestamp;
+  readonly proposedBy?: string;
+}
+
 export interface ArrowHedgeStateReviewArtifactCorpus {
   readonly artifacts: readonly StateReviewArtifact[];
   readonly jsonl: string;
@@ -962,6 +971,176 @@ export function buildArrowHedgeStateReviewArtifactCorpus(
     continuityPayloads: artifacts.map((artifact) =>
       buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact(artifact),
     ),
+  };
+}
+
+export function buildArrowHedgeTemporalMisalignmentFixtureCases(
+  input: ArrowHedgeTemporalMisalignmentFixtureCasesInput,
+): readonly ArrowHedgeStateReviewArtifactCorpusInput[] {
+  const originalView = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = input.state.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!originalView || !decisionId) return [];
+
+  const originalObservation =
+    buildObservationContractFromCurrentStateView(originalView);
+  const proposedBy = input.proposedBy ?? "agent:portfolio-manager";
+  const feedbackReadSet = buildReadSetFromCurrentStateView(
+    originalView,
+    `arrowhedge:execution-feedback:${input.symbol}`,
+  ).map((entry) => ({
+    ...entry,
+    ...(input.projectionVersion !== undefined
+      ? { projectionVersion: input.projectionVersion - 1 }
+      : {}),
+  }));
+  const feedbackObservationState = omitLatestRiskState(input.state, input.symbol);
+  const feedbackObservationView = buildArrowHedgeCurrentStateView({
+    ...input,
+    state: feedbackObservationState,
+    evaluatedAt: input.feedbackToObservationProposedAt,
+  });
+  if (!feedbackObservationView) return [];
+
+  return [
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-observation-to-action-stale-risk",
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId },
+      proposedBy,
+      proposedAt: input.observationToActionProposedAt,
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      artifact: {
+        artifactId: "artifact_arrowhedge_observation_to_action_stale_risk_001",
+        metadata: {
+          temporalMisalignmentPhase: "observation_to_action",
+          invariantClasses: [
+            "freshness_window",
+            "workflow_position",
+            "state_conflict",
+          ],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/temporal-observation-to-action-stale-risk.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-temporal-fixture-observation-action",
+          workflowRunId: "arrowhedge-temporal-workflow-observation-action",
+          evalEventIds: ["eval_arrowhedge_observation_to_action"],
+        },
+      },
+    },
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-action-to-feedback-authority-drift",
+      actionType: "risk.refresh",
+      payload: {
+        decisionId,
+        feedbackId: `feedback:${decisionId}:post_action_authority`,
+      },
+      proposedBy,
+      proposedAt: input.actionToFeedbackProposedAt,
+      readSet: feedbackReadSet,
+      observationContract: originalObservation,
+      artifact: {
+        artifactId: "artifact_arrowhedge_action_to_feedback_authority_001",
+        metadata: {
+          temporalMisalignmentPhase: "action_to_feedback",
+          invariantClasses: ["source_authority", "projection_version"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/temporal-action-to-feedback-authority.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-temporal-fixture-action-feedback",
+          workflowRunId: "arrowhedge-temporal-workflow-action-feedback",
+          evalEventIds: ["eval_arrowhedge_action_to_feedback"],
+        },
+      },
+    },
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: feedbackObservationState,
+      scenarioId: "arrowhedge-feedback-to-observation-missing-risk",
+      actionType: "risk.refresh",
+      payload: {
+        decisionId,
+        missingObservation: "risk_state",
+      },
+      proposedBy,
+      proposedAt: input.feedbackToObservationProposedAt,
+      readSet: buildReadSetFromCurrentStateView(
+        feedbackObservationView,
+        feedbackObservationView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      artifact: {
+        artifactId:
+          "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
+        metadata: {
+          temporalMisalignmentPhase: "feedback_to_observation",
+          invariantClasses: ["required_evidence"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/temporal-feedback-to-observation-missing-risk.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-temporal-fixture-feedback-observation",
+          workflowRunId: "arrowhedge-temporal-workflow-feedback-observation",
+          evalEventIds: ["eval_arrowhedge_feedback_to_observation"],
+        },
+      },
+    },
+  ];
+}
+
+function omitLatestRiskState(
+  state: ArrowHedgeCommonOperatingPictureState,
+  symbol: string,
+): ArrowHedgeCommonOperatingPictureState {
+  const ticker = state.tickers[symbol];
+  if (!ticker) return state;
+
+  const tickerWithoutRiskState: ArrowHedgeTickerCop = {
+    symbol: ticker.symbol,
+    ...(ticker.latestSignal !== undefined
+      ? { latestSignal: ticker.latestSignal }
+      : {}),
+    ...(ticker.latestDecision !== undefined
+      ? { latestDecision: ticker.latestDecision }
+      : {}),
+    authorityGate: ticker.authorityGate,
+    stateDisagreements: ticker.stateDisagreements,
+    staleBlocks: ticker.staleBlocks,
+  };
+  return {
+    ...state,
+    tickers: {
+      ...state.tickers,
+      [symbol]: tickerWithoutRiskState,
+    },
   };
 }
 

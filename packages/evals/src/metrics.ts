@@ -24,6 +24,17 @@ import {
   type StateBenchCategory,
 } from "./schema.js";
 
+export type RequiredStateReviewTemporalMisalignmentPhase = Exclude<
+  StateReviewTemporalMisalignmentPhase,
+  "none"
+>;
+
+export const REQUIRED_STATE_REVIEW_TEMPORAL_MISALIGNMENT_PHASES = [
+  "observation_to_action",
+  "action_to_feedback",
+  "feedback_to_observation",
+] as const satisfies readonly RequiredStateReviewTemporalMisalignmentPhase[];
+
 export interface IncompletePairedGroup {
   readonly pairedRunGroup: string;
   readonly missingArms: readonly RunArm[];
@@ -171,6 +182,13 @@ export interface StateReviewArtifactSample {
   readonly review: ActionProposalReviewSample;
 }
 
+export interface StateReviewTemporalMisalignmentPhaseCoverage {
+  readonly requiredPhases: readonly RequiredStateReviewTemporalMisalignmentPhase[];
+  readonly coveredPhases: readonly RequiredStateReviewTemporalMisalignmentPhase[];
+  readonly missingPhases: readonly RequiredStateReviewTemporalMisalignmentPhase[];
+  readonly coverageRate: number;
+}
+
 export interface StateReviewArtifactMetrics {
   readonly totalArtifacts: number;
   readonly hashVerifiedArtifacts: number;
@@ -191,6 +209,7 @@ export interface StateReviewArtifactMetrics {
   readonly artifactsBySource: Readonly<Record<string, number>>;
   readonly artifactsByType: Readonly<Record<string, number>>;
   readonly artifactsByTemporalMisalignmentPhase: Readonly<Record<string, number>>;
+  readonly temporalMisalignmentPhaseCoverage: StateReviewTemporalMisalignmentPhaseCoverage;
   readonly artifactsByInvariantClass: Readonly<Record<string, number>>;
 }
 
@@ -601,10 +620,32 @@ export function analyzeStateReviewArtifacts(
       temporalMisalignmentPhases,
       (phase) => phase,
     ),
+    temporalMisalignmentPhaseCoverage: analyzeTemporalMisalignmentPhaseCoverage(
+      temporalMisalignmentPhases,
+    ),
     artifactsByInvariantClass: countBy(
       invariantClasses,
       (invariantClass) => invariantClass,
     ),
+  };
+}
+
+function analyzeTemporalMisalignmentPhaseCoverage(
+  phases: readonly StateReviewTemporalMisalignmentPhase[],
+): StateReviewTemporalMisalignmentPhaseCoverage {
+  const covered = REQUIRED_STATE_REVIEW_TEMPORAL_MISALIGNMENT_PHASES.filter(
+    (phase) => phases.includes(phase),
+  );
+  const missing = REQUIRED_STATE_REVIEW_TEMPORAL_MISALIGNMENT_PHASES.filter(
+    (phase) => !phases.includes(phase),
+  );
+
+  return {
+    requiredPhases: REQUIRED_STATE_REVIEW_TEMPORAL_MISALIGNMENT_PHASES,
+    coveredPhases: covered,
+    missingPhases: missing,
+    coverageRate:
+      covered.length / REQUIRED_STATE_REVIEW_TEMPORAL_MISALIGNMENT_PHASES.length,
   };
 }
 

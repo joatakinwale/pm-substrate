@@ -17,6 +17,7 @@ import {
   compareArrowHedgeStateReviewArtifactCorpusEquivalence,
   buildArrowHedgeStateReviewArtifactCorpus,
   buildArrowHedgeStateReviewArtifact,
+  buildArrowHedgeTemporalMisalignmentFixtureCases,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
@@ -670,6 +671,166 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     });
     const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_corpus");
     const state = await foldPlanIntoCop(projection, plan);
+
+    const phaseCases = buildArrowHedgeTemporalMisalignmentFixtureCases({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const corpus = buildArrowHedgeStateReviewArtifactCorpus(phaseCases);
+
+    const imported = importStateReviewArtifactsJsonl(corpus.jsonl);
+
+    expect(corpus.artifacts).toHaveLength(3);
+    expect(corpus.artifacts.map((artifact) => artifact.artifactId)).toEqual([
+      "artifact_arrowhedge_observation_to_action_stale_risk_001",
+      "artifact_arrowhedge_action_to_feedback_authority_001",
+      "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
+    ]);
+    expect(corpus.artifacts.map((artifact) => artifact.metadata)).toEqual([
+      expect.objectContaining({
+        scenarioId: "arrowhedge-observation-to-action-stale-risk",
+        temporalMisalignmentPhase: "observation_to_action",
+        invariantClasses: ["freshness_window", "workflow_position", "state_conflict"],
+        fixtureId:
+          "fixtures/arrowhedge/state-review-artifacts/temporal-observation-to-action-stale-risk.json",
+        clientSurface: "codex",
+        provider: "openai",
+        sessionId: "arrowhedge-temporal-fixture-observation-action",
+        workflowRunId: "arrowhedge-temporal-workflow-observation-action",
+        evalEventIds: ["eval_arrowhedge_observation_to_action"],
+      }),
+      expect.objectContaining({
+        scenarioId: "arrowhedge-action-to-feedback-authority-drift",
+        temporalMisalignmentPhase: "action_to_feedback",
+        invariantClasses: ["source_authority", "projection_version"],
+        fixtureId:
+          "fixtures/arrowhedge/state-review-artifacts/temporal-action-to-feedback-authority.json",
+        clientSurface: "codex",
+        provider: "openai",
+        sessionId: "arrowhedge-temporal-fixture-action-feedback",
+        workflowRunId: "arrowhedge-temporal-workflow-action-feedback",
+        evalEventIds: ["eval_arrowhedge_action_to_feedback"],
+      }),
+      expect.objectContaining({
+        scenarioId: "arrowhedge-feedback-to-observation-missing-risk",
+        temporalMisalignmentPhase: "feedback_to_observation",
+        invariantClasses: ["required_evidence"],
+        fixtureId:
+          "fixtures/arrowhedge/state-review-artifacts/temporal-feedback-to-observation-missing-risk.json",
+        clientSurface: "codex",
+        provider: "openai",
+        sessionId: "arrowhedge-temporal-fixture-feedback-observation",
+        workflowRunId: "arrowhedge-temporal-workflow-feedback-observation",
+        evalEventIds: ["eval_arrowhedge_feedback_to_observation"],
+      }),
+    ]);
+    expect(
+      corpus.artifacts.map((artifact) =>
+        Array.from(new Set(artifact.review.warnings.map((warning) => warning.code))),
+      ),
+    ).toEqual([
+      expect.arrayContaining([
+        "current_view_conflict",
+        "stale_read_ref",
+        "freshness_window_current",
+        "workflow_position_mismatch",
+      ]),
+      expect.arrayContaining([
+        "authority_mismatch",
+        "projection_version_mismatch",
+      ]),
+      expect.arrayContaining([
+        "missing_read_ref",
+        "required_source_refs_present",
+        "missing_sources_declared",
+      ]),
+    ]);
+    expect(imported).toMatchObject([
+      {
+        valid: true,
+        artifact: {
+          artifactId: "artifact_arrowhedge_observation_to_action_stale_risk_001",
+        },
+      },
+      {
+        valid: true,
+        artifact: {
+          artifactId: "artifact_arrowhedge_action_to_feedback_authority_001",
+        },
+      },
+      {
+        valid: true,
+        artifact: {
+          artifactId:
+            "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
+        },
+      },
+    ]);
+    expect(corpus.continuityPayloads).toEqual([
+      expect.objectContaining({
+        currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+        stateReviewArtifactId:
+          "artifact_arrowhedge_observation_to_action_stale_risk_001",
+        reviewId:
+          "arrowhedge_cop_corpus:AAPL:current_state_view:portfolio.decision.accept:proposal_review",
+        valid: false,
+        warningCodes: expect.arrayContaining([
+          "current_view_conflict",
+          "stale_read_ref",
+          "freshness_window_current",
+          "workflow_position_mismatch",
+        ]),
+      }),
+      expect.objectContaining({
+        currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+        stateReviewArtifactId:
+          "artifact_arrowhedge_action_to_feedback_authority_001",
+        reviewId:
+          "arrowhedge_cop_corpus:AAPL:current_state_view:risk.refresh:proposal_review",
+        valid: false,
+        warningCodes: expect.arrayContaining([
+          "authority_mismatch",
+          "projection_version_mismatch",
+        ]),
+      }),
+      expect.objectContaining({
+        currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+        stateReviewArtifactId:
+          "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
+        reviewId:
+          "arrowhedge_cop_corpus:AAPL:current_state_view:risk.refresh:proposal_review",
+        valid: false,
+        warningCodes: expect.arrayContaining([
+          "missing_read_ref",
+          "required_source_refs_present",
+          "missing_sources_declared",
+        ]),
+      }),
+    ]);
+    expect(corpus.jsonl).toBe(
+      buildArrowHedgeStateReviewArtifactCorpus(phaseCases).jsonl,
+    );
+  });
+
+  it("keeps the legacy single-case corpus deterministic", async () => {
+    const tenant = tenantId("tnt_arrowhedge_state_review_corpus_legacy");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_corpus_legacy",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
     const originalView = buildArrowHedgeCurrentStateView({
       tenantId: tenant,
       projectionName: projection.name,
@@ -737,10 +898,11 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     ]);
     expect(corpus.continuityPayloads).toEqual([
       expect.objectContaining({
-        currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+        currentStateViewId:
+          "arrowhedge_cop_corpus_legacy:AAPL:current_state_view",
         stateReviewArtifactId: "artifact_arrowhedge_corpus_stale_001",
         reviewId:
-          "arrowhedge_cop_corpus:AAPL:current_state_view:portfolio.decision.accept:proposal_review",
+          "arrowhedge_cop_corpus_legacy:AAPL:current_state_view:portfolio.decision.accept:proposal_review",
         valid: false,
         warningCodes: expect.arrayContaining([
           "stale_read_ref",
@@ -796,51 +958,34 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     const projectedShapeState = JSON.parse(
       JSON.stringify(fixtureState),
     ) as ArrowHedgeCommonOperatingPictureState;
-    const originalView = buildArrowHedgeCurrentStateView({
+    const commonCaseInput = {
       tenantId: tenant,
       projectionName: projection.name,
       projectionVersion: projection.version,
       symbol: "AAPL",
-      state: fixtureState,
-      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
-    })!;
-    const originalObservation =
-      buildObservationContractFromCurrentStateView(originalView);
-    const commonInput = {
-      tenantId: tenant,
-      projectionName: projection.name,
-      projectionVersion: projection.version,
-      symbol: "AAPL",
-      scenarioId: "arrowhedge-distribution-currentness-equivalence",
-      actionType: "portfolio.decision.accept",
-      payload: { decisionId: "dec_aapl_buy_120" },
       proposedBy: "agent:portfolio-manager",
-      proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
-      readSet: buildReadSetFromCurrentStateView(
-        originalView,
-        originalView.authorityRule,
-      ),
-      observationContract: originalObservation,
-      artifact: {
-        artifactId: "artifact_arrowhedge_equivalence_stale_001",
-        metadata: {
-          fixtureId:
-            "fixtures/arrowhedge/state-review-artifacts/aapl-equivalence.json",
-          clientSurface: "codex",
-          provider: "openai",
-          sessionId: "arrowhedge-session-equivalence-001",
-        },
-      },
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
     } as const;
+    const fixtureInputs = buildArrowHedgeTemporalMisalignmentFixtureCases({
+      ...commonCaseInput,
+      state: fixtureState,
+    });
+    const projectedInputs = buildArrowHedgeTemporalMisalignmentFixtureCases({
+      ...commonCaseInput,
+      state: projectedShapeState,
+    });
 
     const equivalence = compareArrowHedgeStateReviewArtifactCorpusEquivalence({
       fixture: {
         label: "fixture-cop",
-        inputs: [{ ...commonInput, state: fixtureState }],
+        inputs: fixtureInputs,
       },
       projected: {
         label: "persisted-shape-cop",
-        inputs: [{ ...commonInput, state: projectedShapeState }],
+        inputs: projectedInputs,
       },
     });
 
@@ -848,31 +993,61 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(equivalence.mismatches).toEqual([]);
     expect(equivalence.fixture).toMatchObject({
       canonicalArtifactJsonl: equivalence.projected.canonicalArtifactJsonl,
-      replayHashValid: [true],
+      replayHashValid: [true, true, true],
       artifactHashes: equivalence.projected.artifactHashes,
-      continuityArtifactIds: ["artifact_arrowhedge_equivalence_stale_001"],
+      continuityArtifactIds: [
+        "artifact_arrowhedge_observation_to_action_stale_risk_001",
+        "artifact_arrowhedge_action_to_feedback_authority_001",
+        "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
+      ],
       continuityArtifactHashes: equivalence.projected.continuityArtifactHashes,
       continuityWarningCodes: [
         expect.arrayContaining([
+          "current_view_conflict",
           "stale_read_ref",
           "freshness_window_current",
           "workflow_position_mismatch",
+        ]),
+        expect.arrayContaining([
+          "authority_mismatch",
+          "projection_version_mismatch",
+        ]),
+        expect.arrayContaining([
+          "missing_read_ref",
+          "required_source_refs_present",
+          "missing_sources_declared",
         ]),
       ],
       warningCodes: [
         expect.arrayContaining([
+          "current_view_conflict",
           "stale_read_ref",
           "freshness_window_current",
           "workflow_position_mismatch",
         ]),
-      ],
-      temporalPhases: ["observation_to_action"],
-      invariantClasses: [
         expect.arrayContaining([
-          "freshness_window",
-          "workflow_position",
-          "state_conflict",
+          "authority_mismatch",
+          "projection_version_mismatch",
         ]),
+        expect.arrayContaining([
+          "missing_read_ref",
+          "required_source_refs_present",
+          "missing_sources_declared",
+        ]),
+      ],
+      temporalPhases: [
+        "observation_to_action",
+        "action_to_feedback",
+        "feedback_to_observation",
+      ],
+      invariantClasses: [
+        [
+          "freshness_window",
+          "state_conflict",
+          "workflow_position",
+        ],
+        ["projection_version", "source_authority"],
+        ["required_evidence"],
       ],
     });
   });
