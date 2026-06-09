@@ -32,7 +32,12 @@ describe("ArrowHedge state eval suite", () => {
         mode: "warn",
         issueCodes: ["stale_read_ref", "workflow_position_mismatch"],
       },
-      stateReviewArtifactIds: ["artifact_arrowhedge_stale_read_001"],
+      stateReviewArtifacts: [
+        {
+          scenarioId: "arrowhedge-distribution-currentness-mismatch",
+          artifactId: "artifact_arrowhedge_stale_read_001",
+        },
+      ],
       operationalSamples: [
         {
           adapterStartedAt: timestamp("2026-06-03T16:29:58.000Z"),
@@ -57,41 +62,26 @@ describe("ArrowHedge state eval suite", () => {
       "arrowhedge-distribution-currentness-mismatch",
     );
     expect(suite.events).toHaveLength(12);
-    expect(
-      suite.events
-        .filter((event) => event.runArm === "substrate")
-        .flatMap((event) => event.substrateRefs)
-        .filter((ref) => ref.kind === "state_review_artifact"),
-    ).toEqual([
+    const artifactLinkedEvents = suite.events
+      .filter((event) =>
+        event.substrateRefs.some((ref) => ref.kind === "state_review_artifact"),
+      )
+      .map((event) => ({
+        scenarioId: event.scenarioId,
+        refs: event.substrateRefs.filter(
+          (ref) => ref.kind === "state_review_artifact",
+        ),
+      }));
+    expect(artifactLinkedEvents).toEqual([
       {
-        kind: "state_review_artifact",
-        id: "artifact_arrowhedge_stale_read_001",
-        label: "ArrowHedge StateReviewArtifact",
-      },
-      {
-        kind: "state_review_artifact",
-        id: "artifact_arrowhedge_stale_read_001",
-        label: "ArrowHedge StateReviewArtifact",
-      },
-      {
-        kind: "state_review_artifact",
-        id: "artifact_arrowhedge_stale_read_001",
-        label: "ArrowHedge StateReviewArtifact",
-      },
-      {
-        kind: "state_review_artifact",
-        id: "artifact_arrowhedge_stale_read_001",
-        label: "ArrowHedge StateReviewArtifact",
-      },
-      {
-        kind: "state_review_artifact",
-        id: "artifact_arrowhedge_stale_read_001",
-        label: "ArrowHedge StateReviewArtifact",
-      },
-      {
-        kind: "state_review_artifact",
-        id: "artifact_arrowhedge_stale_read_001",
-        label: "ArrowHedge StateReviewArtifact",
+        scenarioId: "arrowhedge-distribution-currentness-mismatch",
+        refs: [
+          {
+            kind: "state_review_artifact",
+            id: "artifact_arrowhedge_stale_read_001",
+            label: "ArrowHedge StateReviewArtifact",
+          },
+        ],
       },
     ]);
 

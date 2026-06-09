@@ -25,10 +25,16 @@ export interface ArrowHedgeStateEvalInput {
     readonly mode: "warn";
     readonly issueCodes: readonly string[];
   };
-  readonly stateReviewArtifactIds?: readonly string[];
+  readonly stateReviewArtifacts?: readonly ArrowHedgeStateReviewArtifactEvalRef[];
   readonly operationalSamples: readonly AdapterOperationalSample[];
   readonly runIdPrefix?: string;
   readonly agentId?: string;
+}
+
+export interface ArrowHedgeStateReviewArtifactEvalRef {
+  readonly scenarioId: string;
+  readonly artifactId: string;
+  readonly label?: string;
 }
 
 export interface ArrowHedgeScenarioSummary {
@@ -132,7 +138,7 @@ export function buildArrowHedgeStateEvalSuite(
 ): ArrowHedgeStateEvalSuite {
   const runIdPrefix = input.runIdPrefix ?? "run_arrowhedge_axis_a";
   const agentId = input.agentId ?? "arrowhedge_axis_a_agent";
-  const substrateRefs = [
+  const commonSubstrateRefs = [
     ...input.substrateRefs.graphNodeIds.map((id) => evalEvidenceRef("graph_node", id)),
     ...input.substrateRefs.eventIds.map((id) => evalEvidenceRef("event", id)),
     ...input.substrateRefs.projectionIds.map((id) =>
@@ -147,9 +153,6 @@ export function buildArrowHedgeStateEvalSuite(
           ),
         ]
       : []),
-    ...(input.stateReviewArtifactIds ?? []).map((id) =>
-      evalEvidenceRef("state_review_artifact", id, "ArrowHedge StateReviewArtifact"),
-    ),
   ];
   const evidenceRefs = input.sourceRecordIds.map((id) =>
     evalEvidenceRef("source_record", id),
@@ -157,6 +160,10 @@ export function buildArrowHedgeStateEvalSuite(
 
   const pairs = SCENARIOS.map((scenario) => {
     const pairedRunGroup = `pair_${scenario.scenarioId}`;
+    const substrateRefs = [
+      ...commonSubstrateRefs,
+      ...stateReviewArtifactRefsForScenario(scenario.scenarioId, input),
+    ];
     const baseline = evalEvent({
       tenantId: input.tenantId,
       axis: "finance",
@@ -230,6 +237,21 @@ export function buildArrowHedgeStateEvalSuite(
     summaries: pairs.map((pair) => pair.summary),
     operationalSamples: input.operationalSamples,
   };
+}
+
+function stateReviewArtifactRefsForScenario(
+  scenarioId: string,
+  input: ArrowHedgeStateEvalInput,
+) {
+  return (input.stateReviewArtifacts ?? [])
+    .filter((artifact) => artifact.scenarioId === scenarioId)
+    .map((artifact) =>
+      evalEvidenceRef(
+        "state_review_artifact",
+        artifact.artifactId,
+        artifact.label ?? "ArrowHedge StateReviewArtifact",
+      ),
+    );
 }
 
 function score(result: EvalResult): number {

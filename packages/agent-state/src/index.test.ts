@@ -6,6 +6,7 @@ import {
   buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
   buildReadSetFromCurrentStateView,
   buildStateReviewArtifact,
+  computeStateReviewArtifactHash,
   evaluateObservationContract,
   importStateReviewArtifact,
   importStateReviewArtifactsJsonl,
@@ -527,6 +528,62 @@ describe("@pm/agent-state read-set validation", () => {
       artifact: {
         artifactId: "artifact_arrowhedge_jsonl_002",
       },
+    });
+  });
+
+  it("rejects malformed nested artifact shape even when the canonical hash matches", () => {
+    const view = baseView();
+    const artifact = buildStateReviewArtifact(
+      reviewProposedActionAgainstCurrentState(actionFrom(view), view),
+    );
+    const malformedPayload = {
+      ...artifact,
+      metadata: {
+        ...artifact.metadata,
+        invariantClasses: "freshness_window",
+      },
+      review: {
+        ...artifact.review,
+        observationEvaluation: {
+          ...artifact.review.observationEvaluation,
+          assertions: [{ code: "freshness_window_current", passed: false, severity: "warn" }],
+        },
+        warnings: [{ source: "read_set", code: "stale_read_ref", severity: "warn" }],
+      },
+    };
+    const { artifactHash: _artifactHash, ...hashPayload } = malformedPayload;
+    const malformed = {
+      ...malformedPayload,
+      artifactHash: computeStateReviewArtifactHash(hashPayload),
+    };
+
+    expect(importStateReviewArtifact(malformed)).toMatchObject({
+      valid: false,
+      hashValidation: {
+        valid: true,
+      },
+      issues: expect.arrayContaining([
+        {
+          path: "/metadata/invariantClasses",
+          message: "expected array",
+        },
+        {
+          path: "/review/observationEvaluation/assertions/0/message",
+          message: "expected non-empty string",
+        },
+        {
+          path: "/review/observationEvaluation/assertions/0/refs",
+          message: "expected array",
+        },
+        {
+          path: "/review/warnings/0/message",
+          message: "expected non-empty string",
+        },
+        {
+          path: "/review/warnings/0/refs",
+          message: "expected array",
+        },
+      ]),
     });
   });
 

@@ -1014,19 +1014,322 @@ function validateStateReviewArtifactShape(
   }
   if (!isRecord(input["eventEnvelope"])) {
     issues.push({ path: "/eventEnvelope", message: "expected object" });
+  } else {
+    validateStateReviewEventEnvelopeShape(input["eventEnvelope"], issues);
   }
   if (!isRecord(input["provenance"])) {
     issues.push({ path: "/provenance", message: "expected object" });
+  } else {
+    validateStateReviewProvenanceShape(input["provenance"], issues);
   }
   if (!isRecord(input["metadata"])) {
     issues.push({ path: "/metadata", message: "expected object" });
+  } else {
+    validateStateReviewMetadataShape(input["metadata"], issues);
   }
   if (!isRecord(input["review"])) {
     issues.push({ path: "/review", message: "expected object" });
+  } else {
+    validateActionProposalReviewShape(input["review"], issues);
   }
   if (!isNonEmptyString(input["artifactHash"])) {
     issues.push({ path: "/artifactHash", message: "expected non-empty string" });
   }
+}
+
+function validateStateReviewEventEnvelopeShape(
+  input: Record<string, unknown>,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  validateNonEmptyStringField(input, "id", "/eventEnvelope/id", issues);
+  validateNonEmptyStringField(input, "source", "/eventEnvelope/source", issues);
+  validateNonEmptyStringField(input, "type", "/eventEnvelope/type", issues);
+  validateNonEmptyStringField(input, "time", "/eventEnvelope/time", issues);
+  validateNonEmptyStringField(input, "subject", "/eventEnvelope/subject", issues);
+  if (input["specversion"] !== STATE_REVIEW_EVENT_SPEC_VERSION) {
+    issues.push({
+      path: "/eventEnvelope/specversion",
+      message: `expected ${STATE_REVIEW_EVENT_SPEC_VERSION}`,
+    });
+  }
+}
+
+function validateStateReviewProvenanceShape(
+  input: Record<string, unknown>,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  validateNonEmptyStringField(input, "generatedBy", "/provenance/generatedBy", issues);
+  validateNonEmptyStringField(
+    input,
+    "associatedAgent",
+    "/provenance/associatedAgent",
+    issues,
+  );
+  validateArrayField(input, "used", "/provenance/used", issues);
+  validateArrayField(input, "derivedFrom", "/provenance/derivedFrom", issues);
+  validateArrayField(input, "links", "/provenance/links", issues);
+}
+
+function validateStateReviewMetadataShape(
+  input: Record<string, unknown>,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  if (!isStateReviewTemporalMisalignmentPhase(input["temporalMisalignmentPhase"])) {
+    issues.push({
+      path: "/metadata/temporalMisalignmentPhase",
+      message: "expected supported temporal misalignment phase",
+    });
+  }
+
+  const invariantClasses = input["invariantClasses"];
+  if (!Array.isArray(invariantClasses)) {
+    issues.push({
+      path: "/metadata/invariantClasses",
+      message: "expected array",
+    });
+    return;
+  }
+
+  for (const [index, invariantClass] of invariantClasses.entries()) {
+    if (!isStateReviewInvariantClass(invariantClass)) {
+      issues.push({
+        path: `/metadata/invariantClasses/${index}`,
+        message: "expected supported invariant class",
+      });
+    }
+  }
+}
+
+function validateActionProposalReviewShape(
+  input: Record<string, unknown>,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  validateNonEmptyStringField(input, "reviewId", "/review/reviewId", issues);
+  validateNonEmptyStringField(input, "tenantId", "/review/tenantId", issues);
+  if (input["mode"] !== "warn") {
+    issues.push({ path: "/review/mode", message: "expected warn" });
+  }
+  validateBooleanField(input, "valid", "/review/valid", issues);
+  validateRecordField(input, "proposedAction", "/review/proposedAction", issues);
+  const currentStateView = validateRecordField(
+    input,
+    "currentStateView",
+    "/review/currentStateView",
+    issues,
+  );
+  if (currentStateView) {
+    validateNonEmptyStringField(
+      currentStateView,
+      "viewId",
+      "/review/currentStateView/viewId",
+      issues,
+    );
+    validateNonEmptyStringField(
+      currentStateView,
+      "authorityRule",
+      "/review/currentStateView/authorityRule",
+      issues,
+    );
+    validateArrayField(
+      currentStateView,
+      "sourceRefs",
+      "/review/currentStateView/sourceRefs",
+      issues,
+    );
+  }
+
+  const observationContract = validateRecordField(
+    input,
+    "observationContract",
+    "/review/observationContract",
+    issues,
+  );
+  if (observationContract) {
+    validateNonEmptyStringField(
+      observationContract,
+      "contractId",
+      "/review/observationContract/contractId",
+      issues,
+    );
+  }
+
+  const observationEvaluation = validateRecordField(
+    input,
+    "observationEvaluation",
+    "/review/observationEvaluation",
+    issues,
+  );
+  if (observationEvaluation) {
+    if (validateArrayField(
+      observationEvaluation,
+      "assertions",
+      "/review/observationEvaluation/assertions",
+      issues,
+    )) {
+      validateStateAssertionArray(
+        observationEvaluation["assertions"] as readonly unknown[],
+        "/review/observationEvaluation/assertions",
+        issues,
+      );
+    }
+  }
+
+  validateRecordField(input, "readSetValidation", "/review/readSetValidation", issues);
+  const execution = validateRecordField(input, "execution", "/review/execution", issues);
+  if (execution) {
+    validateBooleanField(execution, "allowed", "/review/execution/allowed", issues);
+    validateBooleanField(execution, "blocking", "/review/execution/blocking", issues);
+    validateNonEmptyStringField(
+      execution,
+      "enforcementMode",
+      "/review/execution/enforcementMode",
+      issues,
+    );
+  }
+  if (validateArrayField(input, "warnings", "/review/warnings", issues)) {
+    validateActionProposalWarningArray(
+      input["warnings"] as readonly unknown[],
+      "/review/warnings",
+      issues,
+    );
+  }
+}
+
+function validateStateAssertionArray(
+  assertions: readonly unknown[],
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  for (const [index, assertion] of assertions.entries()) {
+    const itemPath = `${path}/${index}`;
+    if (!isRecord(assertion)) {
+      issues.push({ path: itemPath, message: "expected object" });
+      continue;
+    }
+    validateNonEmptyStringField(assertion, "code", `${itemPath}/code`, issues);
+    validateBooleanField(assertion, "passed", `${itemPath}/passed`, issues);
+    validateNonEmptyStringField(assertion, "message", `${itemPath}/message`, issues);
+    validateArrayField(assertion, "refs", `${itemPath}/refs`, issues);
+    if (
+      assertion["severity"] !== "info" &&
+      assertion["severity"] !== "warn" &&
+      assertion["severity"] !== "fail"
+    ) {
+      issues.push({
+        path: `${itemPath}/severity`,
+        message: "expected info|warn|fail",
+      });
+    }
+  }
+}
+
+function validateActionProposalWarningArray(
+  warnings: readonly unknown[],
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  for (const [index, warning] of warnings.entries()) {
+    const itemPath = `${path}/${index}`;
+    if (!isRecord(warning)) {
+      issues.push({ path: itemPath, message: "expected object" });
+      continue;
+    }
+    if (warning["source"] !== "read_set" && warning["source"] !== "observation_contract") {
+      issues.push({
+        path: `${itemPath}/source`,
+        message: "expected read_set|observation_contract",
+      });
+    }
+    validateNonEmptyStringField(warning, "code", `${itemPath}/code`, issues);
+    validateNonEmptyStringField(warning, "message", `${itemPath}/message`, issues);
+    validateArrayField(warning, "refs", `${itemPath}/refs`, issues);
+    if (
+      warning["severity"] !== "info" &&
+      warning["severity"] !== "warn" &&
+      warning["severity"] !== "fail"
+    ) {
+      issues.push({
+        path: `${itemPath}/severity`,
+        message: "expected info|warn|fail",
+      });
+    }
+  }
+}
+
+function validateNonEmptyStringField(
+  input: Record<string, unknown>,
+  key: string,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  if (!isNonEmptyString(input[key])) {
+    issues.push({ path, message: "expected non-empty string" });
+  }
+}
+
+function validateBooleanField(
+  input: Record<string, unknown>,
+  key: string,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  if (typeof input[key] !== "boolean") {
+    issues.push({ path, message: "expected boolean" });
+  }
+}
+
+function validateArrayField(
+  input: Record<string, unknown>,
+  key: string,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): boolean {
+  if (!Array.isArray(input[key])) {
+    issues.push({ path, message: "expected array" });
+    return false;
+  }
+  return true;
+}
+
+function validateRecordField(
+  input: Record<string, unknown>,
+  key: string,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): Record<string, unknown> | null {
+  const value = input[key];
+  if (!isRecord(value)) {
+    issues.push({ path, message: "expected object" });
+    return null;
+  }
+  return value;
+}
+
+function isStateReviewTemporalMisalignmentPhase(
+  value: unknown,
+): value is StateReviewTemporalMisalignmentPhase {
+  return (
+    value === "none" ||
+    value === "observation_to_action" ||
+    value === "action_to_feedback" ||
+    value === "feedback_to_observation"
+  );
+}
+
+function isStateReviewInvariantClass(
+  value: unknown,
+): value is StateReviewInvariantClass {
+  return (
+    value === "subject_identity" ||
+    value === "tenant_boundary" ||
+    value === "required_evidence" ||
+    value === "freshness_window" ||
+    value === "source_authority" ||
+    value === "projection_version" ||
+    value === "workflow_position" ||
+    value === "state_conflict" ||
+    value === "capability_contract"
+  );
 }
 
 function sameStringSet(left: readonly string[], right: readonly string[]): boolean {

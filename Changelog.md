@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-08 - StateReviewArtifact import hardening
+
+- Hardened `StateReviewArtifact` import validation so malformed nested metadata, assertion, and warning shapes are rejected even when the canonical artifact hash is recomputed and replay hash validation passes.
+- Scoped ArrowHedge `state_review_artifact` eval refs to their matching scenario instead of attaching artifact evidence to every substrate event in the suite.
+- Review gates: fresh spec-compliance and code-quality subagents approved the Task A diff after focused verification.
+- Verification: `pnpm vitest run packages/agent-state/src/index.test.ts packages/evals/src/arrowhedge.test.ts`, `pnpm -r --filter @pm/agent-state --filter @pm/evals run typecheck`, and `git diff --check`.
+
 ## 2026-06-08 - Superpowers plan stash repair
 
 - Investigated `stash@{0}` and confirmed it contained only a deletion of the newer `docs/superpowers/plans/2026-05-27-three-axis-state-validation.md` plan, so applying it directly would lose the better copy.

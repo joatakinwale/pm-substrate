@@ -82,6 +82,7 @@ export {
 export {
   buildArrowHedgeStateEvalSuite,
   type ArrowHedgeScenarioSummary,
+  type ArrowHedgeStateReviewArtifactEvalRef,
   type ArrowHedgeStateEvalInput,
   type ArrowHedgeStateEvalSuite,
 } from "./arrowhedge.js";
