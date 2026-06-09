@@ -63,6 +63,17 @@ export interface ReadSetEntry {
   readonly projectionVersion?: number;
 }
 
+export interface ObservedReadSetEntry {
+  readonly ref: StateRef;
+  readonly observedAt: Timestamp;
+  readonly validUntil?: Timestamp;
+  readonly authority: string;
+  readonly projectionVersion?: number;
+  readonly workflowPosition?: string;
+  readonly source?: string;
+  readonly tool?: string;
+}
+
 export interface ProposedAction {
   readonly tenantId: TenantId;
   readonly actionType: string;
@@ -96,6 +107,31 @@ export interface ReadSetValidationDecision {
   readonly valid: boolean;
   readonly mode: "warn";
   readonly issues: readonly ReadSetValidationIssue[];
+}
+
+export type ObservedReadSetValidationIssueCode =
+  | "observed_but_undeclared"
+  | "declared_but_unobserved"
+  | "stale_observed_read"
+  | "authority_mismatch"
+  | "projection_version_drift"
+  | "workflow_position_drift";
+
+export interface ObservedReadSetValidationIssue {
+  readonly code: ObservedReadSetValidationIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly ref?: StateRef;
+  readonly declaredIndex?: number;
+  readonly observedIndex?: number;
+}
+
+export interface ObservedReadSetComparison {
+  readonly valid: boolean;
+  readonly mode: "warn";
+  readonly declaredReadSet: readonly ReadSetEntry[];
+  readonly observedReadSet: readonly ObservedReadSetEntry[];
+  readonly issues: readonly ObservedReadSetValidationIssue[];
 }
 
 export interface ObservationContract {
@@ -257,6 +293,8 @@ export interface StateReviewArtifactMetadataInput {
   readonly sessionId?: string;
   readonly workflowRunId?: string;
   readonly evalEventIds?: readonly string[];
+  readonly observedReadSet?: readonly ObservedReadSetEntry[];
+  readonly observedReadSetComparison?: ObservedReadSetComparison;
 }
 
 export interface StateReviewArtifactMetadata
@@ -359,6 +397,120 @@ export function buildReadSetFromCurrentStateView(
     };
     return entry;
   });
+}
+
+export function compareObservedReadSetToDeclared(
+  declaredReadSet: readonly ReadSetEntry[],
+  observedReadSet: readonly ObservedReadSetEntry[],
+  view: Pick<CurrentStateView, "authorityRule" | "projectionVersion" | "workflowPosition">,
+  proposedAt: Timestamp,
+): ObservedReadSetComparison {
+  const issues: ObservedReadSetValidationIssue[] = [];
+
+  for (const [index, observedEntry] of observedReadSet.entries()) {
+    const declaredIndex = declaredReadSet.findIndex((entry) =>
+      sameStateRef(entry.ref, observedEntry.ref),
+    );
+    const declaredEntry =
+      declaredIndex === -1 ? undefined : declaredReadSet[declaredIndex];
+    if (declaredEntry === undefined) {
+      issues.push({
+        code: "observed_but_undeclared",
+        path: `/observedReadSet/${index}/ref`,
+        message: `Observed state ref ${formatStateRef(observedEntry.ref)} was not declared in the proposal read set.`,
+        ref: observedEntry.ref,
+        observedIndex: index,
+      });
+    }
+  }
+
+  for (const [index, declaredEntry] of declaredReadSet.entries()) {
+    if (!observedReadSet.some((entry) => sameStateRef(entry.ref, declaredEntry.ref))) {
+      issues.push({
+        code: "declared_but_unobserved",
+        path: `/declaredReadSet/${index}/ref`,
+        message: `Declared state ref ${formatStateRef(declaredEntry.ref)} was not observed by the tool/source read set.`,
+        ref: declaredEntry.ref,
+        declaredIndex: index,
+      });
+    }
+  }
+
+  for (const [index, observedEntry] of observedReadSet.entries()) {
+    const declaredIndex = declaredReadSet.findIndex((entry) =>
+      sameStateRef(entry.ref, observedEntry.ref),
+    );
+    const declaredEntry =
+      declaredIndex === -1 ? undefined : declaredReadSet[declaredIndex];
+
+    if (
+      observedEntry.validUntil !== undefined &&
+      isAfter(proposedAt, observedEntry.validUntil)
+    ) {
+      issues.push({
+        code: "stale_observed_read",
+        path: `/observedReadSet/${index}/validUntil`,
+        message: `Observed state ref ${formatStateRef(observedEntry.ref)} expired at ${observedEntry.validUntil} before action proposal at ${proposedAt}.`,
+        ref: observedEntry.ref,
+        ...(declaredIndex !== -1 ? { declaredIndex } : {}),
+        observedIndex: index,
+      });
+    }
+
+    if (declaredEntry === undefined) continue;
+
+    const expectedAuthority = declaredEntry.authority;
+    if (observedEntry.authority !== expectedAuthority) {
+      issues.push({
+        code: "authority_mismatch",
+        path: `/observedReadSet/${index}/authority`,
+        message: `Observed state ref ${formatStateRef(observedEntry.ref)} used authority ${observedEntry.authority}; expected ${expectedAuthority}.`,
+        ref: observedEntry.ref,
+        declaredIndex,
+        observedIndex: index,
+      });
+    }
+
+    const expectedProjectionVersion =
+      declaredEntry.projectionVersion ?? view.projectionVersion;
+    if (
+      observedEntry.projectionVersion !== undefined &&
+      expectedProjectionVersion !== undefined &&
+      observedEntry.projectionVersion !== expectedProjectionVersion
+    ) {
+      issues.push({
+        code: "projection_version_drift",
+        path: `/observedReadSet/${index}/projectionVersion`,
+        message: `Observed state ref ${formatStateRef(observedEntry.ref)} used projection version ${observedEntry.projectionVersion}; expected ${expectedProjectionVersion}.`,
+        ref: observedEntry.ref,
+        declaredIndex,
+        observedIndex: index,
+      });
+    }
+
+    if (
+      observedEntry.workflowPosition !== undefined &&
+      view.workflowPosition !== undefined &&
+      observedEntry.workflowPosition !== view.workflowPosition
+    ) {
+      issues.push({
+        code: "workflow_position_drift",
+        path: `/observedReadSet/${index}/workflowPosition`,
+        message: `Observed state ref ${formatStateRef(observedEntry.ref)} used workflow position ${observedEntry.workflowPosition}; current position is ${view.workflowPosition}.`,
+        ref: observedEntry.ref,
+        declaredIndex,
+        observedIndex: index,
+      });
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    mode: "warn",
+    declaredReadSet,
+    observedReadSet,
+    issues,
+  };
 }
 
 export function buildObservationContractFromCurrentStateView(
@@ -921,6 +1073,16 @@ function buildStateReviewArtifactMetadata(
   review: ActionProposalReview,
   input: StateReviewArtifactMetadataInput | undefined,
 ): StateReviewArtifactMetadata {
+  const observedReadSetComparison =
+    input?.observedReadSet !== undefined
+      ? compareObservedReadSetToDeclared(
+          review.proposedAction.readSet,
+          input.observedReadSet,
+          review.currentStateView,
+          review.proposedAction.proposedAt,
+        )
+      : input?.observedReadSetComparison;
+
   return {
     temporalMisalignmentPhase:
       input?.temporalMisalignmentPhase ??
@@ -939,6 +1101,12 @@ function buildStateReviewArtifactMetadata(
       : {}),
     ...(input?.evalEventIds !== undefined
       ? { evalEventIds: input.evalEventIds }
+      : {}),
+    ...(input?.observedReadSet !== undefined
+      ? { observedReadSet: input.observedReadSet }
+      : {}),
+    ...(observedReadSetComparison !== undefined
+      ? { observedReadSetComparison }
       : {}),
   };
 }
@@ -1096,6 +1264,168 @@ function validateStateReviewMetadataShape(
         path: `/metadata/invariantClasses/${index}`,
         message: "expected supported invariant class",
       });
+    }
+  }
+
+  if (input["observedReadSet"] !== undefined) {
+    if (validateArrayField(input, "observedReadSet", "/metadata/observedReadSet", issues)) {
+      validateObservedReadSetArray(
+        input["observedReadSet"] as readonly unknown[],
+        "/metadata/observedReadSet",
+        issues,
+      );
+    }
+  }
+
+  if (input["observedReadSetComparison"] !== undefined) {
+    const comparison = validateRecordField(
+      input,
+      "observedReadSetComparison",
+      "/metadata/observedReadSetComparison",
+      issues,
+    );
+    if (comparison) {
+      validateObservedReadSetComparisonShape(
+        comparison,
+        "/metadata/observedReadSetComparison",
+        issues,
+      );
+    }
+  }
+}
+
+function validateObservedReadSetComparisonShape(
+  input: Record<string, unknown>,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  validateBooleanField(input, "valid", `${path}/valid`, issues);
+  if (input["mode"] !== "warn") {
+    issues.push({ path: `${path}/mode`, message: "expected warn" });
+  }
+
+  if (validateArrayField(input, "declaredReadSet", `${path}/declaredReadSet`, issues)) {
+    validateDeclaredReadSetArray(
+      input["declaredReadSet"] as readonly unknown[],
+      `${path}/declaredReadSet`,
+      issues,
+    );
+  }
+  if (validateArrayField(input, "observedReadSet", `${path}/observedReadSet`, issues)) {
+    validateObservedReadSetArray(
+      input["observedReadSet"] as readonly unknown[],
+      `${path}/observedReadSet`,
+      issues,
+    );
+  }
+  if (validateArrayField(input, "issues", `${path}/issues`, issues)) {
+    validateObservedReadSetIssueArray(
+      input["issues"] as readonly unknown[],
+      `${path}/issues`,
+      issues,
+    );
+  }
+}
+
+function validateDeclaredReadSetArray(
+  readSet: readonly unknown[],
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  for (const [index, entry] of readSet.entries()) {
+    const itemPath = `${path}/${index}`;
+    if (!isRecord(entry)) {
+      issues.push({ path: itemPath, message: "expected object" });
+      continue;
+    }
+    validateReadSetEntryShape(entry, itemPath, issues);
+  }
+}
+
+function validateObservedReadSetArray(
+  readSet: readonly unknown[],
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  for (const [index, entry] of readSet.entries()) {
+    const itemPath = `${path}/${index}`;
+    if (!isRecord(entry)) {
+      issues.push({ path: itemPath, message: "expected object" });
+      continue;
+    }
+    validateReadSetEntryShape(entry, itemPath, issues);
+    validateOptionalStringField(entry, "workflowPosition", `${itemPath}/workflowPosition`, issues);
+    validateOptionalStringField(entry, "source", `${itemPath}/source`, issues);
+    validateOptionalStringField(entry, "tool", `${itemPath}/tool`, issues);
+  }
+}
+
+function validateReadSetEntryShape(
+  input: Record<string, unknown>,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  const ref = validateRecordField(input, "ref", `${path}/ref`, issues);
+  if (ref) {
+    validateStateRefShape(ref, `${path}/ref`, issues);
+  }
+  validateNonEmptyStringField(input, "observedAt", `${path}/observedAt`, issues);
+  validateNonEmptyStringField(input, "authority", `${path}/authority`, issues);
+  validateOptionalStringField(input, "validUntil", `${path}/validUntil`, issues);
+  validateOptionalNumberField(
+    input,
+    "projectionVersion",
+    `${path}/projectionVersion`,
+    issues,
+  );
+}
+
+function validateStateRefShape(
+  input: Record<string, unknown>,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  validateNonEmptyStringField(input, "kind", `${path}/kind`, issues);
+  validateNonEmptyStringField(input, "id", `${path}/id`, issues);
+  validateOptionalStringField(input, "label", `${path}/label`, issues);
+}
+
+function validateObservedReadSetIssueArray(
+  readSetIssues: readonly unknown[],
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  for (const [index, issue] of readSetIssues.entries()) {
+    const itemPath = `${path}/${index}`;
+    if (!isRecord(issue)) {
+      issues.push({ path: itemPath, message: "expected object" });
+      continue;
+    }
+    if (!isObservedReadSetIssueCode(issue["code"])) {
+      issues.push({
+        path: `${itemPath}/code`,
+        message: "expected supported observed read-set issue code",
+      });
+    }
+    validateNonEmptyStringField(issue, "path", `${itemPath}/path`, issues);
+    validateNonEmptyStringField(issue, "message", `${itemPath}/message`, issues);
+    validateOptionalNonNegativeIntegerField(
+      issue,
+      "declaredIndex",
+      `${itemPath}/declaredIndex`,
+      issues,
+    );
+    validateOptionalNonNegativeIntegerField(
+      issue,
+      "observedIndex",
+      `${itemPath}/observedIndex`,
+      issues,
+    );
+    if (issue["ref"] !== undefined) {
+      const ref = validateRecordField(issue, "ref", `${itemPath}/ref`, issues);
+      if (ref) {
+        validateStateRefShape(ref, `${itemPath}/ref`, issues);
+      }
     }
   }
 }
@@ -1267,6 +1597,42 @@ function validateNonEmptyStringField(
   }
 }
 
+function validateOptionalStringField(
+  input: Record<string, unknown>,
+  key: string,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  if (input[key] !== undefined && !isNonEmptyString(input[key])) {
+    issues.push({ path, message: "expected non-empty string" });
+  }
+}
+
+function validateOptionalNumberField(
+  input: Record<string, unknown>,
+  key: string,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  if (input[key] !== undefined && typeof input[key] !== "number") {
+    issues.push({ path, message: "expected number" });
+  }
+}
+
+function validateOptionalNonNegativeIntegerField(
+  input: Record<string, unknown>,
+  key: string,
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  if (
+    input[key] !== undefined &&
+    (!Number.isInteger(input[key]) || (input[key] as number) < 0)
+  ) {
+    issues.push({ path, message: "expected non-negative integer" });
+  }
+}
+
 function validateBooleanField(
   input: Record<string, unknown>,
   key: string,
@@ -1329,6 +1695,19 @@ function isStateReviewInvariantClass(
     value === "workflow_position" ||
     value === "state_conflict" ||
     value === "capability_contract"
+  );
+}
+
+function isObservedReadSetIssueCode(
+  value: unknown,
+): value is ObservedReadSetValidationIssueCode {
+  return (
+    value === "observed_but_undeclared" ||
+    value === "declared_but_unobserved" ||
+    value === "stale_observed_read" ||
+    value === "authority_mismatch" ||
+    value === "projection_version_drift" ||
+    value === "workflow_position_drift"
   );
 }
 

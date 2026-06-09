@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-08 - Observed read-set capture
+
+- Added pure observed-read-set comparison in `@pm/agent-state` so declared proposal read sets can be checked against tool/source reads without DB or runtime mutation enforcement.
+- Warn-mode comparison now reports observed-but-undeclared refs, declared-but-unobserved refs, stale observed reads, authority mismatch, projection-version drift, and workflow-position drift.
+- Threaded optional observed read-set samples and comparison output into `StateReviewArtifact` metadata while keeping v1 artifact imports backward-compatible when those fields are absent.
+- Verification: red/green focused TDD pass on `packages/agent-state/src/index.test.ts`, plus `@pm/agent-state` typecheck.
+
 ## 2026-06-08 - ArrowHedge DB/fixture artifact equivalence
 
 - Added an executable ArrowHedge `StateReviewArtifact` equivalence helper that compares canonical JSONL, import/replay hash validity, continuity ids/hashes, warning codes, temporal phase, and invariant classes across fixture and projected COP state.

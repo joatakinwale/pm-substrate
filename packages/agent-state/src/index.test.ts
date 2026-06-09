@@ -6,6 +6,7 @@ import {
   buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
   buildReadSetFromCurrentStateView,
   buildStateReviewArtifact,
+  compareObservedReadSetToDeclared,
   computeStateReviewArtifactHash,
   evaluateObservationContract,
   importStateReviewArtifact,
@@ -167,6 +168,93 @@ describe("@pm/agent-state read-set validation", () => {
       "projection_version_mismatch",
       "workflow_position_mismatch",
     ]);
+  });
+
+  it("compares declared proposal read sets against observed tool reads without blocking execution", () => {
+    const view = baseView();
+    const declared = [
+      {
+        ref: signalRef,
+        observedAt: timestamp("2026-06-03T14:00:00.000Z"),
+        validUntil: timestamp("2026-06-03T14:10:00.000Z"),
+        authority: view.authorityRule,
+        projectionVersion: 1,
+      },
+      {
+        ref: riskRef,
+        observedAt: timestamp("2026-06-03T14:00:00.000Z"),
+        validUntil: timestamp("2026-06-03T14:10:00.000Z"),
+        authority: view.authorityRule,
+        projectionVersion: 1,
+      },
+    ];
+
+    const comparison = compareObservedReadSetToDeclared(
+      declared,
+      [
+        {
+          ref: signalRef,
+          observedAt: timestamp("2026-06-03T13:59:00.000Z"),
+          validUntil: timestamp("2026-06-03T14:01:00.000Z"),
+          authority: "arrowhedge:paper_quote:latest",
+          projectionVersion: 0,
+          workflowPosition: "risk_refresh_pending",
+          tool: "arrowhedge.quote.read",
+          source: "broker_snapshot",
+        },
+        {
+          ref: decisionRef,
+          observedAt: timestamp("2026-06-03T14:03:00.000Z"),
+          authority: "arrowhedge:paper_quote:latest",
+          projectionVersion: 0,
+          workflowPosition: "risk_refresh_pending",
+          tool: "arrowhedge.decision.read",
+        },
+      ],
+      view,
+      timestamp("2026-06-03T14:05:00.000Z"),
+    );
+
+    expect(comparison).toMatchObject({
+      valid: false,
+      mode: "warn",
+      issues: [
+        { code: "observed_but_undeclared", path: "/observedReadSet/1/ref" },
+        { code: "declared_but_unobserved", path: "/declaredReadSet/1/ref" },
+        { code: "stale_observed_read", path: "/observedReadSet/0/validUntil" },
+        { code: "authority_mismatch", path: "/observedReadSet/0/authority" },
+        {
+          code: "projection_version_drift",
+          path: "/observedReadSet/0/projectionVersion",
+        },
+        {
+          code: "workflow_position_drift",
+          path: "/observedReadSet/0/workflowPosition",
+        },
+      ],
+    });
+    expect(comparison.observedReadSet.map((entry) => entry.tool)).toEqual([
+      "arrowhedge.quote.read",
+      "arrowhedge.decision.read",
+    ]);
+    expect(comparison.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "observed_but_undeclared",
+          observedIndex: 1,
+        }),
+        expect.objectContaining({
+          code: "authority_mismatch",
+          declaredIndex: 0,
+          observedIndex: 0,
+        }),
+      ]),
+    );
+    expect(
+      comparison.issues.filter((issue) => issue.path.startsWith("/observedReadSet/1/")),
+    ).toHaveLength(1);
+    expect(comparison.issues.some((issue) => "observedEntry" in issue)).toBe(false);
+    expect(comparison.issues.some((issue) => "declaredEntry" in issue)).toBe(false);
   });
 
   it("builds an observation contract from a current-state view", () => {
@@ -462,6 +550,24 @@ describe("@pm/agent-state read-set validation", () => {
         clientSurface: "codex",
         provider: "openai",
         sessionId: "session_arrowhedge_001",
+        observedReadSet: [
+          {
+            ref: signalRef,
+            observedAt: timestamp("2026-06-03T13:59:00.000Z"),
+            validUntil: timestamp("2026-06-03T14:01:00.000Z"),
+            authority: "arrowhedge:paper_quote:latest",
+            projectionVersion: 0,
+            workflowPosition: "risk_refresh_pending",
+            tool: "arrowhedge.quote.read",
+            source: "broker_snapshot",
+          },
+        ],
+        observedReadSetComparison: compareObservedReadSetToDeclared(
+          [],
+          [],
+          view,
+          review.proposedAction.proposedAt,
+        ),
       },
     });
 
@@ -473,6 +579,32 @@ describe("@pm/agent-state read-set validation", () => {
       clientSurface: "codex",
       provider: "openai",
       sessionId: "session_arrowhedge_001",
+      observedReadSet: [
+        {
+          ref: signalRef,
+          observedAt: "2026-06-03T13:59:00.000Z",
+          validUntil: "2026-06-03T14:01:00.000Z",
+          authority: "arrowhedge:paper_quote:latest",
+          projectionVersion: 0,
+          workflowPosition: "risk_refresh_pending",
+          tool: "arrowhedge.quote.read",
+          source: "broker_snapshot",
+        },
+      ],
+      observedReadSetComparison: expect.objectContaining({
+        valid: false,
+        mode: "warn",
+        issues: expect.arrayContaining([
+          expect.objectContaining({
+            code: "declared_but_unobserved",
+            path: "/declaredReadSet/1/ref",
+          }),
+          expect.objectContaining({
+            code: "stale_observed_read",
+            path: "/observedReadSet/0/validUntil",
+          }),
+        ]),
+      }),
     });
 
     const json = serializeStateReviewArtifact(artifact);
@@ -582,6 +714,61 @@ describe("@pm/agent-state read-set validation", () => {
         {
           path: "/review/warnings/0/refs",
           message: "expected array",
+        },
+      ]),
+    });
+  });
+
+  it("rejects malformed observed read-set issue metadata even when replay hash matches", () => {
+    const view = baseView();
+    const artifact = buildStateReviewArtifact(
+      reviewProposedActionAgainstCurrentState(actionFrom(view), view),
+    );
+    const malformedPayload = {
+      ...artifact,
+      metadata: {
+        ...artifact.metadata,
+        observedReadSetComparison: {
+          valid: false,
+          mode: "warn",
+          declaredReadSet: artifact.review.proposedAction.readSet,
+          observedReadSet: [],
+          issues: [
+            {
+              code: "declared_but_unobserved",
+              path: "/declaredReadSet/0/ref",
+              message: "declared ref was not observed",
+              declaredIndex: "0",
+              observedIndex: -1,
+              ref: { kind: "", id: "evt_signal" },
+            },
+          ],
+        },
+      },
+    };
+    const { artifactHash: _artifactHash, ...hashPayload } = malformedPayload;
+    const malformed = {
+      ...malformedPayload,
+      artifactHash: computeStateReviewArtifactHash(hashPayload),
+    };
+
+    expect(importStateReviewArtifact(malformed)).toMatchObject({
+      valid: false,
+      hashValidation: {
+        valid: true,
+      },
+      issues: expect.arrayContaining([
+        {
+          path: "/metadata/observedReadSetComparison/issues/0/declaredIndex",
+          message: "expected non-negative integer",
+        },
+        {
+          path: "/metadata/observedReadSetComparison/issues/0/observedIndex",
+          message: "expected non-negative integer",
+        },
+        {
+          path: "/metadata/observedReadSetComparison/issues/0/ref/kind",
+          message: "expected non-empty string",
         },
       ]),
     });
