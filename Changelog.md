@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-08 - ArrowHedge DB/fixture artifact equivalence
+
+- Added an executable ArrowHedge `StateReviewArtifact` equivalence helper that compares canonical JSONL, import/replay hash validity, continuity ids/hashes, warning codes, temporal phase, and invariant classes across fixture and projected COP state.
+- Added fixture-only coverage that runs without DB credentials, plus DB-gated integration coverage that compares the DB projection state against an in-memory fold when `PM_DATABASE_URL` is available.
+
 ## 2026-06-08 - StateReviewArtifact import hardening
 
 - Hardened `StateReviewArtifact` import validation so malformed nested metadata, assertion, and warning shapes are rejected even when the canonical artifact hash is recomputed and replay hash validation passes.

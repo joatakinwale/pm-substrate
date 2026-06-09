@@ -16,6 +16,7 @@ import {
   buildReadSetFromCurrentStateView,
   buildStateReviewArtifact,
   evaluateObservationContract,
+  importStateReviewArtifactsJsonl,
   reviewProposedActionAgainstCurrentState,
   serializeStateReviewArtifactsJsonl,
   stateRef,
@@ -31,6 +32,7 @@ import {
   type StateReviewArtifactOptions,
   type StateConflict,
   type StateRef,
+  verifyStateReviewArtifactHash,
 } from "@pm/agent-state";
 import type {
   EntityId,
@@ -744,6 +746,47 @@ export interface ArrowHedgeStateReviewArtifactCorpus {
   readonly continuityPayloads: readonly StateReviewArtifactContinuityPayload[];
 }
 
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceSource {
+  readonly label: string;
+  readonly inputs: readonly ArrowHedgeStateReviewArtifactCorpusInput[];
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceInput {
+  readonly fixture: ArrowHedgeStateReviewArtifactCorpusEquivalenceSource;
+  readonly projected: ArrowHedgeStateReviewArtifactCorpusEquivalenceSource;
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot {
+  readonly label: string;
+  readonly inputCount: number;
+  readonly artifactCount: number;
+  readonly canonicalArtifactJsonl: string;
+  readonly importValid: readonly boolean[];
+  readonly replayHashValid: readonly boolean[];
+  readonly artifactIds: readonly string[];
+  readonly artifactHashes: readonly string[];
+  readonly continuityArtifactIds: readonly string[];
+  readonly continuityArtifactHashes: readonly string[];
+  readonly continuityReviewIds: readonly string[];
+  readonly continuityWarningCodes: readonly (readonly string[])[];
+  readonly warningCodes: readonly (readonly string[])[];
+  readonly temporalPhases: readonly string[];
+  readonly invariantClasses: readonly (readonly string[])[];
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch {
+  readonly field: string;
+  readonly fixture: unknown;
+  readonly projected: unknown;
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalence {
+  readonly valid: boolean;
+  readonly mismatches: readonly ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch[];
+  readonly fixture: ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot;
+  readonly projected: ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot;
+}
+
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
   return {
     name,
@@ -920,6 +963,140 @@ export function buildArrowHedgeStateReviewArtifactCorpus(
       buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact(artifact),
     ),
   };
+}
+
+export function compareArrowHedgeStateReviewArtifactCorpusEquivalence(
+  input: ArrowHedgeStateReviewArtifactCorpusEquivalenceInput,
+): ArrowHedgeStateReviewArtifactCorpusEquivalence {
+  const fixture = summarizeStateReviewArtifactCorpusEquivalenceSource(
+    input.fixture,
+  );
+  const projected = summarizeStateReviewArtifactCorpusEquivalenceSource(
+    input.projected,
+  );
+  const comparedFields: readonly (keyof Omit<
+    ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot,
+    "label"
+  >)[] = [
+    "inputCount",
+    "artifactCount",
+    "canonicalArtifactJsonl",
+    "importValid",
+    "replayHashValid",
+    "artifactIds",
+    "artifactHashes",
+    "continuityArtifactIds",
+    "continuityArtifactHashes",
+    "continuityReviewIds",
+    "continuityWarningCodes",
+    "warningCodes",
+    "temporalPhases",
+    "invariantClasses",
+  ];
+  const mismatches: ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch[] = [];
+
+  for (const field of comparedFields) {
+    if (!sameEquivalenceValue(fixture[field], projected[field])) {
+      mismatches.push({
+        field,
+        fixture: fixture[field],
+        projected: projected[field],
+      });
+    }
+  }
+
+  appendValidityFailures(input.fixture.label, fixture, mismatches);
+  appendValidityFailures(input.projected.label, projected, mismatches);
+
+  return {
+    valid: mismatches.length === 0,
+    mismatches,
+    fixture,
+    projected,
+  };
+}
+
+function summarizeStateReviewArtifactCorpusEquivalenceSource(
+  source: ArrowHedgeStateReviewArtifactCorpusEquivalenceSource,
+): ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot {
+  const corpus = buildArrowHedgeStateReviewArtifactCorpus(source.inputs);
+  const imported = importStateReviewArtifactsJsonl(corpus.jsonl);
+
+  return {
+    label: source.label,
+    inputCount: source.inputs.length,
+    artifactCount: corpus.artifacts.length,
+    canonicalArtifactJsonl: corpus.jsonl,
+    importValid: imported.map((result) => result.valid),
+    replayHashValid: corpus.artifacts.map(
+      (artifact) => verifyStateReviewArtifactHash(artifact).valid,
+    ),
+    artifactIds: corpus.artifacts.map((artifact) => artifact.artifactId),
+    artifactHashes: corpus.artifacts.map((artifact) => artifact.artifactHash),
+    continuityArtifactIds: corpus.continuityPayloads.map(
+      (payload) => payload.stateReviewArtifactId,
+    ),
+    continuityArtifactHashes: corpus.continuityPayloads.map(
+      (payload) => payload.stateReviewArtifactHash,
+    ),
+    continuityReviewIds: corpus.continuityPayloads.map(
+      (payload) => payload.reviewId,
+    ),
+    continuityWarningCodes: corpus.continuityPayloads.map((payload) =>
+      sortedStrings(payload.warningCodes),
+    ),
+    warningCodes: corpus.artifacts.map((artifact) =>
+      sortedStrings(artifact.review.warnings.map((warning) => warning.code)),
+    ),
+    temporalPhases: corpus.artifacts.map(
+      (artifact) => artifact.metadata.temporalMisalignmentPhase,
+    ),
+    invariantClasses: corpus.artifacts.map((artifact) =>
+      sortedStrings(artifact.metadata.invariantClasses),
+    ),
+  };
+}
+
+function appendValidityFailures(
+  label: string,
+  snapshot: ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot,
+  mismatches: ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch[],
+): void {
+  if (snapshot.inputCount === 0) {
+    mismatches.push({
+      field: `${label}.inputCount`,
+      fixture: "at least 1",
+      projected: snapshot.inputCount,
+    });
+  } else if (snapshot.artifactCount !== snapshot.inputCount) {
+    mismatches.push({
+      field: `${label}.artifactCount`,
+      fixture: snapshot.inputCount,
+      projected: snapshot.artifactCount,
+    });
+  }
+  if (snapshot.importValid.some((valid) => !valid)) {
+    mismatches.push({
+      field: `${label}.importValid`,
+      fixture: snapshot.importValid.map(() => true),
+      projected: snapshot.importValid,
+    });
+  }
+  if (snapshot.replayHashValid.some((valid) => !valid)) {
+    mismatches.push({
+      field: `${label}.replayHashValid`,
+      fixture: snapshot.replayHashValid.map(() => true),
+      projected: snapshot.replayHashValid,
+    });
+  }
+}
+
+function sameEquivalenceValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sortedStrings(values: readonly string[]): readonly string[] {
+  return [...values].sort((left, right) => left.localeCompare(right));
 }
 
 export function validateArrowHedgeTypedEventPayload(

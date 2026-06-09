@@ -14,6 +14,7 @@ import {
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
+  compareArrowHedgeStateReviewArtifactCorpusEquivalence,
   buildArrowHedgeStateReviewArtifactCorpus,
   buildArrowHedgeStateReviewArtifact,
   createArrowHedgeCommonOperatingPictureProjection,
@@ -778,6 +779,188 @@ describe("ArrowHedge Common Operating Picture projection", () => {
           },
         },
       ]).jsonl,
+    );
+  });
+
+  it("compares fixture and persisted-shape ArrowHedge state-review artifacts for canonical equivalence", async () => {
+    const tenant = tenantId("tnt_arrowhedge_state_review_equivalence");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_equivalence",
+    );
+    const fixtureState = await foldPlanIntoCop(projection, plan);
+    const projectedShapeState = JSON.parse(
+      JSON.stringify(fixtureState),
+    ) as ArrowHedgeCommonOperatingPictureState;
+    const originalView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state: fixtureState,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const originalObservation =
+      buildObservationContractFromCurrentStateView(originalView);
+    const commonInput = {
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      scenarioId: "arrowhedge-distribution-currentness-equivalence",
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId: "dec_aapl_buy_120" },
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      artifact: {
+        artifactId: "artifact_arrowhedge_equivalence_stale_001",
+        metadata: {
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/aapl-equivalence.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-session-equivalence-001",
+        },
+      },
+    } as const;
+
+    const equivalence = compareArrowHedgeStateReviewArtifactCorpusEquivalence({
+      fixture: {
+        label: "fixture-cop",
+        inputs: [{ ...commonInput, state: fixtureState }],
+      },
+      projected: {
+        label: "persisted-shape-cop",
+        inputs: [{ ...commonInput, state: projectedShapeState }],
+      },
+    });
+
+    expect(equivalence.valid).toBe(true);
+    expect(equivalence.mismatches).toEqual([]);
+    expect(equivalence.fixture).toMatchObject({
+      canonicalArtifactJsonl: equivalence.projected.canonicalArtifactJsonl,
+      replayHashValid: [true],
+      artifactHashes: equivalence.projected.artifactHashes,
+      continuityArtifactIds: ["artifact_arrowhedge_equivalence_stale_001"],
+      continuityArtifactHashes: equivalence.projected.continuityArtifactHashes,
+      continuityWarningCodes: [
+        expect.arrayContaining([
+          "stale_read_ref",
+          "freshness_window_current",
+          "workflow_position_mismatch",
+        ]),
+      ],
+      warningCodes: [
+        expect.arrayContaining([
+          "stale_read_ref",
+          "freshness_window_current",
+          "workflow_position_mismatch",
+        ]),
+      ],
+      temporalPhases: ["observation_to_action"],
+      invariantClasses: [
+        expect.arrayContaining([
+          "freshness_window",
+          "workflow_position",
+          "state_conflict",
+        ]),
+      ],
+    });
+  });
+
+  it("flags dropped artifact inputs during ArrowHedge state-review artifact equivalence", async () => {
+    const tenant = tenantId("tnt_arrowhedge_state_review_equivalence_drop");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_equivalence_drop",
+    );
+    const fixtureState = await foldPlanIntoCop(projection, plan);
+    const originalView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state: fixtureState,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const commonInput = {
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      scenarioId: "arrowhedge-dropped-input-equivalence",
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId: "dec_aapl_buy_120" },
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract:
+        buildObservationContractFromCurrentStateView(originalView),
+      artifact: {
+        artifactId: "artifact_arrowhedge_equivalence_valid_001",
+        metadata: {
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/aapl-equivalence-drop.json",
+        },
+      },
+    } as const;
+    const inputs = [
+      { ...commonInput, state: fixtureState },
+      {
+        ...commonInput,
+        symbol: "MSFT",
+        state: fixtureState,
+        artifact: {
+          artifactId: "artifact_arrowhedge_equivalence_missing_001",
+        },
+      },
+    ] as const;
+
+    const equivalence = compareArrowHedgeStateReviewArtifactCorpusEquivalence({
+      fixture: {
+        label: "fixture-cop",
+        inputs,
+      },
+      projected: {
+        label: "persisted-shape-cop",
+        inputs,
+      },
+    });
+
+    expect(equivalence.valid).toBe(false);
+    expect(equivalence.fixture).toMatchObject({
+      inputCount: 2,
+      artifactCount: 1,
+    });
+    expect(equivalence.mismatches).toEqual(
+      expect.arrayContaining([
+        {
+          field: "fixture-cop.artifactCount",
+          fixture: 2,
+          projected: 1,
+        },
+        {
+          field: "persisted-shape-cop.artifactCount",
+          fixture: 2,
+          projected: 1,
+        },
+      ]),
     );
   });
 });
