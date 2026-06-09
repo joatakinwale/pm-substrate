@@ -373,6 +373,9 @@ importers:
 
   packages/evals:
     dependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
       '@pm/types':
         specifier: workspace:*
         version: link:../types

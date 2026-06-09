@@ -81,6 +81,7 @@ export interface EvalEvidenceRef {
     | "capability_invocation"
     | "projection"
     | "source_record"
+    | "state_review_artifact"
     | "external_fixture"
     | "document";
   readonly id: string;
@@ -88,7 +89,7 @@ export interface EvalEvidenceRef {
 }
 ```
 
-Use `evidenceRefs` for the observations proving what happened. Use `substrateRefs` for substrate records involved in the run. A source fixture can appear in `evidenceRefs`; an event id, workflow run, graph node, projection, or continuity checkpoint should appear in `substrateRefs`.
+Use `evidenceRefs` for the observations proving what happened. Use `substrateRefs` for substrate records involved in the run. A source fixture can appear in `evidenceRefs`; an event id, workflow run, graph node, projection, continuity checkpoint, or `state_review_artifact` should appear in `substrateRefs`.
 
 ## Validation Rules
 
@@ -231,6 +232,7 @@ The optional taxonomy fields keep benchmark and cross-disciplinary labels querya
 | `contradiction_rate` | Count `memory_drift`, `source_authority_conflict`, and `continuity_break` failures with contradiction notes. |
 | `resume_success_rate` | Ratio of continuity scenarios that pass over all continuity scenarios not blocked. |
 | `replay_fidelity` | Ratio of replay scenarios that pass over all replay scenarios not blocked. |
+| `state_review_artifact_hash_verification_rate` | Ratio of imported `StateReviewArtifact` records whose canonical hash replays successfully. |
 | `workflow_invalid_transition_rate` | Count `workflow_invalidation` failures per workflow scenario. |
 | `capability_contract_violation_rate` | Count invalid invocation attempts and whether they were blocked before mutation. |
 | `mean_time_to_reconcile` | Later derived from conflict detection event time and resolution event time. |

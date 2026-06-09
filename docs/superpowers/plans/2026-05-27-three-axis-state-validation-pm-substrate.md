@@ -1,5 +1,7 @@
 # Three-Axis State Validation Implementation Plan
 
+Canonical plan path: `docs/superpowers/plans/2026-05-27-three-axis-state-validation-pm-substrate.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a falsifiable validation program that proves, weakens, or kills the pm-substrate state-coherence thesis across finance agents, marketing agents, and controlled local LLM/module agents.

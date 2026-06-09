@@ -12,10 +12,12 @@ import {
 } from "@pm/entity-mapping";
 import {
   buildObservationContractFromCurrentStateView,
+  buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
   buildReadSetFromCurrentStateView,
   buildStateReviewArtifact,
   evaluateObservationContract,
   reviewProposedActionAgainstCurrentState,
+  serializeStateReviewArtifactsJsonl,
   stateRef,
   type ActionProposalReviewEnforcementMode,
   type ActionProposalReview,
@@ -25,6 +27,7 @@ import {
   type ObservationContractEvaluation,
   type ReadSetEntry,
   type StateReviewArtifact,
+  type StateReviewArtifactContinuityPayload,
   type StateReviewArtifactOptions,
   type StateConflict,
   type StateRef,
@@ -727,6 +730,18 @@ export interface ArrowHedgeProposalReviewInput
 export interface ArrowHedgeStateReviewArtifactInput
   extends ArrowHedgeProposalReviewInput {
   readonly artifact?: StateReviewArtifactOptions;
+  readonly scenarioId?: string;
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusInput
+  extends ArrowHedgeStateReviewArtifactInput {
+  readonly scenarioId: string;
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpus {
+  readonly artifacts: readonly StateReviewArtifact[];
+  readonly jsonl: string;
+  readonly continuityPayloads: readonly StateReviewArtifactContinuityPayload[];
 }
 
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
@@ -866,11 +881,16 @@ export function buildArrowHedgeStateReviewArtifact(
   if (!review) return null;
 
   const artifactOptions = input.artifact ?? {};
+  const metadata = {
+    ...(artifactOptions.metadata ?? {}),
+    ...(input.scenarioId !== undefined ? { scenarioId: input.scenarioId } : {}),
+  };
   return buildStateReviewArtifact(review, {
     ...artifactOptions,
     artifactId:
       artifactOptions.artifactId ?? `${review.reviewId}:state_review_artifact`,
     source: artifactOptions.source ?? `arrowhedge/${input.projectionName}`,
+    metadata,
     relatedObjects: [
       {
         role: "ticker_symbol",
@@ -883,6 +903,23 @@ export function buildArrowHedgeStateReviewArtifact(
       ...(artifactOptions.relatedObjects ?? []),
     ],
   });
+}
+
+export function buildArrowHedgeStateReviewArtifactCorpus(
+  inputs: readonly ArrowHedgeStateReviewArtifactCorpusInput[],
+): ArrowHedgeStateReviewArtifactCorpus {
+  const artifacts = inputs.flatMap((input) => {
+    const artifact = buildArrowHedgeStateReviewArtifact(input);
+    return artifact === null ? [] : [artifact];
+  });
+
+  return {
+    artifacts,
+    jsonl: serializeStateReviewArtifactsJsonl(artifacts),
+    continuityPayloads: artifacts.map((artifact) =>
+      buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact(artifact),
+    ),
+  };
 }
 
 export function validateArrowHedgeTypedEventPayload(

@@ -78,6 +78,29 @@ describe("eval event schema", () => {
     expect(assertEvalEvent(baseEvent)).toEqual(baseEvent);
   });
 
+  it("allows eval events to cite durable state-review artifacts", () => {
+    const event = evalEvent({
+      ...baseEvent,
+      evidenceStage: "detected_warning",
+      evidenceRefs: [
+        evalEvidenceRef(
+          "state_review_artifact",
+          "artifact_arrowhedge_stale_read_001",
+          "ArrowHedge stale-read review artifact",
+        ),
+      ],
+      substrateRefs: [
+        ...baseEvent.substrateRefs,
+        evalEvidenceRef(
+          "state_review_artifact",
+          "artifact_arrowhedge_stale_read_001",
+        ),
+      ],
+    });
+
+    expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
+  });
+
   it("collects shape and enum issues without short-circuiting", () => {
     const result = validateEvalEvent({
       ...baseEvent,

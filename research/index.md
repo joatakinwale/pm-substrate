@@ -58,17 +58,16 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 
 ## Current Implementation Frontier
 
-1. Generate deterministic ArrowHedge state-review JSON/JSONL artifacts from existing pure primitives.
-2. Derive `analyzeStateAssertions()`, `analyzeActionProposalReviews()`, and `analyzeStateReviewArtifacts()` inputs from generated artifacts.
-3. Classify generated artifacts by temporal misalignment phase and invariant class.
-4. Add DB/fixture equivalence for state-review artifact generation when `PM_DATABASE_URL` is available.
-5. Define the first invariant-class blocking-policy matrix.
-6. Link continuity checkpoints and handoff summaries to state-review artifact ids.
-7. Add object-centric related refs and qualified roles for multi-object action validity.
+1. Expand the deterministic ArrowHedge state-review JSON/JSONL corpus beyond the first generated corpus builder.
+2. Add DB/fixture equivalence for state-review artifact generation when `PM_DATABASE_URL` is available.
+3. Define the first invariant-class blocking-policy matrix.
+4. Link real continuity checkpoints and handoff summaries to state-review artifact ids/hashes.
+5. Add observed read-set capture so artifacts can compare declared reads with what agents actually consumed.
+6. Add object-centric related refs and qualified roles for multi-object action validity.
+7. Add temporal fixtures for action-to-feedback and feedback-to-observation drift; current artifact metadata covers the phase labels but the first executable fixture is observation-to-action.
 8. Keep competitive-intelligence research tied to whether vendors solve currentness, authority, provenance, workflow validity, and pre-action review, not just memory/RAG.
-9. Add client/plugin/provider/session metadata to state-review artifacts so OpenAI, GitHub, Microsoft, Google, and AWS control-plane changes can be represented in evals.
-10. Add ServiceNow comparator fixtures for governed action completeness.
-11. Add competitor-inspired fixtures for Slack/CRM writes, GitHub/Cursor coding sessions, AWS Step Functions agent steps, Atlassian graph writes, Asana work-graph actions, ServiceNow deploys, and Google Workspace shared artifacts.
+9. Add ServiceNow comparator fixtures for governed action completeness.
+10. Add competitor-inspired fixtures for Slack/CRM writes, GitHub/Cursor coding sessions, AWS Step Functions agent steps, Atlassian graph writes, Asana work-graph actions, ServiceNow deploys, and Google Workspace shared artifacts.
 
 ## Ledger Entries
 
@@ -85,11 +84,12 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | L009 | 2026-06-08 | `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` | L008 | Added temporal state misalignment phases, AdaPlanBench progressive constraints, semantic commit/abort limits, cross-step evidence aggregation, and PM accountability/common-understanding mechanisms. | Persist ArrowHedge state-review artifacts, derive eval metrics from artifacts, and classify temporal phases before policy blocking. |
 | L010 | 2026-06-08 | `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` | AI competitive-intelligence pending setup | First competitive-intelligence run found no fresh vendor proof of pm-substrate-equivalent operational-state artifacts; OpenAI/GitHub/Microsoft/Google/AWS are Medium to Medium-high control-plane threats, and ServiceNow is the highest direct overlap baseline. | Add artifact persistence plus client/plugin/provider/session metadata and cross-source authority evals. |
 | L011 | 2026-06-08 | `research/daily-ai-competitive-intelligence/v02-ai-competitive-intelligence-2026-06-08.md` | L010 plus parallel local commit `bca9bda` reconciled with upstream `3a6d43f` | Preserved upstream v01 unchanged and added the local broader vendor scan as v02, escalating Atlassian, Asana, Cursor, Slack/Salesforce, and Cognition into the active watch set while keeping the complete `StateReviewArtifact` boundary unproven by vendors. | Continue from v02; inspect deeper technical docs for OpenAI/GitHub/AWS/Atlassian/Asana/Cursor/ServiceNow and implement persisted artifact fixtures. |
+| L012 | 2026-06-08 | Code implementation: durable `StateReviewArtifact` lifecycle | L009 | Added canonical artifact metadata, deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, and artifact-derived eval metrics. | Expand corpus coverage, add DB/fixture equivalence, observed read-set capture, and invariant-class policy. |
 
 ## Open Watchlist
 
 1. Continue daily AI competitive-intelligence monitoring for fresh primary evidence that vendors expose portable original-observation/read-set/action-review artifacts.
 2. Inspect whether OpenAI, Anthropic, Microsoft, Google, AWS, ServiceNow, Atlassian, Asana, Cursor, Slack/Salesforce, or other major vendors are solving currentness, authority, provenance, workflow validity, and pre-action review, or only memory/RAG/context/session/workflow/audit.
-3. Generate ArrowHedge state-review artifacts and update this ledger with artifact replay evidence.
-4. Add temporal-misalignment and progressive-constraint fixture metadata before claiming full stale-state coverage.
+3. Expand ArrowHedge state-review artifacts into a larger replay corpus and compare generated fixture artifacts against DB-backed artifacts.
+4. Add action-to-feedback and feedback-to-observation fixture cases before claiming full temporal-state coverage.
 5. Treat future merge conflicts or stale local research as evidence for the substrate thesis and record how they were reconciled.

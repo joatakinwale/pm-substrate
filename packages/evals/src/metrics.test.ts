@@ -1,4 +1,11 @@
 import { describe, expect, it } from "vitest";
+import {
+  buildReadSetFromCurrentStateView,
+  buildStateReviewArtifact,
+  reviewProposedActionAgainstCurrentState,
+  stateRef,
+  type CurrentStateView,
+} from "@pm/agent-state";
 import type { TenantId, Timestamp } from "@pm/types";
 
 import { evalEvidenceRef, type EvalEvent } from "./schema.js";
@@ -8,10 +15,17 @@ import {
   analyzeActionProposalReviews,
   analyzeStateAssertions,
   analyzeStateReviewArtifacts,
+  analyzeStateReviewArtifactEvidence,
+  actionProposalReviewsFromStateReviewArtifacts,
+  stateAssertionsFromStateReviewArtifacts,
+  stateReviewArtifactSamplesFromArtifacts,
 } from "./metrics.js";
 
 const tenantId = "tnt_metrics" as TenantId;
 const observedAt = "2026-06-03T15:00:00.000Z" as Timestamp;
+const signalRef = stateRef("event", "evt_signal", "analyst.signal.created");
+const riskRef = stateRef("event", "evt_risk", "risk.state.validated");
+const decisionRef = stateRef("event", "evt_decision", "portfolio.decision.proposed");
 
 function event(input: {
   readonly scenarioId: string;
@@ -45,6 +59,59 @@ function event(input: {
     result: input.result,
     notes: "metrics fixture",
   };
+}
+
+function currentStateView(): CurrentStateView {
+  return {
+    tenantId,
+    viewId: "arrowhedge_cop:AAPL:current_state_view",
+    subject: stateRef("projection", "arrowhedge_cop:AAPL", "AAPL COP"),
+    observedAt: "2026-06-03T14:00:00.000Z" as Timestamp,
+    validUntil: "2026-06-03T14:10:00.000Z" as Timestamp,
+    authorityRule: "arrowhedge:backtest:bt_aapl_breakout",
+    projectionVersion: 1,
+    workflowPosition: "decision_pending",
+    sourceRefs: [signalRef, riskRef, decisionRef],
+    missingSources: [],
+    conflicts: [],
+    allowedActions: [
+      {
+        actionType: "portfolio.decision.accept",
+        label: "Accept portfolio decision",
+        requiredRefs: [signalRef, riskRef, decisionRef],
+        requiredWorkflowPosition: "decision_pending",
+      },
+    ],
+  };
+}
+
+function persistedArtifactFixture() {
+  const view = currentStateView();
+  const review = reviewProposedActionAgainstCurrentState(
+    {
+      tenantId,
+      actionType: "portfolio.decision.accept",
+      subject: view.subject,
+      payload: { decisionId: "dec_aapl_buy_120" },
+      readSet: buildReadSetFromCurrentStateView(view, view.authorityRule),
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: "2026-06-03T14:11:00.000Z" as Timestamp,
+    },
+    view,
+  );
+
+  return buildStateReviewArtifact(review, {
+    artifactId: "artifact_arrowhedge_metrics_001",
+    source: "arrowhedge/arrowhedge_cop",
+    traceContext: {
+      traceparent:
+        "00-11111111111111111111111111111111-2222222222222222-01",
+    },
+    metadata: {
+      scenarioId: "arrowhedge-distribution-currentness-mismatch",
+      fixtureId: "fixtures/arrowhedge/state-review-artifacts/aapl-stale.json",
+    },
+  });
 }
 
 describe("eval event metrics", () => {
@@ -466,6 +533,85 @@ describe("eval event metrics", () => {
       },
       artifactsByType: {
         "pm.agent_state.action_proposal_reviewed.v1": 2,
+      },
+      artifactsByTemporalMisalignmentPhase: {},
+      artifactsByInvariantClass: {},
+    });
+  });
+
+  it("derives assertion, proposal-review, and artifact metrics from real state-review artifacts", () => {
+    const artifact = persistedArtifactFixture();
+    const assertionSamples = stateAssertionsFromStateReviewArtifacts([artifact]);
+    const reviewSamples = actionProposalReviewsFromStateReviewArtifacts([artifact]);
+    const artifactSamples = stateReviewArtifactSamplesFromArtifacts([artifact]);
+
+    expect(assertionSamples.map((sample) => sample.code)).toEqual([
+      "required_source_refs_present",
+      "authority_rule_matches",
+      "freshness_window_current",
+      "projection_version_matches",
+      "workflow_position_matches",
+      "conflicts_declared",
+      "missing_sources_declared",
+    ]);
+    expect(reviewSamples).toEqual([
+      {
+        valid: false,
+        mode: "warn",
+        execution: {
+          allowed: true,
+          blocking: false,
+          enforcementMode: "advisory",
+        },
+        warnings: [
+          { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          {
+            source: "observation_contract",
+            code: "freshness_window_current",
+            severity: "warn",
+          },
+        ],
+      },
+    ]);
+    expect(artifactSamples).toMatchObject([
+      {
+        artifactHash: artifact.artifactHash,
+        hashValid: true,
+        metadata: {
+          temporalMisalignmentPhase: "observation_to_action",
+          invariantClasses: ["freshness_window"],
+        },
+      },
+    ]);
+
+    expect(analyzeStateReviewArtifactEvidence([artifact])).toMatchObject({
+      stateAssertions: {
+        totalAssertions: 7,
+        failedAssertions: 1,
+        failedByCode: {
+          freshness_window_current: 1,
+        },
+      },
+      actionProposalReviews: {
+        totalReviews: 1,
+        invalidReviews: 1,
+        totalWarnings: 4,
+        warningsByCode: {
+          stale_read_ref: 3,
+          freshness_window_current: 1,
+        },
+      },
+      stateReviewArtifacts: {
+        totalArtifacts: 1,
+        hashVerifiedArtifacts: 1,
+        artifactsByTemporalMisalignmentPhase: {
+          observation_to_action: 1,
+        },
+        artifactsByInvariantClass: {
+          freshness_window: 1,
+        },
       },
     });
   });

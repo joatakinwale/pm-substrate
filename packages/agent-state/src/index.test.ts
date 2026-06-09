@@ -3,10 +3,15 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildObservationContractFromCurrentStateView,
+  buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
   buildReadSetFromCurrentStateView,
   buildStateReviewArtifact,
   evaluateObservationContract,
+  importStateReviewArtifact,
+  importStateReviewArtifactsJsonl,
   reviewProposedActionAgainstCurrentState,
+  serializeStateReviewArtifact,
+  serializeStateReviewArtifactsJsonl,
   stateRef,
   validateProposedActionReadSet,
   verifyStateReviewArtifactHash,
@@ -438,6 +443,124 @@ describe("@pm/agent-state read-set validation", () => {
     );
     expect(artifact.artifactHash).toHaveLength(64);
     expect(verifyStateReviewArtifactHash(artifact).valid).toBe(true);
+  });
+
+  it("serializes and imports state-review artifacts with stable replay metadata", () => {
+    const view = baseView();
+    const review = reviewProposedActionAgainstCurrentState(
+      actionFrom(view, {
+        proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+      }),
+      view,
+    );
+    const artifact = buildStateReviewArtifact(review, {
+      artifactId: "artifact_arrowhedge_json_001",
+      metadata: {
+        scenarioId: "arrowhedge-distribution-currentness-mismatch",
+        fixtureId: "fixtures/arrowhedge/state-review-artifacts/aapl-stale.json",
+        clientSurface: "codex",
+        provider: "openai",
+        sessionId: "session_arrowhedge_001",
+      },
+    });
+
+    expect(artifact.metadata).toEqual({
+      temporalMisalignmentPhase: "observation_to_action",
+      invariantClasses: ["freshness_window"],
+      scenarioId: "arrowhedge-distribution-currentness-mismatch",
+      fixtureId: "fixtures/arrowhedge/state-review-artifacts/aapl-stale.json",
+      clientSurface: "codex",
+      provider: "openai",
+      sessionId: "session_arrowhedge_001",
+    });
+
+    const json = serializeStateReviewArtifact(artifact);
+    const imported = importStateReviewArtifact(json);
+
+    expect(json).toBe(serializeStateReviewArtifact(artifact));
+    expect(imported).toMatchObject({
+      valid: true,
+      issues: [],
+      hashValidation: {
+        valid: true,
+        actualHash: artifact.artifactHash,
+        expectedHash: artifact.artifactHash,
+      },
+    });
+    expect(imported.artifact).toEqual(artifact);
+  });
+
+  it("imports JSONL artifact corpora and reports tampered hashes without hiding the artifact", () => {
+    const view = baseView();
+    const artifact = buildStateReviewArtifact(
+      reviewProposedActionAgainstCurrentState(actionFrom(view), view),
+      { artifactId: "artifact_arrowhedge_jsonl_001" },
+    );
+    const tampered = {
+      ...artifact,
+      artifactId: "artifact_arrowhedge_jsonl_002",
+      review: {
+        ...artifact.review,
+        valid: false,
+      },
+    };
+
+    const imported = importStateReviewArtifactsJsonl(
+      serializeStateReviewArtifactsJsonl([artifact, tampered]),
+    );
+
+    expect(imported[0]).toMatchObject({
+      valid: true,
+      issues: [],
+      artifact: {
+        artifactId: "artifact_arrowhedge_jsonl_001",
+      },
+    });
+    expect(imported[1]).toMatchObject({
+      valid: false,
+      issues: [
+        {
+          path: "/artifactHash",
+          message: "artifact hash mismatch during replay verification",
+        },
+      ],
+      artifact: {
+        artifactId: "artifact_arrowhedge_jsonl_002",
+      },
+    });
+  });
+
+  it("turns a state-review artifact into an evidence-linked continuity payload", () => {
+    const view = baseView();
+    const artifact = buildStateReviewArtifact(
+      reviewProposedActionAgainstCurrentState(
+        actionFrom(view, {
+          proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+        }),
+        view,
+      ),
+      { artifactId: "artifact_arrowhedge_continuity_001" },
+    );
+
+    expect(
+      buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact(artifact, {
+        supersedes: ["checkpoint_arrowhedge_previous"],
+        contradictedBy: ["evt_risk_refresh_002"],
+      }),
+    ).toEqual({
+      sourceRefs: [signalRef, riskRef, decisionRef],
+      validUntil: "2026-06-03T14:10:00.000Z",
+      supersedes: ["checkpoint_arrowhedge_previous"],
+      contradictedBy: ["evt_risk_refresh_002"],
+      authorityRule: "arrowhedge:backtest:bt_aapl_breakout",
+      currentStateViewId: "view_aapl",
+      stateReviewArtifactId: "artifact_arrowhedge_continuity_001",
+      stateReviewArtifactHash: artifact.artifactHash,
+      reviewId: "view_aapl:portfolio.decision.accept:proposal_review",
+      observationContractId: "view_aapl:observation_contract",
+      valid: false,
+      warningCodes: ["stale_read_ref", "freshness_window_current"],
+    });
   });
 
   it("detects tampered state-review artifacts during replay verification", () => {

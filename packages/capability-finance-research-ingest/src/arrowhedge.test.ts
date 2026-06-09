@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
+  importStateReviewArtifactsJsonl,
   validateProposedActionReadSet,
   verifyStateReviewArtifactHash,
 } from "@pm/agent-state";
@@ -13,6 +14,7 @@ import {
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
+  buildArrowHedgeStateReviewArtifactCorpus,
   buildArrowHedgeStateReviewArtifact,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
@@ -655,6 +657,127 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(artifact?.artifactHash).toHaveLength(64);
     expect(artifact ? verifyStateReviewArtifactHash(artifact).valid : false).toBe(
       true,
+    );
+  });
+
+  it("exports deterministic ArrowHedge state-review artifact corpora with continuity links", async () => {
+    const tenant = tenantId("tnt_arrowhedge_state_review_corpus");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_corpus");
+    const state = await foldPlanIntoCop(projection, plan);
+    const originalView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const originalObservation =
+      buildObservationContractFromCurrentStateView(originalView);
+
+    const corpus = buildArrowHedgeStateReviewArtifactCorpus([
+      {
+        tenantId: tenant,
+        projectionName: projection.name,
+        projectionVersion: projection.version,
+        symbol: "AAPL",
+        state,
+        scenarioId: "arrowhedge-distribution-currentness-mismatch",
+        actionType: "portfolio.decision.accept",
+        payload: { decisionId: "dec_aapl_buy_120" },
+        proposedBy: "agent:portfolio-manager",
+        proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+        readSet: buildReadSetFromCurrentStateView(
+          originalView,
+          originalView.authorityRule,
+        ),
+        observationContract: originalObservation,
+        artifact: {
+          artifactId: "artifact_arrowhedge_corpus_stale_001",
+          metadata: {
+            fixtureId:
+              "fixtures/arrowhedge/state-review-artifacts/aapl-stale-risk.json",
+            clientSurface: "codex",
+            provider: "openai",
+            sessionId: "arrowhedge-session-001",
+          },
+        },
+      },
+    ]);
+
+    const imported = importStateReviewArtifactsJsonl(corpus.jsonl);
+
+    expect(corpus.artifacts).toHaveLength(1);
+    expect(corpus.artifacts[0]?.metadata).toMatchObject({
+      scenarioId: "arrowhedge-distribution-currentness-mismatch",
+      temporalMisalignmentPhase: "observation_to_action",
+      invariantClasses: expect.arrayContaining([
+        "freshness_window",
+        "workflow_position",
+        "state_conflict",
+      ]),
+      fixtureId: "fixtures/arrowhedge/state-review-artifacts/aapl-stale-risk.json",
+      clientSurface: "codex",
+      provider: "openai",
+      sessionId: "arrowhedge-session-001",
+    });
+    expect(imported).toMatchObject([
+      {
+        valid: true,
+        artifact: {
+          artifactId: "artifact_arrowhedge_corpus_stale_001",
+        },
+      },
+    ]);
+    expect(corpus.continuityPayloads).toEqual([
+      expect.objectContaining({
+        currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+        stateReviewArtifactId: "artifact_arrowhedge_corpus_stale_001",
+        reviewId:
+          "arrowhedge_cop_corpus:AAPL:current_state_view:portfolio.decision.accept:proposal_review",
+        valid: false,
+        warningCodes: expect.arrayContaining([
+          "stale_read_ref",
+          "freshness_window_current",
+          "workflow_position_mismatch",
+        ]),
+      }),
+    ]);
+    expect(corpus.jsonl).toBe(
+      buildArrowHedgeStateReviewArtifactCorpus([
+        {
+          tenantId: tenant,
+          projectionName: projection.name,
+          projectionVersion: projection.version,
+          symbol: "AAPL",
+          state,
+          scenarioId: "arrowhedge-distribution-currentness-mismatch",
+          actionType: "portfolio.decision.accept",
+          payload: { decisionId: "dec_aapl_buy_120" },
+          proposedBy: "agent:portfolio-manager",
+          proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+          readSet: buildReadSetFromCurrentStateView(
+            originalView,
+            originalView.authorityRule,
+          ),
+          observationContract: originalObservation,
+          artifact: {
+            artifactId: "artifact_arrowhedge_corpus_stale_001",
+            metadata: {
+              fixtureId:
+                "fixtures/arrowhedge/state-review-artifacts/aapl-stale-risk.json",
+              clientSurface: "codex",
+              provider: "openai",
+              sessionId: "arrowhedge-session-001",
+            },
+          },
+        },
+      ]).jsonl,
     );
   });
 });

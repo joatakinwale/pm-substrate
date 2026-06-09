@@ -25,6 +25,7 @@ export interface ArrowHedgeStateEvalInput {
     readonly mode: "warn";
     readonly issueCodes: readonly string[];
   };
+  readonly stateReviewArtifactIds?: readonly string[];
   readonly operationalSamples: readonly AdapterOperationalSample[];
   readonly runIdPrefix?: string;
   readonly agentId?: string;
@@ -146,6 +147,9 @@ export function buildArrowHedgeStateEvalSuite(
           ),
         ]
       : []),
+    ...(input.stateReviewArtifactIds ?? []).map((id) =>
+      evalEvidenceRef("state_review_artifact", id, "ArrowHedge StateReviewArtifact"),
+    ),
   ];
   const evidenceRefs = input.sourceRecordIds.map((id) =>
     evalEvidenceRef("source_record", id),

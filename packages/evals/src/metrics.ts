@@ -1,4 +1,10 @@
 import {
+  verifyStateReviewArtifactHash,
+  type StateReviewArtifact,
+  type StateReviewInvariantClass,
+  type StateReviewTemporalMisalignmentPhase,
+} from "@pm/agent-state";
+import {
   COORDINATION_CLASSES,
   EVAL_EVIDENCE_STAGES,
   FAILURE_CLASSES,
@@ -158,6 +164,10 @@ export interface StateReviewArtifactSample {
     readonly parentReviewId?: string;
   };
   readonly relatedObjects: readonly StateReviewArtifactRelatedObjectSample[];
+  readonly metadata?: {
+    readonly temporalMisalignmentPhase?: StateReviewTemporalMisalignmentPhase;
+    readonly invariantClasses?: readonly StateReviewInvariantClass[];
+  };
   readonly review: ActionProposalReviewSample;
 }
 
@@ -180,6 +190,14 @@ export interface StateReviewArtifactMetrics {
   readonly blockedArtifacts: number;
   readonly artifactsBySource: Readonly<Record<string, number>>;
   readonly artifactsByType: Readonly<Record<string, number>>;
+  readonly artifactsByTemporalMisalignmentPhase: Readonly<Record<string, number>>;
+  readonly artifactsByInvariantClass: Readonly<Record<string, number>>;
+}
+
+export interface StateReviewArtifactEvidenceMetrics {
+  readonly stateAssertions: StateAssertionMetrics;
+  readonly actionProposalReviews: ActionProposalReviewMetrics;
+  readonly stateReviewArtifacts: StateReviewArtifactMetrics;
 }
 
 interface MutableCoordinationClassMetrics {
@@ -431,11 +449,115 @@ export function analyzeActionProposalReviews(
   };
 }
 
+export function stateAssertionsFromStateReviewArtifacts(
+  artifacts: readonly StateReviewArtifact[],
+): readonly StateAssertionSample[] {
+  return artifacts.flatMap((artifact) =>
+    artifact.review.observationEvaluation.assertions.map((assertion) => ({
+      code: assertion.code,
+      passed: assertion.passed,
+      severity: assertion.severity,
+    })),
+  );
+}
+
+export function actionProposalReviewsFromStateReviewArtifacts(
+  artifacts: readonly StateReviewArtifact[],
+): readonly ActionProposalReviewSample[] {
+  return artifacts.map((artifact) => ({
+    valid: artifact.review.valid,
+    mode: artifact.review.mode,
+    execution: {
+      allowed: artifact.review.execution.allowed,
+      blocking: artifact.review.execution.blocking,
+      enforcementMode: artifact.review.execution.enforcementMode,
+    },
+    warnings: artifact.review.warnings.map((warning) => ({
+      source: warning.source,
+      code: warning.code,
+      severity: warning.severity,
+    })),
+  }));
+}
+
+export function stateReviewArtifactSamplesFromArtifacts(
+  artifacts: readonly StateReviewArtifact[],
+): readonly StateReviewArtifactSample[] {
+  return artifacts.map((artifact) => ({
+    artifactHash: artifact.artifactHash,
+    hashValid: verifyStateReviewArtifactHash(artifact).valid,
+    eventEnvelope: {
+      source: artifact.eventEnvelope.source,
+      type: artifact.eventEnvelope.type,
+    },
+    ...(artifact.traceContext !== undefined
+      ? {
+          traceContext: {
+            ...(artifact.traceContext.traceparent !== undefined
+              ? { traceparent: artifact.traceContext.traceparent }
+              : {}),
+            ...(artifact.traceContext.spanId !== undefined
+              ? { spanId: artifact.traceContext.spanId }
+              : {}),
+            ...(artifact.traceContext.parentReviewId !== undefined
+              ? { parentReviewId: artifact.traceContext.parentReviewId }
+              : {}),
+          },
+        }
+      : {}),
+    relatedObjects: artifact.relatedObjects.map((object) => ({
+      role: object.role,
+    })),
+    metadata: {
+      temporalMisalignmentPhase: artifact.metadata.temporalMisalignmentPhase,
+      invariantClasses: artifact.metadata.invariantClasses,
+    },
+    review: {
+      valid: artifact.review.valid,
+      mode: artifact.review.mode,
+      execution: {
+        allowed: artifact.review.execution.allowed,
+        blocking: artifact.review.execution.blocking,
+        enforcementMode: artifact.review.execution.enforcementMode,
+      },
+      warnings: artifact.review.warnings.map((warning) => ({
+        source: warning.source,
+        code: warning.code,
+        severity: warning.severity,
+      })),
+    },
+  }));
+}
+
+export function analyzeStateReviewArtifactEvidence(
+  artifacts: readonly StateReviewArtifact[],
+): StateReviewArtifactEvidenceMetrics {
+  return {
+    stateAssertions: analyzeStateAssertions(
+      stateAssertionsFromStateReviewArtifacts(artifacts),
+    ),
+    actionProposalReviews: analyzeActionProposalReviews(
+      actionProposalReviewsFromStateReviewArtifacts(artifacts),
+    ),
+    stateReviewArtifacts: analyzeStateReviewArtifacts(
+      stateReviewArtifactSamplesFromArtifacts(artifacts),
+    ),
+  };
+}
+
 export function analyzeStateReviewArtifacts(
   artifacts: readonly StateReviewArtifactSample[],
 ): StateReviewArtifactMetrics {
   const warnings = artifacts.flatMap((artifact) => artifact.review.warnings);
   const relatedObjects = artifacts.flatMap((artifact) => artifact.relatedObjects);
+  const invariantClasses = artifacts.flatMap(
+    (artifact) => artifact.metadata?.invariantClasses ?? [],
+  );
+  const temporalMisalignmentPhases = artifacts.flatMap((artifact) =>
+    artifact.metadata?.temporalMisalignmentPhase === undefined
+      ? []
+      : [artifact.metadata.temporalMisalignmentPhase],
+  );
   const traceLinkedArtifacts = artifacts.filter(hasTraceContext).length;
   const artifactsWithRelatedObjects = artifacts.filter(
     (artifact) => artifact.relatedObjects.length > 0,
@@ -475,6 +597,14 @@ export function analyzeStateReviewArtifacts(
       (artifact) => artifact.eventEnvelope.source,
     ),
     artifactsByType: countBy(artifacts, (artifact) => artifact.eventEnvelope.type),
+    artifactsByTemporalMisalignmentPhase: countBy(
+      temporalMisalignmentPhases,
+      (phase) => phase,
+    ),
+    artifactsByInvariantClass: countBy(
+      invariantClasses,
+      (invariantClass) => invariantClass,
+    ),
   };
 }
 

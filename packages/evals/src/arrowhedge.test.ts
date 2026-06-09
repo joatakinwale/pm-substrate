@@ -32,6 +32,7 @@ describe("ArrowHedge state eval suite", () => {
         mode: "warn",
         issueCodes: ["stale_read_ref", "workflow_position_mismatch"],
       },
+      stateReviewArtifactIds: ["artifact_arrowhedge_stale_read_001"],
       operationalSamples: [
         {
           adapterStartedAt: timestamp("2026-06-03T16:29:58.000Z"),
@@ -56,6 +57,43 @@ describe("ArrowHedge state eval suite", () => {
       "arrowhedge-distribution-currentness-mismatch",
     );
     expect(suite.events).toHaveLength(12);
+    expect(
+      suite.events
+        .filter((event) => event.runArm === "substrate")
+        .flatMap((event) => event.substrateRefs)
+        .filter((ref) => ref.kind === "state_review_artifact"),
+    ).toEqual([
+      {
+        kind: "state_review_artifact",
+        id: "artifact_arrowhedge_stale_read_001",
+        label: "ArrowHedge StateReviewArtifact",
+      },
+      {
+        kind: "state_review_artifact",
+        id: "artifact_arrowhedge_stale_read_001",
+        label: "ArrowHedge StateReviewArtifact",
+      },
+      {
+        kind: "state_review_artifact",
+        id: "artifact_arrowhedge_stale_read_001",
+        label: "ArrowHedge StateReviewArtifact",
+      },
+      {
+        kind: "state_review_artifact",
+        id: "artifact_arrowhedge_stale_read_001",
+        label: "ArrowHedge StateReviewArtifact",
+      },
+      {
+        kind: "state_review_artifact",
+        id: "artifact_arrowhedge_stale_read_001",
+        label: "ArrowHedge StateReviewArtifact",
+      },
+      {
+        kind: "state_review_artifact",
+        id: "artifact_arrowhedge_stale_read_001",
+        label: "ArrowHedge StateReviewArtifact",
+      },
+    ]);
 
     const metrics = analyzeEvalEvents(suite.events);
     expect(metrics).toMatchObject({

@@ -230,6 +230,41 @@ export interface StateReviewProvenance {
   readonly links: readonly StateReviewProvenanceLink[];
 }
 
+export type StateReviewTemporalMisalignmentPhase =
+  | "none"
+  | "observation_to_action"
+  | "action_to_feedback"
+  | "feedback_to_observation";
+
+export type StateReviewInvariantClass =
+  | "subject_identity"
+  | "tenant_boundary"
+  | "required_evidence"
+  | "freshness_window"
+  | "source_authority"
+  | "projection_version"
+  | "workflow_position"
+  | "state_conflict"
+  | "capability_contract";
+
+export interface StateReviewArtifactMetadataInput {
+  readonly temporalMisalignmentPhase?: StateReviewTemporalMisalignmentPhase;
+  readonly invariantClasses?: readonly StateReviewInvariantClass[];
+  readonly scenarioId?: string;
+  readonly fixtureId?: string;
+  readonly clientSurface?: string;
+  readonly provider?: string;
+  readonly sessionId?: string;
+  readonly workflowRunId?: string;
+  readonly evalEventIds?: readonly string[];
+}
+
+export interface StateReviewArtifactMetadata
+  extends StateReviewArtifactMetadataInput {
+  readonly temporalMisalignmentPhase: StateReviewTemporalMisalignmentPhase;
+  readonly invariantClasses: readonly StateReviewInvariantClass[];
+}
+
 export interface StateReviewArtifact {
   readonly schemaVersion: typeof STATE_REVIEW_ARTIFACT_SCHEMA_VERSION;
   readonly artifactId: string;
@@ -238,6 +273,7 @@ export interface StateReviewArtifact {
   readonly traceContext?: StateReviewTraceContext;
   readonly relatedObjects: readonly StateReviewRelatedObject[];
   readonly provenance: StateReviewProvenance;
+  readonly metadata: StateReviewArtifactMetadata;
   readonly review: ActionProposalReview;
   readonly artifactHash: string;
 }
@@ -257,12 +293,30 @@ export interface StateReviewArtifactOptions {
   readonly provenanceLinks?: readonly StateReviewProvenanceLink[];
   readonly actedOnBehalfOf?: string;
   readonly planId?: string;
+  readonly metadata?: StateReviewArtifactMetadataInput;
 }
 
 export interface StateReviewArtifactHashValidation {
   readonly valid: boolean;
   readonly expectedHash: string;
   readonly actualHash: string;
+}
+
+export interface StateReviewArtifactImportIssue {
+  readonly path: string;
+  readonly message: string;
+}
+
+export interface StateReviewArtifactImportResult {
+  readonly valid: boolean;
+  readonly artifact?: StateReviewArtifact;
+  readonly hashValidation?: StateReviewArtifactHashValidation;
+  readonly issues: readonly StateReviewArtifactImportIssue[];
+}
+
+export interface StateReviewArtifactContinuityPayloadOptions {
+  readonly supersedes?: readonly string[];
+  readonly contradictedBy?: readonly string[];
 }
 
 export interface EvidenceLinkedContinuityPayload
@@ -273,6 +327,16 @@ export interface EvidenceLinkedContinuityPayload
   readonly contradictedBy: readonly string[];
   readonly authorityRule: string;
   readonly currentStateViewId: string;
+}
+
+export interface StateReviewArtifactContinuityPayload
+  extends EvidenceLinkedContinuityPayload {
+  readonly stateReviewArtifactId: string;
+  readonly stateReviewArtifactHash: string;
+  readonly reviewId: string;
+  readonly observationContractId: string;
+  readonly valid: boolean;
+  readonly warningCodes: readonly string[];
 }
 
 export function stateRef(kind: StateRefKind, id: string, label?: string): StateRef {
@@ -583,6 +647,7 @@ export function buildStateReviewArtifact(
       ...(options.planId !== undefined ? { planId: options.planId } : {}),
       links: provenanceLinks,
     },
+    metadata: buildStateReviewArtifactMetadata(review, options.metadata),
     review,
   };
 
@@ -590,6 +655,75 @@ export function buildStateReviewArtifact(
     ...payload,
     artifactHash: computeStateReviewArtifactHash(payload),
   };
+}
+
+export function serializeStateReviewArtifact(
+  artifact: StateReviewArtifact,
+): string {
+  return canonicalStringify(artifact);
+}
+
+export function serializeStateReviewArtifactsJsonl(
+  artifacts: readonly StateReviewArtifact[],
+): string {
+  if (artifacts.length === 0) return "";
+  return `${artifacts.map(serializeStateReviewArtifact).join("\n")}\n`;
+}
+
+export function importStateReviewArtifact(
+  input: string | unknown,
+): StateReviewArtifactImportResult {
+  let parsed: unknown;
+
+  if (typeof input === "string") {
+    try {
+      parsed = JSON.parse(input);
+    } catch (error) {
+      return {
+        valid: false,
+        issues: [
+          {
+            path: "",
+            message: `invalid state-review artifact JSON: ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  } else {
+    parsed = input;
+  }
+
+  const issues: StateReviewArtifactImportIssue[] = [];
+  validateStateReviewArtifactShape(parsed, issues);
+  const artifact = isRecord(parsed) ? (parsed as unknown as StateReviewArtifact) : undefined;
+  const hashValidation =
+    artifact !== undefined && typeof artifact.artifactHash === "string"
+      ? verifyStateReviewArtifactHash(artifact)
+      : undefined;
+
+  if (hashValidation !== undefined && !hashValidation.valid) {
+    issues.push({
+      path: "/artifactHash",
+      message: "artifact hash mismatch during replay verification",
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    ...(artifact !== undefined ? { artifact } : {}),
+    ...(hashValidation !== undefined ? { hashValidation } : {}),
+    issues,
+  };
+}
+
+export function importStateReviewArtifactsJsonl(
+  input: string,
+): readonly StateReviewArtifactImportResult[] {
+  return input
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => importStateReviewArtifact(line));
 }
 
 export function computeStateReviewArtifactHash(
@@ -609,6 +743,28 @@ export function verifyStateReviewArtifactHash(
     expectedHash,
     actualHash: artifactHash,
   };
+}
+
+export function buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact(
+  artifact: StateReviewArtifact,
+  options: StateReviewArtifactContinuityPayloadOptions = {},
+): StateReviewArtifactContinuityPayload {
+  const view = artifact.review.currentStateView;
+  const payload: StateReviewArtifactContinuityPayload = {
+    sourceRefs: view.sourceRefs,
+    ...(view.validUntil !== undefined ? { validUntil: view.validUntil } : {}),
+    supersedes: options.supersedes ?? [],
+    contradictedBy: options.contradictedBy ?? [],
+    authorityRule: view.authorityRule,
+    currentStateViewId: view.viewId,
+    stateReviewArtifactId: artifact.artifactId,
+    stateReviewArtifactHash: artifact.artifactHash,
+    reviewId: artifact.review.reviewId,
+    observationContractId: artifact.review.observationContract.contractId,
+    valid: artifact.review.valid,
+    warningCodes: uniqueStrings(artifact.review.warnings.map((warning) => warning.code)),
+  };
+  return payload;
 }
 
 export function validateProposedActionReadSet(
@@ -761,6 +917,118 @@ function dedupeRelatedObjects(
   return out;
 }
 
+function buildStateReviewArtifactMetadata(
+  review: ActionProposalReview,
+  input: StateReviewArtifactMetadataInput | undefined,
+): StateReviewArtifactMetadata {
+  return {
+    temporalMisalignmentPhase:
+      input?.temporalMisalignmentPhase ??
+      inferTemporalMisalignmentPhase(review),
+    invariantClasses:
+      input?.invariantClasses ?? inferStateReviewInvariantClasses(review),
+    ...(input?.scenarioId !== undefined ? { scenarioId: input.scenarioId } : {}),
+    ...(input?.fixtureId !== undefined ? { fixtureId: input.fixtureId } : {}),
+    ...(input?.clientSurface !== undefined
+      ? { clientSurface: input.clientSurface }
+      : {}),
+    ...(input?.provider !== undefined ? { provider: input.provider } : {}),
+    ...(input?.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
+    ...(input?.workflowRunId !== undefined
+      ? { workflowRunId: input.workflowRunId }
+      : {}),
+    ...(input?.evalEventIds !== undefined
+      ? { evalEventIds: input.evalEventIds }
+      : {}),
+  };
+}
+
+function inferTemporalMisalignmentPhase(
+  review: ActionProposalReview,
+): StateReviewTemporalMisalignmentPhase {
+  return review.warnings.length === 0 ? "none" : "observation_to_action";
+}
+
+function inferStateReviewInvariantClasses(
+  review: ActionProposalReview,
+): readonly StateReviewInvariantClass[] {
+  return uniqueStrings(
+    review.warnings.flatMap((warning) => invariantClassesForWarningCode(warning.code)),
+  ) as readonly StateReviewInvariantClass[];
+}
+
+function invariantClassesForWarningCode(
+  code: string,
+): readonly StateReviewInvariantClass[] {
+  switch (code) {
+    case "subject_mismatch":
+      return ["subject_identity"];
+    case "tenant_mismatch":
+      return ["tenant_boundary"];
+    case "missing_read_ref":
+    case "required_source_refs_present":
+    case "missing_sources_declared":
+      return ["required_evidence"];
+    case "stale_read_ref":
+    case "freshness_window_current":
+      return ["freshness_window"];
+    case "authority_mismatch":
+    case "authority_rule_matches":
+      return ["source_authority"];
+    case "projection_version_mismatch":
+    case "projection_version_matches":
+      return ["projection_version"];
+    case "workflow_position_mismatch":
+    case "workflow_position_matches":
+      return ["workflow_position"];
+    case "current_view_conflict":
+    case "conflicts_declared":
+      return ["state_conflict"];
+    case "action_not_allowed":
+      return ["capability_contract"];
+    default:
+      return [];
+  }
+}
+
+function validateStateReviewArtifactShape(
+  input: unknown,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  if (!isRecord(input)) {
+    issues.push({ path: "", message: "expected state-review artifact object" });
+    return;
+  }
+
+  if (input["schemaVersion"] !== STATE_REVIEW_ARTIFACT_SCHEMA_VERSION) {
+    issues.push({
+      path: "/schemaVersion",
+      message: `expected ${STATE_REVIEW_ARTIFACT_SCHEMA_VERSION}`,
+    });
+  }
+  if (!isNonEmptyString(input["artifactId"])) {
+    issues.push({ path: "/artifactId", message: "expected non-empty string" });
+  }
+  if (!isNonEmptyString(input["generatedAt"])) {
+    issues.push({ path: "/generatedAt", message: "expected non-empty timestamp" });
+  }
+  if (!isRecord(input["eventEnvelope"])) {
+    issues.push({ path: "/eventEnvelope", message: "expected object" });
+  }
+  if (!isRecord(input["provenance"])) {
+    issues.push({ path: "/provenance", message: "expected object" });
+  }
+  if (!isRecord(input["metadata"])) {
+    issues.push({ path: "/metadata", message: "expected object" });
+  }
+  if (!isRecord(input["review"])) {
+    issues.push({ path: "/review", message: "expected object" });
+  }
+  if (!isNonEmptyString(input["artifactHash"])) {
+    issues.push({ path: "/artifactHash", message: "expected non-empty string" });
+  }
+}
+
 function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
   if (left.length !== right.length) return false;
   const rightSet = new Set(right);
@@ -796,6 +1064,25 @@ function canonicalize(value: unknown): unknown {
     }
   }
   return out;
+}
+
+function uniqueStrings<T extends string>(items: readonly T[]): readonly T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+  }
+  return out;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
 }
 
 function fingerprint64(input: string): string {

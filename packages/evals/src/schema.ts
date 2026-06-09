@@ -94,6 +94,7 @@ export const EVAL_REF_KINDS = [
   "capability_invocation",
   "projection",
   "source_record",
+  "state_review_artifact",
   "external_fixture",
   "document",
 ] as const;

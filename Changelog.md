@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-06-08 - Superpowers plan stash repair
+
+- Investigated `stash@{0}` and confirmed it contained only a deletion of the newer `docs/superpowers/plans/2026-05-27-three-axis-state-validation.md` plan, so applying it directly would lose the better copy.
+- Canonicalized the plan as `docs/superpowers/plans/2026-05-27-three-axis-state-validation-pm-substrate.md`, removed the stale root-level duplicate, and added `docs/superpowers/plans/index.md`.
+
+## 2026-06-08 - Durable StateReviewArtifact lifecycle
+
+- Added canonical `StateReviewArtifact` metadata for temporal-misalignment phase, invariant class, scenario/fixture id, client surface, provider, session, workflow, and eval-event linkage.
+- Added pure artifact persistence helpers in `@pm/agent-state`: deterministic JSON serialization, JSONL corpus export/import, replay hash verification, tamper reporting, and evidence-linked continuity payload generation from artifact id/hash.
+- Added ArrowHedge state-review artifact corpus generation that emits replayable JSONL and continuity payloads from real proposal-review cases.
+- Added `state_review_artifact` as a first-class eval reference kind, ArrowHedge eval substrate refs for artifact ids, and artifact-derived eval metrics for assertions, proposal reviews, hashes, temporal phases, and invariant classes.
+- Verification: focused lifecycle suite passed across `@pm/agent-state`, ArrowHedge, and `@pm/evals`: 5 files / 47 tests.
+
 ## 2026-06-08 - Daily AI competitive-intelligence v02 reconciliation
 
 - Resolved a same-day merge conflict after `origin/main` added `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` while a local competitive-intelligence run was active.
