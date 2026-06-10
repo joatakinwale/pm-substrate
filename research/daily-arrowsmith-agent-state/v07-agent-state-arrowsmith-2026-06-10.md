@@ -8,7 +8,7 @@ Immediate predecessor read: `research/daily-arrowsmith-agent-state/v06-agent-sta
 
 Local context read in required order:
 
-1. Automation memory for `daily-research-task-description` (not present before this run)
+1. Automation memory for `daily-research-task-description`
 2. `research/agent-from-numbers-to-state-arrowsmith_2026-06-04.md`
 3. `research/daily-arrowsmith-agent-state/index.md`
 4. `research/daily-arrowsmith-agent-state/v06-agent-state-arrowsmith-2026-06-09.md`
