@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-09 - Daily AI competitive-intelligence v03 and closure automation
+
+- Added `research/daily-ai-competitive-intelligence/v03-ai-competitive-intelligence-2026-06-09.md` as the missing third numbered competitive-intelligence continuation.
+- Focused the fresh scan on official 2026-06-08 to 2026-06-09 releases: GitHub third-party coding-agent security validation, Claude Fable 5 in GitHub Copilot, Anthropic Fable/Mythos availability, OpenAI Codex enterprise adoption evidence, Google Gemini Apple/Xcode integration, and AWS AgentCore runtime/eval carry-forward docs.
+- Kept the claim boundary strict: third-party agent validation, provider/model policy, client surfaces, and runtime traces are evidence lanes, not replacements for pm-substrate current-state/read-set/source-authority/action-review artifacts.
+- Added a dated implementation/test task tree for external validation evidence admission, model/provider policy evidence, client-surface origin tracking, runtime trace comparison, and daily publish closure.
+- Updated `research/daily-ai-competitive-intelligence/index.md` and `research/index.md` with v03 source changes, claim deltas, implementation implications, and the current task tree.
+- Installed the local Codex automation `pm-substrate-daily-research-publish-closure`, scheduled daily at 8:45 AM local time, to verify/fetch main, inspect uncommitted work, reconcile daily research, create the task tree, validate, commit, push, and re-check remote SHA.
+- Repo transport note: a stale `git push --porcelain origin` process in this repo was blocking remote operations; after terminating it, `git ls-remote --heads origin main` verified remote `main` at `81d67a1cbfc7a00dcfd42c56c9249ca044f40278`, but full `git fetch --prune origin main` still hung and was terminated.
+
+## 2026-06-09 - Daily agent-state Arrowsmith v06
+
+- Added `research/daily-arrowsmith-agent-state/v06-agent-state-arrowsmith-2026-06-09.md` as the sixth numbered daily continuation, building directly from v05 and the same-day implementation commits on `main`.
+- Audited the v05 watchlist against current code and corrected stale claims: durable `StateReviewArtifact` JSON/JSONL export/import, eval refs, observed read-set comparison, temporal misalignment fixtures, DB/fixture equivalence helpers, and invariant-class policy now exist as pure primitives.
+- Shifted the active research frontier to external evidence admission: MCP/tool/task state, memory search, world-model predictions, monitoring events, lineage records, audit events, attestations, and PM handoff artifacts should be admitted as evidence before they influence valid action.
+- Added new bridge evidence from text world models, SentinelBench, memory-search security, Agent libOS, AuthGraph, evidence tracing/provenance, AgentAtlas, VerifyMAS, MCP official docs, OpenLineage, FHIR Provenance/AuditEvent, in-toto/SLSA, human-AI situation awareness, shared mental-model measurement, boundary objects, and coordination theory.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` with v06 source changes, corrected/downgraded claims, implementation implications, metrics, and the next watchlist.
+- Sync note: `git fetch origin main` and `git fetch --no-tags origin main` both failed with `fatal: mmap failed: Operation timed out`, but `git ls-remote origin refs/heads/main`, local `HEAD`, and local `origin/main` all matched `81d67a1cbfc7a00dcfd42c56c9249ca044f40278`, so no upstream merge delta or conflict was present before this research write.
+
 ## 2026-06-08 - Invariant-class policy matrix
 
 - Added a pure `StateReviewInvariantClass` policy matrix in `@pm/agent-state` with explicit low/medium/high action consequences and advisory-vs-blocking recommendations.
