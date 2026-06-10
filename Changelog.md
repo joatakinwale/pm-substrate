@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-10 - Daily AI competitive-intelligence v04
+
+- Added `research/daily-ai-competitive-intelligence/v04-ai-competitive-intelligence-2026-06-10.md` as the fourth numbered daily competitive-intelligence continuation.
+- Built on the fetched `main` state at `7cc0a33`, including the upstream `@pm/agent-state` artifact lifecycle closure and the concurrently present Arrowsmith v07 external-evidence frontier.
+- Focused the fresh scan on official and primary-source deltas for GitHub Copilot CLI `/security-review`, OpenAI Agent Builder/Evals wind-down, Google Cloud ADK long-running approvals, Workspace Drive alignment approvals and DLP policy APIs, AWS AgentCore registry/OBO/memory/trace/eval runtime lanes, Cursor custom stores/tools/subagents, Asana Agentic Work Management, and Atlassian Teamwork Graph/Rovo.
+- Kept the claim boundary strict: external validation, approval state, runtime traces, custom stores, work graphs, and policy APIs are evidence lanes, not replacements for current-state/read-set/source-authority/action-review artifacts.
+- Updated `research/daily-ai-competitive-intelligence/index.md` and `research/index.md` with v04 source changes, claim deltas, threat updates, implementation implications, and a next action around approval-currentness drift.
+- Sync note: initial `git fetch origin main` and fast-forward succeeded with repeated `non-monotonic index .git/objects/pack/._pack-...idx` warnings from AppleDouble pack-index files.
+
+## 2026-06-10 - Daily agent-state Arrowsmith v07
+
+- Added `research/daily-arrowsmith-agent-state/v07-agent-state-arrowsmith-2026-06-10.md` as the seventh numbered daily continuation.
+- Confirmed against current code that `ActionProposalReview`, durable `StateReviewArtifact` JSON/JSONL export/import, hash replay, ArrowHedge temporal fixture corpora, artifact-derived metrics, observed read-set comparison, DB/fixture equivalence, continuity payload linkage, and invariant-class `wouldBlock` policy are implemented pure primitives.
+- Added fresh June 8-10 bridge evidence from DeLM shared verified context, Workflow-GYM, T1-Bench, ActiveMem, observability-safe memory retention, deployment-time memorization, spatial-memory occlusion, H2HMem, SKILL.nb, ALEM, Emergence World, Consistency Illusion, and official MCP state-handle/tool-annotation sources.
+- Added project-management and high-reliability bridges from Faraj/Xiao fast-response coordination, Bigley/Roberts incident command, Endsley situation awareness, Lewis transactive-memory measurement, Hsu et al. IS development TMS, and AHRQ handoff safety.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` so the current implementation frontier is pure external evidence admission: MCP/task/tool handles, memory retrieval/deletion residue, monitoring, lineage, audit, attestation, GUI/professional workflow traces, world-model predictions, and PM handoff artifacts must be admitted before action review can use them.
+- Sync note: `git fetch --no-tags origin main` completed and `HEAD`, `origin/main`, and `FETCH_HEAD` all matched `7cc0a33dce5732b556cb323b6cf6dc3d4f80b487`, but Git emitted repeated `non-monotonic index .git/objects/pack/._pack-...idx` warnings from AppleDouble pack-index files.
+
 ## 2026-06-09 - Daily AI competitive-intelligence v03 and closure automation
 
 - Added `research/daily-ai-competitive-intelligence/v03-ai-competitive-intelligence-2026-06-09.md` as the missing third numbered competitive-intelligence continuation.

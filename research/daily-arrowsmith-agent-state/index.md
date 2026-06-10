@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-09
+Last updated: 2026-06-10
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -13,7 +13,7 @@ The run is not complete until the intended research slice is committed on `main`
 
 LLM agents are statistical predictors promoted into actors. The state problem appears when parametric model state, prompt/inference state, memory/RAG state, tool-observation state, or inter-agent communication state is treated as current, sufficient, authoritative operational state. pm-substrate is the governed operational-state layer between statistical prediction and valid action.
 
-The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The first durable artifact lifecycle and coverage frontier is now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, and an invariant-class `wouldBlock` policy matrix. The next proof boundary is external-state admission: protocol task state, MCP/tool metadata, memory-search results, world-model predictions, monitoring events, data-lineage records, audit events, attestations, and PM handoff artifacts must be admitted as evidence before they influence valid action.
+The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The first durable artifact lifecycle and coverage frontier is now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, and an invariant-class `wouldBlock` policy matrix. The next proof boundary is external-state admission: protocol task state, MCP/tool metadata/state handles, memory-search results, world-model predictions, monitoring events, data-lineage records, audit events, attestations, GUI/professional workflow traces, and PM handoff artifacts must be admitted as evidence before they influence valid action.
 
 ## Versions
 
@@ -27,6 +27,7 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 | v04 | 2026-06-07 | `research/daily-arrowsmith-agent-state/v04-agent-state-arrowsmith-2026-06-07.md` | Canonical artifact lifecycle, preconditions, and coordination-state bridge | Marked `StateReviewArtifact`, ArrowHedge artifact generation, hash replay, and artifact metrics as closed pure primitives; shifted the frontier to persisted/exported artifacts, observed read-set capture, observation-contract v2, artifact-derived evals, and targeted invariant policy. |
 | v05 | 2026-06-08 | `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` | Temporal-state, progressive-constraint, and PM coordination bridge | Added temporal state misalignment phases, AdaPlanBench progressive constraints, typed semantic commit/abort limits, cross-step evidence aggregation, and PM accountability/common-understanding mechanisms; the same-day implementation then closed the first durable ArrowHedge JSON/JSONL artifact lifecycle slice. |
 | v06 | 2026-06-09 | `research/daily-arrowsmith-agent-state/v06-agent-state-arrowsmith-2026-06-09.md` | External evidence admission, protocol/tool task state, and team situation-awareness bridge | Audited v05 against same-day code and marked artifact lifecycle, observed read-set comparison, temporal fixtures, DB/fixture equivalence, and invariant policy as closed pure primitives; shifted the frontier to admitting MCP/tool/task, memory, world-model, monitoring, lineage, audit, attestation, and PM handoff evidence before action. |
+| v07 | 2026-06-10 | `research/daily-arrowsmith-agent-state/v07-agent-state-arrowsmith-2026-06-10.md` | External evidence admission v1, shared verified context, memory retention, and workflow consistency bridge | Confirmed v06's frontier against current code and added June 8-10 evidence from shared-context MAS, observability-safe memory retention, deployment-time memorization, long-horizon professional workflow benchmarks, MCP explicit state handles, and PM/high-reliability coordination sources; recommended a pure `ExternalStateEvidence` / `EvidenceAdmissionReview` code slice. |
 
 ## Top Findings
 
@@ -55,6 +56,11 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 23. **World models are prediction state.** Text world models can support planning and offline evaluation, but predicted next state must be compared to observed authoritative state before action.
 24. **Audit redundancy can expose conflicts.** FHIR-style multi-actor audit/provenance standards suggest duplicate or conflicting records from clients, servers, and intermediaries can be useful substrate warnings.
 25. **PM artifacts are boundary objects with invariant cores.** State-review artifacts can travel across product, engineering, ops, audit, and agent roles only if stable invariant fields survive role-specific projections.
+26. **Shared context must be admitted, not merely shared.** DeLM-style shared verified context strengthens the substrate thesis, but the transfer mechanism is admission-time verification plus read/write discipline, not a shared scratchpad.
+27. **Memory retention now needs deletion, observability, and residue metadata.** Observability-safe memory retention and deployment-time memorization add stale-information risk, online-observable features, deletion mode, and forgetting residue as admission fields.
+28. **Workflow consistency is an explicit eval axis.** Workflow-GYM, T1-Bench, ALEM, Emergence World, and SKILL.nb point to workflow-stage omission, objective drift, error propagation, and environment drift as artifact-sequence failures.
+29. **MCP state handles are addressability, not authority.** The 2026 MCP release candidate and SEP-2567 support explicit state handles, but handles and tool annotations remain evidence needing substrate validation.
+30. **PM handoffs need expertise, authority, and escalation state.** Faraj/Xiao, Bigley/Roberts, Lewis, Hsu et al., and handoff safety literature point to owner/source/expertise/escalation fields as executable PM state.
 
 ## Source Changes
 
@@ -117,6 +123,13 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - OpenLineage, FHIR Provenance, FHIR AuditEvent, and in-toto/SLSA: standards vocabulary for run/job/dataset lineage, multi-actor audit/provenance, and attestable subjects/predicates/materials.
 - National Academies human-AI situation-awareness chapter, DeChurch/Mesmer-Magnus shared mental-model meta-analysis, Star/Griesemer boundary objects, and Malone/Crowston coordination theory: PM artifacts should expose structured dependencies, source/owner/handoff state, and invariant fields that survive role-specific interpretation.
 
+### Added on 2026-06-10 v07
+
+- Workflow-GYM, T1-Bench, WeaveBench, ALEM, Emergence World, and SKILL.nb: long-horizon professional/GUI/open-ended workflows make workflow-stage omission, objective drift, error propagation, environment drift, gate-conditioned execution, and artifact-sequence evaluation first-class eval targets.
+- DeLM shared verified context, ActiveMem distributed memory, OSL-MR observability-safe memory retention, Deployment-Time Memorization, H2HMem, and spatial-memory occlusion work: shared context and memory mechanics improve coordination/retention, but require admission metadata for source, authority, observability, deletion residue, modality, visibility, and stale-information risk.
+- MCP 2025-11-25 current spec, 2026 roadmap, tool-annotation risk post, 2026-07-28 release candidate, and SEP-2567 explicit state handles: protocol state is becoming more addressable, but annotations and handles remain untrusted evidence until substrate admission.
+- Faraj/Xiao fast-response coordination, Bigley/Roberts incident command, Endsley situation awareness, Lewis TMS field measure, Hsu et al. IS development TMS, and AHRQ handoff safety: PM state-review artifacts need expertise owner, source steward, authority/escalation owner, handoff condition, and valid-next-action fields.
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -132,6 +145,10 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - v06 corrects v05's implementation frontier: durable artifacts, artifact-to-eval refs, observed read-set comparison, temporal misalignment fixtures, DB/fixture equivalence, and invariant-class policy are now closed pure primitives.
 - v06 narrows the next frontier from "more artifact lifecycle" to external evidence admission: protocol task state, memory retrieval, monitoring events, world-model predictions, lineage, audit, and PM handoff artifacts must be validated before action.
 - v06 keeps mutation blocking limited: invariant policy now reports recommendations, but external side-effect enforcement remains unclaimed.
+- v07 confirms v06's implementation correction against current code: observation reports, action proposal reviews, durable artifacts, temporal ArrowHedge corpora, artifact-derived metrics, DB/fixture equivalence, and policy `wouldBlock` outputs are existing pure primitives rather than the next code slice.
+- v07 corrects the external-state frontier: MCP explicit state handles and shared-context MAS designs strengthen addressability, but the missing pm-substrate mechanism is admission-time validation before evidence becomes a `StateRef` or action-review input.
+- v07 adds memory deletion and observability as state-review concerns: memory retrieval should carry deletion mode/residue risk, retention policy, online-observable feature boundaries, source modality, and stale-information risk.
+- v07 adds professional workflow consistency as an eval axis: stage omission, objective drift, error propagation, and environment drift should be detected across artifact run groups, not only final outcomes.
 
 ## Downgraded Claims
 
@@ -148,6 +165,11 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - World-model predictions are downgraded as current-state proof; they are advisory prediction/eval artifacts until reconciled with observed authoritative state.
 - Memory-search trust scores are downgraded as authority; memory remains a control channel that requires source, subject, freshness, and workflow validation.
 - Boundary objects are downgraded as agreement proof unless invariant fields and agreement metrics show cross-role convergence.
+- Shared verified context is downgraded as authority unless every write has admission status, source refs, freshness, read/write discipline, and invalidation semantics.
+- Active/distributed/observability-safe memory is downgraded as operational-state proof; it improves retention and reasoning cost tradeoffs but cannot establish authority, deletion fidelity, or currentness alone.
+- MCP 2026-07-28 release-candidate semantics are downgraded as current behavior until the final dated spec ships; they are useful design direction, not current protocol truth.
+- Multi-agent consensus remains downgraded after Consistency Illusion: answer agreement can hide incompatible grounds unless claims cite sources and stances.
+- Long-horizon benchmark final success rates are downgraded as sufficient state proof; pm-substrate needs intermediate artifact-sequence assertions for omitted stages and objective drift.
 
 ## Rejected Bridges
 
@@ -164,20 +186,25 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 11. External protocol task state as direct business authority.
 12. Tool or memory trust metadata as a replacement for source authority.
 13. World-model predicted state as current operational state.
+14. Shared context without admission-time verification.
+15. Explicit protocol state handles as current operational state.
+16. Memory retention policy as deletion proof without residue checks.
+17. Multi-agent answer consensus as reasoning or source-authority alignment.
 
 ## Current Implementation Implications
 
-1. Add an external evidence admission contract for protocol/tool/task, memory, monitoring, lineage, audit, attestation, and PM handoff evidence.
-2. Map MCP-like task/tool metadata into artifacts without trusting server-provided annotations by default.
-3. Attach memory retrieval to observed-read-set evidence with denial/warning reasons for stale, unauthorized, or subject-mismatched memories.
-4. Add wait-condition artifacts for passive monitoring, active action, and no-op success/failure cases.
-5. Add provenance-vs-authorization alignment fields or policy outcomes comparing actual source/parameter paths to intended authority.
-6. Map OpenLineage/FHIR/in-toto vocabulary into source refs or example adapters without making those standards automatic trust.
-7. Add run-level artifact groups so trajectory hypotheses can span multiple artifacts, agents, and handoffs.
-8. Add role-specific projections over one invariant state-review artifact core for PM, engineering, audit, and agent views.
-9. Keep invariant policy as a `wouldBlock` recommendation until external side-effect gates exist.
-10. Add distributed-state PM evals that measure convergence on dependency graph, binding source, owner, blocker, handoff condition, and valid next action.
-11. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
+1. Add a pure external evidence admission contract for protocol/tool/task, memory, monitoring, lineage, audit, attestation, GUI/professional workflow traces, world-model predictions, and PM handoff evidence.
+2. Define candidate types such as `ExternalStateEvidence`, `EvidenceAdmissionReview`, and `AdmittedStateEvidence` in `@pm/agent-state`, with backward-compatible artifact metadata fields.
+3. Map MCP-like task/tool annotations and future explicit state handles into artifacts without trusting server-provided annotations or handles by default.
+4. Attach memory retrieval to observed-read-set evidence with denial/warning reasons for stale, unauthorized, deleted-but-recoverable, offline-supervised, or subject-mismatched memories.
+5. Add wait-condition artifacts for passive monitoring, active action, and no-op success/failure cases.
+6. Add provenance-vs-authorization alignment fields or policy outcomes comparing actual source/parameter paths to intended authority.
+7. Map OpenLineage/FHIR/in-toto vocabulary into source refs or example adapters without making those standards automatic trust.
+8. Add run-level artifact groups so trajectory hypotheses can span multiple artifacts, agents, workflow stages, feedback observations, and handoffs.
+9. Add PM handoff fields for expertise owner, source steward, action owner, escalation owner, handoff condition, unresolved risk, dependency refs, and valid next action.
+10. Keep invariant policy as a `wouldBlock` recommendation until external side-effect gates exist.
+11. Add distributed-state PM evals that measure convergence on dependency graph, binding source, owner, blocker, handoff condition, and valid next action.
+12. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
 
 ## Metrics Queue
 
@@ -243,37 +270,52 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - `handoff_revalidation_success_rate`
 - `external_evidence_admission_rate`
 - `external_evidence_denial_rate`
+- `external_evidence_warning_by_code`
+- `external_evidence_warning_by_severity`
 - `capability_annotation_policy_mismatch_rate`
+- `explicit_state_handle_revalidation_rate`
 - `memory_search_trust_boundary_violation_rate`
+- `memory_deletion_residue_rate`
+- `offline_supervision_leak_rate`
+- `stale_information_retention_rate`
 - `wait_condition_reaction_time`
 - `premature_contact_rate`
 - `no_op_false_action_rate`
+- `workflow_stage_omission_rate`
+- `objective_drift_warning_rate`
 - `world_model_prediction_disagreement_rate`
 - `prediction_to_observation_revalidation_rate`
 - `provenance_authorization_alignment_rate`
 - `unauthorized_parameter_source_detection_rate`
 - `trajectory_hypothesis_verification_rate`
 - `cross_artifact_failure_localization_rate`
+- `artifact_run_group_failure_localization_rate`
 - `lineage_facet_coverage`
 - `dataset_source_version_coverage`
 - `multi_actor_audit_conflict_rate`
 - `expected_actor_audit_coverage`
 - `boundary_object_reinterpretation_gap`
+- `reasoning_alignment_missing_rate`
+- `grounded_claim_coverage`
 - `dependency_structure_agreement`
 - `team_sa_alignment_delta`
 - `handoff_condition_resolution_rate`
+- `pm_handoff_condition_stale_rate`
+- `escalation_owner_resolution_rate`
 
 ## Next-Day Watchlist
 
-1. Decide the smallest code-facing external evidence admission shape and where it belongs.
-2. Add one MCP-like tool/task evidence admission fixture without integrating a live MCP server.
-3. Search official MCP 2025-11 and current draft changes for Tasks, tool annotations, elicitation, authorization, and deprecation policy; avoid citing future release-candidate semantics as current.
-4. Prototype memory-search observation evidence and denial reasons in the observed-read-set lane.
+1. Implement or further specify the smallest code-facing external evidence admission shape: `ExternalStateEvidence`, `EvidenceAdmissionReview`, and `AdmittedStateEvidence`.
+2. Add one MCP-like tool/task evidence admission fixture without integrating a live MCP server; include annotation mismatch and explicit-state-handle revalidation.
+3. Treat MCP 2026-07-28 release-candidate semantics as future/draft until the final dated spec ships; use them only as design pressure.
+4. Prototype memory-search observation evidence with deletion residue, retention policy, online-observable feature boundary, and denial reasons.
 5. Add one monitoring/no-op wait-condition fixture inspired by SentinelBench.
-6. Add provenance-vs-authorization alignment fields or a separate artifact policy outcome.
-7. Decide whether OpenLineage/FHIR/in-toto mappings should be examples, adapters, or generic source-ref facets.
-8. Add one PM distributed-state eval measuring dependency-structure agreement and handoff-condition resolution.
-9. Keep mutation blocking unclaimed until external side-effect gates exist beyond pure `wouldBlock` policy output.
-10. Search for ContractBench and STALE official code/data repos again; do not cite source availability until primary links are located.
-11. Re-run fetch; if `mmap failed` persists, inspect local Git object health separately from research content.
-12. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
+6. Add a clean accepted/current ArrowHedge artifact fixture as the positive metrics baseline.
+7. Add run-level artifact groups for workflow-stage omission, objective drift, and action-to-feedback chains.
+8. Add provenance-vs-authorization alignment fields or a separate artifact policy outcome.
+9. Decide whether OpenLineage/FHIR/in-toto mappings should be examples, adapters, or generic source-ref facets.
+10. Add one PM distributed-state eval measuring expertise owner, source steward, escalation path, dependency-structure agreement, and handoff-condition resolution.
+11. Keep mutation blocking unclaimed until external side-effect gates exist beyond pure `wouldBlock` policy output.
+12. Search for ContractBench and STALE official code/data repos again; do not cite source availability until primary links are located.
+13. Inspect Git AppleDouble `._pack-...idx` warnings if fetch reliability degrades; record repo transport issues as continuity risks.
+14. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.

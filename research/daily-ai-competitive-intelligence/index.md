@@ -1,11 +1,11 @@
 # Daily AI Competitive Intelligence Index
 
-Last updated: 2026-06-09
+Last updated: 2026-06-10
 Scope: major AI companies, workspace AI, enterprise AI, agent platforms, AI coding/productivity tools, and competitors that may overlap with pm-substrate's operational-state thesis.
 
 ## Current Baseline
 
-The first three versioned runs are complete. The live competitive pattern is that major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, and evaluation/analytics. None of the fresh 2026-06-08 to 2026-06-09 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof.
+The first four versioned runs are complete. The live competitive pattern is that major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, long-running runtime state, approval/policy mechanics, and evaluation/analytics. None of the fresh 2026-06-08 to 2026-06-10 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, observed-read-set comparison, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof. The strongest June 10 delta is that evidence lanes are becoming concrete: GitHub exposes explicit Copilot CLI security review, Google exposes approval-currentness and policy-mutation mechanics, AWS exposes more agent-operations substrate pieces, and Cursor exposes custom stores/tools/subagents.
 
 Parallel-run reconciliation on 2026-06-08: `origin/main` created v01 while a local broader vendor scan was still running. v01 remains the canonical first version. The local scan is preserved as v02, and both lines of evidence are folded into this index and the shared research ledger.
 
@@ -34,6 +34,7 @@ Each run must:
 | v01 | 2026-06-08 | `research/daily-ai-competitive-intelligence/v01-ai-competitive-intelligence-2026-06-08.md` | First numbered baseline-plus-delta run | Added official-source comparison across OpenAI, Anthropic, Microsoft/GitHub, Google, AWS, and ServiceNow; marked OpenAI/GitHub/Microsoft/Google/AWS as Medium to Medium-high control-plane threats and ServiceNow as the highest direct overlap baseline; converted findings into artifact, eval, provider, plugin, and workflow-state implementation implications. |
 | v02 | 2026-06-08 | `research/daily-ai-competitive-intelligence/v02-ai-competitive-intelligence-2026-06-08.md` | Parallel same-day reconciliation and broader vendor scan | Preserved upstream v01 unchanged, added broader watch coverage for OpenAI workspace agents, GitHub/Copilot session state, AWS Step Functions plus AgentCore, Atlassian Teamwork Graph, Asana Agentic Work Management, Cursor agent stores, Slack/Salesforce MCP actions, ServiceNow, Anthropic, Google, and Cognition; no reviewed source exposed the full pm-substrate pre-action `StateReviewArtifact` boundary. |
 | v03 | 2026-06-09 | `research/daily-ai-competitive-intelligence/v03-ai-competitive-intelligence-2026-06-09.md` | Fresh official-source continuation and task-tree bridge | Added June 9 official deltas for GitHub third-party coding-agent security validation, Claude Fable 5 provider/model policy, Anthropic model availability, OpenAI Codex adoption evidence, Google Gemini Apple/Xcode integration, and AWS AgentCore carry-forward runtime/eval pressure; converted the findings into a dated implementation/test task tree. |
+| v04 | 2026-06-10 | `research/daily-ai-competitive-intelligence/v04-ai-competitive-intelligence-2026-06-10.md` | Evidence-lane and approval-currentness continuation | Added June 10 official deltas for Copilot CLI `/security-review`, OpenAI Agent Builder/Evals wind-down, Google ADK long-running approval state, Workspace DLP and Drive alignment approvals, AWS AgentCore registry/OBO/memory/trace/eval runtime lanes, Cursor custom stores/tools/subagents, and Asana/Atlassian work-graph watch updates; shifted implementation priority to external evidence admission and approval-currentness drift. |
 
 ## Top Deltas
 
@@ -46,6 +47,10 @@ Each run must:
 7. GitHub's June 9 third-party coding-agent security validation proves that external agent output validation is becoming platform behavior, but the evidence lane is security validation rather than operational-state authority.
 8. Claude Fable 5's Copilot policy and data-retention requirements show that model/provider policy must become action-review evidence for sensitive workflows.
 9. Gemini in Apple's Foundation Models framework and Xcode expands agent-capable client surfaces; this increases source/origin tracking pressure without proving currentness or workflow validity.
+10. GitHub's June 10 Copilot CLI `/security-review` makes external validation an explicit command path, not only background platform behavior.
+11. Google Drive alignment approvals create an approval-currentness fixture: approval state can be preserved while file content changes.
+12. AWS AgentCore now needs to be tracked as multiple evidence lanes: registry, OBO identity, memory metadata, trace search/replay, hook telemetry, runtime filesystem/shell, and eval harness.
+13. Cursor custom stores, custom tools, auto-review, and nested subagents make coding-agent session state a direct external-evidence-admission comparator.
 
 ## Source Changes
 
@@ -74,16 +79,26 @@ Each run must:
 - Google Gemini for Apple developers and DeepMind model-card updates: Gemini expands into Apple's Foundation Models framework and Xcode, reinforcing client-surface origin tracking.
 - AWS AgentCore docs carry-forward: production traces, batch evals, user simulation, file systems, GovCloud, payments, custom headers, and interactive shells remain runtime/eval comparator evidence.
 
+### Added on 2026-06-10 v04
+
+- GitHub Copilot CLI `/security-review`: explicit AI-assisted security review command before PR creation or after code changes.
+- OpenAI Agent Builder and Evals wind-down by 2026-11-30: direct hosted builder/eval threat downgraded; Agents SDK and Workspace Agents remain the active distribution watch.
+- Google Cloud ADK long-running human-in-the-loop state-machine pattern: approval/wait/resume becomes a workflow-state comparator.
+- Google Workspace Drive DLP policy create/update APIs and Drive alignment approvals: policy mutation and approval-currentness drift become concrete fixtures.
+- AWS AgentCore release-note expansion: registry, OBO identity, memory metadata, trace search/replay, hook telemetry, batch eval, runtime file systems, interactive shells, and gateway/identity improvements become separate evidence lanes.
+- Cursor custom stores, custom tools, auto-review, background agents, and nested subagents: coding-agent session state and external review evidence move higher on the comparator list.
+- Asana Agentic Work Management and Atlassian Teamwork Graph/Rovo watch carried forward with 2026-06-09/10 source checks; no portable state-review artifact proof found.
+
 ## Current Highest Threats
 
 | Threat | Vendor | Why it matters | Current assessment |
 | --- | --- | --- | --- |
 | High | ServiceNow | Claims live governed enterprise intelligence plus a system of action exposed to external agents through MCP, identity, audit, and role-scoped tools. | Strongest direct overlap, but still vendor-context evidence. |
-| High | GitHub/Microsoft | Agent tasks API, enterprise-managed plugins, Copilot Studio evaluation/connectors/DLP, model policies, and third-party coding-agent security validation turn developer agents into governed enterprise workflows. | High distribution/control-plane risk plus external validation evidence; no public durable state-review proof. |
+| High | GitHub/Microsoft | Agent tasks API, enterprise-managed plugins, Copilot Studio evaluation/connectors/DLP, model policies, third-party coding-agent security validation, and Copilot CLI `/security-review` turn developer agents into governed enterprise workflows. | High distribution/control-plane risk plus explicit external validation evidence; no public durable state-review proof. |
 | High | OpenAI | ChatGPT/Codex workspace agents, plugins, app templates, sessions, Sites, memory, Lockdown Mode, and enterprise adoption evidence create broad enterprise agent governance surfaces. | Strong client/control-plane pressure; memory and plugin sharing are not operational state. |
-| Medium-high | Google | Workspace/Gemini/ADK/Colab plus Gemini in Apple developer surfaces make agent context and execution ubiquitous, with some explicit workflow-state guidance. | Strong context/runtime/client-surface pressure; authority/currentness remains unproven. |
-| High | AWS | Bedrock/Kiro/Startup Advisor/OpenSearch Agent Skills plus AgentCore runtime, traces, evals, identity, policy, gateway, file systems, and shells push provider-neutral agent infrastructure and model governance. | Strong runtime/eval comparator; not yet an action-validity substrate. |
-| Medium-high | Atlassian/Asana/Cursor | Teamwork Graph, Agentic Work Management, and agent-store/session mechanics overlap with work-state, workflow, and durable agent-trace concerns. | Strong implementation and positioning signals; no public proof of pm-substrate-equivalent action validation. |
+| Medium-high | Google | Workspace/Gemini/ADK/Colab plus Gemini in Apple developer surfaces make agent context and execution ubiquitous; ADK long-running agents and Drive approvals add explicit workflow/currentness mechanics. | Strong context/runtime/client-surface pressure; approval and policy-currentness need fixtures; full authority/currentness remains unproven. |
+| High | AWS | Bedrock/Kiro/Startup Advisor/OpenSearch Agent Skills plus AgentCore registry, memory, traces, evals, identity/OBO, policy, gateway, file systems, and shells push provider-neutral agent infrastructure and model governance. | Strong runtime/eval/identity comparator; not yet an action-validity substrate. |
+| Medium-high | Atlassian/Asana/Cursor | Teamwork Graph, Agentic Work Management, and Cursor custom store/session/subagent mechanics overlap with work-state, workflow, and durable agent-trace concerns. | Strong implementation and positioning signals; no public proof of pm-substrate-equivalent action validation. |
 
 ## Rejected, Weak, Or Downgraded Claims
 
@@ -93,41 +108,56 @@ Each run must:
 - Claude Fable/Mythos model launches are model/provider-policy and autonomy signals, not operational-state releases.
 - ServiceNow has the closest claim but has not publicly shown portable original-observation/read-set/action-review artifacts.
 - Enterprise plugin distribution increases reach; it does not by itself make actions safe.
+- Approval labels are not automatically valid for current content; Google Drive alignment approvals show approval and content revision can diverge.
+- Runtime traces, replay, and evals are evidence lanes, not source authority.
+- Cursor custom stores are not operational state unless admitted with source, tenant, freshness, subject, and authority metadata.
 
 ## Current Implementation Implications
 
-1. Persist/export ArrowHedge `StateReviewArtifact` JSON fixtures with stable hashes.
-2. Add artifact schema validation and import/replay fidelity tests.
-3. Link state-review artifacts to eval events.
-4. Add client/plugin/provider/session metadata to artifacts: `clientSurface`, `pluginId`, `skillId`, `mcpConfigRef`, `connectorScopeRefs`, `sessionRef`, `modelProvider`, `modelId`, and provider lifecycle status.
+1. Keep the durable ArrowHedge `StateReviewArtifact` lifecycle as closed pure primitive; do not reopen it as research-only debt.
+2. Add an external evidence admission contract for validation results, provider/model policy, runtime traces, memory/custom-store values, approval state, DLP/policy versions, and work-graph state.
+3. Add approval-currentness fixtures for Drive-style alignment approvals: approval id, approved revision/hash, current revision/hash, approval scope, approving actor, approvedAt, changedAt, and workflow position.
+4. Add client/plugin/provider/session metadata beyond the current artifact `clientSurface` and `provider`: `clientCommand`, `providerSurface`, `modelId`, `dataRetentionPolicyRef`, `adminPolicyRef`, `runtimeRegistryRef`, `runtimeIdentityRef`, and `toolRuntime`.
 5. Add cross-source authority fixtures for email/file/PR/issue/project-ledger conflicts.
-6. Add agent-task lifecycle fixtures for stale issue/PR state, plugin policy drift, connector lifecycle drift, and model deprecation.
+6. Add agent-task lifecycle fixtures for stale issue/PR state, plugin policy drift, connector lifecycle drift, DLP policy drift, and model/provider policy drift.
 7. Keep ServiceNow as the comparator for "governed action artifact completeness."
 8. Add competitor-inspired fixtures for Slack/CRM writes, GitHub/Cursor coding sessions, AWS workflow agent steps, Atlassian graph writes, Asana work-graph actions, ServiceNow deploys, and Google Workspace shared artifacts.
-9. Add external validation evidence fixtures for third-party coding agents, starting with GitHub-style CodeQL, dependency advisory, and secret-scanning results.
+9. Add external validation evidence fixtures for third-party coding agents, starting with GitHub-style CodeQL, dependency advisory, secret-scanning results, and Copilot CLI `/security-review`.
 10. Add provider/model policy evidence fields for data retention, ZDR status, admin enablement, provider surface, and allowed data class.
-11. Add client-surface origin fields so Codex, Copilot app, Claude Code, Xcode/Gemini, Cursor, Slack, and AgentCore proposals can be compared without confusing client surface with authority.
+11. Add client-surface origin fields so Codex, Copilot app/CLI, Claude Code, Xcode/Gemini, Cursor, Slack, and AgentCore proposals can be compared without confusing client surface with authority.
 
 ## Current Implementation/Test Task Tree
 
 ```text
-competitive-intelligence frontier after v03
+competitive-intelligence frontier after v04
 |
 +-- external validation evidence admission
-|   |-- source: GitHub third-party coding-agent validation
+|   |-- source: GitHub third-party coding-agent validation and Copilot CLI /security-review
 |   `-- proof: external validation can support but not override stale/read-set/source-authority warnings
 |
 +-- model/provider policy evidence
 |   |-- source: Claude Fable 5 Copilot retention/admin policy
 |   `-- proof: sensitive source refs fail when provider policy is not allowed
 |
++-- approval-currentness binding
+|   |-- source: Google Drive alignment approvals
+|   `-- proof: approval evidence is invalid or requires revalidation when current revision/hash differs from approved revision/hash
+|
++-- external policy mutation evidence
+|   |-- source: Google Workspace DLP policy create/update APIs
+|   `-- proof: stale policy version or missing policy owner produces warning/wouldBlock before action
+|
 +-- client-surface origin tracking
-|   |-- source: Gemini in Xcode/Foundation Models, Copilot app, Codex, Claude Code
+|   |-- source: Gemini in Xcode/Foundation Models, Copilot app/CLI, Codex, Claude Code, Cursor SDK
 |   `-- proof: origin surface is recorded without becoming authority
 |
 +-- runtime trace versus action-review comparison
-|   |-- source: AWS AgentCore traces/evals/shells
+|   |-- source: AWS AgentCore registry, OBO identity, memory metadata, traces/evals/shells
 |   `-- proof: runtime trace evidence cannot override current-state review
+|
++-- custom-store and nested-agent evidence
+|   |-- source: Cursor custom stores, custom tools, auto-review, nested subagents
+|   `-- proof: custom-store and subagent outputs are admitted as evidence, not direct authority
 |
 `-- daily publish closure
     |-- source: repeated research/fetch/push coordination gaps
