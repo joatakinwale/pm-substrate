@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -13,7 +13,7 @@ The run is not complete until the intended research slice is committed on `main`
 
 LLM agents are statistical predictors promoted into actors. The state problem appears when parametric model state, prompt/inference state, memory/RAG state, tool-observation state, or inter-agent communication state is treated as current, sufficient, authoritative operational state. pm-substrate is the governed operational-state layer between statistical prediction and valid action.
 
-The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The first durable artifact lifecycle and coverage frontier is now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, and an invariant-class `wouldBlock` policy matrix. The next proof boundary is external-state admission: protocol task state, MCP/tool metadata/state handles, memory-search results, world-model predictions, monitoring events, data-lineage records, audit events, attestations, GUI/professional workflow traces, and PM handoff artifacts must be admitted as evidence before they influence valid action.
+The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The durable artifact lifecycle and first external-evidence frontier are now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, an invariant-class `wouldBlock` policy matrix, and a committed replayable external-evidence admission JSONL corpus. The next proof boundary is runtime consumption: those evidence admissions must cross real capability/workflow write paths and live protocol/runtime handles without being mistaken for authority.
 
 ## Versions
 
@@ -28,6 +28,7 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 | v05 | 2026-06-08 | `research/daily-arrowsmith-agent-state/v05-agent-state-arrowsmith-2026-06-08.md` | Temporal-state, progressive-constraint, and PM coordination bridge | Added temporal state misalignment phases, AdaPlanBench progressive constraints, typed semantic commit/abort limits, cross-step evidence aggregation, and PM accountability/common-understanding mechanisms; the same-day implementation then closed the first durable ArrowHedge JSON/JSONL artifact lifecycle slice. |
 | v06 | 2026-06-09 | `research/daily-arrowsmith-agent-state/v06-agent-state-arrowsmith-2026-06-09.md` | External evidence admission, protocol/tool task state, and team situation-awareness bridge | Audited v05 against same-day code and marked artifact lifecycle, observed read-set comparison, temporal fixtures, DB/fixture equivalence, and invariant policy as closed pure primitives; shifted the frontier to admitting MCP/tool/task, memory, world-model, monitoring, lineage, audit, attestation, and PM handoff evidence before action. |
 | v07 | 2026-06-10 | `research/daily-arrowsmith-agent-state/v07-agent-state-arrowsmith-2026-06-10.md` | External evidence admission v1, shared verified context, memory retention, and workflow consistency bridge | Confirmed v06's frontier against current code and added June 8-10 evidence from shared-context MAS, observability-safe memory retention, deployment-time memorization, long-horizon professional workflow benchmarks, MCP explicit state handles, and PM/high-reliability coordination sources; recommended a pure `ExternalStateEvidence` / `EvidenceAdmissionReview` code slice. |
+| v08 | 2026-06-11 | `research/daily-arrowsmith-agent-state/v08-agent-state-arrowsmith-2026-06-11.md` | Same-day main audit and committed replay closure | Audited the June 10 upstream landing against remote `main`, preserved a superseded dirty local draft as provenance, and closed the remaining durable-proof gap for evidence admission by committing and drift-testing the JSONL replay corpus. |
 
 ## Top Findings
 
@@ -61,6 +62,7 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 28. **Workflow consistency is an explicit eval axis.** Workflow-GYM, T1-Bench, ALEM, Emergence World, and SKILL.nb point to workflow-stage omission, objective drift, error propagation, and environment drift as artifact-sequence failures.
 29. **MCP state handles are addressability, not authority.** The 2026 MCP release candidate and SEP-2567 support explicit state handles, but handles and tool annotations remain evidence needing substrate validation.
 30. **PM handoffs need expertise, authority, and escalation state.** Faraj/Xiao, Bigley/Roberts, Lewis, Hsu et al., and handoff safety literature point to owner/source/expertise/escalation fields as executable PM state.
+31. **Committed replay artifacts are part of the proof boundary.** If evidence admission only passes in memory, the substrate cannot honestly claim durable replay for that lane; checked-in corpora and drift tests matter.
 
 ## Source Changes
 
@@ -149,6 +151,7 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - v07 corrects the external-state frontier: MCP explicit state handles and shared-context MAS designs strengthen addressability, but the missing pm-substrate mechanism is admission-time validation before evidence becomes a `StateRef` or action-review input.
 - v07 adds memory deletion and observability as state-review concerns: memory retrieval should carry deletion mode/residue risk, retention policy, online-observable feature boundaries, source modality, and stale-information risk.
 - v07 adds professional workflow consistency as an eval axis: stage omission, objective drift, error propagation, and environment drift should be detected across artifact run groups, not only final outcomes.
+- v08 narrows the remaining golden-artifact gap: evidence-admission reviews now have a committed replay corpus and drift test; the still-open on-disk corpus gap is ArrowHedge artifact persistence, not admission-review persistence.
 
 ## Downgraded Claims
 
@@ -193,18 +196,16 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 
 ## Current Implementation Implications
 
-1. Add a pure external evidence admission contract for protocol/tool/task, memory, monitoring, lineage, audit, attestation, GUI/professional workflow traces, world-model predictions, and PM handoff evidence.
-2. Define candidate types such as `ExternalStateEvidence`, `EvidenceAdmissionReview`, and `AdmittedStateEvidence` in `@pm/agent-state`, with backward-compatible artifact metadata fields.
-3. Map MCP-like task/tool annotations and future explicit state handles into artifacts without trusting server-provided annotations or handles by default.
+1. Consume evidence-admission reviews in capability/workflow runtime write paths before any side-effecting action claims stronger enforcement.
+2. Keep MCP-like task/tool annotations and explicit state handles in the admission lane; prove the same rules against live protocol/runtime handles, not only pure fixtures.
+3. Persist a canonical ArrowHedge on-disk artifact corpus so both the action-review lane and the evidence-admission lane have committed replay artifacts.
 4. Attach memory retrieval to observed-read-set evidence with denial/warning reasons for stale, unauthorized, deleted-but-recoverable, offline-supervised, or subject-mismatched memories.
-5. Add wait-condition artifacts for passive monitoring, active action, and no-op success/failure cases.
-6. Add provenance-vs-authorization alignment fields or policy outcomes comparing actual source/parameter paths to intended authority.
-7. Map OpenLineage/FHIR/in-toto vocabulary into source refs or example adapters without making those standards automatic trust.
-8. Add run-level artifact groups so trajectory hypotheses can span multiple artifacts, agents, workflow stages, feedback observations, and handoffs.
-9. Add PM handoff fields for expertise owner, source steward, action owner, escalation owner, handoff condition, unresolved risk, dependency refs, and valid next action.
-10. Keep invariant policy as a `wouldBlock` recommendation until external side-effect gates exist.
-11. Add distributed-state PM evals that measure convergence on dependency graph, binding source, owner, blocker, handoff condition, and valid next action.
-12. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
+5. Add provenance-vs-authorization alignment fields or policy outcomes comparing actual source/parameter paths to intended authority.
+6. Add run-level artifact groups so trajectory hypotheses can span multiple artifacts, agents, workflow stages, feedback observations, and handoffs.
+7. Add PM handoff fields for expertise owner, source steward, action owner, escalation owner, handoff condition, unresolved risk, dependency refs, and valid next action.
+8. Keep invariant policy as a `wouldBlock` recommendation until external side-effect gates exist.
+9. Add distributed-state PM evals that measure convergence on dependency graph, binding source, owner, blocker, handoff condition, and valid next action.
+10. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
 
 ## Metrics Queue
 

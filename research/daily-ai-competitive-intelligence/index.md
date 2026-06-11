@@ -1,11 +1,11 @@
 # Daily AI Competitive Intelligence Index
 
-Last updated: 2026-06-10
+Last updated: 2026-06-11
 Scope: major AI companies, workspace AI, enterprise AI, agent platforms, AI coding/productivity tools, and competitors that may overlap with pm-substrate's operational-state thesis.
 
 ## Current Baseline
 
-The first four versioned runs are complete. The live competitive pattern is that major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, long-running runtime state, approval/policy mechanics, and evaluation/analytics. None of the fresh 2026-06-08 to 2026-06-10 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, observed-read-set comparison, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof. The strongest June 10 delta is that evidence lanes are becoming concrete: GitHub exposes explicit Copilot CLI security review, Google exposes approval-currentness and policy-mutation mechanics, AWS exposes more agent-operations substrate pieces, and Cursor exposes custom stores/tools/subagents.
+The first five versioned runs are complete. The live competitive pattern is that major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, long-running runtime state, approval/policy mechanics, and evaluation/analytics. None of the fresh 2026-06-09 to 2026-06-11 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, observed-read-set comparison, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof. The strongest confirmed recent delta is still June 10's evidence-lane split: GitHub exposes explicit Copilot CLI security review, Google exposes approval-currentness and policy-mutation mechanics, AWS exposes more agent-operations substrate pieces, and Cursor exposes custom stores/tools/subagents. June 11 added no stronger official contradiction, which keeps the implementation priority on durable replay of those evidence lanes.
 
 Parallel-run reconciliation on 2026-06-08: `origin/main` created v01 while a local broader vendor scan was still running. v01 remains the canonical first version. The local scan is preserved as v02, and both lines of evidence are folded into this index and the shared research ledger.
 
@@ -35,6 +35,7 @@ Each run must:
 | v02 | 2026-06-08 | `research/daily-ai-competitive-intelligence/v02-ai-competitive-intelligence-2026-06-08.md` | Parallel same-day reconciliation and broader vendor scan | Preserved upstream v01 unchanged, added broader watch coverage for OpenAI workspace agents, GitHub/Copilot session state, AWS Step Functions plus AgentCore, Atlassian Teamwork Graph, Asana Agentic Work Management, Cursor agent stores, Slack/Salesforce MCP actions, ServiceNow, Anthropic, Google, and Cognition; no reviewed source exposed the full pm-substrate pre-action `StateReviewArtifact` boundary. |
 | v03 | 2026-06-09 | `research/daily-ai-competitive-intelligence/v03-ai-competitive-intelligence-2026-06-09.md` | Fresh official-source continuation and task-tree bridge | Added June 9 official deltas for GitHub third-party coding-agent security validation, Claude Fable 5 provider/model policy, Anthropic model availability, OpenAI Codex adoption evidence, Google Gemini Apple/Xcode integration, and AWS AgentCore carry-forward runtime/eval pressure; converted the findings into a dated implementation/test task tree. |
 | v04 | 2026-06-10 | `research/daily-ai-competitive-intelligence/v04-ai-competitive-intelligence-2026-06-10.md` | Evidence-lane and approval-currentness continuation | Added June 10 official deltas for Copilot CLI `/security-review`, OpenAI Agent Builder/Evals wind-down, Google ADK long-running approval state, Workspace DLP and Drive alignment approvals, AWS AgentCore registry/OBO/memory/trace/eval runtime lanes, Cursor custom stores/tools/subagents, and Asana/Atlassian work-graph watch updates; shifted implementation priority to external evidence admission and approval-currentness drift. |
+| v05 | 2026-06-11 | `research/daily-ai-competitive-intelligence/v05-ai-competitive-intelligence-2026-06-11.md` | No-newer-source correction and durable replay closure | Re-checked the 24-72 hour official window and found no stronger post-v04 source; translated that quiet period into the right code move by committing and drift-testing the external-evidence admission JSONL replay corpus. |
 
 ## Top Deltas
 
@@ -51,6 +52,7 @@ Each run must:
 11. Google Drive alignment approvals create an approval-currentness fixture: approval state can be preserved while file content changes.
 12. AWS AgentCore now needs to be tracked as multiple evidence lanes: registry, OBO identity, memory metadata, trace search/replay, hook telemetry, runtime filesystem/shell, and eval harness.
 13. Cursor custom stores, custom tools, auto-review, and nested subagents make coding-agent session state a direct external-evidence-admission comparator.
+14. The absence of a stronger June 11 official contradiction is itself useful: implementation priority should stay on replayable evidence handling, not on inventing a new competitor taxonomy.
 
 ## Source Changes
 
@@ -88,6 +90,12 @@ Each run must:
 - AWS AgentCore release-note expansion: registry, OBO identity, memory metadata, trace search/replay, hook telemetry, batch eval, runtime file systems, interactive shells, and gateway/identity improvements become separate evidence lanes.
 - Cursor custom stores, custom tools, auto-review, background agents, and nested subagents: coding-agent session state and external review evidence move higher on the comparator list.
 - Asana Agentic Work Management and Atlassian Teamwork Graph/Rovo watch carried forward with 2026-06-09/10 source checks; no portable state-review artifact proof found.
+
+### Added on 2026-06-11 v05
+
+- Re-checked official vendor surfaces in the 24-72 hour window ending 2026-06-11 and found no stronger direct operational-state release than the already-confirmed June 10 evidence-lane split.
+- GitHub Copilot CLI `/security-review` remained the highest-signal official source because it keeps external validation as an explicit invoked evidence lane.
+- Repo-grounded correction: a dirty local external-evidence draft was superseded by upstream June 10 code, so today's correct closure was durable replay of that landed corpus rather than a duplicate second implementation.
 
 ## Current Highest Threats
 

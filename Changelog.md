@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-11 - Evidence-admission replay corpus persisted and drift-tested
+
+- Added `buildEvidenceAdmissionReviewCorpus()` and `serializeEvidenceAdmissionReviewsJsonl()` in `packages/evals/src/evidence-admission.ts` so the external-evidence admission fixture set can be exported as deterministic JSONL instead of living only in memory.
+- Committed the canonical replay corpus at `packages/evals/fixtures/evidence-admission-reviews.v1.jsonl`.
+- Added a drift test in `packages/evals/src/evidence-admission.test.ts` that regenerates the corpus and fails if the checked-in JSONL diverges.
+- Research-closure reconciliation: remote `origin/main` had already landed the stronger June 10 external-evidence implementation (`bc716c8`), while the local root worktree still held an older uncommitted draft. This run preserved that dirty root unchanged as provenance, used a clean in-repo detached worktree for the code/test closure, and recorded the reconciliation in the June 11 research continuations instead of recommitting a duplicate implementation.
+- Verification: `tsc -b packages/evals --verbose`; `vitest run packages/evals/src/evidence-admission.test.ts packages/agent-state/src/external-evidence.test.ts` (41 tests passed).
+
 ## 2026-06-10 - Wedding-era retirement: codebase realigned to the rewrite thesis
 
 The repo now matches the canonical objective (`artifacts/pm_substrate_rewrite.md`, "State Coherence Under Partial Observation"): governed agent operational state / PM layer, with ArrowHedgeLabs agents as the validation artifact. The wedding profile and its capabilities are no longer part of the workspace.

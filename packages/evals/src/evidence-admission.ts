@@ -53,6 +53,13 @@ export interface EvidenceAdmissionFixtureCorpusInput {
   readonly evaluatedAt?: Timestamp;
 }
 
+export interface EvidenceAdmissionReviewCorpus {
+  readonly fixtures: readonly EvidenceAdmissionFixture[];
+  readonly results: readonly EvidenceAdmissionFixtureResult[];
+  readonly reviews: readonly EvidenceAdmissionReview[];
+  readonly jsonl: string;
+}
+
 const DEFAULT_TENANT = tenantId("tnt_arrowhedge_fixtures");
 const DEFAULT_EVALUATED_AT = timestamp("2026-06-10T16:00:00.000Z");
 
@@ -419,6 +426,27 @@ export function runEvidenceAdmissionFixtures(
         unexpectedIssueCodes.length === 0,
     };
   });
+}
+
+export function serializeEvidenceAdmissionReviewsJsonl(
+  reviews: readonly EvidenceAdmissionReview[],
+): string {
+  return `${reviews.map((review) => JSON.stringify(review)).join("\n")}\n`;
+}
+
+export function buildEvidenceAdmissionReviewCorpus(
+  input: EvidenceAdmissionFixtureCorpusInput = {},
+): EvidenceAdmissionReviewCorpus {
+  const fixtures = buildEvidenceAdmissionFixtureCorpus(input);
+  const results = runEvidenceAdmissionFixtures(fixtures);
+  const reviews = results.map((result) => result.review);
+
+  return {
+    fixtures,
+    results,
+    reviews,
+    jsonl: serializeEvidenceAdmissionReviewsJsonl(reviews),
+  };
 }
 
 export interface EvidenceAdmissionMetrics {

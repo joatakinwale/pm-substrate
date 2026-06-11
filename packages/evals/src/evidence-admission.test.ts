@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { tenantId, timestamp } from "@pm/types";
 import {
@@ -14,6 +15,7 @@ import {
 
 import {
   analyzeEvidenceAdmissionFixtureResults,
+  buildEvidenceAdmissionReviewCorpus,
   buildEvidenceAdmissionFixtureCorpus,
   groupStateReviewArtifactsByRunGroup,
   projectStateReviewArtifactForRole,
@@ -91,6 +93,18 @@ describe("evidence admission fixture corpus", () => {
     expect(metrics.issueCodeCounts["approval_revision_mismatch"]).toBe(1);
     expect(metrics.wouldBlockAtHighConsequence).toBeGreaterThan(0);
     expect(metrics.invariantClassCounts["freshness_window"]).toBeGreaterThan(0);
+  });
+
+  it("matches the committed golden admission-review corpus JSONL", () => {
+    const corpus = buildEvidenceAdmissionReviewCorpus();
+    const fixturePath = new URL(
+      "../fixtures/evidence-admission-reviews.v1.jsonl",
+      import.meta.url,
+    );
+    const committed = readFileSync(fixturePath, "utf8");
+
+    expect(committed).toBe(corpus.jsonl);
+    expect(committed.trim().split("\n")).toHaveLength(corpus.reviews.length);
   });
 });
 
