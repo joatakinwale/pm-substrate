@@ -1,10 +1,13 @@
 # Changelog
 
-## 2026-06-11 - Evidence-admission replay corpus persisted and drift-tested
+## 2026-06-11 - Evidence-admission replay corpus and agent-state Arrowsmith v08
 
 - Added `buildEvidenceAdmissionReviewCorpus()` and `serializeEvidenceAdmissionReviewsJsonl()` in `packages/evals/src/evidence-admission.ts` so the external-evidence admission fixture set can be exported as deterministic JSONL instead of living only in memory.
 - Committed the canonical replay corpus at `packages/evals/fixtures/evidence-admission-reviews.v1.jsonl`.
 - Added a drift test in `packages/evals/src/evidence-admission.test.ts` that regenerates the corpus and fails if the checked-in JSONL diverges.
+- Reconciled the same-day add/add research conflict and expanded `research/daily-arrowsmith-agent-state/v08-agent-state-arrowsmith-2026-06-11.md` into the required daily Arrowsmith structure while preserving the replay-corpus closure as canonical implementation evidence.
+- Added new bridge evidence from OCELOT trajectory leakage budgets, finite-state vs LLM action-policy drift, production transaction-agent LLM-judge blind spots, SkillAxe skill-document evaluation, MCP spec/roadmap/SEP-2567 re-checks, and human-AI mental-model / ALMANAC collaboration sources.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` so the current frontier is runtime evidence-action binding, ArrowHedge on-disk artifact replay, trajectory release budgets, policy-transition conformance, state-defect recall metrics, live MCP revalidation, skill-document governance, and real-run PM handoff agreement.
 - Research-closure reconciliation: remote `origin/main` had already landed the stronger June 10 external-evidence implementation (`bc716c8`), while the local root worktree still held an older uncommitted draft. This run preserved that dirty root unchanged as provenance, used a clean in-repo detached worktree for the code/test closure, and recorded the reconciliation in the June 11 research continuations instead of recommitting a duplicate implementation.
 - Verification: `tsc -b packages/evals --verbose`; `vitest run packages/evals/src/evidence-admission.test.ts packages/agent-state/src/external-evidence.test.ts` (41 tests passed).
 
