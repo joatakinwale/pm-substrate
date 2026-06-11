@@ -1,149 +1,78 @@
 # Architecture
 
+Canonical thesis: [`artifacts/pm_substrate_rewrite.md`](../artifacts/pm_substrate_rewrite.md) — *State Coherence Under Partial Observation*. This document is the engineering view of that thesis. The earlier wedding-era framing is retired; historical ADRs record it.
+
 ## Thesis
 
-Workspace tools are mature. The missing layer is the one that arbitrates *interactions between tools* — a Project Manager layer, by analogy to a human PM arbitrating between specialists who each speak their own language.
+An agent — human, department, SaaS tool, or LLM — is a bounded perception-action system: it observes a partial world, encodes observations into an internal model, chooses actions, and receives delayed feedback. Work fails when bounded actors act from divergent local state. pm-substrate is the **project-manager layer**: the tenant-scoped governed state plane that keeps those actors aligned.
 
-This substrate is that layer.
+The substrate distinguishes state kinds explicitly: reality state, observed state, belief state, **operational state** (what the workspace accepts as actionable), authoritative state, historical state, and projection state. It never claims to know reality; it makes observation, evidence, freshness, authority, and invalidation explicit.
 
-## The four-layer model
+**AI is semantic I/O, never authority.** Models propose mappings and actions; deterministic validators, profiles, permissions, write gates, and provenance decide admissibility.
 
-### Layer 1 — Entity graph
+## The layers
 
-**Nodes hold identity and stable attributes only.** Everything contextual rides on *typed edges*.
+### 1 — Entity graph (`@pm/graph`)
 
-```
-Customer →[has_invoice]→ Invoice
-Customer →[has_interaction]→ Interaction
-Customer →[employs]→ Person
-```
+Identity-only nodes; everything contextual on typed edges. Tools query the edges they care about, not the whole node — this avoids the fat-node failure mode (every tool writing to one record; reads pulling data tools don't need; writes contending on one row). Profile validators are wired into the graph: profile-illegal writes are rejected at the graph layer, not opt-in.
 
-Tools query the edges they care about, not the whole node. This is the difference between a document store and a graph; we want the graph.
+### 2 — Event log (`@pm/events`)
 
-**Why:** the "fat node" failure mode — every tool writing to the same `Customer` node grows it unbounded; reads pull data tools don't need; writes contend on the same row. Identity-only nodes + typed edges side-step this entirely.
+Append-only, partitioned by tenant, topic-scoped subscriptions. Every event carries `authority`, a `contentHash`, and a `priorEventHash` forming a per-tenant hash chain; `verifyChain()` replays it. Ordering is by a monotonic sequence (`seq`), not timestamps — `now()` freezes per transaction, so multi-event transactions would otherwise tie and fork the chain (found by the ArrowHedge DB proof; fixed in migration 0019). Topic scoping avoids the everyone-subscribes-to-everything thundering herd.
 
-### Layer 2 — Event log
+### 3 — Capability registry (`@pm/registry`, `@pm/capability-kit`)
 
-**Append-only.** Topic-scoped streams partitioned by tenant + entity type. Tools subscribe declaratively to `(event type × tenant scope)`.
+Tools register as capability providers declaring reads, emitted events, and required permissions. Capabilities are siblings, not friends: no capability may import another capability or a foreign profile — enforced statically by `capability-isolation.test.ts`. "Integration" stops existing as a concept; the substrate routes.
 
-Two payoffs the naive design doesn't have:
+### 4 — Workflow runtime (`@pm/workflow`)
 
-- **Decoupling.** A new tool subscribes to existing events without coordinating with anyone.
-- **Time-travel queries.** "What did this customer's record look like 90 days ago?" is free.
+Processes expressed as per-tenant graphs of capability invocations conditioned on events, with contract validation. Lifecycle state machines are declared by profiles (e.g. a research run blocks on `workflow.blocked.stale_state`).
 
-Built right from day one — not bolted on after the fact (which is what kills audit at most companies that try to add it later).
+### 5 — Agent operational state (`@pm/agent-state`)
 
-**Why topic-scoped:** the "everyone subscribes to everything" failure mode — global event log → every event wakes N handlers → thundering herd. Topic-scoped streams + declarative subscriptions mean the router only fans out to interested subscribers.
+The layer that makes the agent-state claim concrete, as pure primitives:
 
-### Layer 3 — Capability registry
+- `CurrentStateView` — sourceRefs, observedAt, validUntil, authorityRule, projectionVersion, workflowPosition, missingSources, conflicts, allowedActions.
+- `ObservationContract` (v2) — issuer, integrity hash, holder binding (DPoP-style), allowed use, redaction policy, revocation ref.
+- `ActionProposalReview` — warn-first review of a proposed action against current state: read-set validation, observation re-evaluation, contract-binding checks, multi-object role preconditions. Advisory vs blocking is explicit; external mutation blocking is **unclaimed** until runtime wiring lands.
+- `StateReviewArtifact` — durable, canonical-JSON, hash-replayable record of every review; JSONL export/import; continuity payload linkage; run-group metadata for trajectory-level analysis.
+- Observed read-set comparison — declared reads vs what tools actually read (undeclared/unobserved/stale/authority drift).
+- Invariant-class policy matrix — subject identity, tenant boundary, required evidence, freshness, source authority, projection version, workflow position, state conflict, capability contract × low/medium/high consequence → advisory/`wouldBlock`.
+- **External evidence admission** — MCP handles/tasks/annotations, memory retrieval (retention/deletion-residue metadata), monitoring, lineage, audit, attestations, workflow traces, approvals (currentness vs revision/hash/scope), provider policy (retention/ZDR/data classes), custom stores, subagent outputs, OBO identity (provenance-vs-authorization alignment), PM handoffs (typed owners). Admission validates source, subject, tenant, freshness, integrity, and policy; `authorityStatus` is always `evidence_only`. Evidence informs review; it never becomes authority.
 
-Tools register themselves as **capability providers** against the graph. Each tool declares:
+### 6 — Evals (`@pm/evals`)
 
-- Nodes / edges it reads
-- Events it produces
-- Permissions it requires
+Paired baseline/substrate scenarios (local-lab), the ArrowHedge fixture corpus (temporal misalignment phases, clean-current baseline), artifact-derived metrics, evidence-admission fixture corpus across all lanes, run groups (error-propagation detection), and role projections (risk officer / project manager / auditor) over a stable artifact invariant core.
 
-A `send-invoice` tool: *reads `Customer` and `Invoice`; produces `EmailSent` and `PaymentRequest`.*
-A `schedule-meeting` tool: *reads `Person` and `Calendar`; produces `MeetingScheduled`.*
+## The plug-in pipeline (how a platform onboards)
 
-A new tool isn't *integrated* with existing tools — it's plugged into the same substrate, declaring inputs and outputs, and the substrate handles routing.
+1. Discover the source (DB schema, API schema, CSV headers, event payloads).
+2. AI proposes the mapping (entities, field aliases, edges, source refs, event types).
+3. Validate structurally against the mapping format (`@pm/entity-mapping`).
+4. Validate semantically against the installed profile (concrete types, tier-1 bindings, identity fields, edge types/cardinalities).
+5. Dry-run sample data into graph-ready inputs without mutating production state.
+6. Write gates validate every mutation (tenant, identity, schema version, permissions, idempotency, provenance).
+7. Version and approve the mapping (fixtures, expected outputs, rollback path).
+8. Operate through adapters; the source platform remains itself.
 
-**This is what makes "integration" stop existing as a concept.**
+**Acceptance criterion:** onboarding requires new mapping files, fixtures, tests, and possibly a thin adapter — and **zero changes to substrate packages or existing providers**. A substrate edit during onboarding is a falsified claim, not a feature request.
 
-### Layer 4 — Workflow runtime
+## Heartbeats are reconciliation, not truth
 
-Business processes are **expressed, not coded**.
+A cron tick emits a **state census**: which sources were checked, which facts were fresh, which projections were invalidated, which workflows blocked, which agent plans depend on changed state, which conflicts need resolution. Borrowed disciplines: Kubernetes controllers (desired vs current state), OpenTelemetry (traces/metrics/logs as separate signals), Lamport (ordering without a shared clock).
 
-> When a customer signs a contract → create a project → assign it to the relevant team → schedule a kickoff → send a welcome email → set up billing.
+## Layered ontology
 
-A graph of capability invocations conditioned on events. Per-tenant configuration. No fixed workflow ships.
+Tier 1: seven universal primitives, identical across tenants. Tier 2: profiles as libraries — currently `finance-research` (the ArrowHedge validation artifact) and `agency` (second-profile proof). Tier 3: tenant customizations. The substrate names no profile in its own source — enforced by `substrate-profile-agnostic.test.ts`, which scans substrate packages for any profile identifier and fails on leak.
 
-## The layered ontology (the part that resolves "pick a vertical or stay generic")
+## Where this pattern dies — and the guards
 
-### Tier 1 — Universal primitives (this repo)
+- **Schema governance** → tools bind to declared interfaces, not concrete tenant types.
+- **God-object registry** → capability isolation test; capabilities communicate only via events.
+- **Profile leakage** → profile-agnostic scan; raw Tier-1 writes stay legal with profiles installed.
+- **Two-state problem** (agent memory vs project state) → agent memory is subordinate: claims cite evidence and rebase against substrate state before action; admission gates external evidence.
+- **Performance modes** — fat node (layer-1 design), thundering herd (topic scoping), schema-flex tax (hot fields typed, custom fields JSONB + partial indexes), cross-tenant analytics (CQRS projections), audit firehose (tiered storage when scale demands).
 
-The seven types covering ~90% of B2B operations. Defined once, identical across all tenants and industries.
+## Day-1 stack and day-365 swaps
 
-- `Counterparty` — customer / client / patient / guest / vendor / partner
-- `Engagement` — project / case / deal / event / matter / job / ticket
-- `Transaction` — invoice / payment / contract / order / claim
-- `Resource` — person / asset / room / equipment
-- `Communication` — email / call / message / note
-- `Document` — any file produced or referenced
-- `Event` — something happened at a time, immutable
-
-### Tier 2 — Industry profiles (separate packages)
-
-Opinionated extensions that encode industry-specific constraints, vocabulary, and relationship rules.
-
-- **Wedding profile** specializes `Engagement → Wedding` (with `event_date`, `venue`, `couple_ids[2]`, `guest_count` constraints), `Counterparty → Couple/Guest/Vendor`.
-- **Legal profile** specializes `Engagement → Matter` (with `practice_area`, `conflict_check_status`, `statute_of_limitations`), `Counterparty → Client/Opposing Party`.
-- **Healthcare profile** specializes `Counterparty → Patient` with HIPAA flags.
-
-Profiles are **libraries**, not hardcoded modules. A tenant picks one (or composes several — a law firm doing real estate gets both).
-
-### Tier 3 — Tenant customizations
-
-The specific business's own fields, custom entities, workflow tweaks. Salesforce calls these "custom objects."
-
-### Why this beats both naive approaches
-
-- **"One generic schema for everyone"** fails: industry-specific constraints leak into app logic (now your "interoperable substrate" has hidden coupling) or get ignored (now your platform is a worse Notion).
-- **"One vertical at a time"** fails: you build the same primitives 5 times and your tools don't transfer.
-- **Layered ontology**: the substrate stays universal; domain logic lives in profiles; tools written against Tier 1 work everywhere; tenants customize at Tier 3 without forking.
-
-This is also how Schema.org evolved (`Thing → Place → LocalBusiness → Restaurant`) and how FHIR works in healthcare (`Resource → Patient/Observation/Encounter`).
-
-## Where this pattern usually dies — and how we avoid each
-
-### 1. Schema governance
-
-If every tenant defines their own entities, tools can't bind to a concrete `Customer` type.
-
-**Solution:** tools bind to **declared interfaces**, not concrete tenant types. *"This tool needs an entity with `email`, `name`, `created_at`."* Schema.org / linked-data style.
-
-### 2. The migration cliff
-
-Businesses already have data in Salesforce, QuickBooks, Notion. Import = ETL nightmare; sync = CDC + conflict-resolution + eventual-consistency hell.
-
-**Solution (Phase 2+):** the wedding-app integration is *exactly* the migration story — we sit alongside MongoDB and project events into the substrate via CDC. Proves the pattern without forcing a single business to migrate.
-
-### 3. The first-tool problem
-
-A workspace with one tool is just a worse version of that tool. People compare your single tool to the best-in-class point solution and you lose.
-
-**Solution:** the WeddingWebApp Phase 2/3 plan refactors three subsystems (planner-task, gcal-projection, vendor-milestone) into capability providers, then adds a fourth (budget-tracker or RSVP-reminder) without touching the first three. **Three composing tools on day one of the demo.**
-
-### 4. Performance
-
-A generic substrate is queried unpredictably (Epic gets away with hierarchical/M because read patterns are well-known: one patient, mostly reads). Five concrete failure modes:
-
-- **Fat node** — addressed by Layer 1 design.
-- **Everyone subscribes to everything** — addressed by Layer 2 topic scoping.
-- **Schema-flexibility tax** — Tier 3 customizations as JSONB blob → full-table scans. **Solution: hot fields in typed columns; custom fields in JSONB with on-demand expression indexes (per-tenant + per-field partial indexes).**
-- **Cross-tenant query** — naive 4-hop traversal across 1M nodes is seconds. **Solution: CQRS. Graph = source of truth; analytics = materialized views projected from the event stream.**
-- **Audit-log-as-firehose** — at 1M events/day/tenant, audit infra becomes the most expensive component. **Solution: tier the storage. Hot (last 30 days) = queryable; cold = S3 + Parquet or ClickHouse; aggregated rollups for compliance.**
-
-## Day-1 stack
-
-- **PostgreSQL.** All five schemas. JSONB for flex fields, `ltree` / recursive CTEs for hierarchy, partial indexes for tenant custom fields.
-- **`LISTEN/NOTIFY`.** Event bus. Migrate to Kafka or Redpanda when sustained throughput crosses ~10k events/sec.
-- **Postgres FTS.** Search. Migrate to OpenSearch / Meilisearch when row count + query patterns demand it.
-- **Single projection-worker process.** Will eventually become a fleet, but the contract is what matters now.
-
-The cost of doing it right at day one is *discipline*, not infrastructure:
-
-- Emit events for every mutation, even if there's no consumer yet.
-- Build read models even when there's only one.
-- Partition by tenant from commit one — even at one tenant.
-
-## Day-365 migration plan
-
-Each is a swap behind a stable interface, not a rewrite:
-
-- Move event bus → Kafka when `LISTEN/NOTIFY` chokes.
-- Move search → OpenSearch when FTS slows.
-- Add ClickHouse when analytics queries hit Postgres limits.
-- Add read replicas when the primary saturates on reads.
-
-That's what the architecture buys you.
+PostgreSQL only: `graph`, `events`, `projections`, `registry`, `workflow` schemas; `LISTEN/NOTIFY` bus; FTS; single projection worker. Discipline over infrastructure: emit events for every mutation, build read models even with one consumer, partition by tenant from commit one. Swap-behind-interface when triggered: Kafka/Redpanda past ~10k events/sec sustained, OpenSearch when FTS slows, ClickHouse for analytics, read replicas on primary saturation.

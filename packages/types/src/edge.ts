@@ -15,7 +15,7 @@ import type {
  * "scheduled_for"). The substrate does not know the catalog of edge types;
  * it stores them, indexes them, and routes queries against them.
  *
- * Cardinality and constraints (e.g., "Wedding has_principal exactly 2")
+ * Cardinality and constraints (e.g., "Project client_has_project exactly 1")
  * are enforced at the profile layer, not here.
  */
 export interface Edge {

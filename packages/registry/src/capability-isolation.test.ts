@@ -29,10 +29,10 @@
  *
  * Forbidden:
  *   - Any other @pm/capability-* package.
- *   - Any other @pm/profile-* package (wedding capability cannot import
- *     the agency profile, etc.).
+ *   - Any other @pm/profile-* package (an agency capability cannot import
+ *     the finance-research profile, etc.).
  *   - Relative imports that escape the package's own directory tree
- *     (e.g., "../../profile-wedding/src/internal-thing.js").
+ *     (e.g., "../../profile-agency/src/internal-thing.js").
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -78,8 +78,8 @@ interface ImportSite {
 
 interface CapabilityPackage {
   dir: string; // absolute
-  name: string; // e.g., capability-wedding-budget
-  pkgName: string; // e.g., @pm/capability-wedding-budget
+  name: string; // e.g., capability-agency-lead-scoring
+  pkgName: string; // e.g., @pm/capability-agency-lead-scoring
   /** The profile prefix this capability is bound to, or null for non-profile-bound. */
   profilePrefix: string | null;
   declaredDeps: Set<string>;
@@ -99,7 +99,6 @@ function listCapabilityPackages(): CapabilityPackage[] {
       dependencies?: Record<string, string>;
     };
     // Infer the profile prefix from the capability's directory name:
-    //   capability-wedding-budget   \u2192 wedding
     //   capability-agency-lead-scoring \u2192 agency
     //   capability-audit            \u2192 null (profile-agnostic)
     const rest = name.slice("capability-".length);

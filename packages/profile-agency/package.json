@@ -28,7 +28,7 @@
     "@pm/events": "workspace:*",
     "@pm/graph": "workspace:*",
     "@pm/profile-registry": "workspace:*",
-    "@pm/profile-wedding": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
     "@pm/projections": "workspace:*",
     "@pm/registry": "workspace:*",
     "@types/pg": "^8.11.10",

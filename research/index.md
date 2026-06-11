@@ -75,74 +75,45 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 
 ## Current Implementation Frontier
 
-1. Add a pure external evidence admission contract for MCP/tool/task handles, memory, monitoring, lineage, audit, attestation, GUI/professional workflow traces, world-model prediction, and PM handoff evidence.
-2. Add one MCP-like fixture that admits or rejects tool/task evidence without requiring a live MCP server, including annotation mismatch and explicit-state-handle revalidation.
-3. Prototype memory-search observation evidence and denial reasons in the observed-read-set lane, including deletion residue and observability-safe retention metadata.
-4. Add a clean accepted/current ArrowHedge artifact fixture as a positive metrics baseline.
-5. Add a monitoring/no-op wait-condition fixture with reaction-time and premature-action metrics.
-6. Add provenance-vs-authorization alignment fields or a policy outcome for actual source/parameter path vs authorized intent.
-7. Decide whether OpenLineage/FHIR/in-toto vocabulary should be generic source-ref facets, examples, or adapter-specific mappings.
-8. Add run-level artifact groups for trajectory-level failure hypotheses spanning multiple artifacts, agents, workflow stages, feedback observations, and handoffs.
-9. Add role-specific projections over a stable state-review artifact invariant core.
-10. Add PM distributed-state evals for dependency-structure agreement, expertise/source/escalation owner convergence, handoff-condition resolution, source/owner/blocker convergence, and valid next action.
-11. Keep competitive-intelligence research tied to whether vendors solve currentness, authority, provenance, workflow validity, and pre-action review, not just memory/RAG/context/session/workflow/audit.
-12. Add ServiceNow comparator fixtures for governed action completeness.
-13. Add competitor-inspired fixtures for Slack/CRM writes, GitHub/Cursor coding sessions, AWS Step Functions agent steps, Atlassian graph writes, Asana work-graph actions, ServiceNow deploys, and Google Workspace shared artifacts.
-14. Add external validation evidence fixtures for third-party coding agents, starting with GitHub-style CodeQL, dependency advisory, and secret-scanning outcomes.
-15. Add model/provider policy evidence fields for retention, ZDR, admin enablement, provider surface, and allowed data class.
-16. Add client-surface origin tracking for Codex, Copilot app, Claude Code, Cursor, Xcode/Gemini, Slack/Salesforce, and AgentCore.
-17. Add approval-currentness fixtures where approval state diverges from current file/content revision.
-18. Add policy-version drift fixtures for DLP/workspace/model-provider policies.
-19. Add custom-store and nested-subagent evidence fixtures for coding-agent state.
-20. Split runtime evidence admission into registry, identity/OBO, memory metadata, trace/replay, eval, filesystem/shell, and gateway evidence.
+Status note (2026-06-10): the previous 20-item frontier was implemented as pure tested primitives in `@pm/agent-state` (`external-evidence.ts`), `@pm/evals` (`evidence-admission.ts`), and `@pm/capability-finance-research-ingest` (clean-current fixture). See Changelog entry "External evidence admission, contract v2 bindings, fixture corpus" and ledger entry L017. Item 7 was decided as generic evidence kinds + source URIs. Item 11 remains a research-protocol rule, not code. The stalled v03/v04 watchlist items (multi-object precondition, ObservationContract v2 fields) also closed.
+
+Remaining frontier:
+
+1. Wire evidence admission into the capability/workflow runtime write paths (currently pure primitives only; external mutation blocking remains explicitly unclaimed).
+2. Exercise the MCP admission lane against a live MCP server (the fixture lane is pure; revalidation semantics against real handles/annotations are untested).
+3. Persist golden admission-fixture JSONL files on disk alongside the ArrowHedge artifact corpus for replay regression in CI.
+4. Run PM dependency-structure agreement (`comparePmHandoffAgreement`) over real multi-agent ArrowHedge runs, not synthetic facets.
+5. Track the rewrite-thesis instruments as ledger claims: ArrowHedge T1-T8 pass status and the 12 behavior metrics (time-to-plugin, substrate edit count, mapping coverage, etc.) — the plug-in half of the thesis has no research stream.
+6. Competitive falsification attempts against vendor technical/SDK docs (ServiceNow dev portal, Atlassian Forge/Rovo, Asana developers) instead of press-release surfaces; add a plug-in-comparator scan (embedded iPaaS, schema-mapping vendors) against the zero-substrate-edit criterion.
+7. ~~Update front-door docs (`README.md`, `docs/roadmap.md`, `docs/validation.md`) to the rewrite thesis so research and automation anchor on the current objective.~~ **Done 2026-06-10** — all four front-door docs rewritten (incl. `docs/architecture.md`); wedding-era packages removed from the workspace; validation re-anchored to ArrowHedge T1–T8 + 12 metrics (see Changelog "Wedding-era retirement").
 
 ## Current Task Tree
 
 ```text
-pm-substrate implementation frontier
+pm-substrate implementation frontier (updated 2026-06-10, post-L017)
 |
-+-- external evidence admission
-|   |-- from: Arrowsmith v06-v07
-|   `-- next proof: pure ExternalStateEvidence/EvidenceAdmissionReview with MCP handle, memory, workflow trace, and PM handoff fixtures
++-- external evidence admission ............ IMPLEMENTED (pure) 2026-06-10
+|   `-- next proof: wire admission into capability/workflow write paths; live MCP revalidation
++-- memory admission metadata .............. IMPLEMENTED (pure) 2026-06-10
++-- workflow artifact run groups ........... IMPLEMENTED (pure) 2026-06-10
++-- external validation evidence ........... IMPLEMENTED (pure) 2026-06-10
++-- model/provider policy evidence ......... IMPLEMENTED (pure) 2026-06-10
++-- approval-currentness evidence .......... IMPLEMENTED (pure) 2026-06-10
++-- runtime evidence admission lanes ....... IMPLEMENTED (pure) 2026-06-10
++-- custom-store and nested-agent evidence . IMPLEMENTED (pure) 2026-06-10
++-- client-surface origin tracking ......... IMPLEMENTED (pure) 2026-06-10
++-- PM distributed-state evals ............. IMPLEMENTED (pure) 2026-06-10
+|   `-- next proof: run comparePmHandoffAgreement over real multi-agent ArrowHedge runs
 |
-+-- memory admission metadata
-|   |-- from: Arrowsmith v07
-|   `-- next proof: deletion residue, observability-safe retention, source modality, and stale-information risk warnings
-|
-+-- workflow artifact run groups
-|   |-- from: Arrowsmith v07
-|   `-- next proof: stage omission, objective drift, error propagation, and gate outcome assertions across artifacts
-|
-+-- external validation evidence
-|   |-- from: competitive intelligence v03
-|   `-- next proof: third-party coding-agent validation evidence supports but cannot override state-review warnings
-|
-+-- model/provider policy evidence
-|   |-- from: competitive intelligence v03
-|   `-- next proof: retention/admin/ZDR policy mismatch blocks or warns for sensitive source refs
-|
-+-- approval-currentness evidence
-|   |-- from: competitive intelligence v04
-|   `-- next proof: approved revision/hash/scope mismatch produces warning or wouldBlock before action
-|
-+-- runtime evidence admission
-|   |-- from: competitive intelligence v04
-|   `-- next proof: registry/OBO identity/memory/trace/eval evidence is admitted but cannot override state-review failures
-|
-+-- custom-store and nested-agent evidence
-|   |-- from: competitive intelligence v04
-|   `-- next proof: store/subagent output must be fresh, declared, tenant-correct, and authority-bound before action
-|
-+-- client-surface origin tracking
-|   |-- from: competitive intelligence v03
-|   `-- next proof: client surface is recorded separately from source authority
-|
-+-- PM distributed-state evals
-|   |-- from: Arrowsmith v06-v07
-|   `-- next proof: expertise owner, source steward, escalation path, dependency agreement, and handoff-condition scenarios
-|
++-- runtime integration (NEW)
+|   `-- next proof: admission consumed by registry/workflow runtime before side effects; mutation blocking still unclaimed
++-- golden fixture persistence (NEW)
+|   `-- next proof: admission corpus JSONL committed and replay-verified in CI
++-- rewrite-thesis instruments (NEW)
+|   `-- next proof: T1-T8 pass status and 12 behavior metrics tracked as ledger claims (plug-in half of thesis)
++-- front-door doc alignment (NEW)
+|   `-- next proof: README/roadmap/validation describe the rewrite thesis
 `-- daily publish closure
-    |-- from: Changelog 2026-06-09
     `-- next proof: automation run leaves local HEAD and origin/main equal with clean status, or records transport warnings
 ```
 
@@ -166,6 +137,7 @@ pm-substrate implementation frontier
 | L014 | 2026-06-09 | `research/daily-ai-competitive-intelligence/v03-ai-competitive-intelligence-2026-06-09.md` | L011 plus L013 | Added official June 9 deltas for GitHub third-party coding-agent validation, Claude Fable 5 provider/model policy, Anthropic model availability, Google Gemini Apple/Xcode integration, OpenAI Codex adoption evidence, and AWS AgentCore runtime/eval pressure. | Add external validation evidence, model/provider policy, client-surface origin, and runtime-trace comparison fixtures. |
 | L015 | 2026-06-10 | `research/daily-arrowsmith-agent-state/v07-agent-state-arrowsmith-2026-06-10.md` | L013 plus current code audit on `7cc0a33d` | Confirmed durable artifact/review primitives are implemented, then added shared verified context, observability-safe memory retention, deployment-time memorization, MCP explicit state handles, long-horizon workflow consistency, and PM/high-reliability coordination bridges. | Implement pure external evidence admission with MCP handle/annotation, memory deletion residue, workflow trace, clean ArrowHedge, and PM handoff fixtures. |
 | L016 | 2026-06-10 | `research/daily-ai-competitive-intelligence/v04-ai-competitive-intelligence-2026-06-10.md` | L014 plus L015 and current code audit on `7cc0a33d` | Added June 10 evidence-lane deltas for GitHub Copilot CLI security review, OpenAI Agent Builder/Evals wind-down, Google ADK/Workspace approval-currentness and DLP policy mutation, AWS AgentCore registry/OBO/memory/trace/eval runtime lanes, Cursor custom stores/tools/subagents, and Asana/Atlassian watch updates. | Implement approval-currentness drift first, then external validation, provider-policy, runtime-evidence, and custom-store/subagent admission fixtures. |
+| L017 | 2026-06-10 | Code implementation: external evidence admission + contract v2 + fixture corpus (Changelog same date) | L015 + L016 frontier on `f9d95fe` | Implemented the full 20-item frontier as pure primitives: `ExternalStateEvidence`/`EvidenceAdmissionReview` with 22 evidence kinds and facet checks (approval-currentness, memory retention, provider policy, validation, workflow trace, PM handoff, OBO provenance-vs-authorization), `authorityStatus` fixed to `evidence_only`, observed-read-set bridging, 18-fixture deterministic admission corpus with metrics, artifact run groups, role projections, PM handoff agreement comparison, clean-current ArrowHedge baseline fixture, ObservationContract v2 binding warnings, and multi-object role preconditions. 38 new tests; full suite 279 passed; typecheck clean. | Wire admission into runtime write paths, persist golden JSONL fixtures, run PM agreement on real runs, track T1-T8 + 12 thesis metrics as claims, update front-door docs. |
 
 ## Open Watchlist
 

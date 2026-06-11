@@ -15,7 +15,7 @@
  *     9.  COMMIT (or ROLLBACK on any throw)
  *    10.  Connection released in finally
  *
- *   `capability-wedding-budget/handler.ts` and
+ *   `capability-agency-lead-scoring/handler.ts` and
  *   `capability-agency-lead-scoring/handler.ts` were near-clones of each
  *   other. The differences were entirely in step 4 (which edges to walk)
  *   and step 7 (which field to bump). Everything else was ceremony.

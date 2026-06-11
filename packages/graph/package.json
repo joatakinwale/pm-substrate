@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@pm/events": "workspace:*",
-    "@pm/profile-wedding": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
     "@types/pg": "^8.11.10",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"

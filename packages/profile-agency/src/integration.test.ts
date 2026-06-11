@@ -7,8 +7,9 @@
  *      (nodes, edges, lifecycle states) using only profile-declared rules —
  *      no agency-aware code anywhere in the substrate.
  *   3. The Tier-1 audit capability (@pm/capability-audit) runs against an
- *      agency tenant identically to how it runs against a wedding tenant
- *      and a raw Tier-1 tenant. The same projection state shape comes out.
+ *      agency tenant identically to how it runs against a finance-research
+ *      tenant and a raw Tier-1 tenant. The same projection state shape comes
+ *      out.
  *
  * What it does NOT prove:
  *   - End-to-end HTTP contract (that lives in @pm/substrate-http tests).
@@ -35,7 +36,7 @@ import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresRegistry } from "@pm/registry";
 import { AUDIT_CAPABILITY, auditProjection } from "@pm/capability-audit";
 import type { AuditState } from "@pm/capability-audit";
-import { WEDDING_PROFILE } from "@pm/profile-wedding";
+import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import type { TenantId } from "@pm/types";
 
 import { AGENCY_PROFILE } from "./profile.js";
@@ -161,7 +162,7 @@ describeIfDb("AGENCY_PROFILE — substrate integration (G4 Phase 2)", () => {
     ).rejects.toBeInstanceOf(ProfileValidationError);
   });
 
-  it("enforces agency edge cardinality with the same engine that enforces wedding's", async () => {
+  it("enforces agency edge cardinality with the same engine that enforces finance-research's", async () => {
     const t = await makeTenant("edges");
     await profileRegistry.install(t, AGENCY_PROFILE);
 
@@ -212,16 +213,16 @@ describeIfDb("AGENCY_PROFILE — substrate integration (G4 Phase 2)", () => {
     ).rejects.toBeInstanceOf(ProfileValidationError);
   });
 
-  it("Tier-1 audit capability runs unchanged on a wedding, agency, and raw tenant", async () => {
+  it("Tier-1 audit capability runs unchanged on a finance-research, agency, and raw tenant", async () => {
     // Three tenants. Same six events on each. Same audit state on each.
-    const weddingT = await makeTenant("audit_w");
+    const financeT = await makeTenant("audit_f");
     const agencyT = await makeTenant("audit_a");
     const rawT = await makeTenant("audit_r");
-    await profileRegistry.install(weddingT, WEDDING_PROFILE);
+    await profileRegistry.install(financeT, FINANCE_RESEARCH_PROFILE);
     await profileRegistry.install(agencyT, AGENCY_PROFILE);
     // rawT: no profile installed — raw Tier-1.
 
-    await capRegistry.register(weddingT, AUDIT_CAPABILITY);
+    await capRegistry.register(financeT, AUDIT_CAPABILITY);
     await capRegistry.register(agencyT, AUDIT_CAPABILITY);
     await capRegistry.register(rawT, AUDIT_CAPABILITY);
 
@@ -229,12 +230,12 @@ describeIfDb("AGENCY_PROFILE — substrate integration (G4 Phase 2)", () => {
       "thing.created",
       "thing.updated",
       "agency.lead.scored", // agency-flavored type — audit is type-blind
-      "wedding.contract.signed",
+      "analyst.signal.created", // finance-flavored type — audit is type-blind
       "anything.else.happened",
       "thing.deleted",
     ];
 
-    for (const t of [weddingT, agencyT, rawT]) {
+    for (const t of [financeT, agencyT, rawT]) {
       for (const type of eventTypes) {
         await events.publish({
           tenantId: t,
@@ -247,40 +248,40 @@ describeIfDb("AGENCY_PROFILE — substrate integration (G4 Phase 2)", () => {
       }
     }
 
-    await runner.catchUp(weddingT, "common/audit-log");
+    await runner.catchUp(financeT, "common/audit-log");
     await runner.catchUp(agencyT, "common/audit-log");
     await runner.catchUp(rawT, "common/audit-log");
 
-    const wState = await runner.getState<AuditState>(weddingT, "common/audit-log");
+    const fState = await runner.getState<AuditState>(financeT, "common/audit-log");
     const aState = await runner.getState<AuditState>(agencyT, "common/audit-log");
     const rState = await runner.getState<AuditState>(rawT, "common/audit-log");
 
-    expect(wState?.count).toBe(6);
+    expect(fState?.count).toBe(6);
     expect(aState?.count).toBe(6);
     expect(rState?.count).toBe(6);
 
     // The byType breakdown is identical across all three tenants. Audit
     // does not know what profile is installed; it counts event types.
-    expect(aState?.byType).toEqual(wState?.byType);
+    expect(aState?.byType).toEqual(fState?.byType);
     expect(aState?.byType).toEqual(rState?.byType);
     expect(aState?.byType).toEqual({
       "thing.created": 1,
       "thing.updated": 1,
       "agency.lead.scored": 1,
-      "wedding.contract.signed": 1,
+      "analyst.signal.created": 1,
       "anything.else.happened": 1,
       "thing.deleted": 1,
     });
 
     // Entry shapes are identical (modulo unique ids), proving the projection
-    // path took no agency- or wedding-specific branch.
+    // path took no agency- or finance-specific branch.
     const shape = (s: AuditState) =>
       s.entries.map((e) => ({
         type: e.type,
         emittedBy: e.emittedBy,
         hasEntityId: !!e.entityId,
       }));
-    expect(shape(aState!)).toEqual(shape(wState!));
+    expect(shape(aState!)).toEqual(shape(fState!));
     expect(shape(aState!)).toEqual(shape(rState!));
   });
 

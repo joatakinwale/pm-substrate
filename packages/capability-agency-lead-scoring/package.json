@@ -2,7 +2,7 @@
   "name": "@pm/capability-agency-lead-scoring",
   "version": "0.1.0",
   "private": true,
-  "description": "agency.lead-scoring capability — owns LeadScoringConfig.currentTotalLeadsScored rollup via graph-inferred topology. Subscribes to agency.lead.qualified and similar lead-progression events; resolves the scoring config by walking the graph (lead -> lead_scored_by -> config OR lead -> lead_assigned_to_user -> user_default_scoring -> config). No scoring_config_id on the lead payload — topology is the contract. G4 anti-fixation proof that the wedding-budget capability shape transfers to a non-wedding profile with no substrate edits.",
+  "description": "agency.lead-scoring capability — owns LeadScoringConfig.currentTotalLeadsScored rollup via graph-inferred topology. Subscribes to agency.lead.qualified and similar lead-progression events; resolves the scoring config by walking the graph (lead -> lead_scored_by -> config OR lead -> lead_assigned_to_user -> user_default_scoring -> config). No scoring_config_id on the lead payload — topology is the contract. G4 anti-fixation proof that a Tier-1 capability shape transfers across profiles with no substrate edits (originally proven against the since-retired wedding-era capability).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

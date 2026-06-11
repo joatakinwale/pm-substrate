@@ -1,12 +1,15 @@
 /**
  * Integration tests for PostgresProfileRegistry + SnapshotValidator.
+ *
+ * Fixtures use the finance-research profile (the ArrowHedge agent-state
+ * validation artifact).
  */
 
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import type { ProfileBinding, TenantId } from "@pm/types";
-import { WEDDING_PROFILE } from "@pm/profile-wedding";
+import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import {
   PostgresProfileRegistry,
   ProfileValidationError,
@@ -46,60 +49,62 @@ describeIfDb("PostgresProfileRegistry", () => {
 
   it("install + get round-trips a ProfileDefinition", async () => {
     const tenantId = await makeTenant();
-    await reg.install(tenantId, WEDDING_PROFILE);
-    const back = await reg.get(tenantId, "wedding");
-    expect(back?.name).toBe("wedding");
-    expect(back?.entityTypes.Wedding?.tier1).toBe("Engagement");
+    await reg.install(tenantId, FINANCE_RESEARCH_PROFILE);
+    const back = await reg.get(tenantId, "finance-research");
+    expect(back?.name).toBe("finance-research");
+    expect(back?.entityTypes.ResearchRun?.tier1).toBe("Engagement");
   });
 
   it("install is idempotent on (tenantId, name)", async () => {
     const tenantId = await makeTenant();
-    await reg.install(tenantId, WEDDING_PROFILE);
-    await reg.install(tenantId, { ...WEDDING_PROFILE, version: 2 });
+    await reg.install(tenantId, FINANCE_RESEARCH_PROFILE);
+    await reg.install(tenantId, { ...FINANCE_RESEARCH_PROFILE, version: 2 });
     const list = await reg.list(tenantId);
     expect(list.length).toBe(1);
   });
 
   it("uninstall removes the installation", async () => {
     const tenantId = await makeTenant();
-    await reg.install(tenantId, WEDDING_PROFILE);
-    await reg.uninstall(tenantId, "wedding");
-    expect(await reg.get(tenantId, "wedding")).toBeNull();
+    await reg.install(tenantId, FINANCE_RESEARCH_PROFILE);
+    await reg.uninstall(tenantId, "finance-research");
+    expect(await reg.get(tenantId, "finance-research")).toBeNull();
   });
 
-  describe("validator (wedding profile installed)", () => {
+  describe("validator (finance-research profile installed)", () => {
     let tenantId: TenantId;
 
     beforeAll(async () => {
       tenantId = await makeTenant();
-      await reg.install(tenantId, WEDDING_PROFILE);
+      await reg.install(tenantId, FINANCE_RESEARCH_PROFILE);
     });
 
-    const wedding = (
-      identity: Record<string, unknown> = {
-        title: "T", eventDate: "2026-09-01", venue: "V", operationalState: "planning",
-      },
-    ): ProfileBinding => ({
-      tier1: "Engagement", profile: "wedding", concrete: "Wedding",
+    const researchRun = (): ProfileBinding => ({
+      tier1: "Engagement", profile: "finance-research", concrete: "ResearchRun",
     });
+    const researchRunIdentity = {
+      title: "AAPL breakout research",
+      scopeStart: "2026-05-01",
+      scopeEnd: "2026-06-03",
+      state: "configured",
+    };
 
-    it("accepts a well-formed Wedding node", async () => {
+    it("accepts a well-formed ResearchRun node", async () => {
       const v = await reg.validator(tenantId);
       v.validateNode({
         tenantId,
-        profile: wedding(),
-        identity: { title: "T", eventDate: "2026-09-01", venue: "V", operationalState: "planning" },
+        profile: researchRun(),
+        identity: researchRunIdentity,
         schemaVersion: 1,
       });
     });
 
-    it("rejects a Wedding missing required fields", async () => {
+    it("rejects a ResearchRun missing required fields", async () => {
       const v = await reg.validator(tenantId);
       expect(() =>
         v.validateNode({
           tenantId,
-          profile: wedding(),
-          identity: { title: "T" }, // missing eventDate, venue, operationalState
+          profile: researchRun(),
+          identity: { title: "T" }, // missing scopeStart, scopeEnd, state
           schemaVersion: 1,
         }),
       ).toThrow(ProfileValidationError);
@@ -110,8 +115,8 @@ describeIfDb("PostgresProfileRegistry", () => {
       expect(() =>
         v.validateNode({
           tenantId,
-          profile: { tier1: "Counterparty", profile: "wedding", concrete: "Wedding" },
-          identity: { title: "T", eventDate: "x", venue: "V", operationalState: "planning" },
+          profile: { tier1: "Counterparty", profile: "finance-research", concrete: "ResearchRun" },
+          identity: researchRunIdentity,
           schemaVersion: 1,
         }),
       ).toThrow(ProfileValidationError);
@@ -122,7 +127,7 @@ describeIfDb("PostgresProfileRegistry", () => {
       expect(() =>
         v.validateNode({
           tenantId,
-          profile: { tier1: "Engagement", profile: "wedding", concrete: "Wedding3" },
+          profile: { tier1: "Engagement", profile: "finance-research", concrete: "ResearchRun3" },
           identity: {},
           schemaVersion: 1,
         }),
@@ -144,8 +149,8 @@ describeIfDb("PostgresProfileRegistry", () => {
       const v = await reg.validator(tenantId);
       expect(() =>
         v.validateEdge({
-          tenantId, type: "wedding/invented_edge",
-          fromConcrete: "Wedding", toConcrete: "Couple",
+          tenantId, type: "finance-research/invented_edge",
+          fromConcrete: "AnalystSignal", toConcrete: "Ticker",
           existingFromCount: 0, existingToCount: 0,
         }),
       ).toThrow(/unknown edge type/);
@@ -155,34 +160,29 @@ describeIfDb("PostgresProfileRegistry", () => {
       const v = await reg.validator(tenantId);
       expect(() =>
         v.validateEdge({
-          tenantId, type: "wedding/has_principal",
-          fromConcrete: "Vendor", toConcrete: "Couple",
+          tenantId, type: "finance-research/signal_for_ticker",
+          fromConcrete: "Ticker", toConcrete: "Ticker",
           existingFromCount: 0, existingToCount: 0,
         }),
-      ).toThrow(/cannot start at Vendor/);
+      ).toThrow(/cannot start at Ticker/);
     });
 
-    it("validateEdge: enforces exactly:2 on has_principal", async () => {
+    it("validateEdge: enforces exactly:1 on signal_for_ticker", async () => {
       const v = await reg.validator(tenantId);
-      // First two are fine.
+      // The first edge from a signal is fine.
       v.validateEdge({
-        tenantId, type: "wedding/has_principal",
-        fromConcrete: "Wedding", toConcrete: "Couple",
+        tenantId, type: "finance-research/signal_for_ticker",
+        fromConcrete: "AnalystSignal", toConcrete: "Ticker",
         existingFromCount: 0, existingToCount: 0,
       });
-      v.validateEdge({
-        tenantId, type: "wedding/has_principal",
-        fromConcrete: "Wedding", toConcrete: "Couple",
-        existingFromCount: 1, existingToCount: 0,
-      });
-      // Third would push existingFromCount+1=3 > 2.
+      // A second would push existingFromCount+1=2 > 1.
       expect(() =>
         v.validateEdge({
-          tenantId, type: "wedding/has_principal",
-          fromConcrete: "Wedding", toConcrete: "Couple",
-          existingFromCount: 2, existingToCount: 0,
+          tenantId, type: "finance-research/signal_for_ticker",
+          fromConcrete: "AnalystSignal", toConcrete: "Ticker",
+          existingFromCount: 1, existingToCount: 0,
         }),
-      ).toThrow(/exactly:2/);
+      ).toThrow(/exactly:1/);
     });
 
     it("validateEdge: permits unprefixed (raw) edge types without lookup", async () => {

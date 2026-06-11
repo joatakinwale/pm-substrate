@@ -1,96 +1,57 @@
 # Validation Framework
 
-> Read this before reading the architecture doc. Architecture without falsification criteria is theology.
+> Read this before the architecture doc. Architecture without falsification criteria is theology.
 
 ## The objective
 
-The PM-layer architecture is validated when **two facts are simultaneously true**:
+The substrate is validated when **two claims hold simultaneously** on the ArrowHedgeLabs sandbox (a multi-agent research project used strictly for research/education — the *agents and their operational state* are the subject, not finance):
 
-1. The wedding profile demo runs end-to-end and a 4th capability provider drops in cleanly (P3).
-2. A second profile in an unrelated vertical (legal or agency) works on the same substrate without modifying it (P4).
+1. **Plug-in claim** — ArrowHedgeLabs onboards through mapping/profile/capability files with **zero substrate-package edits and zero changes to existing providers**.
+2. **Agent-state claim** — agents resuming from substrate state outperform chat-history baselines on staleness, authority, evidence, replay, and continuity.
 
-The wedding application is the **forcing function**, not the product. Wedding profile + 2–3 tools written against Tier 1 = proof of concept. The second profile = proof of architecture.
+The agent-state work is not a pivot from the PM-layer thesis; it is the harder validation surface for it (see `artifacts/pm_substrate_rewrite.md`).
 
 ---
 
-## P3 — the demo moment
+## Test plan T1–T8 (from the rewrite thesis)
 
-### The shape of the validated claim
+| Test | Pass condition | Status / executable proof |
+|---|---|---|
+| T1 Source mapping | ArrowHedge tickers/signals/risk/decisions map into substrate entities/events; mapping validates structurally + semantically; no substrate edits | **Implemented** — `ARROWHEDGE_ENTITY_MAPPING`, `@pm/entity-mapping` structural + semantic validators, ingestion-plan tests |
+| T2 Event provenance | Every decision traces to contributing signals + risk state via causation chain | **Implemented** — typed events with `authority`/`causedBy`, hash-chained log, `verifyChain` DB proof (chain-fork bug under same-transaction bursts found and fixed via monotonic `seq`, migration 0019) |
+| T3 Deterministic risk gate | LLM can choose only actions/quantities the deterministic gate permits | **Partial** — `RiskState` recorded as operational state; `allowedActions` gate proposals at review; runtime write-path enforcement still unclaimed |
+| T4 Amnesiac resume | Delete chat context; agent resumes open work from tenant/agent/scope, avoids contradicted claims, cites substrate evidence | **Open** — `@pm/continuity` checkpoints + evidence-linked payloads exist; the full delete-context resume eval has not run |
+| T5 Staleness failure | Workflow blocks or requests refresh before producing a stale decision | **Implemented (eval level)** — stale-observation paired evals, ArrowHedge temporal fixtures, `workflow.blocked.stale_state` lifecycle |
+| T6 Plug-in file formats | JSON/CSV/SQL-row exports produce equivalent canonical entities/events | **Partial** — corpus-equivalence helpers (fixture vs projected); CSV/SQL lanes not yet exercised |
+| T7 Replay audit | Historical run replays from event history; differences explained deterministically | **Implemented (eval level)** — artifact hash replay, JSONL import validity, COP fold determinism |
+| T8 Conflict handling | Conflicting claims + stale risk recorded; no silent promotion; routed to rule/human review | **Implemented (eval level)** — state disagreements, authority gates, conflict warnings in review artifacts |
 
-> "A new capability provider plugged into the substrate produced behavior that no individual tool could have produced, and required zero modification to the existing three providers or the substrate itself."
+## The 12 behavior metrics
 
-If we cannot write that sentence with concrete subjects after P3, the demo is theater.
+Time-to-plugin · substrate edit count (target: zero) · mapping coverage · validator rejection rate · evidence coverage · state disagreement rate · stale action rate · agent resume success · replay fidelity · unauthorized action block rate · cross-tool outcome success · mean time to reconcile.
 
-### The 4 providers
-
-Drawn from the WeddingWebApp's existing surface area so the demo exercises real workflow, not contrived scenarios:
-
-| # | Provider | Owns | Emits |
-|---|----------|------|-------|
-| 1 | **Planner / tasks** | `Engagement.Wedding` lifecycle, checklist tasks | task state changes |
-| 2 | **Calendar** | Google Calendar projection | availability events |
-| 3 | **Vendor + contracts** | `Counterparty.Vendor`, `Transaction.Contract` | contract state changes (sent/signed/expired) |
-| 4 | **Comms (the drop-in)** | Twilio + Resend reminders | (subscriber only) |
-
-The 4th is the load-bearing one — comms shares zero code with the first three.
-
-### The cross-tool flow
-
-A flow that the PM layer makes trivial and that no single tool can solve alone:
-
-> Vendor signs a contract → calendar block for the vendor's deliverable shifts from tentative to confirmed → planner's downstream tasks unlock → 72h before the deliverable, comms sends a reminder to both the couple and the vendor referencing the contract terms.
-
-What this exercises:
-
-- **Capability resolution across providers.** Comms doesn't know about contracts directly — it subscribes to a typed event (`Transaction.Contract.signed`) emitted by the contracts provider.
-- **Tier-1 tools work uniformly.** Audit, perms, attachments work on `Contract`, `Task`, and `CalendarEntry` with the same code path.
-- **Time-travel.** The event log can replay "what did the system know at T-72h" to validate the reminder fired on correct state.
-- **Tenant boundary.** Every read/write is owner-scoped without each provider hand-rolling enforcement.
-
-### Acceptance tests for P3
-
-Three automated tests, all must pass:
-
-1. **Drop-in test.** Adding the comms provider modifies *zero lines* outside `packages/provider-comms/` and its registration call. Enforced by a CI check on the PR diff.
-2. **Cross-tool flow test.** End-to-end test that runs contract → calendar → tasks → reminder, asserts each event landed in the log with correct causation chain, and asserts the reminder was sent with the contract reference.
-3. **Capability-resolution negative test.** Comms is uninstalled mid-flow. The other three providers continue working without errors. (This is what "loosely coupled" means in practice.)
+Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) cover the staleness/evidence/replay/policy lanes. The plug-in lane (time-to-plugin, substrate edit count, mapping coverage) is **not yet instrumented** — tracked in `research/index.md` → remaining frontier.
 
 ---
 
 ## Falsification — what kills the architecture
 
-These failure modes mean the architecture is wrong, not the implementation. Hitting any of them triggers a stop-and-decide.
-
-### From P3
-
-1. **Comms needs to import from `provider-contracts` to function.** → events are under-typed; leaky abstraction.
-2. **The drop-in test requires touching the workflow definition AND a substrate file.** → workflow layer isn't actually decoupled from substrate.
-3. **The cross-tool flow only works because of a shared utility module.** → we built a monolith with namespaces, not a substrate.
-4. **Projection lag exceeds seconds under wedding-demo load.** → Postgres-only day-1 stack was wrong; defer architecture validation until infra is right.
-5. **AI placement test fails.** When building reminder logic, the natural home for the LLM is *inside* the comms provider rather than at the workflow / capability-resolution layer. → core thesis is wrong; AI-in-each-tool is the right answer; PM layer is unnecessary.
-
-### From P4
-
-6. **Second profile requires substrate modification.** Writing the legal/agency profile requires diffs in `packages/{types,graph,events,registry,workflow,projections,profile-wedding}/`. → the substrate isn't universal; we built a wedding-shaped thing with a profile-flavored config layer.
-7. **Tier 1 leaks domain logic.** We end up adding wedding-specific or contract-specific fields to Tier-1 types to make tools work. → 7-primitive abstraction doesn't hold; layered ontology was wishful thinking.
-8. **Profile authoring is harder than just writing an app.** A competent dev cannot ship a working profile in <1 week with substrate docs alone. → boundary isn't real, it's just a naming convention.
-9. **Capability registry becomes a god object.** Providers end up coupled through registry config (X must install before Y, Z requires shared registry metadata). → we recreated integration spaghetti one layer up.
-
----
-
-## Validation criteria — keep building if all are true after P4
-
-1. P4's second profile compiles and runs end-to-end with **only** new files in `packages/profile-{vertical}/`. No diffs in any other package.
-2. At least one Tier-1 tool (audit, perms, search, or comments) works against both profiles' data with no profile-specific code paths.
-3. The reminder/orchestration logic for the second profile is expressed as a workflow definition, not as imperative code in a provider.
+1. **Onboarding requires a substrate edit.** The plug-in claim is the sharpest falsifiable claim; an edit is a falsification, not a feature request.
+2. **A profile name appears in substrate code.** Enforced continuously by `packages/registry/src/substrate-profile-agnostic.test.ts`.
+3. **A capability imports another capability or a foreign profile.** Enforced by `packages/registry/src/capability-isolation.test.ts`.
+4. **Tier-1 leaks domain fields** to make a tool work — the layered ontology has failed.
+5. **AI output becomes authority.** Any path where a model-proposed mapping/action mutates state without deterministic validation, or where admitted external evidence overrides current-state review. `authorityStatus` must remain `evidence_only`.
+6. **Hash-chain or replay failure** — an event chain or artifact that cannot replay to the same hashes without a deterministic explanation.
+7. **Two-state divergence** — agent memory acted on without rebase against substrate state. The review layer makes this visible (warn-first); once runtime wiring lands, blockable by invariant-class policy.
+8. **The second profile stops being free.** If `profile-agency` (or any future profile) requires substrate diffs to coexist with `finance-research`, the universality claim is dead.
 
 ---
 
 ## Hard checkpoints
 
-Each phase ends with a written **go / no-go decision**, logged in `memory/YYYY-MM-DD.md` (workspace) and referenced from this doc's changelog.
+Each milestone ends with a written **go / no-go decision**, logged and referenced from this doc's changelog.
 
-If a phase ends with any falsification mode active, options are:
+If a milestone ends with any falsification mode active, options are:
 
 - **(a) Fix the architecture.** Identify the specific design flaw, update ADR, retry.
 - **(b) Descope.** Reduce the validation claim. Document what we're no longer claiming.
@@ -100,6 +61,13 @@ No "we'll address it later." That's how this kind of project rots.
 
 ---
 
+## Out of scope (deliberately)
+
+No multi-region; no managed-service abstraction before the migration triggers; no GraphQL; tenant isolation = `tenant_id` partitioning until a real tenant demands more. ArrowHedgeLabs remains historical/research simulation — no real-trading path, no financial advice.
+
+---
+
 ## Changelog
 
-- **2026-05-03** — initial framework written. Pre-implementation, post-scaffold. P0.5 (ProfileDefinition contract + wedding profile skeleton) shipped.
+- **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
+- **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).

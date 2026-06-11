@@ -1,5 +1,9 @@
 import type { TenantId, Timestamp } from "@pm/types";
 
+import type { EvidenceAdmissionReview } from "./external-evidence.js";
+
+export * from "./external-evidence.js";
+
 export const STATE_REVIEW_ARTIFACT_SCHEMA_VERSION =
   "state-review-artifact.v1" as const;
 export const STATE_REVIEW_EVENT_TYPE =
@@ -33,11 +37,23 @@ export interface StateConflict {
   readonly message: string;
 }
 
+export interface RequiredRelatedRole {
+  readonly role: string;
+  readonly refKind?: StateRefKind;
+}
+
+export interface RelatedSubject {
+  readonly role: string;
+  readonly ref: StateRef;
+}
+
 export interface AllowedAction {
   readonly actionType: string;
   readonly label: string;
   readonly requiredRefs: readonly StateRef[];
   readonly requiredWorkflowPosition?: string;
+  /** Multi-object preconditions: roles that must be bound on the proposal (OCEL-style qualified roles). */
+  readonly requiredRelatedRoles?: readonly RequiredRelatedRole[];
 }
 
 export interface CurrentStateView {
@@ -78,6 +94,8 @@ export interface ProposedAction {
   readonly tenantId: TenantId;
   readonly actionType: string;
   readonly subject: StateRef;
+  /** Role-qualified secondary objects this action touches (multi-object preconditions). */
+  readonly relatedSubjects?: readonly RelatedSubject[];
   readonly payload: Readonly<Record<string, unknown>>;
   readonly readSet: readonly ReadSetEntry[];
   readonly observationContract?: ObservationContract;
@@ -94,7 +112,9 @@ export type ReadSetValidationIssueCode =
   | "current_view_conflict"
   | "authority_mismatch"
   | "projection_version_mismatch"
-  | "workflow_position_mismatch";
+  | "workflow_position_mismatch"
+  | "missing_related_object_role"
+  | "related_object_role_mismatch";
 
 export interface ReadSetValidationIssue {
   readonly code: ReadSetValidationIssueCode;
@@ -147,6 +167,13 @@ export interface ObservationContract {
   readonly requiredSourceRefs: readonly StateRef[];
   readonly declaredMissingSources: readonly string[];
   readonly declaredConflictCount: number;
+  /** v2 fields (Arrowsmith v04): issuer, integrity, holder binding, and allowed use. All optional and backward compatible. */
+  readonly issuer?: string;
+  readonly integrityHash?: string;
+  readonly holderBinding?: string;
+  readonly allowedUse?: readonly string[];
+  readonly redactionPolicy?: string;
+  readonly revocationRef?: StateRef;
 }
 
 export type StateAssertionCode =
@@ -182,7 +209,10 @@ export type ActionProposalExecutionReason =
   | "advisory_warn_first_v1"
   | "blocking_policy_passed"
   | "blocking_policy_failed";
-export type ActionProposalWarningSource = "read_set" | "observation_contract";
+export type ActionProposalWarningSource =
+  | "read_set"
+  | "observation_contract"
+  | "contract_binding";
 
 export interface ActionProposalWarning {
   readonly source: ActionProposalWarningSource;
@@ -373,9 +403,13 @@ export interface StateReviewArtifactMetadataInput {
   readonly provider?: string;
   readonly sessionId?: string;
   readonly workflowRunId?: string;
+  /** Trajectory-level run grouping: artifacts sharing a runGroupId form one long-horizon run (frontier item 8). */
+  readonly runGroupId?: string;
   readonly evalEventIds?: readonly string[];
   readonly observedReadSet?: readonly ObservedReadSetEntry[];
   readonly observedReadSetComparison?: ObservedReadSetComparison;
+  /** External evidence admission reviews consumed by this action review (frontier item 1). */
+  readonly evidenceAdmissions?: readonly EvidenceAdmissionReview[];
 }
 
 export interface StateReviewArtifactMetadata
@@ -775,6 +809,10 @@ export function reviewProposedActionAgainstCurrentState(
     evaluatedAt,
   );
   const readSetValidation = validateProposedActionReadSet(action, view);
+  const contractBindingWarnings = validateObservationContractBinding(
+    observationContract,
+    action,
+  );
   const warnings = [
     ...readSetValidation.issues.map((issue): ActionProposalWarning => ({
       source: "read_set",
@@ -792,16 +830,22 @@ export function reviewProposedActionAgainstCurrentState(
         message: assertion.message,
         refs: assertion.refs,
     })),
+    ...contractBindingWarnings,
   ] as const;
   const blocking =
     enforcementMode === "blocking" &&
-    (!readSetValidation.valid || !observationEvaluation.valid);
+    (!readSetValidation.valid ||
+      !observationEvaluation.valid ||
+      contractBindingWarnings.length > 0);
 
   return {
     tenantId: action.tenantId,
     reviewId: `${view.viewId}:${action.actionType}:proposal_review`,
     mode: "warn",
-    valid: readSetValidation.valid && observationEvaluation.valid,
+    valid:
+      readSetValidation.valid &&
+      observationEvaluation.valid &&
+      contractBindingWarnings.length === 0,
     proposedAction: action,
     currentStateView: view,
     observationContract,
@@ -821,6 +865,86 @@ export function reviewProposedActionAgainstCurrentState(
       warningCount: warnings.length,
     },
   };
+}
+
+/**
+ * Compute the canonical integrity hash for an observation contract (v2
+ * field). The hash covers every contract field except `integrityHash` itself.
+ */
+export function computeObservationContractIntegrityHash(
+  contract: ObservationContract,
+): string {
+  const { integrityHash: _ignored, ...payload } = contract;
+  return fingerprint64(canonicalStringify(payload));
+}
+
+export interface ObservationContractIntegrityValidation {
+  readonly valid: boolean;
+  readonly expectedHash: string;
+  readonly actualHash: string;
+}
+
+export function verifyObservationContractIntegrity(
+  contract: ObservationContract,
+): ObservationContractIntegrityValidation | undefined {
+  if (contract.integrityHash === undefined) return undefined;
+  const expectedHash = computeObservationContractIntegrityHash(contract);
+  return {
+    valid: contract.integrityHash === expectedHash,
+    expectedHash,
+    actualHash: contract.integrityHash,
+  };
+}
+
+/**
+ * Validate v2 observation-contract bindings against the proposed action:
+ * holder binding (DPoP-style), allowed use, and integrity hash (Arrowsmith
+ * v04). Contracts without v2 fields produce no warnings.
+ */
+export function validateObservationContractBinding(
+  contract: ObservationContract,
+  action: ProposedAction,
+): readonly ActionProposalWarning[] {
+  const warnings: ActionProposalWarning[] = [];
+
+  if (
+    contract.holderBinding !== undefined &&
+    contract.holderBinding !== action.proposedBy
+  ) {
+    warnings.push({
+      source: "contract_binding",
+      code: "holder_binding_mismatch",
+      severity: "warn",
+      message: `Observation contract is bound to holder ${contract.holderBinding}; action was proposed by ${action.proposedBy}.`,
+      refs: [contract.subject],
+    });
+  }
+
+  if (
+    contract.allowedUse !== undefined &&
+    !contract.allowedUse.includes(action.actionType)
+  ) {
+    warnings.push({
+      source: "contract_binding",
+      code: "allowed_use_mismatch",
+      severity: "warn",
+      message: `Observation contract allows use for [${contract.allowedUse.join(", ")}]; action type ${action.actionType} is outside the allowed use.`,
+      refs: [contract.subject],
+    });
+  }
+
+  const integrity = verifyObservationContractIntegrity(contract);
+  if (integrity !== undefined && !integrity.valid) {
+    warnings.push({
+      source: "contract_binding",
+      code: "integrity_hash_mismatch",
+      severity: "warn",
+      message: `Observation contract integrity hash ${integrity.actualHash} does not match recomputed hash ${integrity.expectedHash}; the contract content changed after issuance.`,
+      refs: [contract.subject],
+    });
+  }
+
+  return warnings;
 }
 
 export function buildStateReviewArtifact(
@@ -1085,6 +1209,28 @@ export function validateProposedActionReadSet(
         });
       }
     }
+
+    for (const required of allowedAction.requiredRelatedRoles ?? []) {
+      const bound = (action.relatedSubjects ?? []).find(
+        (subject) => subject.role === required.role,
+      );
+      if (bound === undefined) {
+        issues.push({
+          code: "missing_related_object_role",
+          path: "/relatedSubjects",
+          message: `Action ${action.actionType} requires a related object bound to role ${required.role}; none was provided.`,
+        });
+        continue;
+      }
+      if (required.refKind !== undefined && bound.ref.kind !== required.refKind) {
+        issues.push({
+          code: "related_object_role_mismatch",
+          path: "/relatedSubjects",
+          message: `Related object for role ${required.role} must be of kind ${required.refKind}; got ${bound.ref.kind} (${formatStateRef(bound.ref)}).`,
+          ref: bound.ref,
+        });
+      }
+    }
   }
 
   for (const [index, missingSource] of view.missingSources.entries()) {
@@ -1211,8 +1357,14 @@ function buildStateReviewArtifactMetadata(
     ...(input?.workflowRunId !== undefined
       ? { workflowRunId: input.workflowRunId }
       : {}),
+    ...(input?.runGroupId !== undefined
+      ? { runGroupId: input.runGroupId }
+      : {}),
     ...(input?.evalEventIds !== undefined
       ? { evalEventIds: input.evalEventIds }
+      : {}),
+    ...(input?.evidenceAdmissions !== undefined
+      ? { evidenceAdmissions: input.evidenceAdmissions }
       : {}),
     ...(input?.observedReadSet !== undefined
       ? { observedReadSet: input.observedReadSet }
@@ -1265,7 +1417,14 @@ function invariantClassesForWarningCode(
     case "conflicts_declared":
       return ["state_conflict"];
     case "action_not_allowed":
+    case "allowed_use_mismatch":
       return ["capability_contract"];
+    case "missing_related_object_role":
+    case "related_object_role_mismatch":
+    case "holder_binding_mismatch":
+      return ["subject_identity"];
+    case "integrity_hash_mismatch":
+      return ["required_evidence"];
     default:
       return [];
   }
@@ -1403,6 +1562,65 @@ function validateStateReviewMetadataShape(
         issues,
       );
     }
+  }
+
+  validateOptionalStringField(input, "runGroupId", "/metadata/runGroupId", issues);
+
+  if (input["evidenceAdmissions"] !== undefined) {
+    if (
+      validateArrayField(
+        input,
+        "evidenceAdmissions",
+        "/metadata/evidenceAdmissions",
+        issues,
+      )
+    ) {
+      validateEvidenceAdmissionArray(
+        input["evidenceAdmissions"] as readonly unknown[],
+        "/metadata/evidenceAdmissions",
+        issues,
+      );
+    }
+  }
+}
+
+function validateEvidenceAdmissionArray(
+  admissions: readonly unknown[],
+  path: string,
+  issues: StateReviewArtifactImportIssue[],
+): void {
+  for (const [index, admission] of admissions.entries()) {
+    const itemPath = `${path}/${index}`;
+    if (!isRecord(admission)) {
+      issues.push({ path: itemPath, message: "expected object" });
+      continue;
+    }
+    validateNonEmptyStringField(admission, "reviewId", `${itemPath}/reviewId`, issues);
+    validateNonEmptyStringField(admission, "tenantId", `${itemPath}/tenantId`, issues);
+    validateNonEmptyStringField(
+      admission,
+      "evaluatedAt",
+      `${itemPath}/evaluatedAt`,
+      issues,
+    );
+    if (
+      admission["decision"] !== "admitted" &&
+      admission["decision"] !== "admitted_with_warnings" &&
+      admission["decision"] !== "rejected"
+    ) {
+      issues.push({
+        path: `${itemPath}/decision`,
+        message: "expected admitted|admitted_with_warnings|rejected",
+      });
+    }
+    if (admission["authorityStatus"] !== "evidence_only") {
+      issues.push({
+        path: `${itemPath}/authorityStatus`,
+        message: "expected evidence_only",
+      });
+    }
+    validateRecordField(admission, "evidence", `${itemPath}/evidence`, issues);
+    validateArrayField(admission, "issues", `${itemPath}/issues`, issues);
   }
 }
 

@@ -17,7 +17,7 @@ import {
  * Tenants on this profile use these specializations of the seven Tier-1
  * primitives. Capability providers binding to Tier-1 interfaces work here
  * automatically; capabilities binding to agency-specific concrete types
- * are profile-bound (and won't run on, e.g., a wedding tenant).
+ * are profile-bound (and won't run on, e.g., a finance-research tenant).
  *
  * Identity primacy: Project. Every record in an agency tenant's graph
  * eventually reaches a Project entity through edges.
@@ -28,7 +28,7 @@ import {
  *
  * G4 anti-fixation rule: building this profile must NOT require any change
  * to packages/types, graph, events, registry, workflow, projections,
- * profile-wedding, profile-registry, capability-audit, or substrate-http.
+ * profile-finance-research, profile-registry, capability-audit, or substrate-http.
  * If anything outside packages/profile-agency and packages/capability-agency-*
  * has to change, that's a substrate fixation finding, not a feature.
  */

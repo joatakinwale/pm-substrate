@@ -1,81 +1,36 @@
 # Roadmap
 
-Five phases. Each ends with a demonstrable artifact, not a promise.
+Anchored to the rewrite thesis (`artifacts/pm_substrate_rewrite.md`) and the validation plan (`docs/validation.md`, T1–T8). Each milestone ends with a demonstrable artifact, not a promise. The wedding-era Phase 0–4 plan is retired; its proofs that survived (profile-agnostic substrate, capability isolation, Tier-1 tool portability) are now continuously enforced tests rather than phases.
 
-## Phase 0 — Substrate (this repo)
+## Done (verified by the suite — 387 tests, 0 skipped against a real DB)
 
-**Goal:** the Tier-1 substrate as a working, type-checked, migration-applied skeleton with stable interfaces. No business logic. No profile.
+- **Substrate skeleton** — graph, hash-chained event log, capability registry, workflow runtime, projections, tenants, profile registry, substrate-http (+ demo), all Postgres-only.
+- **Two live profiles** — `finance-research` (ArrowHedge validation artifact) and `agency` (second-profile proof). Substrate profile-agnosticism and capability isolation enforced by always-on tests.
+- **Plug-in pipeline v1** — declarative entity mappings, structural + profile-aware semantic validation, dry-run ingestion adapter, typed event contracts, write gates (T1/T2 implemented; T6 partial).
+- **Agent operational state (pure primitives)** — `CurrentStateView`, `ObservationContract` v2 (integrity hash, holder binding, allowed use), warn-first `ActionProposalReview`, durable `StateReviewArtifact` + hash replay, observed read-set comparison, temporal-misalignment fixtures, invariant-class policy, multi-object role preconditions.
+- **External evidence admission (pure)** — 22 evidence lanes (MCP, memory, monitoring, lineage, audit, attestation, traces, approvals, provider policy, custom stores, subagents, OBO, PM handoffs) with admission review, `evidence_only` authority status, fixture corpus, metrics, run groups, role projections, PM handoff agreement.
+- **Eval harness** — paired baseline/substrate local-lab scenarios, ArrowHedge corpus (incl. clean-current baseline), artifact-derived metrics.
+- **Event-chain integrity fix** — monotonic `seq` ordering (migration 0019) closing the same-transaction chain-fork bug surfaced by the ArrowHedge DB proof.
 
-**Deliverables:**
+## Now
 
-- pnpm monorepo, six packages.
-- Postgres-only stack via `docker compose`.
-- Five DB schemas: `graph`, `events`, `projections`, `registry`, `workflow`.
-- Seven Tier-1 entity-interface contracts in `@pm/types`.
-- `@pm/graph` Postgres adapter — read/write API behind a stable interface.
-- `@pm/events` append-only log + `LISTEN/NOTIFY` publisher/subscriber.
-- `@pm/registry` capability-registration API.
-- `@pm/workflow` workflow runtime stub (executes a hand-written workflow).
-- `@pm/projections` single projection-worker process.
-- ADRs for every decision worth remembering.
-- Typecheck + test in CI.
+1. **Runtime evidence wiring** — consume `ActionProposalReview` + evidence admission in the capability/workflow write paths; define when `wouldBlock` becomes an actual block (invariant-class policy → enforcement). External mutation blocking stays unclaimed until this lands.
+2. **T4 amnesiac resume eval** — run session 1 against ArrowHedge, persist continuity checkpoints, delete chat context, resume from tenant/agent/scope; measure resume success and contradicted-claim avoidance.
+3. **Plug-in metrics instrumentation** — time-to-plugin, substrate edit count, mapping coverage, validator rejection rate, wired into the eval harness so the plug-in claim has numbers (closes the half of the thesis with no research loop).
+4. **Golden fixture persistence** — admission + artifact JSONL corpora committed and replay-verified in CI.
 
-**Effort:** 2–3 weeks.
+## Next
 
-## Phase 1 — Wedding profile (Tier 2)
+5. **T6 completion** — ingest the same ArrowHedge scenario from JSON, CSV, and SQL-row exports; assert canonical equivalence.
+6. **Live MCP admission lane** — exercise handle/annotation revalidation against a real MCP server (fixtures are pure today).
+7. **PM distributed-state evals on real runs** — `comparePmHandoffAgreement` over actual multi-agent ArrowHedge sessions, not synthetic facets.
+8. **T3 hardening** — deterministic risk gate output recorded and *required* by decisions at the write path.
 
-**Goal:** prove the substrate by writing one profile against it.
+## Later
 
-**Deliverables:**
-
-- `@pm/profile-wedding` package.
-- Specializations: `Engagement → Wedding` (with `event_date`, `venue`, `couple_ids[2]` exact-cardinality constraint), `Counterparty → Couple/Guest/Vendor`, `Transaction → Contract/Payment/Invoice` (with the SaaS-style lifecycle), `Document → WeddingDocument` (with retention rules).
-- Identity primacy declared at profile level: **`Wedding` is the spine** (every record hangs off the wedding entity, the way every Epic record hangs off the patient).
-- Profile is consumed by the substrate at tenant configuration time. Substrate code unchanged.
-
-**Effort:** 1 week.
-
-## Phase 2 — Three composing capability providers
-
-**Goal:** refactor three WeddingWebApp subsystems to register as capability providers against the substrate.
-
-**Deliverables:**
-
-- `planner-task` provider — reads `Engagement (Wedding)`; writes `Engagement.scheduled_items[]`; emits `task.created`, `task.updated`, `task.completed`.
-- `gcal-projection` provider — subscribes to `task.*`; reads tenant's GCal connection; projects internal tasks to the external calendar. **The source-of-truth rule from WeddingWebApp's `AGENTS.md` is now structural** — gcal can never be the source because it's a downstream subscriber.
-- `vendor-milestone` provider — reads `Counterparty (Vendor)`; writes `Transaction (Contract).milestones[]`; subscribes to `task.completed` where task is linked to a milestone; emits `milestone.due` and `payment.requested`.
-- WeddingWebApp keeps running. It just routes through the substrate for these three flows. Other subsystems unchanged.
-
-**Effort:** 2–3 weeks.
-
-## Phase 3 — The demo moment
-
-**Goal:** add a fourth capability provider with **zero coordination** with the first three.
-
-**Deliverables:**
-
-- A fourth provider — likely `budget-tracker` (subscribes to `payment.requested` → updates budget projections) or `rsvp-reminder` (subscribes to `wedding.date_changed` → schedules reminder cascades).
-- Tests prove: no source code in providers A/B/C was touched.
-- Recorded walkthrough showing the new capability composing cleanly with the existing three.
-
-**Effort:** 3–5 days.
-
-## Phase 4 — Second profile (architecture proven)
-
-**Goal:** write a second Tier-2 profile (legal services or agency project) without touching the substrate.
-
-**Deliverables:**
-
-- `@pm/profile-{legal,agency}` package.
-- Specializations declared; identity primacy declared (legal = `Matter`; agency = `Project`); lifecycle state machines declared.
-- A ported subset of one or two capability providers from Phase 2 — proves they work against either profile *if* the providers were written against Tier-1 interfaces correctly.
-- If the substrate needed any change to support the second profile, **that's a substrate bug** — not a feature request. Fix it before declaring Phase 4 done.
-
-**Effort:** 1–2 weeks.
+- Second external platform onboarding (beyond ArrowHedge) to measure time-to-plugin on a system we don't control.
+- Day-365 swaps when triggers fire: bus → Kafka/Redpanda (~10k events/sec sustained), search → OpenSearch, analytics → ClickHouse, read replicas.
 
 ## Out of scope (deliberately)
 
-- No multi-region. Single-Postgres, single-region until scale demands otherwise.
-- No managed-service abstractions. Direct Postgres until we hit the migration trigger.
-- No GraphQL. The graph is internal to the substrate; tools talk to it through typed APIs, not a query language.
-- No multi-tenant *isolation* hardening beyond `tenant_id` partitioning. Schema-per-tenant comes later if and only if a real tenant requires it.
+No multi-region; no managed-service abstractions; no GraphQL; schema-per-tenant only if a real tenant requires it; no real-trading path in the sandbox.

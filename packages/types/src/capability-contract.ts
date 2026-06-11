@@ -25,7 +25,7 @@ export interface SchemaVersion {
 /**
  * A reference to a JSON Schema file shipped alongside the capability's source.
  *
- * - `type` is the stable event-type string (e.g. "wedding.contract.payment_recorded").
+ * - `type` is the stable event-type string (e.g. "agency.lead.qualified").
  *   It must match the topic pattern subscribers use.
  * - `version` is the schema's semver. Field-additive changes are minor/patch;
  *   field-removal or required-narrowing is major.
@@ -54,7 +54,7 @@ export interface EmitContract {
 export interface SubscribeContract {
   /**
    * Pattern matches `PayloadSchemaRef.type`. Wildcards allowed (e.g.
-   * "wedding.contract.*"). Wildcard semantics match `@pm/registry`'s
+   * "agency.lead.*"). Wildcard semantics match `@pm/registry`'s
    * `matchesPattern`.
    */
   readonly pattern: string;

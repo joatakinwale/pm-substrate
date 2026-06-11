@@ -1116,6 +1116,62 @@ export function buildArrowHedgeTemporalMisalignmentFixtureCases(
   ];
 }
 
+export interface ArrowHedgeCleanCurrentFixtureCaseInput
+  extends ArrowHedgeCurrentStateViewInput {
+  /** Time the (fresh) observation was captured; also used as the proposal time. */
+  readonly observationCapturedAt: Timestamp;
+  readonly proposedBy?: string;
+}
+
+/**
+ * Clean accepted/current ArrowHedge artifact fixture (research frontier item
+ * 4): a positive metrics baseline where the observation is fresh, the read
+ * set matches the current state view, the contract evaluates clean, and the
+ * review is valid with zero warnings and temporal phase `none`.
+ */
+export function buildArrowHedgeCleanCurrentFixtureCase(
+  input: ArrowHedgeCleanCurrentFixtureCaseInput,
+): ArrowHedgeStateReviewArtifactCorpusInput | null {
+  const view = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = input.state.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!view || !decisionId) return null;
+
+  return {
+    tenantId: input.tenantId,
+    projectionName: input.projectionName,
+    ...(input.projectionVersion !== undefined
+      ? { projectionVersion: input.projectionVersion }
+      : {}),
+    symbol: input.symbol,
+    state: input.state,
+    scenarioId: "arrowhedge-clean-current-accepted",
+    actionType: "risk.refresh",
+    payload: { decisionId, refreshId: `refresh:${decisionId}:clean_current` },
+    proposedBy: input.proposedBy ?? "agent:portfolio-manager",
+    proposedAt: input.observationCapturedAt,
+    readSet: buildReadSetFromCurrentStateView(view, view.authorityRule),
+    observationContract: buildObservationContractFromCurrentStateView(view),
+    artifact: {
+      artifactId: "artifact_arrowhedge_clean_current_accepted_001",
+      metadata: {
+        temporalMisalignmentPhase: "none",
+        invariantClasses: [],
+        fixtureId:
+          "fixtures/arrowhedge/state-review-artifacts/clean-current-accepted.json",
+        clientSurface: "codex",
+        provider: "openai",
+        sessionId: "arrowhedge-clean-current-fixture",
+        workflowRunId: "arrowhedge-clean-current-workflow",
+        evalEventIds: ["eval_arrowhedge_clean_current_accepted"],
+      },
+    },
+  };
+}
+
 function omitLatestRiskState(
   state: ArrowHedgeCommonOperatingPictureState,
   symbol: string,

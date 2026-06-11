@@ -11,6 +11,7 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgeIngestionPlan,
+  buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
@@ -817,6 +818,49 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     ]);
     expect(corpus.jsonl).toBe(
       buildArrowHedgeStateReviewArtifactCorpus(phaseCases).jsonl,
+    );
+  });
+
+  it("emits a clean accepted/current artifact fixture as a positive metrics baseline", async () => {
+    const tenant = tenantId("tnt_arrowhedge_clean_current");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection =
+      createArrowHedgeCommonOperatingPictureProjection("arrowhedge_cop_clean");
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const cleanCase = buildArrowHedgeCleanCurrentFixtureCase({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    expect(cleanCase).not.toBeNull();
+
+    const corpus = buildArrowHedgeStateReviewArtifactCorpus([cleanCase!]);
+    expect(corpus.artifacts).toHaveLength(1);
+
+    const artifact = corpus.artifacts[0]!;
+    expect(artifact.artifactId).toBe(
+      "artifact_arrowhedge_clean_current_accepted_001",
+    );
+    expect(artifact.review.valid).toBe(true);
+    expect(artifact.review.warnings).toHaveLength(0);
+    expect(artifact.metadata.temporalMisalignmentPhase).toBe("none");
+    expect(artifact.metadata.invariantClasses).toHaveLength(0);
+    expect(artifact.metadata.scenarioId).toBe("arrowhedge-clean-current-accepted");
+    expect(verifyStateReviewArtifactHash(artifact).valid).toBe(true);
+
+    const imported = importStateReviewArtifactsJsonl(corpus.jsonl);
+    expect(imported[0]?.valid).toBe(true);
+    expect(corpus.continuityPayloads[0]).toEqual(
+      expect.objectContaining({ valid: true, warningCodes: [] }),
     );
   });
 

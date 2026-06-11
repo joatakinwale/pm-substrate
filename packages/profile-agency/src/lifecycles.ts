@@ -16,7 +16,7 @@ import type { LifecycleDef } from "@pm/types";
  * Note on Lead: although Lead has a qualificationStatus field, that progression
  * is operational (CRM-style) and lives in the identity bag, not as a
  * substrate-enforced lifecycle. We avoid lifting it into a LifecycleDef to
- * stay parallel with how profile-wedding handles Couple/Guest/Vendor.
+ * stay parallel with how other profiles handle their counterparty types.
  */
 
 export const PROJECT_LIFECYCLE: LifecycleDef = {

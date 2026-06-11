@@ -226,7 +226,7 @@ export const CLIENT_HAS_REPORT: EdgeTypeDef = {
  *
  * Architecture note: this edge is the reason `scoring_config_id` does NOT
  * appear on Lead payloads. The scoring capability walks the graph to find
- * the rollup target — same pattern as wedding.budget walks contract → vendor
+ * the rollup target — same rollup-walk pattern the retired wedding-era budget capability proved
  * → budget category.
  */
 export const LEAD_SCORED_BY: EdgeTypeDef = {

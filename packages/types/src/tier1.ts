@@ -37,7 +37,7 @@ export interface Counterparty extends NodeBase {
  * Specializes to: project, case, deal, event, matter, job, ticket.
  *
  * Minimum shape: a title + a time scope. Profile decides whether the scope
- * is open-ended (a SaaS deal) or bounded (a wedding event_date), and whether
+ * is open-ended (a SaaS deal) or bounded (a fixed event date), and whether
  * cardinality of related Counterparties is 1, 2, or N.
  */
 export interface Engagement extends NodeBase {

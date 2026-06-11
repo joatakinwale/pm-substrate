@@ -5,6 +5,7 @@ export {
 } from "./capability.js";
 export {
   ARROWHEDGE_ENTITY_MAPPING,
+  buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeCurrentStateViews,
   buildArrowHedgeIngestionPlan,
@@ -18,6 +19,7 @@ export {
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
   validateArrowHedgeTypedEventPayload,
+  type ArrowHedgeCleanCurrentFixtureCaseInput,
   type ArrowHedgeCommonOperatingPictureState,
   type ArrowHedgeCurrentStateViewInput,
   type ArrowHedgeCurrentStateViewsInput,

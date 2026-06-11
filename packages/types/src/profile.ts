@@ -32,7 +32,7 @@ export interface ProfileDefinition {
 
   /**
    * Concrete entity-type specializations. Keyed by the concrete type name
-   * the profile exposes (e.g., "Wedding", "Couple", "Contract").
+   * the profile exposes (e.g., "Project", "ClientOrg", "Ticker").
    */
   readonly entityTypes: Readonly<Record<string, EntityTypeDef>>;
 
@@ -54,7 +54,7 @@ export interface ProfileDefinition {
    * "spine" for this industry. Every other record in the tenant's graph
    * eventually reaches this entity through edges.
    *
-   * Healthcare = "Patient". Manufacturing = "SKU". Wedding = "Wedding".
+   * Healthcare = "Patient". Manufacturing = "SKU". Finance research = "ResearchRun".
    * Legal = "Matter". Agency = "Project". SaaS = "Subscription".
    *
    * The substrate uses this to decide indexing strategy and to catch the
@@ -95,7 +95,7 @@ export interface EntityTypeDef {
 
 /**
  * Edge catalog entry. Names are profile-prefixed at write time
- * (e.g., "wedding/has_principal") to avoid collision across profiles.
+ * (e.g., "agency/client_has_project") to avoid collision across profiles.
  */
 export interface EdgeTypeDef {
   /** Local name within the profile (no prefix). */
@@ -165,10 +165,9 @@ export interface LifecycleTransition {
  *
  * Usage in profile packages:
  *
- *   export interface Wedding extends ProfileEntity<{
+ *   export interface ResearchRun extends ProfileEntity<{
  *     title: string;
- *     event_date: string;
- *     venue: string;
+ *     state: string;
  *     scopeStart: string;
  *     scopeEnd: string;
  *   }> {}

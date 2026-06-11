@@ -37,7 +37,7 @@ export const now = (): Timestamp => new Date().toISOString() as Timestamp;
  * at tenant configuration time.
  *
  * Examples:
- *   { tier1: "Engagement", profile: "wedding", concrete: "Wedding" }
+ *   { tier1: "Engagement", profile: "agency", concrete: "Project" }
  *   { tier1: "Counterparty", profile: "legal", concrete: "Client" }
  *   { tier1: "Counterparty", profile: null,    concrete: "Counterparty" }   // raw Tier-1
  */

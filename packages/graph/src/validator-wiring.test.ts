@@ -6,6 +6,9 @@
  * silently accepted. This closes the bypass identified at the end of P1:
  * before this commit, validator.validateNode() was opt-in, so callers
  * could skip it accidentally.
+ *
+ * Fixtures use the finance-research profile (the ArrowHedge agent-state
+ * validation artifact).
  */
 
 import { randomUUID } from "node:crypto";
@@ -15,7 +18,7 @@ import {
   PostgresProfileRegistry,
   ProfileValidationError,
 } from "@pm/profile-registry";
-import { WEDDING_PROFILE } from "@pm/profile-wedding";
+import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import type { ProfileBinding, TenantId } from "@pm/types";
 import { PostgresGraph } from "./postgres.js";
 
@@ -28,12 +31,36 @@ describeIfDb("PostgresGraph validator wiring", () => {
   let graph: PostgresGraph;
   let tenantId: TenantId;
 
-  const WEDDING: ProfileBinding = {
-    tier1: "Engagement", profile: "wedding", concrete: "Wedding",
+  const RESEARCH_RUN: ProfileBinding = {
+    tier1: "Engagement", profile: "finance-research", concrete: "ResearchRun",
   };
-  const COUPLE: ProfileBinding = {
-    tier1: "Counterparty", profile: "wedding", concrete: "Couple",
+  const TICKER: ProfileBinding = {
+    tier1: "Resource", profile: "finance-research", concrete: "Ticker",
   };
+  const ANALYST_SIGNAL: ProfileBinding = {
+    tier1: "Event", profile: "finance-research", concrete: "AnalystSignal",
+  };
+
+  const researchRunIdentity = (title: string) => ({
+    title,
+    scopeStart: "2026-05-01",
+    scopeEnd: "2026-06-03",
+    state: "configured",
+  });
+  const tickerIdentity = (symbol: string) => ({
+    name: `${symbol} ticker`,
+    kind: "ticker",
+    symbol,
+    assetClass: "equity",
+    currency: "USD",
+  });
+  const signalIdentity = (agentId: string) => ({
+    kind: "analyst_signal",
+    occurredAt: "2026-06-03T14:00:00.000Z",
+    agentId,
+    signal: "bullish",
+    confidence: 0.8,
+  });
 
   beforeAll(async () => {
     pool = new pg.Pool({ connectionString: DATABASE_URL });
@@ -44,7 +71,7 @@ describeIfDb("PostgresGraph validator wiring", () => {
        ON CONFLICT DO NOTHING`,
       [tenantId],
     );
-    await profileRegistry.install(tenantId, WEDDING_PROFILE);
+    await profileRegistry.install(tenantId, FINANCE_RESEARCH_PROFILE);
 
     graph = new PostgresGraph(pool, {
       validatorFactory: (t) => profileRegistry.validator(t),
@@ -63,8 +90,8 @@ describeIfDb("PostgresGraph validator wiring", () => {
     await expect(
       graph.createNode({
         tenantId,
-        profile: WEDDING,
-        identity: { title: "T" }, // missing eventDate, venue, operationalState
+        profile: RESEARCH_RUN,
+        identity: { title: "T" }, // missing scopeStart, scopeEnd, state
         schemaVersion: 1,
       }),
     ).rejects.toBeInstanceOf(ProfileValidationError);
@@ -74,98 +101,77 @@ describeIfDb("PostgresGraph validator wiring", () => {
     await expect(
       graph.createNode({
         tenantId,
-        profile: { tier1: "Engagement", profile: "wedding", concrete: "Wedding3" },
+        profile: { tier1: "Engagement", profile: "finance-research", concrete: "ResearchRun3" },
         identity: {},
         schemaVersion: 1,
       }),
     ).rejects.toBeInstanceOf(ProfileValidationError);
   });
 
-  it("accepts a well-formed Wedding node", async () => {
-    const { node: w } = await graph.createNode({
+  it("accepts a well-formed ResearchRun node", async () => {
+    const { node: run } = await graph.createNode({
       tenantId,
-      profile: WEDDING,
-      identity: {
-        title: "Test Wedding",
-        eventDate: "2026-09-01",
-        venue: "Beach",
-        operationalState: "planning",
-      },
+      profile: RESEARCH_RUN,
+      identity: researchRunIdentity("AAPL breakout research"),
       schemaVersion: 1,
     });
-    expect(w.id).toMatch(/^ent_/);
+    expect(run.id).toMatch(/^ent_/);
   });
 
-  it("rejects createEdge that would exceed has_principal exactly:2", async () => {
-    const { node: w } = await graph.createNode({
-      tenantId, profile: WEDDING,
-      identity: {
-        title: "Edge Test", eventDate: "2026-10-01", venue: "X",
-        operationalState: "planning",
-      },
+  it("rejects createEdge that would exceed signal_for_ticker exactly:1", async () => {
+    const { node: signal } = await graph.createNode({
+      tenantId, profile: ANALYST_SIGNAL,
+      identity: signalIdentity("agent:analyst_momentum"),
       schemaVersion: 1,
     });
-    const { node: c1 } = await graph.createNode({
-      tenantId, profile: COUPLE, identity: { name: "P1" }, schemaVersion: 1,
+    const { node: t1 } = await graph.createNode({
+      tenantId, profile: TICKER, identity: tickerIdentity("AAPL"), schemaVersion: 1,
     });
-    const { node: c2 } = await graph.createNode({
-      tenantId, profile: COUPLE, identity: { name: "P2" }, schemaVersion: 1,
-    });
-    const { node: c3 } = await graph.createNode({
-      tenantId, profile: COUPLE, identity: { name: "P3" }, schemaVersion: 1,
+    const { node: t2 } = await graph.createNode({
+      tenantId, profile: TICKER, identity: tickerIdentity("MSFT"), schemaVersion: 1,
     });
 
     await graph.createEdge({
-      tenantId, type: "wedding/has_principal",
-      fromId: w.id, toId: c1.id, attrs: {},
+      tenantId, type: "finance-research/signal_for_ticker",
+      fromId: signal.id, toId: t1.id, attrs: {},
     });
-    await graph.createEdge({
-      tenantId, type: "wedding/has_principal",
-      fromId: w.id, toId: c2.id, attrs: {},
-    });
-    // Third would push from-count to 3 — must reject.
+    // Second would push from-count to 2 — a signal targets exactly one ticker.
     await expect(
       graph.createEdge({
-        tenantId, type: "wedding/has_principal",
-        fromId: w.id, toId: c3.id, attrs: {},
+        tenantId, type: "finance-research/signal_for_ticker",
+        fromId: signal.id, toId: t2.id, attrs: {},
       }),
     ).rejects.toBeInstanceOf(ProfileValidationError);
   });
 
   it("rejects createEdge with from-type not in the declared from-types", async () => {
-    const { node: w } = await graph.createNode({
-      tenantId, profile: WEDDING,
-      identity: {
-        title: "FromType", eventDate: "2026-10-01", venue: "X",
-        operationalState: "planning",
-      },
+    const { node: signal } = await graph.createNode({
+      tenantId, profile: ANALYST_SIGNAL,
+      identity: signalIdentity("agent:analyst_value"),
       schemaVersion: 1,
     });
-    const { node: c } = await graph.createNode({
-      tenantId, profile: COUPLE, identity: { name: "P" }, schemaVersion: 1,
+    const { node: ticker } = await graph.createNode({
+      tenantId, profile: TICKER, identity: tickerIdentity("NVDA"), schemaVersion: 1,
     });
-    // has_principal is declared as Wedding -> Couple. Reverse the direction.
+    // signal_for_ticker is declared as AnalystSignal -> Ticker. Reverse it.
     await expect(
       graph.createEdge({
-        tenantId, type: "wedding/has_principal",
-        fromId: c.id, toId: w.id, attrs: {},
+        tenantId, type: "finance-research/signal_for_ticker",
+        fromId: ticker.id, toId: signal.id, attrs: {},
       }),
     ).rejects.toBeInstanceOf(ProfileValidationError);
   });
 
   it("rejects updateNode that drops a required field", async () => {
-    const { node: w } = await graph.createNode({
-      tenantId, profile: WEDDING,
-      identity: {
-        title: "Update Test", eventDate: "2026-10-01", venue: "X",
-        operationalState: "planning",
-      },
+    const { node: run } = await graph.createNode({
+      tenantId, profile: RESEARCH_RUN,
+      identity: researchRunIdentity("Update Test research"),
       schemaVersion: 1,
     });
     await expect(
       graph.updateNode({
         tenantId,
-        id: w.id,
+        id: run.id,
         identity: { title: "Only Title" }, // dropped required fields
         expectedSchemaVersion: 1,
       }),

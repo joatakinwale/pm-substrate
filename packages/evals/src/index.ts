@@ -90,3 +90,18 @@ export {
   type ArrowHedgeStateEvalInput,
   type ArrowHedgeStateEvalSuite,
 } from "./arrowhedge.js";
+export {
+  analyzeEvidenceAdmissionFixtureResults,
+  buildEvidenceAdmissionFixtureCorpus,
+  groupStateReviewArtifactsByRunGroup,
+  projectStateReviewArtifactForRole,
+  runEvidenceAdmissionFixtures,
+  type EvidenceAdmissionFixture,
+  type EvidenceAdmissionFixtureCorpusInput,
+  type EvidenceAdmissionFixtureResult,
+  type EvidenceAdmissionMetrics,
+  type StateReviewArtifactInvariantCore,
+  type StateReviewArtifactRole,
+  type StateReviewArtifactRoleProjection,
+  type StateReviewArtifactRunGroup,
+} from "./evidence-admission.js";
