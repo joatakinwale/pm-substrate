@@ -46,6 +46,7 @@ import {
   validateInvocationEvidenceBinding,
   type EvidenceBindingMode,
   type EvidenceBindingProvider,
+  type EvidenceBindingVerifier,
   type InvocationEvidenceBinding,
 } from "./evidence-binding.js";
 import type {
@@ -136,6 +137,7 @@ export interface RuntimeDeps {
    */
   readonly evidenceBindingMode?: EvidenceBindingMode;
   readonly evidenceBindingProvider?: EvidenceBindingProvider;
+  readonly evidenceBindingVerifier?: EvidenceBindingVerifier;
 }
 
 export class PostgresWorkflowRuntime implements WorkflowRuntime {
@@ -148,6 +150,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
   readonly #inputValidator: InputValidator;
   readonly #evidenceBindingMode: EvidenceBindingMode;
   readonly #evidenceBindingProvider: EvidenceBindingProvider | undefined;
+  readonly #evidenceBindingVerifier: EvidenceBindingVerifier | undefined;
 
   constructor(deps: RuntimeDeps) {
     this.#pool = deps.pool;
@@ -159,6 +162,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     this.#inputValidator = deps.inputValidator ?? acceptAllInputValidator();
     this.#evidenceBindingMode = deps.evidenceBindingMode ?? "off";
     this.#evidenceBindingProvider = deps.evidenceBindingProvider;
+    this.#evidenceBindingVerifier = deps.evidenceBindingVerifier;
   }
 
   // -------------------------------------------------------------------------
@@ -439,7 +443,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
           this.#evidenceBindingMode === "require_for_writes" && capabilityWrites;
         let evidenceBinding: InvocationEvidenceBinding | undefined;
         if (evidenceBindingRequired) {
-          const providedBinding = await this.#evidenceBindingProvider?.bind({
+          const bindingRequest = {
             tenantId: doc.tenantId,
             workflowId: doc.id,
             workflowName: doc.name,
@@ -449,7 +453,8 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
             inputs,
             capabilityWrites,
             triggerEventId: event.id,
-          });
+          };
+          const providedBinding = await this.#evidenceBindingProvider?.bind(bindingRequest);
           const evidenceDecision = validateInvocationEvidenceBinding({
             capabilityWrites,
             evidenceBindingRequired,
@@ -468,6 +473,26 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
             });
             runStatus = "failed";
             return;
+          }
+          if (this.#evidenceBindingVerifier && providedBinding) {
+            const verificationDecision = await this.#evidenceBindingVerifier.verify({
+              request: bindingRequest,
+              evidenceBinding: providedBinding,
+            });
+            if (!verificationDecision.valid) {
+              const errPayload = {
+                error: verificationDecision.reason,
+                issues: verificationDecision.issues,
+              };
+              await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+              await this.#writeDeadLetter({
+                tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+                nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+                inputs, attempts: 1, error: errPayload, reason: verificationDecision.reason,
+              });
+              runStatus = "failed";
+              return;
+            }
           }
           evidenceBinding = providedBinding ?? undefined;
         }
@@ -577,7 +602,8 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       | "input_invalid"
       | "evidence_binding_missing"
       | "evidence_binding_incomplete"
-      | "evidence_policy_blocked";
+      | "evidence_policy_blocked"
+      | "evidence_binding_unverified";
   }): Promise<void> {
     const id = `dl_${randomUUID()}`;
     await this.#pool.query(

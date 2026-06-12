@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   validateInvocationEvidenceBinding,
+  verifyInvocationEvidenceBindingAgainstCatalog,
   type InvocationEvidenceBinding,
 } from "./evidence-binding.js";
 
@@ -124,6 +125,163 @@ describe("workflow evidence-action binding", () => {
           path: "/evidenceBinding/policyDisposition",
           message:
             "blocking policy disposition denies write-capable dispatch",
+        },
+      ],
+    });
+  });
+
+  it("verifies bindings against a substrate-owned artifact/evidence catalog", () => {
+    expect(
+      verifyInvocationEvidenceBindingAgainstCatalog({
+        request: {
+          tenantId: "tenant_a",
+          workflowId: "wf_accept",
+          workflowName: "accept-decision",
+          workflowVersion: 1,
+          nodeId: "accept",
+          capability: "portfolio/decision.accept",
+          inputs: {},
+          capabilityWrites: true,
+          triggerEventId: "evt_ready",
+        },
+        evidenceBinding: binding({
+          stateReviewArtifactId: "artifact_nvda_001",
+          stateReviewArtifactHash: "a".repeat(64),
+          evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+        }),
+        catalog: {
+          stateReviewArtifacts: [
+            {
+              stateReviewArtifactId: "artifact_nvda_001",
+              artifactHash: "a".repeat(64),
+              tenantId: "tenant_a",
+              workflowId: "wf_accept",
+              evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+            },
+          ],
+          evidenceAdmissionReviews: [
+            {
+              reviewId: "ev_security:admission_review",
+              tenantId: "tenant_a",
+              decision: "admitted",
+              authorityStatus: "evidence_only",
+            },
+          ],
+        },
+      }),
+    ).toEqual({ valid: true });
+  });
+
+  it("rejects catalog-missing and hash-mismatched evidence bindings", () => {
+    const decision = verifyInvocationEvidenceBindingAgainstCatalog({
+      request: {
+        tenantId: "tenant_a",
+        workflowId: "wf_accept",
+        workflowName: "accept-decision",
+        workflowVersion: 1,
+        nodeId: "accept",
+        capability: "portfolio/decision.accept",
+        inputs: {},
+        capabilityWrites: true,
+        triggerEventId: "evt_ready",
+      },
+      evidenceBinding: binding({
+        stateReviewArtifactId: "artifact_nvda_001",
+        stateReviewArtifactHash: "b".repeat(64),
+        evidenceAdmissionReviewIds: [
+          "ev_security:admission_review",
+          "ev_missing:admission_review",
+        ],
+      }),
+      catalog: {
+        stateReviewArtifacts: [
+          {
+            stateReviewArtifactId: "artifact_nvda_001",
+            artifactHash: "a".repeat(64),
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+          },
+        ],
+        evidenceAdmissionReviews: [
+          {
+            reviewId: "ev_security:admission_review",
+            tenantId: "tenant_a",
+            decision: "admitted",
+            authorityStatus: "evidence_only",
+          },
+        ],
+      },
+    });
+
+    expect(decision).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_unverified",
+      issues: expect.arrayContaining([
+        {
+          path: "/evidenceBinding/stateReviewArtifactHash",
+          message:
+            "state review artifact hash does not match the verification catalog",
+        },
+        {
+          path: "/evidenceBinding/evidenceAdmissionReviewIds",
+          message:
+            "evidence admission review id is not linked to the referenced state review artifact",
+        },
+        {
+          path: "/evidenceBinding/evidenceAdmissionReviewIds/1",
+          message:
+            "evidence admission review id was not found in the verification catalog",
+        },
+      ]),
+    });
+  });
+
+  it("requires rejected evidence to produce a blocking policy disposition", () => {
+    const decision = verifyInvocationEvidenceBindingAgainstCatalog({
+      request: {
+        tenantId: "tenant_a",
+        workflowId: "wf_accept",
+        workflowName: "accept-decision",
+        workflowVersion: 1,
+        nodeId: "accept",
+        capability: "portfolio/decision.accept",
+        inputs: {},
+        capabilityWrites: true,
+        triggerEventId: "evt_ready",
+      },
+      evidenceBinding: binding({
+        stateReviewArtifactHash: "a".repeat(64),
+      }),
+      catalog: {
+        stateReviewArtifacts: [
+          {
+            stateReviewArtifactId: "artifact_nvda_001",
+            artifactHash: "a".repeat(64),
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+          },
+        ],
+        evidenceAdmissionReviews: [
+          {
+            reviewId: "ev_security:admission_review",
+            tenantId: "tenant_a",
+            decision: "rejected",
+            authorityStatus: "evidence_only",
+          },
+        ],
+      },
+    });
+
+    expect(decision).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_unverified",
+      issues: [
+        {
+          path: "/evidenceBinding/policyDisposition",
+          message:
+            "rejected evidence admission reviews require a blocking policy disposition",
         },
       ],
     });

@@ -9,7 +9,10 @@ import type { InvocationEvidenceBinding } from "./evidence-binding.js";
 export type {
   EvidenceBindingMode,
   EvidenceBindingProvider,
+  EvidenceBindingVerifier,
   EvidenceBindingRequest,
+  EvidenceBindingVerificationDecision,
+  EvidenceBindingRuntimeVerificationRequest,
   InvocationEvidenceBinding,
   InvocationEvidenceConsequence,
   InvocationEvidencePolicyDisposition,

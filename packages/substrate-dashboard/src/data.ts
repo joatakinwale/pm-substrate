@@ -129,6 +129,7 @@ export interface WriteBindingReplayRecord {
   }[];
   readonly invocationEvidenceBinding: null | {
     readonly stateReviewArtifactId: string;
+    readonly stateReviewArtifactHash?: string;
     readonly evidenceAdmissionReviewIds: readonly string[];
     readonly policyDisposition: {
       readonly evaluatedAt: string;
@@ -144,7 +145,8 @@ export interface WriteBindingReplayRecord {
         readonly reason:
           | "evidence_binding_missing"
           | "evidence_binding_incomplete"
-          | "evidence_policy_blocked";
+          | "evidence_policy_blocked"
+          | "evidence_binding_unverified";
         readonly issues: readonly {
           readonly path: string;
           readonly message: string;
@@ -154,7 +156,8 @@ export interface WriteBindingReplayRecord {
     | "allowed"
     | "blocked_missing_binding"
     | "blocked_incomplete_binding"
-    | "blocked_policy";
+    | "blocked_policy"
+    | "blocked_unverified_binding";
   readonly warningCodes: readonly string[];
   readonly invariantClasses: readonly string[];
   readonly temporalMisalignmentPhase: string;

@@ -35,7 +35,7 @@
  *     (e.g., "../../profile-agency/src/internal-thing.js").
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -94,6 +94,20 @@ function listCapabilityPackages(): CapabilityPackage[] {
     if (NON_CAPABILITY_HELPERS.has(name)) continue;
     const dir = join(PACKAGES_DIR, name);
     const pkgPath = join(dir, "package.json");
+    if (!existsSync(pkgPath)) {
+      const sourceFiles = collectManifestlessSourceFiles(dir);
+      if (sourceFiles.length > 0) {
+        throw new Error(
+          [
+            `Capability package ${name} has source files but no package.json.`,
+            "Either restore the manifest or delete the source tree; manifestless source must not be silently skipped by the isolation test.",
+            "",
+            ...sourceFiles.map((file) => `  - ${relative(WORKSPACE_ROOT, file)}`),
+          ].join("\n"),
+        );
+      }
+      continue;
+    }
     const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as {
       name: string;
       dependencies?: Record<string, string>;
@@ -156,6 +170,35 @@ function collectTsFiles(root: string): string[] {
     }
   }
   return out;
+}
+
+function collectManifestlessSourceFiles(root: string): string[] {
+  const out: string[] = [];
+  const stack = [root];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    let entries: string[];
+    try {
+      entries = readdirSync(cur);
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const full = join(cur, e);
+      const st = statSync(full);
+      if (st.isDirectory()) {
+        if (e === "node_modules" || e === "dist" || e === "build") continue;
+        stack.push(full);
+      } else if (
+        st.isFile() &&
+        full.endsWith(".ts") &&
+        !full.endsWith(".d.ts")
+      ) {
+        out.push(full);
+      }
+    }
+  }
+  return out.sort();
 }
 
 const IMPORT_RE =

@@ -648,6 +648,93 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     });
   });
 
+  it("fails write-capable invoke nodes before dispatch when evidence binding verification rejects", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const evidenceBinding: InvocationEvidenceBinding = {
+      stateReviewArtifactId: "artifact_nvda_accept_001",
+      stateReviewArtifactHash: "0".repeat(64),
+      evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+      policyDisposition: {
+        evaluatedAt: "2026-06-11T16:00:00.000Z",
+        consequence: "high",
+        wouldBlock: false,
+        mode: "advisory",
+      },
+    };
+    const runtime = new PostgresWorkflowRuntime({
+      pool,
+      registry,
+      events,
+      dispatcher,
+      evidenceBindingMode: "require_for_writes",
+      evidenceBindingProvider: {
+        async bind(): Promise<InvocationEvidenceBinding> {
+          return evidenceBinding;
+        },
+      },
+      evidenceBindingVerifier: {
+        async verify() {
+          return {
+            valid: false,
+            reason: "evidence_binding_unverified",
+            issues: [
+              {
+                path: "/evidenceBinding/stateReviewArtifactHash",
+                message:
+                  "state review artifact hash does not match the verification catalog",
+              },
+            ],
+          };
+        },
+      },
+    });
+    await registerCap(tenantId, "portfolio/accept", [], undefined, {
+      writesInterfaces: [
+        { interface: "PortfolioDecision", fields: ["status"], ownership: "owner" },
+      ],
+    });
+
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "evidence-bound-write-unverified",
+      version: 1,
+      nodes: [
+        { nodeId: "t", kind: "trigger", on: "decision.ready" },
+        { nodeId: "n", kind: "invoke", capability: "portfolio/accept", inputs: {} },
+      ],
+      edges: [{ from: "t", to: "n" }],
+    };
+    await runtime.install(doc);
+
+    const ev = await events.publish({
+      tenantId,
+      type: "decision.ready",
+      entityId: "decision_nvda",
+      emittedBy: "agent.runtime",
+      payloadSchema: "v1",
+      payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+
+    expect(dispatcher.calls).toEqual([]);
+
+    const dl = await pool.query<{ reason: string; error: Record<string, unknown> }>(
+      `SELECT reason, error FROM workflow.dead_letter WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect(dl.rows[0]?.reason).toBe("evidence_binding_unverified");
+    expect(dl.rows[0]?.error).toMatchObject({
+      error: "evidence_binding_unverified",
+      issues: [
+        {
+          path: "/evidenceBinding/stateReviewArtifactHash",
+        },
+      ],
+    });
+  });
+
   it("fails the step and does not dispatch when authorization denies", async () => {
     const tenantId = await makeTenant();
     const dispatcher = new RecordingDispatcher();

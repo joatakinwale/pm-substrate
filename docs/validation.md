@@ -30,7 +30,7 @@ The agent-state work is not a pivot from the PM-layer thesis; it is the harder v
 
 Time-to-plugin · substrate edit count (target: zero) · mapping coverage · validator rejection rate · evidence coverage · state disagreement rate · stale action rate · agent resume success · replay fidelity · unauthorized action block rate · cross-tool outcome success · mean time to reconcile.
 
-Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes and selected write-gate outcomes. The plug-in lane (time-to-plugin, substrate edit count, mapping coverage) is **not yet instrumented** — tracked in `research/index.md` → remaining frontier.
+Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. The plug-in lane (time-to-plugin, substrate edit count, mapping coverage) is **not yet instrumented** — tracked in `research/index.md` → remaining frontier.
 
 ---
 

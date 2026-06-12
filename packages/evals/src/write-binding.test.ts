@@ -7,11 +7,12 @@ import {
 } from "./write-binding.js";
 
 describe("write-binding replay corpus", () => {
-  it("generates an ArrowHedge corpus that covers allowed, missing, incomplete, and policy-blocked write attempts", () => {
+  it("generates an ArrowHedge corpus that covers allowed, unverified, missing, incomplete, and policy-blocked write attempts", () => {
     const corpus = buildArrowHedgeWriteBindingReplayCorpus();
 
     expect(corpus.records.map((record) => record.decision)).toEqual([
       "allowed",
+      "blocked_unverified_binding",
       "blocked_missing_binding",
       "blocked_incomplete_binding",
       "blocked_policy",
@@ -44,22 +45,24 @@ describe("write-binding replay corpus", () => {
     );
 
     expect(metrics).toMatchObject({
-      totalRecords: 5,
+      totalRecords: 6,
       allowed: 1,
-      blocked: 4,
-      completeBindings: 3,
+      blocked: 5,
+      completeBindings: 4,
       missingBindings: 1,
       incompleteBindings: 1,
       policyBlocked: 2,
+      unverifiedBindings: 1,
       rejectedEvidenceReferences: 1,
       replayHashCoverage: 1,
-      highConsequenceRecords: 5,
+      highConsequenceRecords: 6,
     });
     expect(metrics.byDecision).toEqual({
       allowed: 1,
       blocked_missing_binding: 1,
       blocked_incomplete_binding: 1,
       blocked_policy: 2,
+      blocked_unverified_binding: 1,
     });
   });
 

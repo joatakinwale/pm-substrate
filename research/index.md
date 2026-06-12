@@ -80,11 +80,11 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 
 ## Current Implementation Frontier
 
-Status note (2026-06-11): the previous 20-item frontier was implemented as pure tested primitives on 2026-06-10 in `@pm/agent-state` (`external-evidence.ts`), `@pm/evals` (`evidence-admission.ts`), and `@pm/capability-finance-research-ingest` (clean-current fixture). Follow-on June 11 work committed replay corpora for evidence admission, ArrowHedge state-review artifacts, and write-binding attempts. The selected workflow runtime gate now blocks missing, incomplete, and explicitly policy-blocked evidence bindings before write-capable dispatch when `evidenceBindingMode: "require_for_writes"` is enabled. Broad production mutation governance remains unclaimed until every external write path consumes this gate.
+Status note (2026-06-11): the previous 20-item frontier was implemented as pure tested primitives on 2026-06-10 in `@pm/agent-state` (`external-evidence.ts`), `@pm/evals` (`evidence-admission.ts`), and `@pm/capability-finance-research-ingest` (clean-current fixture). Follow-on June 11 work committed replay corpora for evidence admission, ArrowHedge state-review artifacts, and write-binding attempts. The selected workflow runtime gate now blocks missing, incomplete, explicitly policy-blocked, and opt-in catalog-unverified evidence bindings before write-capable dispatch when `evidenceBindingMode: "require_for_writes"` is enabled. Broad production mutation governance remains unclaimed until durable verification stores and every external write path consume this gate.
 
 Remaining frontier:
 
-1. Expand the selected write-binding gate beyond the ArrowHedge replay/runtime fixture path: every write-capable capability transport must provide state-review artifact ids/hashes, evidence-admission review ids, and policy disposition before broad mutation-governance claims.
+1. Expand the selected write-binding gate beyond the ArrowHedge replay/runtime fixture path: every write-capable capability transport must provide state-review artifact ids/hashes, evidence-admission review ids, and a policy disposition that is recomputed or verified against durable substrate stores before broad mutation-governance claims.
 2. Exercise the MCP admission lane against a live MCP server (the fixture lane is pure; revalidation semantics against real handles/annotations are untested).
 3. Run the write-binding corpus against a real DB-backed ArrowHedge workflow when `PM_DATABASE_URL` is available and compare it with the static JSONL replay stream.
 4. Run PM dependency-structure agreement (`comparePmHandoffAgreement`) over real multi-agent ArrowHedge runs, not synthetic facets.

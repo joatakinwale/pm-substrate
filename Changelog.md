@@ -1,9 +1,17 @@
 # Changelog
 
+## 2026-06-11 - Write-binding review cleanup
+
+- Added an opt-in workflow `EvidenceBindingVerifier` hook plus `verifyInvocationEvidenceBindingAgainstCatalog()` so a runtime can reject bindings whose artifact id/hash, evidence review ids, tenant, workflow, or rejected-evidence policy disposition cannot be verified against a substrate-owned catalog.
+- Extended the ArrowHedge write-binding replay corpus with a hash-mismatch row (`blocked_unverified_binding`) so self-attested evidence bindings have an executable falsification case.
+- Fixed the dashboard replay-data view so selecting a write-binding row shows the compact write-binding source object instead of an empty JSON object.
+- Tightened the capability isolation test's stale-package handling: manifestless retired build-output tombstones are skipped, but any manifestless capability directory with TypeScript source now fails loudly.
+- Clarified the architecture/research claim boundary: the current runtime gate validates complete evidence bindings, explicit policy blocks, and optional catalog verification on opted-in write-capable workflow paths; full mutation governance still requires durable verification stores and adoption across every external write transport.
+
 ## 2026-06-11 - Write-binding replay corpus and policy-blocked workflow gate
 
 - Added `packages/evals/src/write-binding.ts` with a deterministic ArrowHedge write-binding replay corpus that links write attempts to existing state-review artifact ids/hashes and evidence-admission review ids.
-- Committed `packages/evals/fixtures/write-binding-replay.v1.jsonl` with five replay rows: one allowed complete binding, one missing-binding block, one incomplete-binding block, one stale-artifact policy block, and one rejected-evidence policy block.
+- Committed `packages/evals/fixtures/write-binding-replay.v1.jsonl` with replay rows for allowed complete binding, missing-binding block, incomplete-binding block, stale-artifact policy block, and rejected-evidence policy block.
 - Extended `@pm/workflow` evidence binding validation so an explicit `policyDisposition: { mode: "blocking", wouldBlock: true }` stops write-capable dispatch before side effects and records `evidence_policy_blocked` in the dead-letter lane.
 - Updated `@pm/substrate-dashboard` to consume the committed write-binding JSONL as a third real replay stream instead of showing the write-binding boundary as pending.
 - Verification: red tests first failed on the missing policy block, missing write-binding module, and pending dashboard stream; then `pnpm vitest run packages/workflow/src/evidence-binding.test.ts packages/workflow/src/postgres.test.ts`, `pnpm vitest run packages/evals/src/write-binding.test.ts`, `pnpm --filter @pm/evals typecheck`, `pnpm --filter @pm/workflow typecheck`, `pnpm --filter @pm/substrate-dashboard test`, `pnpm --filter @pm/substrate-dashboard typecheck`, and `pnpm --filter @pm/substrate-dashboard build` passed. DB workflow tests collected but skipped without `PM_DATABASE_URL`.

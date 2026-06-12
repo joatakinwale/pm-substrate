@@ -9,8 +9,9 @@ import {
 import type { TenantId, Timestamp } from "@pm/types";
 import {
   validateInvocationEvidenceBinding,
+  verifyInvocationEvidenceBindingAgainstCatalog,
   type EvidenceBindingMode,
-  type EvidenceBindingValidationDecision,
+  type EvidenceBindingVerificationDecision,
   type InvocationEvidenceBinding,
 } from "@pm/workflow";
 
@@ -20,7 +21,8 @@ export type WriteBindingReplayDecision =
   | "allowed"
   | "blocked_missing_binding"
   | "blocked_incomplete_binding"
-  | "blocked_policy";
+  | "blocked_policy"
+  | "blocked_unverified_binding";
 
 export interface WriteBindingReplayArtifactRef {
   readonly artifactId: string;
@@ -60,7 +62,7 @@ export interface WriteBindingReplayRecord {
   readonly stateReviewArtifact: WriteBindingReplayArtifactRef;
   readonly evidenceAdmissionReviews: readonly WriteBindingReplayAdmissionRef[];
   readonly invocationEvidenceBinding: InvocationEvidenceBinding | null;
-  readonly validation: EvidenceBindingValidationDecision;
+  readonly validation: EvidenceBindingVerificationDecision;
   readonly decision: WriteBindingReplayDecision;
   readonly warningCodes: readonly string[];
   readonly invariantClasses: readonly StateReviewInvariantClass[];
@@ -81,6 +83,7 @@ export interface WriteBindingReplayMetrics {
   readonly missingBindings: number;
   readonly incompleteBindings: number;
   readonly policyBlocked: number;
+  readonly unverifiedBindings: number;
   readonly rejectedEvidenceReferences: number;
   readonly replayHashCoverage: number;
   readonly highConsequenceRecords: number;
@@ -197,6 +200,16 @@ export function buildArrowHedgeWriteBindingReplayCorpus(): WriteBindingReplayCor
       generatedAt: "2026-06-11T16:00:00.000Z" as Timestamp,
     }),
     buildRecord({
+      recordId: "wb_arrowhedge_hash_mismatch_blocked_001",
+      artifact: ARROWHEDGE_ARTIFACTS.clean,
+      admissions: [cleanAdmission],
+      capability: "risk/refresh",
+      nodeId: "refresh-risk",
+      triggerEventId: "evt_arrowhedge_clean_refresh_bad_hash",
+      bindingKind: "unverified_artifact_hash",
+      generatedAt: "2026-06-11T16:00:30.000Z" as Timestamp,
+    }),
+    buildRecord({
       recordId: "wb_arrowhedge_missing_binding_blocked_001",
       artifact: ARROWHEDGE_ARTIFACTS.staleAccept,
       admissions: [cleanAdmission],
@@ -253,6 +266,7 @@ export function analyzeWriteBindingReplayRecords(
     blocked_missing_binding: 0,
     blocked_incomplete_binding: 0,
     blocked_policy: 0,
+    blocked_unverified_binding: 0,
   } satisfies Record<WriteBindingReplayDecision, number>;
 
   let completeBindings = 0;
@@ -284,6 +298,7 @@ export function analyzeWriteBindingReplayRecords(
     missingBindings: byDecision.blocked_missing_binding,
     incompleteBindings: byDecision.blocked_incomplete_binding,
     policyBlocked: byDecision.blocked_policy,
+    unverifiedBindings: byDecision.blocked_unverified_binding,
     rejectedEvidenceReferences,
     replayHashCoverage: records.length === 0 ? 1 : hashPresent / records.length,
     highConsequenceRecords,
@@ -313,9 +328,11 @@ function buildRecord(input: {
     | "missing"
     | "incomplete"
     | "complete_advisory"
-    | "complete_blocking";
+    | "complete_blocking"
+    | "unverified_artifact_hash";
   readonly generatedAt: Timestamp;
 }): WriteBindingReplayRecord {
+  const workflowId = "wf_arrowhedge_write_binding_replay";
   const actionConsequence: StateReviewActionConsequence = "high";
   const bindingMode: EvidenceBindingMode = "require_for_writes";
   const policy = evaluateStateReviewInvariantPolicy(
@@ -332,11 +349,48 @@ function buildRecord(input: {
     bindingKind: input.bindingKind,
     wouldBlock: policy.wouldBlock,
   });
-  const validation = validateInvocationEvidenceBinding({
-    capabilityWrites: true,
-    evidenceBindingRequired: true,
-    evidenceBinding: invocationEvidenceBinding,
-  });
+  const validation =
+    invocationEvidenceBinding === null
+      ? validateInvocationEvidenceBinding({
+          capabilityWrites: true,
+          evidenceBindingRequired: true,
+          evidenceBinding: invocationEvidenceBinding,
+        })
+      : verifyInvocationEvidenceBindingAgainstCatalog({
+          request: {
+            tenantId: ARROWHEDGE_TENANT,
+            workflowId,
+            workflowName: "arrowhedge-write-binding-replay",
+            workflowVersion: 1,
+            nodeId: input.nodeId,
+            capability: input.capability,
+            inputs: {},
+            capabilityWrites: true,
+            triggerEventId: input.triggerEventId,
+          },
+          evidenceBinding: invocationEvidenceBinding,
+          catalog: {
+            stateReviewArtifacts: [
+              {
+                stateReviewArtifactId: input.artifact.artifactId,
+                artifactHash: input.artifact.artifactHash,
+                tenantId: ARROWHEDGE_TENANT,
+                workflowId,
+                workflowRunId: input.artifact.workflowRunId,
+                currentStateViewId: input.artifact.currentStateViewId,
+                evidenceAdmissionReviewIds: input.admissions.map(
+                  (review) => review.reviewId,
+                ),
+              },
+            ],
+            evidenceAdmissionReviews: input.admissions.map((review) => ({
+              reviewId: review.reviewId,
+              tenantId: ARROWHEDGE_TENANT,
+              decision: review.decision,
+              authorityStatus: review.authorityStatus,
+            })),
+          },
+        });
 
   return {
     recordId: input.recordId,
@@ -344,7 +398,7 @@ function buildRecord(input: {
     generatedAt: input.generatedAt,
     tenantId: ARROWHEDGE_TENANT,
     workflowRunId: input.artifact.workflowRunId,
-    workflowId: "wf_arrowhedge_write_binding_replay",
+    workflowId,
     workflowName: "arrowhedge-write-binding-replay",
     workflowVersion: 1,
     nodeId: input.nodeId,
@@ -389,7 +443,8 @@ function buildInvocationEvidenceBinding(input: {
     | "missing"
     | "incomplete"
     | "complete_advisory"
-    | "complete_blocking";
+    | "complete_blocking"
+    | "unverified_artifact_hash";
   readonly wouldBlock: boolean;
 }): InvocationEvidenceBinding | null {
   if (input.bindingKind === "missing") return null;
@@ -403,6 +458,10 @@ function buildInvocationEvidenceBinding(input: {
 
   return {
     stateReviewArtifactId: input.artifact.artifactId,
+    stateReviewArtifactHash:
+      input.bindingKind === "unverified_artifact_hash"
+        ? "0".repeat(64)
+        : input.artifact.artifactHash,
     evidenceAdmissionReviewIds,
     policyDisposition: {
       evaluatedAt: "2026-06-11T16:00:00.000Z" as Timestamp,
@@ -414,7 +473,7 @@ function buildInvocationEvidenceBinding(input: {
 }
 
 function decisionFromValidation(
-  validation: EvidenceBindingValidationDecision,
+  validation: EvidenceBindingVerificationDecision,
 ): WriteBindingReplayDecision {
   if (validation.valid) return "allowed";
   switch (validation.reason) {
@@ -424,6 +483,8 @@ function decisionFromValidation(
       return "blocked_incomplete_binding";
     case "evidence_policy_blocked":
       return "blocked_policy";
+    case "evidence_binding_unverified":
+      return "blocked_unverified_binding";
   }
 }
 

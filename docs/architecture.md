@@ -34,7 +34,7 @@ The layer that makes the agent-state claim concrete, as pure primitives:
 
 - `CurrentStateView` — sourceRefs, observedAt, validUntil, authorityRule, projectionVersion, workflowPosition, missingSources, conflicts, allowedActions.
 - `ObservationContract` (v2) — issuer, integrity hash, holder binding (DPoP-style), allowed use, redaction policy, revocation ref.
-- `ActionProposalReview` — warn-first review of a proposed action against current state: read-set validation, observation re-evaluation, contract-binding checks, multi-object role preconditions. Advisory vs blocking is explicit. The selected workflow runtime gate can now block write-capable dispatch when an evidence binding is missing, incomplete, or explicitly policy-blocked; broad external mutation governance remains unclaimed until all write transports consume that gate.
+- `ActionProposalReview` — warn-first review of a proposed action against current state: read-set validation, observation re-evaluation, contract-binding checks, multi-object role preconditions. Advisory vs blocking is explicit. The selected workflow runtime gate can now block write-capable dispatch when an evidence binding is missing, incomplete, explicitly policy-blocked, or unverifiable by an opt-in catalog verifier; broad external mutation governance remains unclaimed until all write transports consume that gate.
 - `StateReviewArtifact` — durable, canonical-JSON, hash-replayable record of every review; JSONL export/import; continuity payload linkage; run-group metadata for trajectory-level analysis.
 - Observed read-set comparison — declared reads vs what tools actually read (undeclared/unobserved/stale/authority drift).
 - Invariant-class policy matrix — subject identity, tenant boundary, required evidence, freshness, source authority, projection version, workflow position, state conflict, capability contract × low/medium/high consequence → advisory/`wouldBlock`.
@@ -42,7 +42,7 @@ The layer that makes the agent-state claim concrete, as pure primitives:
 
 ### 6 — Evals (`@pm/evals`)
 
-Paired baseline/substrate scenarios (local-lab), the ArrowHedge fixture corpus (temporal misalignment phases, clean-current baseline), artifact-derived metrics, evidence-admission fixture corpus across all lanes, write-binding replay corpus for allowed/missing/incomplete/policy-blocked write attempts, run groups (error-propagation detection), and role projections (risk officer / project manager / auditor) over a stable artifact invariant core.
+Paired baseline/substrate scenarios (local-lab), the ArrowHedge fixture corpus (temporal misalignment phases, clean-current baseline), artifact-derived metrics, evidence-admission fixture corpus across all lanes, write-binding replay corpus for allowed/unverified/missing/incomplete/policy-blocked write attempts, run groups (error-propagation detection), and role projections (risk officer / project manager / auditor) over a stable artifact invariant core.
 
 ## The plug-in pipeline (how a platform onboards)
 
@@ -51,7 +51,7 @@ Paired baseline/substrate scenarios (local-lab), the ArrowHedge fixture corpus (
 3. Validate structurally against the mapping format (`@pm/entity-mapping`).
 4. Validate semantically against the installed profile (concrete types, tier-1 bindings, identity fields, edge types/cardinalities).
 5. Dry-run sample data into graph-ready inputs without mutating production state.
-6. Write gates validate every mutation (tenant, identity, schema version, permissions, idempotency, provenance).
+6. Write-capable paths that opt into the runtime evidence-binding gate validate their state-review artifact ids, artifact hashes, evidence-admission review ids, and policy disposition before dispatch. The verifier hook can reject unverifiable bindings against a trusted catalog; broad mutation governance is a frontier item until durable verification stores and every external write transport consume the same gate.
 7. Version and approve the mapping (fixtures, expected outputs, rollback path).
 8. Operate through adapters; the source platform remains itself.
 

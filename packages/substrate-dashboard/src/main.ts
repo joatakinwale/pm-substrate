@@ -322,7 +322,16 @@ function renderDataBoard(dashboard: DashboardData, state: DashboardState): strin
   const admission = dashboard.admissions.find(
     (item) => state.selection.kind === "admission" && item.reviewId === state.selection.id,
   );
-  const selected = artifact ? compactArtifact(artifact) : admission ? compactAdmission(admission) : {};
+  const writeBinding = dashboard.writeBindings.find(
+    (item) => state.selection.kind === "writeBinding" && item.recordId === state.selection.id,
+  );
+  const selected = artifact
+    ? compactArtifact(artifact)
+    : admission
+      ? compactAdmission(admission)
+      : writeBinding
+        ? compactWriteBinding(writeBinding)
+        : {};
   return `
     <section class="view-panel">
       <div class="panel-heading compact">
@@ -481,6 +490,9 @@ function renderFlowBoard(dashboard: DashboardData): string {
   const blockedPolicy = dashboard.writeBindings.filter(
     (record) => record.decision === "blocked_policy",
   ).length;
+  const blockedUnverified = dashboard.writeBindings.filter(
+    (record) => record.decision === "blocked_unverified_binding",
+  ).length;
   const blockedIncomplete = dashboard.writeBindings.filter(
     (record) => record.decision === "blocked_incomplete_binding",
   ).length;
@@ -527,6 +539,7 @@ function renderFlowBoard(dashboard: DashboardData): string {
           <div class="flow-column-title">Write Binding <strong>${dashboard.writeBindings.length}</strong></div>
           ${renderFlowNode("Allowed", allowedBindings, "good")}
           ${renderFlowNode("Policy blocked", blockedPolicy, "bad")}
+          ${renderFlowNode("Unverified binding", blockedUnverified, "bad")}
           ${renderFlowNode("Missing binding", blockedMissing, "warn")}
           ${renderFlowNode("Incomplete binding", blockedIncomplete, "warn")}
         </div>
@@ -1458,7 +1471,12 @@ function compactWriteBinding(record: WriteBindingReplayRecord): Record<string, u
 
 function toneForWriteBinding(record: WriteBindingReplayRecord): StatusTone {
   if (record.decision === "allowed") return "good";
-  if (record.decision === "blocked_policy") return "bad";
+  if (
+    record.decision === "blocked_policy" ||
+    record.decision === "blocked_unverified_binding"
+  ) {
+    return "bad";
+  }
   return "warn";
 }
 

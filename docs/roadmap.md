@@ -9,7 +9,7 @@ Anchored to the rewrite thesis (`artifacts/pm_substrate_rewrite.md`) and the val
 - **Plug-in pipeline v1** — declarative entity mappings, structural + profile-aware semantic validation, dry-run ingestion adapter, typed event contracts, write gates (T1/T2 implemented; T6 partial).
 - **Agent operational state (pure primitives)** — `CurrentStateView`, `ObservationContract` v2 (integrity hash, holder binding, allowed use), warn-first `ActionProposalReview`, durable `StateReviewArtifact` + hash replay, observed read-set comparison, temporal-misalignment fixtures, invariant-class policy, multi-object role preconditions.
 - **External evidence admission (pure)** — 22 evidence lanes (MCP, memory, monitoring, lineage, audit, attestation, traces, approvals, provider policy, custom stores, subagents, OBO, PM handoffs) with admission review, `evidence_only` authority status, fixture corpus, metrics, run groups, role projections, PM handoff agreement.
-- **Selected write-binding gate** — opt-in workflow runtime mode `require_for_writes`, deterministic ArrowHedge write-binding replay corpus, and dashboard stream for allowed/missing/incomplete/policy-blocked write attempts.
+- **Selected write-binding gate** — opt-in workflow runtime mode `require_for_writes`, deterministic ArrowHedge write-binding replay corpus, catalog-verifier hook, and dashboard stream for allowed/unverified/missing/incomplete/policy-blocked write attempts.
 - **Eval harness** — paired baseline/substrate local-lab scenarios, ArrowHedge corpus (incl. clean-current baseline), artifact-derived metrics.
 - **Event-chain integrity fix** — monotonic `seq` ordering (migration 0019) closing the same-transaction chain-fork bug surfaced by the ArrowHedge DB proof.
 
