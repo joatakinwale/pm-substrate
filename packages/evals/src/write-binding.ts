@@ -1,5 +1,6 @@
 import {
   evaluateStateReviewInvariantPolicy,
+  importStateReviewArtifactsJsonl,
   type EvidenceAdmissionReview,
   type StateRef,
   type StateReviewActionConsequence,
@@ -10,12 +11,17 @@ import type { TenantId, Timestamp } from "@pm/types";
 import {
   validateInvocationEvidenceBinding,
   verifyInvocationEvidenceBindingAgainstCatalog,
+  type EvidenceBindingReferenceCatalog,
+  type EvidenceBindingStateReviewArtifactRef,
   type EvidenceBindingMode,
   type EvidenceBindingVerificationDecision,
   type InvocationEvidenceBinding,
 } from "@pm/workflow";
 
-import { buildEvidenceAdmissionReviewCorpus } from "./evidence-admission.js";
+import {
+  buildEvidenceAdmissionReviewCorpus,
+  importEvidenceAdmissionReviewsJsonl,
+} from "./evidence-admission.js";
 
 export type WriteBindingReplayDecision =
   | "allowed"
@@ -88,6 +94,50 @@ export interface WriteBindingReplayMetrics {
   readonly replayHashCoverage: number;
   readonly highConsequenceRecords: number;
   readonly byDecision: Readonly<Record<WriteBindingReplayDecision, number>>;
+}
+
+export interface EvidenceBindingReferenceCatalogMetrics {
+  readonly stateReviewArtifactCount: number;
+  readonly stateReviewArtifactsBackedByCorpus: number;
+  readonly evidenceAdmissionReviewCount: number;
+  readonly rejectedEvidenceAdmissionReviews: number;
+  readonly writeBindingRecordCount: number;
+  readonly bindingsWithCatalogCandidates: number;
+}
+
+export interface EvidenceBindingReferenceCatalogBuildResult {
+  readonly catalog: EvidenceBindingReferenceCatalog;
+  readonly metrics: EvidenceBindingReferenceCatalogMetrics;
+}
+
+export type WriteTransportBindingCoverageDisposition =
+  | "required_verified"
+  | "advisory_only"
+  | "missing_provider";
+
+export interface WriteTransportBindingCoverageSample {
+  readonly transportId: string;
+  readonly profile: string;
+  readonly workflowName: string;
+  readonly capability: string;
+  readonly capabilityWrites: boolean;
+  readonly bindingMode: EvidenceBindingMode;
+  readonly hasBindingProvider: boolean;
+  readonly hasBindingVerifier: boolean;
+}
+
+export interface WriteTransportBindingCoverageMetrics {
+  readonly totalWriteCapableTransports: number;
+  readonly verifiedRequiredTransports: number;
+  readonly advisoryOnlyTransports: number;
+  readonly missingProviderTransports: number;
+  readonly coverageRate: number;
+  readonly byDisposition: Readonly<
+    Record<WriteTransportBindingCoverageDisposition, number>
+  >;
+  readonly samples: readonly (WriteTransportBindingCoverageSample & {
+    readonly disposition: WriteTransportBindingCoverageDisposition;
+  })[];
 }
 
 interface ArrowHedgeArtifactSeed {
@@ -167,6 +217,210 @@ export function serializeWriteBindingReplayRecordsJsonl(
   records: readonly WriteBindingReplayRecord[],
 ): string {
   return `${records.map((record) => JSON.stringify(record)).join("\n")}\n`;
+}
+
+export function importWriteBindingReplayRecordsJsonl(
+  jsonl: string,
+): readonly WriteBindingReplayRecord[] {
+  return jsonl
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as WriteBindingReplayRecord);
+}
+
+export function buildEvidenceBindingReferenceCatalogFromReplayCorpora(input: {
+  readonly stateReviewArtifactsJsonl: string;
+  readonly evidenceAdmissionReviewsJsonl: string;
+  readonly writeBindingReplayJsonl: string;
+}): EvidenceBindingReferenceCatalogBuildResult {
+  const stateReviewArtifacts = importStateReviewArtifactsJsonl(
+    input.stateReviewArtifactsJsonl,
+  ).map((result, index) => {
+    if (!result.valid || result.artifact === undefined) {
+      throw new Error(
+        `invalid state-review artifact replay row ${index}: ${result.issues
+          .map((issue) => `${issue.path} ${issue.message}`)
+          .join("; ")}`,
+      );
+    }
+    return result.artifact;
+  });
+  const evidenceAdmissionReviews = importEvidenceAdmissionReviewsJsonl(
+    input.evidenceAdmissionReviewsJsonl,
+  );
+  const writeBindingRecords = importWriteBindingReplayRecordsJsonl(
+    input.writeBindingReplayJsonl,
+  );
+
+  const artifactRefs = new Map<string, MutableArtifactCatalogRef>();
+  for (const record of writeBindingRecords) {
+    const ref = getOrCreateArtifactRef(
+      artifactRefs,
+      record.stateReviewArtifact.artifactId,
+    );
+    mergeArtifactCatalogField(
+      ref,
+      "artifactHash",
+      record.stateReviewArtifact.artifactHash,
+      record.recordId,
+    );
+    mergeArtifactCatalogField(ref, "tenantId", record.tenantId, record.recordId);
+    mergeArtifactCatalogField(
+      ref,
+      "workflowId",
+      record.workflowId,
+      record.recordId,
+    );
+    mergeArtifactCatalogField(
+      ref,
+      "workflowRunId",
+      record.workflowRunId,
+      record.recordId,
+    );
+    mergeArtifactCatalogField(
+      ref,
+      "currentStateViewId",
+      record.currentStateView.viewId,
+      record.recordId,
+    );
+    record.evidenceAdmissionReviews.forEach((review) =>
+      ref.evidenceAdmissionReviewIds.add(review.reviewId),
+    );
+  }
+
+  for (const artifact of stateReviewArtifacts) {
+    const ref = getOrCreateArtifactRef(artifactRefs, artifact.artifactId);
+    mergeArtifactCatalogField(
+      ref,
+      "artifactHash",
+      artifact.artifactHash,
+      artifact.artifactId,
+    );
+    mergeArtifactCatalogField(
+      ref,
+      "tenantId",
+      artifact.review.tenantId,
+      artifact.artifactId,
+    );
+    mergeArtifactCatalogField(
+      ref,
+      "workflowRunId",
+      artifact.metadata.workflowRunId,
+      artifact.artifactId,
+    );
+    mergeArtifactCatalogField(
+      ref,
+      "currentStateViewId",
+      artifact.review.currentStateView.viewId,
+      artifact.artifactId,
+    );
+  }
+
+  return {
+    catalog: {
+      stateReviewArtifacts: [...artifactRefs.values()].map((ref) =>
+        compactArtifactCatalogRef(ref),
+      ),
+      evidenceAdmissionReviews: evidenceAdmissionReviews.map((review) => ({
+        reviewId: review.reviewId,
+        tenantId: review.tenantId,
+        decision: review.decision,
+        authorityStatus: review.authorityStatus,
+      })),
+    },
+    metrics: {
+      stateReviewArtifactCount: artifactRefs.size,
+      stateReviewArtifactsBackedByCorpus: stateReviewArtifacts.length,
+      evidenceAdmissionReviewCount: evidenceAdmissionReviews.length,
+      rejectedEvidenceAdmissionReviews: evidenceAdmissionReviews.filter(
+        (review) => review.decision === "rejected",
+      ).length,
+      writeBindingRecordCount: writeBindingRecords.length,
+      bindingsWithCatalogCandidates: writeBindingRecords.filter(
+        (record) => record.invocationEvidenceBinding !== null,
+      ).length,
+    },
+  };
+}
+
+export function buildFixtureWriteTransportBindingCoverageSamples(): readonly WriteTransportBindingCoverageSample[] {
+  return [
+    {
+      transportId: "arrowhedge.portfolio.accept",
+      profile: "finance-research",
+      workflowName: "arrowhedge-write-binding-replay",
+      capability: "portfolio/decision.accept",
+      capabilityWrites: true,
+      bindingMode: "require_for_writes",
+      hasBindingProvider: true,
+      hasBindingVerifier: true,
+    },
+    {
+      transportId: "agency.lead.promote",
+      profile: "agency",
+      workflowName: "agency-lead-promote",
+      capability: "agency/lead.promote",
+      capabilityWrites: true,
+      bindingMode: "require_for_writes",
+      hasBindingProvider: true,
+      hasBindingVerifier: true,
+    },
+    {
+      transportId: "research.memo.publish",
+      profile: "finance-research",
+      workflowName: "research-memo-publish",
+      capability: "research/memo.publish",
+      capabilityWrites: true,
+      bindingMode: "off",
+      hasBindingProvider: true,
+      hasBindingVerifier: false,
+    },
+    {
+      transportId: "crm.note.sync",
+      profile: "shared",
+      workflowName: "crm-note-sync",
+      capability: "crm/note.sync",
+      capabilityWrites: true,
+      bindingMode: "require_for_writes",
+      hasBindingProvider: false,
+      hasBindingVerifier: false,
+    },
+  ];
+}
+
+export function analyzeWriteTransportBindingCoverage(
+  samples: readonly WriteTransportBindingCoverageSample[],
+): WriteTransportBindingCoverageMetrics {
+  const byDisposition = {
+    required_verified: 0,
+    advisory_only: 0,
+    missing_provider: 0,
+  } satisfies Record<WriteTransportBindingCoverageDisposition, number>;
+
+  const evaluated = samples
+    .filter((sample) => sample.capabilityWrites)
+    .map((sample) => {
+      const disposition = classifyWriteTransportBindingCoverage(sample);
+      byDisposition[disposition] += 1;
+      return {
+        ...sample,
+        disposition,
+      };
+    });
+
+  return {
+    totalWriteCapableTransports: evaluated.length,
+    verifiedRequiredTransports: byDisposition.required_verified,
+    advisoryOnlyTransports: byDisposition.advisory_only,
+    missingProviderTransports: byDisposition.missing_provider,
+    coverageRate:
+      evaluated.length === 0
+        ? 1
+        : byDisposition.required_verified / evaluated.length,
+    byDisposition,
+    samples: evaluated,
+  };
 }
 
 export function buildArrowHedgeWriteBindingReplayCorpus(): WriteBindingReplayCorpus {
@@ -492,4 +746,80 @@ function uniqueInvariantClasses(
   values: readonly StateReviewInvariantClass[],
 ): readonly StateReviewInvariantClass[] {
   return [...new Set(values)];
+}
+
+interface MutableArtifactCatalogRef
+  extends Omit<EvidenceBindingStateReviewArtifactRef, "evidenceAdmissionReviewIds"> {
+  readonly evidenceAdmissionReviewIds: Set<string>;
+}
+
+function getOrCreateArtifactRef(
+  refs: Map<string, MutableArtifactCatalogRef>,
+  artifactId: string,
+): MutableArtifactCatalogRef {
+  let ref = refs.get(artifactId);
+  if (ref === undefined) {
+    ref = {
+      stateReviewArtifactId: artifactId,
+      evidenceAdmissionReviewIds: new Set<string>(),
+    };
+    refs.set(artifactId, ref);
+  }
+  return ref;
+}
+
+function mergeArtifactCatalogField<
+  K extends keyof Omit<MutableArtifactCatalogRef, "stateReviewArtifactId" | "evidenceAdmissionReviewIds">,
+>(
+  ref: MutableArtifactCatalogRef,
+  key: K,
+  value: MutableArtifactCatalogRef[K] | undefined,
+  sourceId: string,
+): void {
+  if (value === undefined) return;
+  const prior = ref[key];
+  if (prior !== undefined && prior !== value) {
+    throw new Error(
+      `conflicting ${String(key)} for state review artifact ${ref.stateReviewArtifactId}: ${prior} !== ${value} (${sourceId})`,
+    );
+  }
+  ref[key] = value;
+}
+
+function classifyWriteTransportBindingCoverage(
+  sample: WriteTransportBindingCoverageSample,
+): WriteTransportBindingCoverageDisposition {
+  if (!sample.hasBindingProvider) return "missing_provider";
+  if (
+    sample.bindingMode === "require_for_writes" &&
+    sample.hasBindingVerifier
+  ) {
+    return "required_verified";
+  }
+  return "advisory_only";
+}
+
+function compactArtifactCatalogRef(
+  ref: MutableArtifactCatalogRef,
+): EvidenceBindingStateReviewArtifactRef {
+  const compact: {
+    stateReviewArtifactId: string;
+    evidenceAdmissionReviewIds: readonly string[];
+    artifactHash?: string;
+    tenantId?: string;
+    workflowId?: string;
+    workflowRunId?: string;
+    currentStateViewId?: string;
+  } = {
+    stateReviewArtifactId: ref.stateReviewArtifactId,
+    evidenceAdmissionReviewIds: [...ref.evidenceAdmissionReviewIds],
+  };
+  if (ref.artifactHash !== undefined) compact.artifactHash = ref.artifactHash;
+  if (ref.tenantId !== undefined) compact.tenantId = ref.tenantId;
+  if (ref.workflowId !== undefined) compact.workflowId = ref.workflowId;
+  if (ref.workflowRunId !== undefined) compact.workflowRunId = ref.workflowRunId;
+  if (ref.currentStateViewId !== undefined) {
+    compact.currentStateViewId = ref.currentStateViewId;
+  }
+  return compact;
 }

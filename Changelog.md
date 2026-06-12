@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-12 - Replay-backed verification catalogs and write-transport coverage
+
+- Added replay-corpus import helpers for evidence-admission reviews and write-binding records in `@pm/evals`, so the committed JSONL corpora are reusable verification inputs instead of drift-test outputs only.
+- Added `buildEvidenceBindingReferenceCatalogFromReplayCorpora()` in `packages/evals/src/write-binding.ts`, which merges the committed ArrowHedge state-review artifact corpus, evidence-admission review corpus, and write-binding replay corpus into a substrate-owned `EvidenceBindingReferenceCatalog`.
+- Added a focused replay verification test in `packages/evals/src/write-binding.test.ts` that proves the committed rows still evaluate as intended when reloaded through that catalog: allowed, missing-binding, incomplete-binding, policy-blocked, and the intentional hash-mismatch case remain stable.
+- Added fixture-backed write-transport coverage metrics with a non-ArrowHedge agency write path so the current boundary can distinguish `required_verified`, `advisory_only`, and `missing_provider` transports instead of overclaiming repo-wide mutation governance.
+- Added `research/daily-ai-competitive-intelligence/v06-ai-competitive-intelligence-2026-06-12.md` and updated the shared research ledger to record the June 10-12 official persistence/governance deltas from GitHub, Google, AWS, and OpenAI plus the code slice that converted those deltas into verification reuse.
+- Verification: `pnpm vitest run packages/evals/src/write-binding.test.ts packages/evals/src/evidence-admission.test.ts packages/capability-finance-research-ingest/src/arrowhedge.test.ts`, `pnpm --filter @pm/evals typecheck`, and `pnpm --filter @pm/capability-finance-research-ingest build` passed.
+
 ## 2026-06-12 - Daily agent-state Arrowsmith v09
 
 - Added `research/daily-arrowsmith-agent-state/v09-agent-state-arrowsmith-2026-06-12.md` as the ninth numbered daily continuation.

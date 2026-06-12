@@ -434,6 +434,16 @@ export function serializeEvidenceAdmissionReviewsJsonl(
   return `${reviews.map((review) => JSON.stringify(review)).join("\n")}\n`;
 }
 
+export function importEvidenceAdmissionReviewsJsonl(
+  jsonl: string,
+): readonly EvidenceAdmissionReview[] {
+  return jsonl
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as EvidenceAdmissionReview);
+}
+
 export function buildEvidenceAdmissionReviewCorpus(
   input: EvidenceAdmissionFixtureCorpusInput = {},
 ): EvidenceAdmissionReviewCorpus {

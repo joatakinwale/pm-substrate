@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   analyzeWriteBindingReplayRecords,
+  analyzeWriteTransportBindingCoverage,
   buildArrowHedgeWriteBindingReplayCorpus,
+  buildEvidenceBindingReferenceCatalogFromReplayCorpora,
+  buildFixtureWriteTransportBindingCoverageSamples,
+  importWriteBindingReplayRecordsJsonl,
 } from "./write-binding.js";
 
 describe("write-binding replay corpus", () => {
@@ -76,5 +80,98 @@ describe("write-binding replay corpus", () => {
 
     expect(committed).toBe(corpus.jsonl);
     expect(committed.trim().split("\n")).toHaveLength(corpus.records.length);
+  });
+
+  it("builds a verification catalog from the committed replay corpora and verifies every intentional binding outcome", () => {
+    const stateReviewArtifactsJsonl = readFileSync(
+      new URL("../fixtures/arrowhedge-state-review-artifacts.v1.jsonl", import.meta.url),
+      "utf8",
+    );
+    const evidenceAdmissionReviewsJsonl = readFileSync(
+      new URL("../fixtures/evidence-admission-reviews.v1.jsonl", import.meta.url),
+      "utf8",
+    );
+    const writeBindingReplayJsonl = readFileSync(
+      new URL("../fixtures/write-binding-replay.v1.jsonl", import.meta.url),
+      "utf8",
+    );
+
+    const { catalog, metrics } = buildEvidenceBindingReferenceCatalogFromReplayCorpora(
+      {
+        stateReviewArtifactsJsonl,
+        evidenceAdmissionReviewsJsonl,
+        writeBindingReplayJsonl,
+      },
+    );
+    const records = importWriteBindingReplayRecordsJsonl(writeBindingReplayJsonl);
+
+    expect(metrics).toMatchObject({
+      stateReviewArtifactCount: 4,
+      stateReviewArtifactsBackedByCorpus: 4,
+      evidenceAdmissionReviewCount: 18,
+      rejectedEvidenceAdmissionReviews: 2,
+      writeBindingRecordCount: 6,
+      bindingsWithCatalogCandidates: 5,
+    });
+    expect(catalog.stateReviewArtifacts).toHaveLength(4);
+    expect(catalog.evidenceAdmissionReviews).toHaveLength(18);
+
+    const decisionsByRecordId = new Map(
+      records.map((record) => [record.recordId, record.validation]),
+    );
+
+    expect(decisionsByRecordId.get("wb_arrowhedge_clean_refresh_allowed_001")).toEqual({
+      valid: true,
+    });
+    expect(
+      decisionsByRecordId.get("wb_arrowhedge_hash_mismatch_blocked_001"),
+    ).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_unverified",
+    });
+    expect(
+      decisionsByRecordId.get("wb_arrowhedge_missing_binding_blocked_001"),
+    ).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_missing",
+    });
+    expect(
+      decisionsByRecordId.get("wb_arrowhedge_incomplete_binding_blocked_001"),
+    ).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_incomplete",
+    });
+    expect(
+      decisionsByRecordId.get("wb_arrowhedge_stale_artifact_policy_blocked_001"),
+    ).toMatchObject({
+      valid: false,
+      reason: "evidence_policy_blocked",
+    });
+    expect(
+      decisionsByRecordId.get("wb_arrowhedge_rejected_evidence_policy_blocked_001"),
+    ).toMatchObject({
+      valid: false,
+      reason: "evidence_policy_blocked",
+    });
+  });
+
+  it("reports write-transport binding coverage across required, advisory-only, and missing-provider paths", () => {
+    const report = analyzeWriteTransportBindingCoverage(
+      buildFixtureWriteTransportBindingCoverageSamples(),
+    );
+
+    expect(report.totalWriteCapableTransports).toBe(4);
+    expect(report.verifiedRequiredTransports).toBe(2);
+    expect(report.advisoryOnlyTransports).toBe(1);
+    expect(report.missingProviderTransports).toBe(1);
+    expect(report.coverageRate).toBe(0.5);
+    expect(report.byDisposition).toEqual({
+      advisory_only: 1,
+      missing_provider: 1,
+      required_verified: 2,
+    });
+    expect(report.samples.map((sample) => sample.transportId)).toContain(
+      "agency.lead.promote",
+    );
   });
 });
