@@ -1,5 +1,6 @@
 import arrowHedgeJsonl from "../../evals/fixtures/arrowhedge-state-review-artifacts.v1.jsonl?raw";
 import evidenceAdmissionJsonl from "../../evals/fixtures/evidence-admission-reviews.v1.jsonl?raw";
+import writeBindingJsonl from "../../evals/fixtures/write-binding-replay.v1.jsonl?raw";
 
 export type StatusTone = "good" | "warn" | "bad" | "neutral";
 
@@ -95,6 +96,70 @@ export interface EvidenceAdmissionReview {
   readonly invariantClasses: readonly string[];
 }
 
+export interface WriteBindingReplayRecord {
+  readonly recordId: string;
+  readonly schemaVersion: "pm.write_binding_replay.v1";
+  readonly generatedAt: string;
+  readonly tenantId: string;
+  readonly workflowRunId: string;
+  readonly workflowId: string;
+  readonly workflowName: string;
+  readonly workflowVersion: number;
+  readonly nodeId: string;
+  readonly capability: string;
+  readonly capabilityWrites: boolean;
+  readonly triggerEventId: string;
+  readonly actionType: string;
+  readonly actionConsequence: "low" | "medium" | "high";
+  readonly bindingMode: "off" | "require_for_writes";
+  readonly currentStateView: {
+    readonly viewId: string;
+    readonly subject: StateRef;
+  };
+  readonly stateReviewArtifact: {
+    readonly artifactId: string;
+    readonly artifactHash: string;
+  };
+  readonly evidenceAdmissionReviews: readonly {
+    readonly reviewId: string;
+    readonly evidenceId: string;
+    readonly decision: EvidenceAdmissionReview["decision"];
+    readonly authorityStatus: "evidence_only";
+    readonly invariantClasses: readonly string[];
+  }[];
+  readonly invocationEvidenceBinding: null | {
+    readonly stateReviewArtifactId: string;
+    readonly evidenceAdmissionReviewIds: readonly string[];
+    readonly policyDisposition: {
+      readonly evaluatedAt: string;
+      readonly consequence: "low" | "medium" | "high";
+      readonly wouldBlock: boolean;
+      readonly mode: "advisory" | "blocking";
+    };
+  };
+  readonly validation:
+    | { readonly valid: true }
+    | {
+        readonly valid: false;
+        readonly reason:
+          | "evidence_binding_missing"
+          | "evidence_binding_incomplete"
+          | "evidence_policy_blocked";
+        readonly issues: readonly {
+          readonly path: string;
+          readonly message: string;
+        }[];
+      };
+  readonly decision:
+    | "allowed"
+    | "blocked_missing_binding"
+    | "blocked_incomplete_binding"
+    | "blocked_policy";
+  readonly warningCodes: readonly string[];
+  readonly invariantClasses: readonly string[];
+  readonly temporalMisalignmentPhase: string;
+}
+
 export interface MetricCard {
   readonly id: string;
   readonly label: string;
@@ -112,18 +177,20 @@ export interface CountDatum {
 export interface DashboardData {
   readonly artifacts: readonly StateReviewArtifact[];
   readonly admissions: readonly EvidenceAdmissionReview[];
+  readonly writeBindings: readonly WriteBindingReplayRecord[];
   readonly metrics: readonly MetricCard[];
   readonly phaseCounts: readonly CountDatum[];
   readonly invariantCounts: readonly CountDatum[];
   readonly warningCounts: readonly CountDatum[];
   readonly decisionCounts: readonly CountDatum[];
+  readonly writeBindingDecisionCounts: readonly CountDatum[];
   readonly evidenceKindCounts: readonly CountDatum[];
   readonly flow: {
     readonly observations: number;
     readonly stateReviews: number;
     readonly admittedEvidence: number;
     readonly rejectedEvidence: number;
-    readonly writeBindings: number | null;
+    readonly writeBindings: number;
   };
 }
 
@@ -139,18 +206,23 @@ export function loadDashboardData(): DashboardData {
   return buildDashboardData(
     parseJsonl<StateReviewArtifact>(arrowHedgeJsonl),
     parseJsonl<EvidenceAdmissionReview>(evidenceAdmissionJsonl),
+    parseJsonl<WriteBindingReplayRecord>(writeBindingJsonl),
   );
 }
 
 export function buildDashboardData(
   artifacts: readonly StateReviewArtifact[],
   admissions: readonly EvidenceAdmissionReview[],
+  writeBindings: readonly WriteBindingReplayRecord[] = [],
 ): DashboardData {
   const sortedArtifacts = [...artifacts].sort((a, b) =>
     a.generatedAt.localeCompare(b.generatedAt),
   );
   const sortedAdmissions = [...admissions].sort((a, b) =>
     a.evaluatedAt.localeCompare(b.evaluatedAt),
+  );
+  const sortedWriteBindings = [...writeBindings].sort((a, b) =>
+    a.generatedAt.localeCompare(b.generatedAt),
   );
   const hashVerified = sortedArtifacts.filter(
     (artifact) => artifact.artifactHash.length === 64,
@@ -168,10 +240,15 @@ export function buildDashboardData(
   const cleanArtifacts = sortedArtifacts.filter(
     (artifact) => artifact.review.valid,
   ).length;
+  const allowedBindings = sortedWriteBindings.filter(
+    (record) => record.decision === "allowed",
+  ).length;
+  const blockedBindings = sortedWriteBindings.length - allowedBindings;
 
   return {
     artifacts: sortedArtifacts,
     admissions: sortedAdmissions,
+    writeBindings: sortedWriteBindings,
     metrics: [
       {
         id: "artifacts",
@@ -204,9 +281,14 @@ export function buildDashboardData(
       {
         id: "binding",
         label: "Write binding stream",
-        value: "Pending",
-        detail: "Runtime gate exists; no replay fixture stream yet",
-        tone: "neutral",
+        value: String(sortedWriteBindings.length),
+        detail: `${allowedBindings} allowed, ${blockedBindings} blocked`,
+        tone:
+          sortedWriteBindings.length === 0
+            ? "neutral"
+            : blockedBindings > 0
+              ? "warn"
+              : "good",
       },
     ],
     phaseCounts: sortCounts(
@@ -228,6 +310,10 @@ export function buildDashboardData(
       countBy(sortedAdmissions, (review) => review.decision),
       decisionTone,
     ),
+    writeBindingDecisionCounts: sortCounts(
+      countBy(sortedWriteBindings, (record) => record.decision),
+      writeBindingDecisionTone,
+    ),
     evidenceKindCounts: sortCounts(
       countBy(sortedAdmissions, (review) => review.evidence.kind),
       () => "neutral",
@@ -237,7 +323,7 @@ export function buildDashboardData(
       stateReviews: sortedArtifacts.length,
       admittedEvidence,
       rejectedEvidence,
-      writeBindings: null,
+      writeBindings: sortedWriteBindings.length,
     },
   };
 }
@@ -326,4 +412,10 @@ function decisionTone(decision: string): StatusTone {
   if (decision === "rejected") return "bad";
   if (decision === "admitted_with_warnings") return "warn";
   return "good";
+}
+
+function writeBindingDecisionTone(decision: string): StatusTone {
+  if (decision === "allowed") return "good";
+  if (decision === "blocked_policy") return "bad";
+  return "warn";
 }

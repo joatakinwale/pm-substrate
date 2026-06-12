@@ -101,4 +101,31 @@ describe("workflow evidence-action binding", () => {
       }),
     ).toEqual({ valid: true });
   });
+
+  it("blocks write-capable dispatch when the provided policy disposition is explicitly blocking", () => {
+    expect(
+      validateInvocationEvidenceBinding({
+        capabilityWrites: true,
+        evidenceBindingRequired: true,
+        evidenceBinding: binding({
+          policyDisposition: {
+            evaluatedAt: "2026-06-11T16:00:00.000Z",
+            consequence: "high",
+            wouldBlock: true,
+            mode: "blocking",
+          },
+        }),
+      }),
+    ).toMatchObject({
+      valid: false,
+      reason: "evidence_policy_blocked",
+      issues: [
+        {
+          path: "/evidenceBinding/policyDisposition",
+          message:
+            "blocking policy disposition denies write-capable dispatch",
+        },
+      ],
+    });
+  });
 });

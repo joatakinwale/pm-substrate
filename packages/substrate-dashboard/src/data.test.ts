@@ -9,7 +9,7 @@ describe("substrate dashboard data", () => {
     ]);
   });
 
-  it("derives honest replay metrics without inventing write-binding rows", () => {
+  it("derives honest replay metrics from committed write-binding rows", () => {
     const data = buildDashboardData(
       [
         {
@@ -66,6 +66,57 @@ describe("substrate dashboard data", () => {
           invariantClasses: [],
         },
       ],
+      [
+        {
+          recordId: "wb_allowed",
+          schemaVersion: "pm.write_binding_replay.v1",
+          generatedAt: "2026-06-11T16:00:00.000Z",
+          tenantId: "tenant",
+          workflowRunId: "workflow_1",
+          workflowId: "wf_1",
+          workflowName: "portfolio-decision-accept",
+          workflowVersion: 1,
+          nodeId: "accept",
+          capability: "portfolio/accept",
+          capabilityWrites: true,
+          triggerEventId: "evt_decision_ready",
+          actionType: "portfolio.decision.accept",
+          actionConsequence: "high",
+          bindingMode: "require_for_writes",
+          currentStateView: {
+            viewId: "view_a",
+            subject: { kind: "projection", id: "p1" },
+          },
+          stateReviewArtifact: {
+            artifactId: "artifact_clean",
+            artifactHash: "a".repeat(64),
+          },
+          evidenceAdmissionReviews: [
+            {
+              reviewId: "ev1:admission_review",
+              evidenceId: "ev1",
+              decision: "admitted",
+              authorityStatus: "evidence_only",
+              invariantClasses: [],
+            },
+          ],
+          invocationEvidenceBinding: {
+            stateReviewArtifactId: "artifact_clean",
+            evidenceAdmissionReviewIds: ["ev1:admission_review"],
+            policyDisposition: {
+              evaluatedAt: "2026-06-11T16:00:00.000Z",
+              consequence: "high",
+              wouldBlock: false,
+              mode: "advisory",
+            },
+          },
+          validation: { valid: true },
+          decision: "allowed",
+          warningCodes: [],
+          invariantClasses: [],
+          temporalMisalignmentPhase: "none",
+        },
+      ],
     );
 
     expect(data.metrics.find((metric) => metric.id === "replay")?.value).toBe(
@@ -76,7 +127,12 @@ describe("substrate dashboard data", () => {
       stateReviews: 1,
       admittedEvidence: 1,
       rejectedEvidence: 0,
-      writeBindings: null,
+      writeBindings: 1,
+    });
+    expect(data.metrics.find((metric) => metric.id === "binding")).toMatchObject({
+      value: "1",
+      detail: "1 allowed, 0 blocked",
+      tone: "good",
     });
   });
 });

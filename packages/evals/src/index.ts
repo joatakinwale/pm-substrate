@@ -108,3 +108,15 @@ export {
   type StateReviewArtifactRoleProjection,
   type StateReviewArtifactRunGroup,
 } from "./evidence-admission.js";
+export {
+  analyzeWriteBindingReplayRecords,
+  buildArrowHedgeWriteBindingReplayCorpus,
+  serializeWriteBindingReplayRecordsJsonl,
+  type WriteBindingReplayAdmissionRef,
+  type WriteBindingReplayArtifactRef,
+  type WriteBindingReplayCorpus,
+  type WriteBindingReplayCurrentStateViewRef,
+  type WriteBindingReplayDecision,
+  type WriteBindingReplayMetrics,
+  type WriteBindingReplayRecord,
+} from "./write-binding.js";

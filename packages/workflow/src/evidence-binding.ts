@@ -45,7 +45,8 @@ export type EvidenceBindingValidationDecision =
       readonly valid: false;
       readonly reason:
         | "evidence_binding_missing"
-        | "evidence_binding_incomplete";
+        | "evidence_binding_incomplete"
+        | "evidence_policy_blocked";
       readonly issues: ReadonlyArray<{
         readonly path: string;
         readonly message: string;
@@ -119,6 +120,28 @@ export function validateInvocationEvidenceBinding(
       path: "/evidenceBinding/policyDisposition/evaluatedAt",
       message: "policy disposition evaluatedAt is required",
     });
+  } else if (
+    disposition.consequence !== "low" &&
+    disposition.consequence !== "medium" &&
+    disposition.consequence !== "high"
+  ) {
+    issues.push({
+      path: "/evidenceBinding/policyDisposition/consequence",
+      message: "policy disposition consequence must be low, medium, or high",
+    });
+  } else if (typeof disposition.wouldBlock !== "boolean") {
+    issues.push({
+      path: "/evidenceBinding/policyDisposition/wouldBlock",
+      message: "policy disposition wouldBlock must be boolean",
+    });
+  } else if (
+    disposition.mode !== "advisory" &&
+    disposition.mode !== "blocking"
+  ) {
+    issues.push({
+      path: "/evidenceBinding/policyDisposition/mode",
+      message: "policy disposition mode must be advisory or blocking",
+    });
   }
 
   if (issues.length > 0) {
@@ -126,6 +149,22 @@ export function validateInvocationEvidenceBinding(
       valid: false,
       reason: "evidence_binding_incomplete",
       issues,
+    };
+  }
+
+  if (
+    binding.policyDisposition?.mode === "blocking" &&
+    binding.policyDisposition.wouldBlock === true
+  ) {
+    return {
+      valid: false,
+      reason: "evidence_policy_blocked",
+      issues: [
+        {
+          path: "/evidenceBinding/policyDisposition",
+          message: "blocking policy disposition denies write-capable dispatch",
+        },
+      ],
     };
   }
 

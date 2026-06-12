@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@pm/agent-state": "workspace:*",
-    "@pm/types": "workspace:*"
+    "@pm/types": "workspace:*",
+    "@pm/workflow": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-11 - Write-binding replay corpus and policy-blocked workflow gate
+
+- Added `packages/evals/src/write-binding.ts` with a deterministic ArrowHedge write-binding replay corpus that links write attempts to existing state-review artifact ids/hashes and evidence-admission review ids.
+- Committed `packages/evals/fixtures/write-binding-replay.v1.jsonl` with five replay rows: one allowed complete binding, one missing-binding block, one incomplete-binding block, one stale-artifact policy block, and one rejected-evidence policy block.
+- Extended `@pm/workflow` evidence binding validation so an explicit `policyDisposition: { mode: "blocking", wouldBlock: true }` stops write-capable dispatch before side effects and records `evidence_policy_blocked` in the dead-letter lane.
+- Updated `@pm/substrate-dashboard` to consume the committed write-binding JSONL as a third real replay stream instead of showing the write-binding boundary as pending.
+- Verification: red tests first failed on the missing policy block, missing write-binding module, and pending dashboard stream; then `pnpm vitest run packages/workflow/src/evidence-binding.test.ts packages/workflow/src/postgres.test.ts`, `pnpm vitest run packages/evals/src/write-binding.test.ts`, `pnpm --filter @pm/evals typecheck`, `pnpm --filter @pm/workflow typecheck`, `pnpm --filter @pm/substrate-dashboard test`, `pnpm --filter @pm/substrate-dashboard typecheck`, and `pnpm --filter @pm/substrate-dashboard build` passed. DB workflow tests collected but skipped without `PM_DATABASE_URL`.
+
 ## 2026-06-11 - Substrate dashboard screenshot QA fixes
 
 - Fixed screenshot-visible dashboard defects: the monitor root now fills the viewport, stale URL state is canonicalized so artifact corpus views cannot render an admission inspector, and long warning codes/messages in the inspector no longer overlap.

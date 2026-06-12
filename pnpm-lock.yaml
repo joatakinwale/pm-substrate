@@ -231,6 +231,9 @@ importers:
       '@pm/types':
         specifier: workspace:*
         version: link:../types
+      '@pm/workflow':
+        specifier: workspace:*
+        version: link:../workflow
     devDependencies:
       typescript:
         specifier: ^5.9.0

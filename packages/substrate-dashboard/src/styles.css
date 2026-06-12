@@ -113,6 +113,12 @@ p {
   text-transform: uppercase;
 }
 
+.rail-icon span {
+  max-width: 100%;
+  overflow: hidden;
+  line-height: 1;
+}
+
 .rail-icon.active,
 .rail-icon:hover {
   background: #16365d;
@@ -122,7 +128,7 @@ p {
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr);
+  grid-template-rows: 64px minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -130,6 +136,7 @@ p {
   min-width: 0;
   display: grid;
   grid-template-columns: 310px repeat(11, minmax(82px, 1fr)) 48px;
+  min-height: 64px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   overflow: hidden;

@@ -80,13 +80,13 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 
 ## Current Implementation Frontier
 
-Status note (2026-06-11): the previous 20-item frontier was implemented as pure tested primitives on 2026-06-10 in `@pm/agent-state` (`external-evidence.ts`), `@pm/evals` (`evidence-admission.ts`), and `@pm/capability-finance-research-ingest` (clean-current fixture). This run confirmed that landing against remote `main`, preserved a superseded dirty local draft as provenance rather than duplicating it, and closed remaining frontier item 3 for the admission lane by committing and drift-testing `packages/evals/fixtures/evidence-admission-reviews.v1.jsonl`. Item 7 remains generic evidence kinds + source URIs. Item 11 remains a research-protocol rule, not code.
+Status note (2026-06-11): the previous 20-item frontier was implemented as pure tested primitives on 2026-06-10 in `@pm/agent-state` (`external-evidence.ts`), `@pm/evals` (`evidence-admission.ts`), and `@pm/capability-finance-research-ingest` (clean-current fixture). Follow-on June 11 work committed replay corpora for evidence admission, ArrowHedge state-review artifacts, and write-binding attempts. The selected workflow runtime gate now blocks missing, incomplete, and explicitly policy-blocked evidence bindings before write-capable dispatch when `evidenceBindingMode: "require_for_writes"` is enabled. Broad production mutation governance remains unclaimed until every external write path consumes this gate.
 
 Remaining frontier:
 
-1. Wire evidence admission into the capability/workflow runtime write paths (currently pure primitives only; external mutation blocking remains explicitly unclaimed).
+1. Expand the selected write-binding gate beyond the ArrowHedge replay/runtime fixture path: every write-capable capability transport must provide state-review artifact ids/hashes, evidence-admission review ids, and policy disposition before broad mutation-governance claims.
 2. Exercise the MCP admission lane against a live MCP server (the fixture lane is pure; revalidation semantics against real handles/annotations are untested).
-3. Persist a canonical ArrowHedge on-disk artifact corpus alongside the now-committed admission-review JSONL corpus for replay regression in CI.
+3. Run the write-binding corpus against a real DB-backed ArrowHedge workflow when `PM_DATABASE_URL` is available and compare it with the static JSONL replay stream.
 4. Run PM dependency-structure agreement (`comparePmHandoffAgreement`) over real multi-agent ArrowHedge runs, not synthetic facets.
 5. Add trajectory release-budget fixtures before making privacy/release claims.
 6. Add explicit policy-transition fixtures so admitted evidence cannot bypass workflow state machines or approval/escalation policy.
@@ -114,11 +114,13 @@ pm-substrate implementation frontier (updated 2026-06-11, post-L018)
 +-- PM distributed-state evals ............. IMPLEMENTED (pure) 2026-06-10
 |   `-- next proof: run comparePmHandoffAgreement over real multi-agent ArrowHedge runs
 |
-+-- runtime integration (NEW)
-|   `-- next proof: admission consumed by registry/workflow runtime before side effects; mutation blocking still unclaimed
-+-- golden fixture persistence ............. PARTLY IMPLEMENTED 2026-06-11
++-- selected runtime write binding ......... IMPLEMENTED (opt-in) 2026-06-11
+|   |-- proof: workflow gate blocks missing, incomplete, and explicitly policy-blocked write bindings
+|   `-- next proof: require the binding across every external write-capable transport
++-- golden fixture persistence ............. IMPLEMENTED 2026-06-11
 |   |-- proof: admission corpus JSONL committed and replay-verified in tests
-|   `-- next proof: ArrowHedge on-disk artifact corpus committed alongside it
+|   |-- proof: ArrowHedge state-review artifact JSONL committed and replay-verified in tests
+|   `-- proof: write-binding replay JSONL committed and replay-verified in tests
 +-- trajectory release budgets (NEW)
 |   `-- next proof: cumulative disclosure fixtures with sink trust and declassification reason
 +-- policy-transition conformance (NEW)

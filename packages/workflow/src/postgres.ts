@@ -576,7 +576,8 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       | "capability_not_found"
       | "input_invalid"
       | "evidence_binding_missing"
-      | "evidence_binding_incomplete";
+      | "evidence_binding_incomplete"
+      | "evidence_policy_blocked";
   }): Promise<void> {
     const id = `dl_${randomUUID()}`;
     await this.#pool.query(
