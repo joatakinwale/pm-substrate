@@ -11,19 +11,6 @@ export const FINANCE_RESEARCH_EVENT_TYPES = [
 
 export type FinanceResearchEventType = (typeof FINANCE_RESEARCH_EVENT_TYPES)[number];
 
-const emit = (
-  type: FinanceResearchEventType,
-  schemaPath: string,
-  affectsEntities: readonly string[],
-) => ({
-  schema: {
-    type,
-    version: { major: 1, minor: 0, patch: 0 },
-    schemaPath,
-  },
-  affectsEntities,
-});
-
 /**
  * Capability descriptor for finance-research.ingest.
  *
@@ -100,31 +87,46 @@ export const FINANCE_RESEARCH_INGEST_CAPABILITY = {
     "finance-research/decision_uses_signal",
   ],
   emits: [
-    emit(
-      "analyst.signal.created",
-      "schemas/analyst-signal-created.v1.json",
-      ["AnalystSignal", "Ticker", "EvidenceDocument"],
-    ),
-    emit(
-      "risk.state.validated",
-      "schemas/risk-state-validated.v1.json",
-      ["RiskState", "Ticker", "PortfolioState"],
-    ),
-    emit(
-      "portfolio.decision.proposed",
-      "schemas/portfolio-decision-proposed.v1.json",
-      ["PortfolioDecision", "Ticker"],
-    ),
-    emit(
-      "portfolio.decision.accepted",
-      "schemas/portfolio-decision-accepted.v1.json",
-      ["PortfolioDecision", "RiskState"],
-    ),
-    emit(
-      "workflow.blocked.stale_state",
-      "schemas/workflow-blocked-stale-state.v1.json",
-      ["ResearchRun", "RiskState", "PortfolioDecision"],
-    ),
+    {
+      schema: {
+        type: "analyst.signal.created",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/analyst-signal-created.v1.json",
+      },
+      affectsEntities: ["AnalystSignal", "Ticker", "EvidenceDocument"],
+    },
+    {
+      schema: {
+        type: "risk.state.validated",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/risk-state-validated.v1.json",
+      },
+      affectsEntities: ["RiskState", "Ticker", "PortfolioState"],
+    },
+    {
+      schema: {
+        type: "portfolio.decision.proposed",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/portfolio-decision-proposed.v1.json",
+      },
+      affectsEntities: ["PortfolioDecision", "Ticker"],
+    },
+    {
+      schema: {
+        type: "portfolio.decision.accepted",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/portfolio-decision-accepted.v1.json",
+      },
+      affectsEntities: ["PortfolioDecision", "RiskState"],
+    },
+    {
+      schema: {
+        type: "workflow.blocked.stale_state",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/workflow-blocked-stale-state.v1.json",
+      },
+      affectsEntities: ["ResearchRun", "RiskState", "PortfolioDecision"],
+    },
   ],
   subscribesTo: [],
   requiredPermissions: ["finance-research.ingest.write"],
