@@ -53,6 +53,7 @@ export {
 export {
   validateInvocationEvidenceBinding,
   verifyInvocationEvidenceBindingAgainstCatalog,
+  type EvidenceBindingAdmissionCertificateRef,
   type EvidenceBindingAdmissionReviewRef,
   type EvidenceBindingIssue,
   type EvidenceBindingMode,

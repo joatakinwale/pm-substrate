@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   evaluateStateReviewInvariantPolicy,
   importStateReviewArtifactsJsonl,
@@ -11,6 +13,7 @@ import type { TenantId, Timestamp } from "@pm/types";
 import {
   validateInvocationEvidenceBinding,
   verifyInvocationEvidenceBindingAgainstCatalog,
+  type EvidenceBindingAdmissionCertificateRef,
   type EvidenceBindingReferenceCatalog,
   type EvidenceBindingStateReviewArtifactRef,
   type EvidenceBindingMode,
@@ -101,8 +104,11 @@ export interface EvidenceBindingReferenceCatalogMetrics {
   readonly stateReviewArtifactsBackedByCorpus: number;
   readonly evidenceAdmissionReviewCount: number;
   readonly rejectedEvidenceAdmissionReviews: number;
+  readonly admissionCertificateCount: number;
+  readonly revokedAdmissionCertificateCount: number;
   readonly writeBindingRecordCount: number;
   readonly bindingsWithCatalogCandidates: number;
+  readonly bindingsWithAdmissionCertificates: number;
 }
 
 export interface EvidenceBindingReferenceCatalogBuildResult {
@@ -252,6 +258,14 @@ export function buildEvidenceBindingReferenceCatalogFromReplayCorpora(input: {
   const writeBindingRecords = importWriteBindingReplayRecordsJsonl(
     input.writeBindingReplayJsonl,
   );
+  const admissionCertificates = writeBindingRecords
+    .map((record) => buildAdmissionCertificateRefFromRecord(record))
+    .filter(
+      (
+        certificate,
+      ): certificate is EvidenceBindingAdmissionCertificateRef =>
+        certificate !== undefined,
+    );
 
   const artifactRefs = new Map<string, MutableArtifactCatalogRef>();
   for (const record of writeBindingRecords) {
@@ -328,6 +342,7 @@ export function buildEvidenceBindingReferenceCatalogFromReplayCorpora(input: {
         decision: review.decision,
         authorityStatus: review.authorityStatus,
       })),
+      admissionCertificates,
     },
     metrics: {
       stateReviewArtifactCount: artifactRefs.size,
@@ -336,9 +351,18 @@ export function buildEvidenceBindingReferenceCatalogFromReplayCorpora(input: {
       rejectedEvidenceAdmissionReviews: evidenceAdmissionReviews.filter(
         (review) => review.decision === "rejected",
       ).length,
+      admissionCertificateCount: admissionCertificates.length,
+      revokedAdmissionCertificateCount: admissionCertificates.filter(
+        (certificate) => certificate.revokedAt !== undefined,
+      ).length,
       writeBindingRecordCount: writeBindingRecords.length,
       bindingsWithCatalogCandidates: writeBindingRecords.filter(
         (record) => record.invocationEvidenceBinding !== null,
+      ).length,
+      bindingsWithAdmissionCertificates: writeBindingRecords.filter(
+        (record) =>
+          record.invocationEvidenceBinding?.admissionCertificateId !==
+          undefined,
       ).length,
     },
   };
@@ -596,9 +620,23 @@ function buildRecord(input: {
     ],
     actionConsequence,
   );
+  const admissionCertificate = buildAdmissionCertificateRef({
+    certificateId: `cert_${input.recordId}`,
+    artifact: input.artifact,
+    evidenceAdmissionReviewIds: input.admissions.map(
+      (review) => review.reviewId,
+    ),
+    tenantId: ARROWHEDGE_TENANT,
+    workflowId,
+    workflowName: "arrowhedge-write-binding-replay",
+  });
   const invocationEvidenceBinding = buildInvocationEvidenceBinding({
     artifact: input.artifact,
     admissions: input.admissions,
+    admissionCertificate:
+      input.bindingKind === "missing" || input.bindingKind === "incomplete"
+        ? undefined
+        : admissionCertificate,
     actionConsequence,
     bindingKind: input.bindingKind,
     wouldBlock: policy.wouldBlock,
@@ -637,6 +675,10 @@ function buildRecord(input: {
                 ),
               },
             ],
+            admissionCertificates:
+              invocationEvidenceBinding?.admissionCertificateId === undefined
+                ? []
+                : [admissionCertificate],
             evidenceAdmissionReviews: input.admissions.map((review) => ({
               reviewId: review.reviewId,
               tenantId: ARROWHEDGE_TENANT,
@@ -692,6 +734,9 @@ function buildRecord(input: {
 function buildInvocationEvidenceBinding(input: {
   readonly artifact: ArrowHedgeArtifactSeed;
   readonly admissions: readonly EvidenceAdmissionReview[];
+  readonly admissionCertificate:
+    | EvidenceBindingAdmissionCertificateRef
+    | undefined;
   readonly actionConsequence: StateReviewActionConsequence;
   readonly bindingKind:
     | "missing"
@@ -717,6 +762,13 @@ function buildInvocationEvidenceBinding(input: {
         ? "0".repeat(64)
         : input.artifact.artifactHash,
     evidenceAdmissionReviewIds,
+    ...(input.admissionCertificate === undefined
+      ? {}
+      : {
+          admissionCertificateId: input.admissionCertificate.certificateId,
+          admissionCertificateDigest:
+            input.admissionCertificate.certificateDigest,
+        }),
     policyDisposition: {
       evaluatedAt: "2026-06-11T16:00:00.000Z" as Timestamp,
       consequence: input.actionConsequence,
@@ -746,6 +798,76 @@ function uniqueInvariantClasses(
   values: readonly StateReviewInvariantClass[],
 ): readonly StateReviewInvariantClass[] {
   return [...new Set(values)];
+}
+
+function buildAdmissionCertificateRef(input: {
+  readonly certificateId: string;
+  readonly artifact: {
+    readonly artifactId: string;
+    readonly artifactHash: string;
+  };
+  readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly tenantId: TenantId;
+  readonly workflowId: string;
+  readonly workflowName: string;
+}): EvidenceBindingAdmissionCertificateRef {
+  const unsigned = {
+    certificateId: input.certificateId,
+    stateReviewArtifactId: input.artifact.artifactId,
+    stateReviewArtifactHash: input.artifact.artifactHash,
+    evidenceAdmissionReviewIds: [...input.evidenceAdmissionReviewIds],
+    tenantId: input.tenantId,
+    workflowId: input.workflowId,
+    policyVersion: "policy.write-binding.v1",
+    revocationEpoch: 0,
+    executionIdentity: `workflow-runtime:${input.workflowName}`,
+    validFrom: "2026-06-11T15:55:00.000Z",
+    validUntil: "2026-06-12T16:00:00.000Z",
+  } satisfies Omit<
+    EvidenceBindingAdmissionCertificateRef,
+    "certificateDigest"
+  >;
+
+  return {
+    ...unsigned,
+    certificateDigest: digestAdmissionCertificate(unsigned),
+  };
+}
+
+function buildAdmissionCertificateRefFromRecord(
+  record: WriteBindingReplayRecord,
+): EvidenceBindingAdmissionCertificateRef | undefined {
+  const binding = record.invocationEvidenceBinding;
+  if (binding?.admissionCertificateId === undefined) return undefined;
+
+  const certificate = buildAdmissionCertificateRef({
+    certificateId: binding.admissionCertificateId,
+    artifact: record.stateReviewArtifact,
+    evidenceAdmissionReviewIds: binding.evidenceAdmissionReviewIds,
+    tenantId: record.tenantId,
+    workflowId: record.workflowId,
+    workflowName: record.workflowName,
+  });
+  if (
+    binding.admissionCertificateDigest !== undefined &&
+    binding.admissionCertificateDigest !== certificate.certificateDigest
+  ) {
+    throw new Error(
+      `admission certificate digest drift for ${record.recordId}: ${binding.admissionCertificateDigest} !== ${certificate.certificateDigest}`,
+    );
+  }
+  return certificate;
+}
+
+function digestAdmissionCertificate(
+  certificate: Omit<
+    EvidenceBindingAdmissionCertificateRef,
+    "certificateDigest"
+  >,
+): string {
+  return createHash("sha256")
+    .update(JSON.stringify(certificate))
+    .digest("hex");
 }
 
 interface MutableArtifactCatalogRef

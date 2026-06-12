@@ -9,6 +9,7 @@ const binding = (
   overrides: Partial<InvocationEvidenceBinding> = {},
 ): InvocationEvidenceBinding => ({
   stateReviewArtifactId: "artifact_nvda_001",
+  stateReviewArtifactHash: "a".repeat(64),
   evidenceAdmissionReviewIds: ["ev_security:admission_review"],
   policyDisposition: {
     evaluatedAt: "2026-06-11T16:00:00.000Z",
@@ -146,7 +147,8 @@ describe("workflow evidence-action binding", () => {
         },
         evidenceBinding: binding({
           stateReviewArtifactId: "artifact_nvda_001",
-          stateReviewArtifactHash: "a".repeat(64),
+          admissionCertificateId: "cert_nvda_001",
+          admissionCertificateDigest: "c".repeat(64),
           evidenceAdmissionReviewIds: ["ev_security:admission_review"],
         }),
         catalog: {
@@ -157,6 +159,22 @@ describe("workflow evidence-action binding", () => {
               tenantId: "tenant_a",
               workflowId: "wf_accept",
               evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+            },
+          ],
+          admissionCertificates: [
+            {
+              certificateId: "cert_nvda_001",
+              certificateDigest: "c".repeat(64),
+              stateReviewArtifactId: "artifact_nvda_001",
+              stateReviewArtifactHash: "a".repeat(64),
+              evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+              tenantId: "tenant_a",
+              workflowId: "wf_accept",
+              policyVersion: "policy.write-binding.v1",
+              revocationEpoch: 0,
+              executionIdentity: "workflow-runtime:arrowhedge",
+              validFrom: "2026-06-11T15:59:00.000Z",
+              validUntil: "2026-06-11T16:30:00.000Z",
             },
           ],
           evidenceAdmissionReviews: [
@@ -170,6 +188,221 @@ describe("workflow evidence-action binding", () => {
         },
       }),
     ).toEqual({ valid: true });
+  });
+
+  it("requires a matching admission certificate when the catalog has certificate-backed refs", () => {
+    const decision = verifyInvocationEvidenceBindingAgainstCatalog({
+      request: {
+        tenantId: "tenant_a",
+        workflowId: "wf_accept",
+        workflowName: "accept-decision",
+        workflowVersion: 1,
+        nodeId: "accept",
+        capability: "portfolio/decision.accept",
+        inputs: {},
+        capabilityWrites: true,
+        triggerEventId: "evt_ready",
+      },
+      evidenceBinding: binding({
+        admissionCertificateId: "cert_nvda_001",
+        admissionCertificateDigest: "x".repeat(64),
+      }),
+      catalog: {
+        stateReviewArtifacts: [
+          {
+            stateReviewArtifactId: "artifact_nvda_001",
+            artifactHash: "a".repeat(64),
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+          },
+        ],
+        admissionCertificates: [
+          {
+            certificateId: "cert_nvda_001",
+            certificateDigest: "c".repeat(64),
+            stateReviewArtifactId: "artifact_nvda_001",
+            stateReviewArtifactHash: "a".repeat(64),
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            policyVersion: "policy.write-binding.v1",
+            revocationEpoch: 0,
+            executionIdentity: "workflow-runtime:arrowhedge",
+            validFrom: "2026-06-11T15:59:00.000Z",
+            validUntil: "2026-06-11T16:30:00.000Z",
+          },
+        ],
+        evidenceAdmissionReviews: [
+          {
+            reviewId: "ev_security:admission_review",
+            tenantId: "tenant_a",
+            decision: "admitted",
+            authorityStatus: "evidence_only",
+          },
+        ],
+      },
+    });
+
+    expect(decision).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_unverified",
+      issues: [
+        {
+          path: "/evidenceBinding/admissionCertificateDigest",
+          message: "admission certificate digest does not match the verification catalog",
+        },
+      ],
+    });
+  });
+
+  it("rejects expired or revoked admission certificates before treating a binding as verified", () => {
+    const decision = verifyInvocationEvidenceBindingAgainstCatalog({
+      request: {
+        tenantId: "tenant_a",
+        workflowId: "wf_accept",
+        workflowName: "accept-decision",
+        workflowVersion: 1,
+        nodeId: "accept",
+        capability: "portfolio/decision.accept",
+        inputs: {},
+        capabilityWrites: true,
+        triggerEventId: "evt_ready",
+      },
+      evidenceBinding: binding({
+        admissionCertificateId: "cert_nvda_001",
+        admissionCertificateDigest: "c".repeat(64),
+        policyDisposition: {
+          evaluatedAt: "2026-06-11T17:00:00.000Z",
+          consequence: "high",
+          wouldBlock: false,
+          mode: "advisory",
+        },
+      }),
+      catalog: {
+        stateReviewArtifacts: [
+          {
+            stateReviewArtifactId: "artifact_nvda_001",
+            artifactHash: "a".repeat(64),
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+          },
+        ],
+        admissionCertificates: [
+          {
+            certificateId: "cert_nvda_001",
+            certificateDigest: "c".repeat(64),
+            stateReviewArtifactId: "artifact_nvda_001",
+            stateReviewArtifactHash: "a".repeat(64),
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            policyVersion: "policy.write-binding.v1",
+            revocationEpoch: 1,
+            executionIdentity: "workflow-runtime:arrowhedge",
+            validFrom: "2026-06-11T15:59:00.000Z",
+            validUntil: "2026-06-11T16:30:00.000Z",
+            revokedAt: "2026-06-11T16:45:00.000Z",
+          },
+        ],
+        evidenceAdmissionReviews: [
+          {
+            reviewId: "ev_security:admission_review",
+            tenantId: "tenant_a",
+            decision: "admitted",
+            authorityStatus: "evidence_only",
+          },
+        ],
+      },
+    });
+
+    expect(decision).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_unverified",
+      issues: expect.arrayContaining([
+        {
+          path: "/evidenceBinding/admissionCertificateId",
+          message: "admission certificate is outside its validity window",
+        },
+        {
+          path: "/evidenceBinding/admissionCertificateId",
+          message: "admission certificate was revoked before verification",
+        },
+      ]),
+    });
+  });
+
+  it("rejects certificate-backed bindings with an invalid policy evaluation timestamp", () => {
+    const decision = verifyInvocationEvidenceBindingAgainstCatalog({
+      request: {
+        tenantId: "tenant_a",
+        workflowId: "wf_accept",
+        workflowName: "accept-decision",
+        workflowVersion: 1,
+        nodeId: "accept",
+        capability: "portfolio/decision.accept",
+        inputs: {},
+        capabilityWrites: true,
+        triggerEventId: "evt_ready",
+      },
+      evidenceBinding: binding({
+        admissionCertificateId: "cert_nvda_001",
+        admissionCertificateDigest: "c".repeat(64),
+        policyDisposition: {
+          evaluatedAt: "not-a-date",
+          consequence: "high",
+          wouldBlock: false,
+          mode: "advisory",
+        },
+      }),
+      catalog: {
+        stateReviewArtifacts: [
+          {
+            stateReviewArtifactId: "artifact_nvda_001",
+            artifactHash: "a".repeat(64),
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+          },
+        ],
+        admissionCertificates: [
+          {
+            certificateId: "cert_nvda_001",
+            certificateDigest: "c".repeat(64),
+            stateReviewArtifactId: "artifact_nvda_001",
+            stateReviewArtifactHash: "a".repeat(64),
+            evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+            tenantId: "tenant_a",
+            workflowId: "wf_accept",
+            policyVersion: "policy.write-binding.v1",
+            revocationEpoch: 0,
+            executionIdentity: "workflow-runtime:arrowhedge",
+            validFrom: "2026-06-11T15:59:00.000Z",
+            validUntil: "2026-06-11T16:30:00.000Z",
+          },
+        ],
+        evidenceAdmissionReviews: [
+          {
+            reviewId: "ev_security:admission_review",
+            tenantId: "tenant_a",
+            decision: "admitted",
+            authorityStatus: "evidence_only",
+          },
+        ],
+      },
+    });
+
+    expect(decision).toMatchObject({
+      valid: false,
+      reason: "evidence_binding_unverified",
+      issues: [
+        {
+          path: "/evidenceBinding/policyDisposition/evaluatedAt",
+          message: "policy disposition evaluatedAt is not a valid timestamp",
+        },
+      ],
+    });
   });
 
   it("rejects catalog-missing and hash-mismatched evidence bindings", () => {

@@ -60,7 +60,7 @@ export interface EvidenceAdmissionReviewCorpus {
   readonly jsonl: string;
 }
 
-const DEFAULT_TENANT = tenantId("tnt_arrowhedge_fixtures");
+const DEFAULT_TENANT = tenantId("tnt_arrowhedge_state_review_corpus");
 const DEFAULT_EVALUATED_AT = timestamp("2026-06-10T16:00:00.000Z");
 
 export function buildEvidenceAdmissionFixtureCorpus(

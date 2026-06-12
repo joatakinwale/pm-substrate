@@ -13,6 +13,8 @@ export interface InvocationEvidenceBinding {
   readonly stateReviewArtifactId: string;
   readonly stateReviewArtifactHash?: string;
   readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly admissionCertificateId?: string;
+  readonly admissionCertificateDigest?: string;
   readonly policyDisposition: InvocationEvidencePolicyDisposition;
 }
 
@@ -87,9 +89,26 @@ export interface EvidenceBindingAdmissionReviewRef {
   readonly authorityStatus?: "evidence_only";
 }
 
+export interface EvidenceBindingAdmissionCertificateRef {
+  readonly certificateId: string;
+  readonly certificateDigest?: string;
+  readonly stateReviewArtifactId: string;
+  readonly stateReviewArtifactHash?: string;
+  readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly tenantId?: string;
+  readonly workflowId?: string;
+  readonly policyVersion: string;
+  readonly revocationEpoch: number;
+  readonly executionIdentity: string;
+  readonly validFrom: string;
+  readonly validUntil?: string;
+  readonly revokedAt?: string;
+}
+
 export interface EvidenceBindingReferenceCatalog {
   readonly stateReviewArtifacts: readonly EvidenceBindingStateReviewArtifactRef[];
   readonly evidenceAdmissionReviews: readonly EvidenceBindingAdmissionReviewRef[];
+  readonly admissionCertificates?: readonly EvidenceBindingAdmissionCertificateRef[];
 }
 
 export interface EvidenceBindingRuntimeVerificationRequest {
@@ -152,6 +171,27 @@ export function validateInvocationEvidenceBinding(
           message: "evidence admission review id must be a non-empty string",
         });
       }
+    });
+  }
+
+  if (
+    binding.admissionCertificateId !== undefined &&
+    (typeof binding.admissionCertificateId !== "string" ||
+      binding.admissionCertificateId.trim() === "")
+  ) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate id must be a non-empty string",
+    });
+  }
+  if (
+    binding.admissionCertificateDigest !== undefined &&
+    (typeof binding.admissionCertificateDigest !== "string" ||
+      binding.admissionCertificateDigest.trim() === "")
+  ) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateDigest",
+      message: "admission certificate digest must be a non-empty string",
     });
   }
 
@@ -317,6 +357,40 @@ export function verifyInvocationEvidenceBindingAgainstCatalog(
     }
   }
 
+  const certificates = check.catalog.admissionCertificates ?? [];
+  const artifactCertificates = certificates.filter(
+    (certificate) =>
+      certificate.stateReviewArtifactId === binding.stateReviewArtifactId,
+  );
+  if (artifactCertificates.length > 0) {
+    if (
+      binding.admissionCertificateId === undefined ||
+      binding.admissionCertificateId.trim() === ""
+    ) {
+      issues.push({
+        path: "/evidenceBinding/admissionCertificateId",
+        message:
+          "admission certificate id is required for certificate-backed catalog verification",
+      });
+    } else {
+      verifyAdmissionCertificateRef({
+        certificate: certificates.find(
+          (candidate) =>
+            candidate.certificateId === binding.admissionCertificateId,
+        ),
+        request: check.request,
+        binding,
+        issues,
+      });
+    }
+  } else if (binding.admissionCertificateId !== undefined) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message:
+        "admission certificate id was not found in the verification catalog",
+    });
+  }
+
   if (issues.length > 0) {
     return {
       valid: false,
@@ -326,4 +400,175 @@ export function verifyInvocationEvidenceBindingAgainstCatalog(
   }
 
   return { valid: true };
+}
+
+function verifyAdmissionCertificateRef(input: {
+  readonly certificate: EvidenceBindingAdmissionCertificateRef | undefined;
+  readonly request: EvidenceBindingRequest;
+  readonly binding: InvocationEvidenceBinding;
+  readonly issues: EvidenceBindingIssue[];
+}): void {
+  const { certificate, request, binding, issues } = input;
+  if (!certificate) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate id was not found in the verification catalog",
+    });
+    return;
+  }
+
+  if (
+    certificate.certificateDigest !== undefined &&
+    binding.admissionCertificateDigest === undefined
+  ) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateDigest",
+      message: "admission certificate digest is required for this catalog ref",
+    });
+  } else if (
+    certificate.certificateDigest !== undefined &&
+    binding.admissionCertificateDigest !== certificate.certificateDigest
+  ) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateDigest",
+      message:
+        "admission certificate digest does not match the verification catalog",
+    });
+  }
+
+  if (certificate.tenantId !== undefined && certificate.tenantId !== request.tenantId) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate tenant does not match invocation tenant",
+    });
+  }
+  if (certificate.workflowId !== undefined && certificate.workflowId !== request.workflowId) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate workflow does not match invocation workflow",
+    });
+  }
+  if (certificate.stateReviewArtifactId !== binding.stateReviewArtifactId) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message:
+        "admission certificate is not bound to the referenced state review artifact",
+    });
+  }
+  if (
+    certificate.stateReviewArtifactHash !== undefined &&
+    binding.stateReviewArtifactHash !== certificate.stateReviewArtifactHash
+  ) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message:
+        "admission certificate artifact hash does not match the invocation binding",
+    });
+  }
+
+  const certifiedReviewIds = new Set(certificate.evidenceAdmissionReviewIds);
+  const bindingReviewIds = new Set(binding.evidenceAdmissionReviewIds);
+  for (const id of bindingReviewIds) {
+    if (!certifiedReviewIds.has(id)) {
+      issues.push({
+        path: "/evidenceBinding/admissionCertificateId",
+        message:
+          "admission certificate does not cover every bound evidence admission review",
+      });
+      break;
+    }
+  }
+  for (const id of certifiedReviewIds) {
+    if (!bindingReviewIds.has(id)) {
+      issues.push({
+        path: "/evidenceBinding/admissionCertificateId",
+        message:
+          "invocation binding omits an evidence admission review covered by the admission certificate",
+      });
+      break;
+    }
+  }
+
+  if (certificate.policyVersion.trim() === "") {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate policy version is required",
+    });
+  }
+  if (
+    !Number.isInteger(certificate.revocationEpoch) ||
+    certificate.revocationEpoch < 0
+  ) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate revocation epoch must be a non-negative integer",
+    });
+  }
+  if (certificate.executionIdentity.trim() === "") {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate execution identity is required",
+    });
+  }
+
+  const evaluatedAt = parseIsoTimestamp(binding.policyDisposition.evaluatedAt);
+  const validFrom = parseIsoTimestamp(certificate.validFrom);
+  const validUntil =
+    certificate.validUntil === undefined
+      ? undefined
+      : parseIsoTimestamp(certificate.validUntil);
+  const revokedAt =
+    certificate.revokedAt === undefined
+      ? undefined
+      : parseIsoTimestamp(certificate.revokedAt);
+
+  if (evaluatedAt === undefined) {
+    issues.push({
+      path: "/evidenceBinding/policyDisposition/evaluatedAt",
+      message: "policy disposition evaluatedAt is not a valid timestamp",
+    });
+  }
+  if (validFrom === undefined) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate validFrom is not a valid timestamp",
+    });
+  }
+  if (validUntil === undefined && certificate.validUntil !== undefined) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate validUntil is not a valid timestamp",
+    });
+  }
+  if (revokedAt === undefined && certificate.revokedAt !== undefined) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate revokedAt is not a valid timestamp",
+    });
+  }
+
+  if (evaluatedAt === undefined) return;
+  if (validFrom !== undefined && evaluatedAt < validFrom) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate is outside its validity window",
+    });
+  }
+  if (validUntil !== undefined && evaluatedAt > validUntil) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate is outside its validity window",
+    });
+  }
+  if (revokedAt !== undefined && evaluatedAt >= revokedAt) {
+    issues.push({
+      path: "/evidenceBinding/admissionCertificateId",
+      message: "admission certificate was revoked before verification",
+    });
+  }
+}
+
+function parseIsoTimestamp(value: string): number | undefined {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

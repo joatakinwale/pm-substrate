@@ -1,5 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import {
+  validateInvocationEvidenceBinding,
+  verifyInvocationEvidenceBindingAgainstCatalog,
+  type EvidenceBindingReferenceCatalog,
+} from "@pm/workflow";
 
 import {
   analyzeWriteBindingReplayRecords,
@@ -8,6 +13,7 @@ import {
   buildEvidenceBindingReferenceCatalogFromReplayCorpora,
   buildFixtureWriteTransportBindingCoverageSamples,
   importWriteBindingReplayRecordsJsonl,
+  type WriteBindingReplayRecord,
 } from "./write-binding.js";
 
 describe("write-binding replay corpus", () => {
@@ -110,14 +116,21 @@ describe("write-binding replay corpus", () => {
       stateReviewArtifactsBackedByCorpus: 4,
       evidenceAdmissionReviewCount: 18,
       rejectedEvidenceAdmissionReviews: 2,
+      admissionCertificateCount: 4,
+      revokedAdmissionCertificateCount: 0,
       writeBindingRecordCount: 6,
       bindingsWithCatalogCandidates: 5,
+      bindingsWithAdmissionCertificates: 4,
     });
     expect(catalog.stateReviewArtifacts).toHaveLength(4);
     expect(catalog.evidenceAdmissionReviews).toHaveLength(18);
+    expect(catalog.admissionCertificates).toHaveLength(4);
 
     const decisionsByRecordId = new Map(
-      records.map((record) => [record.recordId, record.validation]),
+      records.map((record) => [
+        record.recordId,
+        replayBindingRecord(record, catalog),
+      ]),
     );
 
     expect(decisionsByRecordId.get("wb_arrowhedge_clean_refresh_allowed_001")).toEqual({
@@ -175,3 +188,32 @@ describe("write-binding replay corpus", () => {
     );
   });
 });
+
+function replayBindingRecord(
+  record: WriteBindingReplayRecord,
+  catalog: EvidenceBindingReferenceCatalog,
+) {
+  if (record.invocationEvidenceBinding === null) {
+    return validateInvocationEvidenceBinding({
+      capabilityWrites: record.capabilityWrites,
+      evidenceBindingRequired: record.bindingMode === "require_for_writes",
+      evidenceBinding: record.invocationEvidenceBinding,
+    });
+  }
+
+  return verifyInvocationEvidenceBindingAgainstCatalog({
+    request: {
+      tenantId: record.tenantId,
+      workflowId: record.workflowId,
+      workflowName: record.workflowName,
+      workflowVersion: record.workflowVersion,
+      nodeId: record.nodeId,
+      capability: record.capability,
+      inputs: {},
+      capabilityWrites: record.capabilityWrites,
+      triggerEventId: record.triggerEventId,
+    },
+    evidenceBinding: record.invocationEvidenceBinding,
+    catalog,
+  });
+}

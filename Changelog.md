@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-12 - Certificate-bound replay verification and tenant-aligned corpora
+
+- Added certificate-aware evidence-binding verification in `@pm/workflow`: invocation bindings can now carry an admission certificate id/digest, and catalog verification rejects digest drift, expired validity windows, revoked certificates, artifact mismatch, tenant/workflow mismatch, invalid policy/revocation metadata, and incomplete evidence-review coverage.
+- Added deterministic replay admission certificates in `@pm/evals` for complete write-binding replay rows, plus certificate counts in `EvidenceBindingReferenceCatalog` metrics.
+- Tightened write-binding replay proof so committed JSONL rows are re-verified against a freshly built catalog instead of trusting serialized `record.validation`.
+- Fixed a hidden cross-corpus proof bug: the evidence-admission replay corpus now uses the ArrowHedge state-review tenant (`tnt_arrowhedge_state_review_corpus`) so evidence-admission, state-review, and write-binding corpora can replay under strict tenant checks.
+- Regenerated `packages/evals/fixtures/evidence-admission-reviews.v1.jsonl` and `packages/evals/fixtures/write-binding-replay.v1.jsonl` to preserve deterministic golden proof after the tenant/certificate contract change.
+- Added `research/daily-ai-competitive-intelligence/v07-ai-competitive-intelligence-2026-06-12.md` and `research/daily-arrowsmith-agent-state/v11-agent-state-arrowsmith-2026-06-12.md`, then updated both chain indexes and the shared research ledger. Claim boundary: this is replay/catalog certificate proof, not signed production certificates, live revocation, DB-backed stores, target-side delivery confirmation, or all-transport mutation governance.
+- Verification: red workflow test first showed stale/revoked certificate inputs still verified as valid; after implementation, `pnpm vitest run packages/workflow/src/evidence-binding.test.ts packages/evals/src/evidence-admission.test.ts packages/evals/src/write-binding.test.ts packages/capability-finance-research-ingest/src/arrowhedge.test.ts` passed (42 tests).
+
 ## 2026-06-12 - Daily agent-state Arrowsmith v10
 
 - Added `research/daily-arrowsmith-agent-state/v10-agent-state-arrowsmith-2026-06-12.md` as the tenth numbered daily continuation.
