@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-11 - Substrate dashboard screenshot QA fixes
+
+- Fixed screenshot-visible dashboard defects: the monitor root now fills the viewport, stale URL state is canonicalized so artifact corpus views cannot render an admission inspector, and long warning codes/messages in the inspector no longer overlap.
+- Verification: reproduced the stale `corpus=artifacts&kind=admission` URL, confirmed it normalizes back to the artifact inspector, checked the memory-admission warning inspector, verified wide-viewport geometry, and confirmed the browser console stayed free of warnings/errors.
+- Verification: `pnpm --filter @pm/substrate-dashboard test`, `pnpm --filter @pm/substrate-dashboard typecheck`, and `pnpm --filter @pm/substrate-dashboard build` passed.
+
 ## 2026-06-11 - Substrate dashboard operational monitor correction
 
 - Reworked `@pm/substrate-dashboard` from the first simplified card layout into the operational monitor surface: dark module rail, compact command strip, replay corpus filters, heatmap timeline, evidence-flow board, event timeline table, and fuller artifact/evidence inspector.

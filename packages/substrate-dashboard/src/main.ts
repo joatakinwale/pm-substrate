@@ -16,11 +16,14 @@ type Selection =
   | { readonly kind: "artifact"; readonly id: string }
   | { readonly kind: "admission"; readonly id: string };
 
+type DashboardView = "grid" | "list" | "flow" | "safe" | "data" | "trend" | "gear";
+
 interface DashboardState {
   corpus: "artifacts" | "admissions";
   phase: string;
   decision: string;
   query: string;
+  view: DashboardView;
   selection: Selection;
 }
 
@@ -45,12 +48,13 @@ if (!app) {
   throw new Error("missing #app root");
 }
 
+writeStateToUrl(initialState, true);
 render(app, data, initialState);
 
 function render(root: HTMLElement, dashboard: DashboardData, state: DashboardState): void {
   root.innerHTML = `
     <div class="monitor-shell">
-      ${renderAppRail()}
+      ${renderAppRail(state)}
       <div class="monitor-frame">
         ${renderCommandBar(dashboard)}
         <div class="monitor-grid">
@@ -65,27 +69,25 @@ function render(root: HTMLElement, dashboard: DashboardData, state: DashboardSta
   bindInteractions(root, dashboard, state);
 }
 
-function renderAppRail(): string {
-  const items: ReadonlyArray<readonly [string, string]> = [
-    ["pm", "Product"],
-    ["grid", "Dashboard"],
+function renderAppRail(state: DashboardState): string {
+  const items: ReadonlyArray<readonly [DashboardView, string]> = [
+    ["grid", "Overview"],
     ["list", "Rows"],
-    ["flow", "Flow"],
-    ["safe", "Policy"],
-    ["data", "Corpus"],
-    ["trend", "Metrics"],
-    ["gear", "Settings"],
+    ["flow", "Evidence Flow"],
+    ["safe", "Policy Safety"],
+    ["data", "Replay Data"],
+    ["trend", "Timeline Trend"],
+    ["gear", "Diagnostics"],
   ];
   return `
     <nav class="app-rail" aria-label="Substrate sections">
       <div class="rail-logo">pm</div>
       <div class="rail-stack">
         ${items
-          .slice(1)
           .map(
-            ([icon, label], index) => `
-              <button class="rail-icon ${index === 0 ? "active" : ""}" aria-label="${escapeAttribute(label)}">
-                <span>${escapeHtml(icon)}</span>
+            ([view, label]) => `
+              <button class="rail-icon ${state.view === view ? "active" : ""}" data-view="${view}" aria-label="${escapeAttribute(label)}">
+                <span>${escapeHtml(view)}</span>
               </button>
             `,
           )
@@ -198,12 +200,186 @@ function renderLeftRail(dashboard: DashboardData, state: DashboardState): string
 }
 
 function renderMainSurface(dashboard: DashboardData, state: DashboardState): string {
+  if (state.view === "list") {
+    return `
+      <main class="main-surface">
+        ${renderEventTimeline(dashboard, state)}
+        ${renderHeatmapTimeline(dashboard, state)}
+      </main>
+    `;
+  }
+
+  if (state.view === "flow") {
+    return `
+      <main class="main-surface">
+        ${renderFlowBoard(dashboard)}
+        ${renderEventTimeline(dashboard, state)}
+      </main>
+    `;
+  }
+
+  if (state.view === "safe") {
+    return `
+      <main class="main-surface">
+        ${renderSafetyBoard(dashboard)}
+        ${renderEventTimeline(dashboard, state)}
+      </main>
+    `;
+  }
+
+  if (state.view === "data") {
+    return `
+      <main class="main-surface">
+        ${renderDataBoard(dashboard, state)}
+        ${renderEventTimeline(dashboard, state)}
+      </main>
+    `;
+  }
+
+  if (state.view === "trend") {
+    return `
+      <main class="main-surface">
+        ${renderHeatmapTimeline(dashboard, state)}
+        ${renderSafetyBoard(dashboard)}
+      </main>
+    `;
+  }
+
+  if (state.view === "gear") {
+    return `
+      <main class="main-surface">
+        ${renderDiagnosticsBoard(dashboard)}
+      </main>
+    `;
+  }
+
   return `
     <main class="main-surface">
       ${renderHeatmapTimeline(dashboard, state)}
       ${renderFlowBoard(dashboard)}
       ${renderEventTimeline(dashboard, state)}
     </main>
+  `;
+}
+
+function renderSafetyBoard(dashboard: DashboardData): string {
+  const totals = getTotals(dashboard);
+  const warningCodes = dashboard.warningCounts.slice(0, 6);
+  const decisions = dashboard.decisionCounts;
+  return `
+    <section class="view-panel">
+      <div class="panel-heading compact">
+        <div>
+          <h1>Policy Safety</h1>
+          <span>Replay hash, evidence admission, and warning concentrations</span>
+        </div>
+      </div>
+      <div class="view-card-grid">
+        ${renderViewCard("Replay hashes", totals.replayHashesValid ? "VALID" : "REVIEW", "All artifact hashes are present in the static replay corpus.", totals.replayHashesValid ? "good" : "bad")}
+        ${renderViewCard("Rejected evidence", String(totals.rejected), "Evidence rows that failed admission checks.", totals.rejected > 0 ? "bad" : "good")}
+        ${renderViewCard("Warnings", String(totals.warnings), `${dashboard.warningCounts.length} warning codes across state-review artifacts.`, totals.warnings > 0 ? "warn" : "good")}
+        ${renderViewCard("Write binding stream", "PENDING", "Runtime gate exists; no committed write-binding replay stream yet.", "neutral")}
+      </div>
+      <div class="summary-grid">
+        <div>
+          <h2>Top Warning Codes</h2>
+          ${warningCodes.map((count) => renderSummaryRow(count.key, count.count, count.tone)).join("")}
+        </div>
+        <div>
+          <h2>Admission Decisions</h2>
+          ${decisions.map((count) => renderSummaryRow(count.key, count.count, count.tone)).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderDataBoard(dashboard: DashboardData, state: DashboardState): string {
+  const artifact = dashboard.artifacts.find(
+    (item) => state.selection.kind === "artifact" && item.artifactId === state.selection.id,
+  );
+  const admission = dashboard.admissions.find(
+    (item) => state.selection.kind === "admission" && item.reviewId === state.selection.id,
+  );
+  const selected = artifact ? compactArtifact(artifact) : admission ? compactAdmission(admission) : {};
+  return `
+    <section class="view-panel">
+      <div class="panel-heading compact">
+        <div>
+          <h1>Replay Data</h1>
+          <span>Committed JSONL fixture corpus and selected source object</span>
+        </div>
+      </div>
+      <div class="source-grid">
+        <div class="source-card">
+          <h2>Corpus Inventory</h2>
+          ${renderFactGrid([
+            ["State artifacts", String(dashboard.artifacts.length)],
+            ["Evidence admissions", String(dashboard.admissions.length)],
+            ["Artifact warning codes", String(dashboard.warningCounts.length)],
+            ["Evidence kinds", String(dashboard.evidenceKindCounts.length)],
+          ])}
+        </div>
+        <div class="source-card">
+          <h2>Selected Object</h2>
+          <pre>${escapeHtml(JSON.stringify(selected, null, 2))}</pre>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderDiagnosticsBoard(dashboard: DashboardData): string {
+  const totals = getTotals(dashboard);
+  return `
+    <section class="view-panel">
+      <div class="panel-heading compact">
+        <div>
+          <h1>Diagnostics</h1>
+          <span>Dashboard runtime and data-boundary checks</span>
+        </div>
+      </div>
+      <div class="diagnostic-list">
+        ${renderDiagnostic("Source mode", "Static JSONL fixtures", "neutral")}
+        ${renderDiagnostic("Artifact/admission URL state", "Canonicalized on load and on row selection", "good")}
+        ${renderDiagnostic("Replay hashes", totals.replayHashesValid ? "Present" : "Needs review", totals.replayHashesValid ? "good" : "bad")}
+        ${renderDiagnostic("Write-binding replay stream", "Pending fixture, not invented", "warn")}
+        ${renderDiagnostic("Dashboard rows", `${dashboard.artifacts.length + dashboard.admissions.length} committed rows`, "neutral")}
+      </div>
+    </section>
+  `;
+}
+
+function renderViewCard(
+  label: string,
+  value: string,
+  detail: string,
+  tone: StatusTone,
+): string {
+  return `
+    <div class="view-card tone-border-${tone}">
+      <span>${escapeHtml(label)}</span>
+      <strong class="tone-${tone}">${escapeHtml(value)}</strong>
+      <p>${escapeHtml(detail)}</p>
+    </div>
+  `;
+}
+
+function renderSummaryRow(label: string, value: number, tone: StatusTone): string {
+  return `
+    <div class="summary-row">
+      <span>${escapeHtml(label)}</span>
+      <b class="tone-${tone}">${value}</b>
+    </div>
+  `;
+}
+
+function renderDiagnostic(label: string, value: string, tone: StatusTone): string {
+  return `
+    <div class="diagnostic-row">
+      <span>${escapeHtml(label)}</span>
+      <strong class="tone-${tone}">${escapeHtml(value)}</strong>
+    </div>
   `;
 }
 
@@ -600,10 +776,23 @@ function bindInteractions(root: HTMLElement, dashboard: DashboardData, state: Da
       const kind = element.dataset.selectKind;
       const id = element.dataset.selectId;
       if ((kind === "artifact" || kind === "admission") && id) {
-        const next = { ...state, selection: { kind, id } as Selection };
+        const next = {
+          ...state,
+          corpus: kind === "admission" ? "admissions" as const : "artifacts" as const,
+          selection: { kind, id } as Selection,
+        };
         writeStateToUrl(next);
         render(root, dashboard, next);
       }
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const view = parseDashboardView(button.dataset.view);
+      const next = { ...state, view };
+      writeStateToUrl(next);
+      render(root, dashboard, next);
     });
   });
 
@@ -747,6 +936,7 @@ function makeTimeTicks(dashboard: DashboardData): string[] {
     phase: "all",
     decision: "all",
     query: "",
+    view: "grid",
     selection: { kind: "artifact", id: dashboard.artifacts[0]?.artifactId ?? "" },
   });
   const times = rows.map((row) => row.time).sort();
@@ -796,21 +986,32 @@ function readStateFromUrl(dashboard: DashboardData): DashboardState {
   const kind = params.get("kind") === "admission" ? "admission" : "artifact";
   const fallbackArtifact = dashboard.artifacts[0]?.artifactId ?? "";
   const fallbackAdmission = dashboard.admissions[0]?.reviewId ?? "";
+  const requestedCorpus: DashboardState["corpus"] =
+    params.get("corpus") === "admissions" ? "admissions" : "artifacts";
+  const normalizedSelection: Selection =
+    requestedCorpus === "admissions"
+      ? {
+          kind: "admission",
+          id: kind === "admission" ? params.get("id") ?? fallbackAdmission : fallbackAdmission,
+        }
+      : {
+          kind: "artifact",
+          id: kind === "artifact" ? params.get("id") ?? fallbackArtifact : fallbackArtifact,
+        };
   return {
-    corpus: params.get("corpus") === "admissions" ? "admissions" : "artifacts",
+    corpus: requestedCorpus,
     phase: params.get("phase") ?? "all",
     decision: params.get("decision") ?? "all",
     query: params.get("q") ?? "",
-    selection:
-      kind === "admission"
-        ? { kind, id: params.get("id") ?? fallbackAdmission }
-        : { kind, id: params.get("id") ?? fallbackArtifact },
+    view: parseDashboardView(params.get("view")),
+    selection: normalizedSelection,
   };
 }
 
 function writeStateToUrl(state: DashboardState, replace = false): void {
   const params = new URLSearchParams();
   params.set("corpus", state.corpus);
+  params.set("view", state.view);
   params.set("kind", state.selection.kind);
   params.set("id", state.selection.id);
   if (state.phase !== "all") params.set("phase", state.phase);
@@ -822,6 +1023,20 @@ function writeStateToUrl(state: DashboardState, replace = false): void {
   } else {
     window.history.pushState(null, "", url);
   }
+}
+
+function parseDashboardView(value: string | null | undefined): DashboardView {
+  if (
+    value === "list" ||
+    value === "flow" ||
+    value === "safe" ||
+    value === "data" ||
+    value === "trend" ||
+    value === "gear"
+  ) {
+    return value;
+  }
+  return "grid";
 }
 
 function renderOptions(options: readonly string[], selected: string): string {
