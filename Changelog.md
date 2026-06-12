@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-11 - Substrate replay dashboard
+
+- Implemented the first substrate monitoring dashboard as `@pm/substrate-dashboard`, a Vite/TypeScript app that reads the committed ArrowHedge state-review artifact JSONL and evidence-admission JSONL directly instead of inventing a separate demo data model.
+- Added dashboard data shaping for replay-hash coverage, artifact warning concentration, evidence-admission decisions, invariant counts, and the current write-binding stream boundary. The binding stream is intentionally shown as pending because runtime gating exists but no replay fixture stream has been committed yet.
+- Built a dense operational UI with URL-backed corpus, filter, search, and selection state; a timeline for state-review and evidence-admission rows; evidence-flow and heatmap panels; replay-row inspection; and a source-object inspector for warnings, issues, refs, and JSON context.
+- Verification: `pnpm --filter @pm/substrate-dashboard test`, `pnpm --filter @pm/substrate-dashboard typecheck`, and `pnpm --filter @pm/substrate-dashboard build` passed; browser QA covered desktop and mobile layouts on the local Vite app.
+
 ## 2026-06-11 - ArrowHedge on-disk state-review replay corpus
 
 - Implemented the next post-evidence-binding research-to-code slice for the remaining v08 frontier: a canonical ArrowHedge state-review artifact corpus that combines the clean accepted/current baseline with observation-to-action, action-to-feedback, and feedback-to-observation temporal drift artifacts.

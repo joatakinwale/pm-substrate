@@ -310,6 +310,8 @@ button {
 }
 
 .surface-section {
+  min-width: 0;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -415,15 +417,18 @@ h3 {
 }
 
 .surface-grid {
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(360px, 1.15fr) minmax(300px, 0.85fr);
   gap: 14px;
+  align-items: start;
 }
 
 .flow {
-  padding: 18px 16px;
+  padding: 14px;
   display: grid;
-  grid-template-columns: 1fr 22px 1fr 22px 1fr 22px 1fr 22px 1fr;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
   align-items: center;
 }
 
@@ -431,7 +436,7 @@ h3 {
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 10px;
+  padding: 8px;
   background: #fbfcfd;
 }
 
@@ -441,14 +446,21 @@ h3 {
 
 .flow-label {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.2;
   font-weight: 680;
+  overflow-wrap: anywhere;
 }
 
 .flow-value {
   margin-top: 5px;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.flow-node.pending .flow-value {
+  font-size: 13px;
 }
 
 .flow-bar,
@@ -472,6 +484,7 @@ h3 {
 }
 
 .flow-link {
+  display: none;
   height: 1px;
   background: var(--line-strong);
 }
@@ -519,11 +532,14 @@ h3 {
 }
 
 .table-wrap {
-  overflow: auto;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 12px;
 }

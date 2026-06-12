@@ -56,7 +56,7 @@ function renderTopBar(dashboard: DashboardData): string {
         <div class="mark" aria-hidden="true">pm</div>
         <div>
           <div class="brand-title">Substrate Monitor</div>
-          <div class="brand-subtitle">Replay corpora · operational-state evidence</div>
+          <div class="brand-subtitle">Replay corpora / operational-state evidence</div>
         </div>
       </div>
       <div class="status-strip" aria-label="dashboard metrics">
@@ -130,7 +130,7 @@ function renderMainSurface(dashboard: DashboardData, state: DashboardState): str
             <h1>Evidence Timeline</h1>
             <p>Committed replay artifacts and evidence-admission reviews from the current fixture boundary.</p>
           </div>
-          <div class="source-note">Static JSONL · ${dashboard.artifacts.length + dashboard.admissions.length} rows</div>
+          <div class="source-note">Static JSONL / ${dashboard.artifacts.length + dashboard.admissions.length} rows</div>
         </div>
         ${renderTimeline(dashboard, state)}
       </section>
@@ -138,7 +138,7 @@ function renderMainSurface(dashboard: DashboardData, state: DashboardState): str
         <div class="surface-section flow-section">
           <div class="section-heading compact">
             <h2>Evidence Flow</h2>
-            <span>Observation → review → admission → binding</span>
+            <span>Observation -> review -> admission -> binding</span>
           </div>
           ${renderFlow(dashboard)}
         </div>
@@ -229,7 +229,7 @@ function renderTimelinePoint(
     <button
       class="timeline-point tone-${point.tone} ${selected ? "selected" : ""}"
       style="left:${left}%"
-      title="${escapeAttribute(`${point.label} · ${point.id}`)}"
+      title="${escapeAttribute(`${point.label} / ${point.id}`)}"
       data-select-kind="${point.kind}"
       data-select-id="${escapeAttribute(point.id)}"
       aria-label="${escapeAttribute(`${point.kind} ${point.label}`)}"
@@ -484,7 +484,7 @@ function renderArtifactListItem(
       <span class="dot tone-${toneForArtifact(artifact)}"></span>
       <span>
         <strong>${escapeHtml(shortId(artifact.artifactId, 22))}</strong>
-        <small>${escapeHtml(artifact.metadata.temporalMisalignmentPhase ?? "none")} · ${formatTime(artifact.generatedAt)}</small>
+        <small>${escapeHtml(artifact.metadata.temporalMisalignmentPhase ?? "none")} / ${formatTime(artifact.generatedAt)}</small>
       </span>
       <span class="status-pill tone-${toneForArtifact(artifact)}">${artifact.review.valid ? "valid" : "warn"}</span>
     </button>
@@ -501,7 +501,7 @@ function renderAdmissionListItem(
       <span class="dot tone-${toneForAdmission(review)}"></span>
       <span>
         <strong>${escapeHtml(shortId(review.reviewId, 22))}</strong>
-        <small>${escapeHtml(review.evidence.kind)} · ${formatTime(review.evaluatedAt)}</small>
+        <small>${escapeHtml(review.evidence.kind)} / ${formatTime(review.evaluatedAt)}</small>
       </span>
       <span class="status-pill tone-${toneForAdmission(review)}">${escapeHtml(review.decision.replaceAll("_", " "))}</span>
     </button>

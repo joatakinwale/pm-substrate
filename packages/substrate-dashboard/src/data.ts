@@ -243,7 +243,7 @@ export function buildDashboardData(
 }
 
 export function shortId(id: string, size = 12): string {
-  return id.length <= size ? id : `${id.slice(0, size - 1)}…`;
+  return id.length <= size ? id : `${id.slice(0, size - 3)}...`;
 }
 
 export function toneForArtifact(artifact: StateReviewArtifact): StatusTone {
