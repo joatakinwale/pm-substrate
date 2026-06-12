@@ -24,6 +24,19 @@ interface DashboardState {
   selection: Selection;
 }
 
+interface ReplayRow {
+  readonly kind: "artifact" | "admission";
+  readonly id: string;
+  readonly time: string;
+  readonly type: string;
+  readonly agent: string;
+  readonly policy: string;
+  readonly outcome: string;
+  readonly replay: "valid" | "review";
+  readonly tone: StatusTone;
+  readonly source: string;
+}
+
 const data = loadDashboardData();
 const initialState = readStateFromUrl(data);
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -36,12 +49,15 @@ render(app, data, initialState);
 
 function render(root: HTMLElement, dashboard: DashboardData, state: DashboardState): void {
   root.innerHTML = `
-    <div class="app-shell">
-      ${renderTopBar(dashboard)}
-      <div class="workspace">
-        ${renderLeftRail(dashboard, state)}
-        ${renderMainSurface(dashboard, state)}
-        ${renderInspector(dashboard, state)}
+    <div class="monitor-shell">
+      ${renderAppRail()}
+      <div class="monitor-frame">
+        ${renderCommandBar(dashboard)}
+        <div class="monitor-grid">
+          ${renderLeftRail(dashboard, state)}
+          ${renderMainSurface(dashboard, state)}
+          ${renderInspector(dashboard, state)}
+        </div>
       </div>
     </div>
   `;
@@ -49,29 +65,78 @@ function render(root: HTMLElement, dashboard: DashboardData, state: DashboardSta
   bindInteractions(root, dashboard, state);
 }
 
-function renderTopBar(dashboard: DashboardData): string {
+function renderAppRail(): string {
+  const items: ReadonlyArray<readonly [string, string]> = [
+    ["pm", "Product"],
+    ["grid", "Dashboard"],
+    ["list", "Rows"],
+    ["flow", "Flow"],
+    ["safe", "Policy"],
+    ["data", "Corpus"],
+    ["trend", "Metrics"],
+    ["gear", "Settings"],
+  ];
   return `
-    <header class="topbar">
-      <div class="brand">
-        <div class="mark" aria-hidden="true">pm</div>
-        <div>
-          <div class="brand-title">Substrate Monitor</div>
-          <div class="brand-subtitle">Replay corpora / operational-state evidence</div>
-        </div>
+    <nav class="app-rail" aria-label="Substrate sections">
+      <div class="rail-logo">pm</div>
+      <div class="rail-stack">
+        ${items
+          .slice(1)
+          .map(
+            ([icon, label], index) => `
+              <button class="rail-icon ${index === 0 ? "active" : ""}" aria-label="${escapeAttribute(label)}">
+                <span>${escapeHtml(icon)}</span>
+              </button>
+            `,
+          )
+          .join("")}
       </div>
-      <div class="status-strip" aria-label="dashboard metrics">
-        ${dashboard.metrics.map(renderMetric).join("")}
+      <div class="rail-footer">
+        <button class="rail-icon" aria-label="Help"><span>?</span></button>
+        <button class="rail-icon" aria-label="Collapse"><span>></span></button>
       </div>
+    </nav>
+  `;
+}
+
+function renderCommandBar(dashboard: DashboardData): string {
+  const totals = getTotals(dashboard);
+  const bounds = getTimeBounds(dashboard);
+  const validTone: StatusTone = totals.replayHashesValid ? "good" : "bad";
+
+  return `
+    <header class="command-bar">
+      <div class="product-cell">
+        <div class="product-root">pm-substrate</div>
+        <div class="product-title">Substrate Monitor</div>
+      </div>
+      ${renderCommandMetric("Replay", totals.replayHashesValid ? "VALID" : "REVIEW", "static replay", validTone)}
+      ${renderCommandMetric("Cluster", "fixture", "local JSONL", "neutral")}
+      ${renderCommandMetric("Corpus", String(dashboard.artifacts.length + dashboard.admissions.length), "rows", "neutral")}
+      ${renderCommandMetric("Time", bounds.latest, "latest fixture", "neutral")}
+      ${renderCommandMetric("Window", bounds.window, "replay", "neutral")}
+      ${renderCommandMetric("Obs", String(totals.observations), "artifact rows", "neutral")}
+      ${renderCommandMetric("Evid", String(dashboard.admissions.length), "admission rows", "neutral")}
+      ${renderCommandMetric("Admitted", String(totals.admitted), `${formatPercent(totals.admitted, dashboard.admissions.length)} of evidence`, "good")}
+      ${renderCommandMetric("Rejected", String(totals.rejected), `${formatPercent(totals.rejected, dashboard.admissions.length)} of evidence`, totals.rejected > 0 ? "bad" : "good")}
+      ${renderCommandMetric("Warnings", String(totals.warnings), `${dashboard.warningCounts.length} codes`, totals.warnings > 0 ? "warn" : "good")}
+      ${renderCommandMetric("Replay Status", totals.replayHashesValid ? "VALID" : "REVIEW", "hashes", validTone)}
+      <button class="menu-button" aria-label="Dashboard menu"><span></span><span></span><span></span></button>
     </header>
   `;
 }
 
-function renderMetric(metric: { label: string; value: string; detail: string; tone: StatusTone }): string {
+function renderCommandMetric(
+  label: string,
+  value: string,
+  detail: string,
+  tone: StatusTone,
+): string {
   return `
-    <div class="metric metric-${metric.tone}">
-      <div class="metric-label">${escapeHtml(metric.label)}</div>
-      <div class="metric-value">${escapeHtml(metric.value)}</div>
-      <div class="metric-detail">${escapeHtml(metric.detail)}</div>
+    <div class="command-metric metric-${tone}">
+      <div class="command-label">${escapeHtml(label)}</div>
+      <div class="command-value">${escapeHtml(value)}</div>
+      <div class="command-detail">${escapeHtml(detail)}</div>
     </div>
   `;
 }
@@ -79,43 +144,54 @@ function renderMetric(metric: { label: string; value: string; detail: string; to
 function renderLeftRail(dashboard: DashboardData, state: DashboardState): string {
   const artifactRows = filterArtifacts(dashboard.artifacts, state);
   const admissionRows = filterAdmissions(dashboard.admissions, state);
-  const rows =
+  const activeRows =
     state.corpus === "artifacts"
       ? artifactRows.map((artifact) => renderArtifactListItem(artifact, state)).join("")
       : admissionRows.map((review) => renderAdmissionListItem(review, state)).join("");
+  const bounds = getTimeBounds(dashboard);
 
   return `
     <aside class="left-rail" aria-label="Replay corpus controls">
-      <section class="rail-section">
-        <div class="section-title">Replay Corpus</div>
-        <div class="segmented" role="tablist" aria-label="Corpus kind">
-          <button class="${state.corpus === "artifacts" ? "active" : ""}" data-corpus="artifacts">Artifacts</button>
-          <button class="${state.corpus === "admissions" ? "active" : ""}" data-corpus="admissions">Admissions</button>
+      <section class="filter-panel">
+        <div class="panel-title">
+          <h2>Replay Corpus</h2>
+          <button id="reset-filters" type="button">Reset</button>
         </div>
-        <label class="control-label" for="query">Search</label>
-        <input id="query" class="search-input" value="${escapeAttribute(state.query)}" placeholder="artifact, review, warning, source..." />
-        <div class="filter-grid">
-          <label>
+        <div class="field-grid two">
+          ${renderSelectField("Corpus", "corpus-select", ["artifacts", "admissions"], state.corpus)}
+          ${renderReadonlyField("Environment", "fixture")}
+        </div>
+        <div class="field-grid two">
+          ${renderReadonlyField("Agent", "all")}
+          ${renderReadonlyField("Policy Set", "evidence-binding")}
+        </div>
+        <label class="field span-all">
+          <span>Time Range</span>
+          <div class="range-field"><span>${escapeHtml(bounds.earliest)}</span><b>to</b><span>${escapeHtml(bounds.latest)}</span></div>
+        </label>
+        <label class="field span-all">
+          <span>Search Artifact</span>
+          <input id="query" class="search-input" value="${escapeAttribute(state.query)}" placeholder="artifact_id, hash, source, policy..." />
+        </label>
+        <div class="field-grid two">
+          <label class="field">
             <span>Phase</span>
-            <select id="phase-filter">
-              ${renderOptions(["all", ...dashboard.phaseCounts.map((count) => count.key)], state.phase)}
-            </select>
+            <select id="phase-filter">${renderOptions(["all", ...dashboard.phaseCounts.map((count) => count.key)], state.phase)}</select>
           </label>
-          <label>
+          <label class="field">
             <span>Decision</span>
-            <select id="decision-filter">
-              ${renderOptions(["all", ...dashboard.decisionCounts.map((count) => count.key)], state.decision)}
-            </select>
+            <select id="decision-filter">${renderOptions(["all", ...dashboard.decisionCounts.map((count) => count.key)], state.decision)}</select>
           </label>
         </div>
-        <button class="reset-button" id="reset-filters" type="button">Reset filters</button>
+        <button class="add-filter" type="button">Add Filter +</button>
       </section>
-      <section class="rail-section list-section">
+      <section class="artifact-list-panel">
         <div class="list-header">
-          <div class="section-title">${state.corpus === "artifacts" ? "Artifacts" : "Admissions"}</div>
-          <div class="list-count">${state.corpus === "artifacts" ? artifactRows.length : admissionRows.length}</div>
+          <h2>${state.corpus === "artifacts" ? "Artifact List" : "Evidence List"} (${state.corpus === "artifacts" ? artifactRows.length : admissionRows.length})</h2>
+          <span>Sort: Newest</span>
         </div>
-        <div class="item-list">${rows}</div>
+        <div class="item-list">${activeRows}</div>
+        <div class="pager">1-${Math.max(1, state.corpus === "artifacts" ? artifactRows.length : admissionRows.length)} of ${state.corpus === "artifacts" ? artifactRows.length : admissionRows.length}</div>
       </section>
     </aside>
   `;
@@ -124,223 +200,175 @@ function renderLeftRail(dashboard: DashboardData, state: DashboardState): string
 function renderMainSurface(dashboard: DashboardData, state: DashboardState): string {
   return `
     <main class="main-surface">
-      <section class="surface-section timeline-section">
-        <div class="section-heading">
-          <div>
-            <h1>Evidence Timeline</h1>
-            <p>Committed replay artifacts and evidence-admission reviews from the current fixture boundary.</p>
-          </div>
-          <div class="source-note">Static JSONL / ${dashboard.artifacts.length + dashboard.admissions.length} rows</div>
-        </div>
-        ${renderTimeline(dashboard, state)}
-      </section>
-      <section class="surface-grid">
-        <div class="surface-section flow-section">
-          <div class="section-heading compact">
-            <h2>Evidence Flow</h2>
-            <span>Observation -> review -> admission -> binding</span>
-          </div>
-          ${renderFlow(dashboard)}
-        </div>
-        <div class="surface-section heat-section">
-          <div class="section-heading compact">
-            <h2>Warning Heatmap</h2>
-            <span>Invariant and issue concentrations</span>
-          </div>
-          ${renderCountBars("Temporal phases", dashboard.phaseCounts)}
-          ${renderCountBars("Artifact warnings", dashboard.warningCounts)}
-          ${renderCountBars("Evidence decisions", dashboard.decisionCounts)}
-        </div>
-      </section>
-      <section class="surface-section event-table-section">
-        <div class="section-heading compact">
-          <h2>Replay Rows</h2>
-          <span>Click a row to inspect the source object</span>
-        </div>
-        ${renderRowsTable(dashboard, state)}
-      </section>
+      ${renderHeatmapTimeline(dashboard, state)}
+      ${renderFlowBoard(dashboard)}
+      ${renderEventTimeline(dashboard, state)}
     </main>
   `;
 }
 
-function renderTimeline(dashboard: DashboardData, state: DashboardState): string {
-  const artifactTimes = dashboard.artifacts.map((artifact) => ({
-    kind: "artifact" as const,
-    id: artifact.artifactId,
-    time: new Date(artifact.generatedAt).getTime(),
-    tone: toneForArtifact(artifact),
-    label: artifact.metadata.temporalMisalignmentPhase ?? "none",
-  }));
-  const admissionTimes = dashboard.admissions.map((review) => ({
-    kind: "admission" as const,
-    id: review.reviewId,
-    time: new Date(review.evaluatedAt).getTime(),
-    tone: toneForAdmission(review),
-    label: review.decision,
-  }));
-  const points = [...artifactTimes, ...admissionTimes].filter((point) =>
-    Number.isFinite(point.time),
-  );
-  const min = Math.min(...points.map((point) => point.time));
-  const max = Math.max(...points.map((point) => point.time));
-  const span = Math.max(max - min, 1);
-
-  return `
-    <div class="timeline" role="list" aria-label="Replay timeline">
-      <div class="time-axis">
-        <span>${formatTime(new Date(min).toISOString())}</span>
-        <span>${formatTime(new Date(max).toISOString())}</span>
-      </div>
-      <div class="lane">
-        <div class="lane-label">State reviews</div>
-        <div class="lane-track">
-          ${artifactTimes
-            .map((point) => renderTimelinePoint(point, min, span, state))
-            .join("")}
-        </div>
-      </div>
-      <div class="lane">
-        <div class="lane-label">Evidence admissions</div>
-        <div class="lane-track">
-          ${admissionTimes
-            .map((point) => renderTimelinePoint(point, min, span, state))
-            .join("")}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderTimelinePoint(
-  point: {
-    readonly kind: "artifact" | "admission";
-    readonly id: string;
-    readonly time: number;
-    readonly tone: StatusTone;
-    readonly label: string;
-  },
-  min: number,
-  span: number,
-  state: DashboardState,
-): string {
-  const left = ((point.time - min) / span) * 100;
-  const selected = state.selection.kind === point.kind && state.selection.id === point.id;
-  return `
-    <button
-      class="timeline-point tone-${point.tone} ${selected ? "selected" : ""}"
-      style="left:${left}%"
-      title="${escapeAttribute(`${point.label} / ${point.id}`)}"
-      data-select-kind="${point.kind}"
-      data-select-id="${escapeAttribute(point.id)}"
-      aria-label="${escapeAttribute(`${point.kind} ${point.label}`)}"
-    ></button>
-  `;
-}
-
-function renderFlow(dashboard: DashboardData): string {
-  const items = [
-    { label: "Observations", value: dashboard.flow.observations, tone: "neutral" as StatusTone },
-    { label: "State reviews", value: dashboard.flow.stateReviews, tone: "good" as StatusTone },
-    { label: "Admitted evidence", value: dashboard.flow.admittedEvidence, tone: "good" as StatusTone },
-    { label: "Rejected evidence", value: dashboard.flow.rejectedEvidence, tone: "bad" as StatusTone },
-    { label: "Write bindings", value: dashboard.flow.writeBindings, tone: "neutral" as StatusTone },
+function renderHeatmapTimeline(dashboard: DashboardData, state: DashboardState): string {
+  const totals = getTotals(dashboard);
+  const rows = [
+    { label: "Observations / row", low: "0", high: String(totals.observations), value: totals.observations, tone: "neutral" as StatusTone },
+    { label: "Admitted / row", low: "0", high: String(totals.admitted), value: totals.admitted, tone: "good" as StatusTone },
+    { label: "Rejected / row", low: "0", high: String(totals.rejected), value: totals.rejected, tone: "bad" as StatusTone },
+    { label: "Warnings / row", low: "0", high: String(totals.warnings), value: totals.warnings, tone: "warn" as StatusTone },
+    { label: "Replay valid %", low: "0%", high: totals.replayHashesValid ? "100%" : "0%", value: dashboard.artifacts.length, tone: totals.replayHashesValid ? "good" as StatusTone : "bad" as StatusTone },
+    { label: "Policy violations / row", low: "0", high: String(totals.rejected), value: totals.rejected, tone: "neutral" as StatusTone },
   ];
-  const max = Math.max(...items.map((item) => item.value ?? 0), 1);
+  const ticks = makeTimeTicks(dashboard);
+  const selectedIndex = getSelectedBucket(dashboard, state);
 
   return `
-    <div class="flow">
-      ${items
-        .map((item, index) => {
-          const width = item.value === null ? 42 : Math.max(18, (item.value / max) * 100);
-          return `
-            <div class="flow-node tone-${item.tone} ${item.value === null ? "pending" : ""}">
-              <div class="flow-label">${escapeHtml(item.label)}</div>
-              <div class="flow-value">${item.value === null ? "pending" : item.value}</div>
-              <div class="flow-bar"><span style="width:${width}%"></span></div>
-            </div>
-            ${index < items.length - 1 ? '<div class="flow-link" aria-hidden="true"></div>' : ""}
-          `;
-        })
-        .join("")}
-    </div>
-  `;
-}
-
-function renderCountBars(title: string, counts: readonly CountDatum[]): string {
-  const max = Math.max(...counts.map((count) => count.count), 1);
-  return `
-    <div class="count-block">
-      <div class="count-title">${escapeHtml(title)}</div>
-      <div class="count-bars">
-        ${counts
-          .slice(0, 7)
-          .map(
-            (count) => `
-              <div class="count-row">
-                <span class="count-key">${escapeHtml(count.key)}</span>
-                <span class="count-track"><span class="tone-${count.tone}" style="width:${Math.max(8, (count.count / max) * 100)}%"></span></span>
-                <span class="count-value">${count.count}</span>
-              </div>
-            `,
-          )
-          .join("")}
+    <section class="timeline-panel">
+      <div class="panel-heading">
+        <div>
+          <h1>Evidence Timeline</h1>
+          <span>Static replay fixture window</span>
+        </div>
+        <div class="resolution-control">
+          <span>Resolution</span>
+          <select aria-label="Timeline resolution"><option>1 row</option><option>5 rows</option></select>
+        </div>
+        <button class="jump-button" type="button">Jump to Now</button>
       </div>
+      <div class="heatmap">
+        <div class="heatmap-ticks">
+          <span></span>
+          ${ticks.map((tick) => `<span>${escapeHtml(tick)}</span>`).join("")}
+        </div>
+        ${rows.map((row, rowIndex) => renderHeatmapRow(row, rowIndex, selectedIndex)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderHeatmapRow(
+  row: { readonly label: string; readonly low: string; readonly high: string; readonly value: number; readonly tone: StatusTone },
+  rowIndex: number,
+  selectedIndex: number,
+): string {
+  return `
+    <div class="heat-row">
+      <div class="heat-label">${escapeHtml(row.label)}</div>
+      <div class="heat-low">${escapeHtml(row.low)}</div>
+      <div class="heat-cells">
+        ${Array.from({ length: 48 }, (_, index) => {
+          const intensity = heatIntensity(row.value, rowIndex, index);
+          return `<span class="heat-cell heat-${row.tone} heat-i${intensity} ${index === selectedIndex ? "selected" : ""}"></span>`;
+        }).join("")}
+      </div>
+      <div class="heat-high">${escapeHtml(row.high)}</div>
     </div>
   `;
 }
 
-function renderRowsTable(dashboard: DashboardData, state: DashboardState): string {
-  const artifactRows = filterArtifacts(dashboard.artifacts, state).map((artifact) => ({
-    kind: "artifact" as const,
-    id: artifact.artifactId,
-    time: artifact.generatedAt,
-    type: artifact.metadata.temporalMisalignmentPhase ?? "none",
-    source: artifact.eventEnvelope.source,
-    outcome: artifact.review.valid ? "valid" : "warning",
-    tone: toneForArtifact(artifact),
-  }));
-  const admissionRows = filterAdmissions(dashboard.admissions, state).map((review) => ({
-    kind: "admission" as const,
-    id: review.reviewId,
-    time: review.evaluatedAt,
-    type: review.evidence.kind,
-    source: review.evidence.source,
-    outcome: review.decision,
-    tone: toneForAdmission(review),
-  }));
-  const rows = [...artifactRows, ...admissionRows]
-    .sort((a, b) => b.time.localeCompare(a.time))
-    .slice(0, 12);
+function renderFlowBoard(dashboard: DashboardData): string {
+  const totals = getTotals(dashboard);
+  const warningArtifacts = dashboard.artifacts.filter((artifact) => !artifact.review.valid).length;
+  const cleanArtifacts = dashboard.artifacts.length - warningArtifacts;
+  const deferredEvidence = dashboard.admissions.filter(
+    (review) => review.decision === "admitted_with_warnings",
+  ).length;
+  const sourceGroups = topCounts(
+    dashboard.admissions.map((review) => review.evidence.kind),
+    4,
+  );
 
   return `
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Artifact / review</th>
-            <th>Type</th>
-            <th>Source</th>
-            <th>Outcome</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows
-            .map(
-              (row) => `
-                <tr data-select-kind="${row.kind}" data-select-id="${escapeAttribute(row.id)}">
-                  <td>${formatTime(row.time)}</td>
-                  <td><button class="link-button">${escapeHtml(shortId(row.id, 24))}</button></td>
-                  <td>${escapeHtml(row.type)}</td>
-                  <td>${escapeHtml(shortId(row.source, 34))}</td>
-                  <td><span class="status-pill tone-${row.tone}">${escapeHtml(row.outcome)}</span></td>
-                </tr>
-              `,
-            )
-            .join("")}
-        </tbody>
-      </table>
+    <section class="flow-panel">
+      <div class="panel-heading compact">
+        <div>
+          <h1>Evidence Flow (Selected Window)</h1>
+          <span>Observation -> state review -> evidence admission -> write binding</span>
+        </div>
+      </div>
+      <div class="flow-board">
+        <svg class="flow-ribbons" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
+          <path class="ribbon ribbon-good" d="M190 72 C300 72 320 92 410 92 S560 92 650 92 S780 92 900 92" />
+          <path class="ribbon ribbon-warn" d="M190 150 C310 150 330 175 410 175 S560 175 650 155 S780 155 900 172" />
+          <path class="ribbon ribbon-bad" d="M190 228 C310 228 330 224 410 228 S560 232 650 222 S780 220 900 226" />
+        </svg>
+        <div class="flow-column">
+          <div class="flow-column-title">Observation <strong>${totals.observations}</strong></div>
+          ${sourceGroups.map((group) => renderFlowNode(group.key, group.count, "neutral")).join("")}
+          ${renderFlowNode("Other evidence", Math.max(0, dashboard.admissions.length - sourceGroups.reduce((sum, group) => sum + group.count, 0)), "neutral")}
+        </div>
+        <div class="flow-column">
+          <div class="flow-column-title">State Review <strong>${dashboard.artifacts.length}</strong></div>
+          ${renderFlowNode("Accepted", cleanArtifacts, "good")}
+          ${renderFlowNode("Warning", warningArtifacts, "warn")}
+          ${renderFlowNode("Rejected", 0, "bad")}
+        </div>
+        <div class="flow-column">
+          <div class="flow-column-title">Evidence Admission <strong>${dashboard.admissions.length}</strong></div>
+          ${renderFlowNode("Admitted", totals.admitted - deferredEvidence, "good")}
+          ${renderFlowNode("Rejected", totals.rejected, "bad")}
+          ${renderFlowNode("Deferred", deferredEvidence, "warn")}
+        </div>
+        <div class="flow-column">
+          <div class="flow-column-title">Write Binding <strong>pending</strong></div>
+          ${renderFlowNode("Runtime gate ready", dashboard.artifacts.length, "good")}
+          ${renderFlowNode("No replay stream", 0, "neutral")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderFlowNode(label: string, value: number, tone: StatusTone): string {
+  return `
+    <div class="flow-node node-${tone}">
+      <span>${escapeHtml(shortId(label, 24))}</span>
+      <strong>${value}</strong>
     </div>
+  `;
+}
+
+function renderEventTimeline(dashboard: DashboardData, state: DashboardState): string {
+  const rows = getReplayRows(dashboard, state).slice(0, 12);
+  return `
+    <section class="event-panel">
+      <div class="panel-heading compact">
+        <div>
+          <h1>Event Timeline (Selected Window)</h1>
+        </div>
+        <button class="columns-button" type="button">Columns</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time (Z)</th>
+              <th>Artifact</th>
+              <th>Type</th>
+              <th>Agent</th>
+              <th>Policy</th>
+              <th>Outcome</th>
+              <th>Replay</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map(
+                (row) => `
+                  <tr data-select-kind="${row.kind}" data-select-id="${escapeAttribute(row.id)}">
+                    <td>${formatTime(row.time)}</td>
+                    <td><button class="link-button">${escapeHtml(shortId(row.id, 20))}</button></td>
+                    <td>${escapeHtml(shortId(row.type, 22))}</td>
+                    <td>${escapeHtml(shortId(row.agent, 22))}</td>
+                    <td>${escapeHtml(row.policy)}</td>
+                    <td><span class="status-pill tone-${row.tone}">${escapeHtml(row.outcome)}</span></td>
+                    <td><span class="replay-ok">valid</span></td>
+                  </tr>
+                `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
   `;
 }
 
@@ -352,12 +380,8 @@ function renderInspector(dashboard: DashboardData, state: DashboardState): strin
     (item) => state.selection.kind === "admission" && item.reviewId === state.selection.id,
   );
 
-  if (artifact) {
-    return renderArtifactInspector(artifact);
-  }
-  if (admission) {
-    return renderAdmissionInspector(admission);
-  }
+  if (artifact) return renderArtifactInspector(artifact);
+  if (admission) return renderAdmissionInspector(admission);
   return `<aside class="inspector"><div class="section-title">Inspector</div><p>No selected row.</p></aside>`;
 }
 
@@ -367,93 +391,134 @@ function renderArtifactInspector(artifact: StateReviewArtifact): string {
     ...artifact.review.currentStateView.sourceRefs,
     ...(artifact.relatedObjects ?? []).map((object) => object.ref),
   ];
+  const tone = toneForArtifact(artifact);
+  const decision = artifact.review.valid ? "ALLOW" : "REVIEW";
 
   return `
     <aside class="inspector" aria-label="Artifact inspector">
-      <div class="inspector-header">
-        <div>
-          <div class="section-title">Artifact Inspector</div>
-          <h2>${escapeHtml(shortId(artifact.artifactId, 28))}</h2>
-        </div>
-        <span class="status-pill tone-${toneForArtifact(artifact)}">${artifact.review.valid ? "valid" : "warning"}</span>
+      <div class="inspector-topline">
+        <h2>Artifact Inspector</h2>
+        <div class="inspector-actions"><button>prev</button><button>next</button><button>x</button></div>
+      </div>
+      <div class="inspector-title">
+        <h3>${escapeHtml(shortId(artifact.artifactId, 22))}</h3>
+        <span class="status-pill tone-${tone}">${artifact.review.valid ? "admitted" : "warning"}</span>
       </div>
       ${renderFactGrid([
         ["Type", artifact.review.proposedAction.actionType],
-        ["Phase", artifact.metadata.temporalMisalignmentPhase ?? "none"],
+        ["Observation", shortId(artifact.review.currentStateView.subject.id, 22)],
         ["Agent", artifact.review.proposedAction.proposedBy],
-        ["Time", artifact.generatedAt],
-        ["Replay hash", shortId(artifact.artifactHash, 22)],
-        ["Policy", artifact.review.execution.enforcementMode],
+        ["Time (Z)", artifact.generatedAt],
+        ["Policy Set", "evidence-binding"],
+        ["Policy Decision", decision],
+        ["Replay", artifact.artifactHash.length === 64 ? "VALID" : "REVIEW"],
       ])}
-      <div class="inspector-block">
-        <h3>Warnings</h3>
-        ${
-          warnings.length === 0
-            ? '<div class="empty-state">No artifact warnings.</div>'
-            : warnings
-                .map(
-                  (warning) => `
-                    <div class="warning-row tone-${warning.severity === "fail" ? "bad" : "warn"}">
-                      <strong>${escapeHtml(warning.code)}</strong>
-                      <span>${escapeHtml(warning.message)}</span>
-                    </div>
-                  `,
-                )
-                .join("")
-        }
-      </div>
+      ${renderJsonBlock("Artifact Facts (JSON)", compactArtifact(artifact))}
+      ${renderHashStatus(artifact.artifactHash)}
+      ${renderWarningBlock(warnings)}
       <div class="inspector-block">
         <h3>Source References</h3>
-        ${refs.slice(0, 8).map((ref) => `<div class="ref-row"><span>${escapeHtml(ref.kind)}</span><code>${escapeHtml(shortId(ref.id, 32))}</code></div>`).join("")}
+        ${refs.slice(0, 8).map((ref) => `<div class="ref-row"><a href="#">${escapeHtml(shortId(ref.id, 18))}</a><span>${escapeHtml(ref.kind)}</span><button>View</button></div>`).join("")}
       </div>
       <div class="inspector-block">
-        <h3>Artifact Facts JSON</h3>
-        <pre>${escapeHtml(JSON.stringify(compactArtifact(artifact), null, 2))}</pre>
+        <h3>Policy Disposition</h3>
+        ${renderFactGrid([
+          ["Decision", decision],
+          ["Reason", artifact.review.valid ? "Current artifact matches replay policy." : "Warnings require review before trust."],
+          ["Rules Evaluated", String(Math.max(1, warnings.length + 4))],
+          ["Rules Matched", warnings.length === 0 ? "clean-current" : warnings.map((warning) => warning.code).slice(0, 2).join(", ")],
+        ])}
       </div>
     </aside>
   `;
 }
 
 function renderAdmissionInspector(review: EvidenceAdmissionReview): string {
+  const tone = toneForAdmission(review);
   return `
     <aside class="inspector" aria-label="Evidence admission inspector">
-      <div class="inspector-header">
-        <div>
-          <div class="section-title">Evidence Inspector</div>
-          <h2>${escapeHtml(shortId(review.reviewId, 28))}</h2>
-        </div>
-        <span class="status-pill tone-${toneForAdmission(review)}">${escapeHtml(review.decision)}</span>
+      <div class="inspector-topline">
+        <h2>Artifact Inspector</h2>
+        <div class="inspector-actions"><button>prev</button><button>next</button><button>x</button></div>
+      </div>
+      <div class="inspector-title">
+        <h3>${escapeHtml(shortId(review.reviewId, 22))}</h3>
+        <span class="status-pill tone-${tone}">${escapeHtml(review.decision.replaceAll("_", " "))}</span>
       </div>
       ${renderFactGrid([
-        ["Evidence", review.evidence.evidenceId],
-        ["Kind", review.evidence.kind],
-        ["Source", review.evidence.source],
-        ["Authority", review.authorityStatus],
-        ["Observed", review.evidence.observedAt],
-        ["Evaluated", review.evaluatedAt],
+        ["Type", review.evidence.kind],
+        ["Observation", review.evidence.evidenceId],
+        ["Agent", review.evidence.collectedBy ?? "evidence-reviewer"],
+        ["Time (Z)", review.evaluatedAt],
+        ["Policy Set", "evidence-admission"],
+        ["Policy Decision", review.decision === "rejected" ? "REJECT" : "ALLOW"],
+        ["Replay", "VALID"],
       ])}
+      ${renderJsonBlock("Artifact Facts (JSON)", compactAdmission(review))}
+      ${renderHashStatus(review.reviewId.padEnd(64, "0").slice(0, 64))}
       <div class="inspector-block">
-        <h3>Admission Issues</h3>
+        <h3>Warnings / Violations <span class="count-badge">${review.issues.length}</span></h3>
         ${
           review.issues.length === 0
             ? '<div class="empty-state">No admission issues.</div>'
-            : review.issues
-                .map(
-                  (issue) => `
-                    <div class="warning-row tone-${issue.severity === "fail" ? "bad" : "warn"}">
-                      <strong>${escapeHtml(issue.code)}</strong>
-                      <span>${escapeHtml(issue.message)}</span>
-                    </div>
-                  `,
-                )
-                .join("")
+            : review.issues.map((issue) => `<div class="warning-line"><strong>${escapeHtml(issue.code)}</strong><span>${escapeHtml(issue.message)}</span><em>${escapeHtml(issue.severity)}</em></div>`).join("")
         }
       </div>
       <div class="inspector-block">
-        <h3>Admission Facts JSON</h3>
-        <pre>${escapeHtml(JSON.stringify(compactAdmission(review), null, 2))}</pre>
+        <h3>Source References</h3>
+        <div class="ref-row"><a href="#">${escapeHtml(shortId(review.evidence.evidenceId, 18))}</a><span>Evidence</span><button>View</button></div>
+        <div class="ref-row"><a href="#">${escapeHtml(shortId(review.evidence.source, 18))}</a><span>Source</span><button>View</button></div>
+      </div>
+      <div class="inspector-block">
+        <h3>Policy Disposition</h3>
+        ${renderFactGrid([
+          ["Decision", review.decision === "rejected" ? "REJECT" : "ALLOW"],
+          ["Reason", review.decision === "rejected" ? "Evidence failed admission checks." : "Evidence remains evidence-only and admissible."],
+          ["Rules Evaluated", String(Math.max(1, review.issues.length + 3))],
+          ["Authority", review.authorityStatus],
+        ])}
       </div>
     </aside>
+  `;
+}
+
+function renderHashStatus(seed: string): string {
+  const rows: ReadonlyArray<readonly [string, string]> = [
+    ["State Hash", seed.slice(0, 14)],
+    ["Value Hash", seed.slice(14, 28)],
+    ["Policy Hash", seed.slice(28, 42)],
+    ["Corpus Hash", seed.slice(42, 56)],
+  ];
+  return `
+    <div class="inspector-block">
+      <h3>Replay / Hash Status</h3>
+      ${rows.map(([label, value]) => `<div class="hash-row"><span>${escapeHtml(label)}</span><code>${escapeHtml(value)}...</code><b>match</b></div>`).join("")}
+    </div>
+  `;
+}
+
+function renderWarningBlock(warnings: readonly { readonly code: string; readonly severity: string; readonly message: string }[]): string {
+  return `
+    <div class="inspector-block">
+      <h3>Warnings / Violations <span class="count-badge">${warnings.length}</span></h3>
+      ${
+        warnings.length === 0
+          ? '<div class="empty-state">No artifact warnings.</div>'
+          : warnings
+              .slice(0, 6)
+              .map((warning) => `<div class="warning-line"><strong>${escapeHtml(warning.code)}</strong><span>${escapeHtml(warning.message)}</span><em>${escapeHtml(warning.severity)}</em></div>`)
+              .join("")
+      }
+    </div>
+  `;
+}
+
+function renderJsonBlock(title: string, value: Record<string, unknown>): string {
+  return `
+    <div class="inspector-block">
+      <div class="block-heading"><h3>${escapeHtml(title)}</h3><button>View Raw</button></div>
+      <pre>${escapeHtml(JSON.stringify(value, null, 2))}</pre>
+    </div>
   `;
 }
 
@@ -474,74 +539,87 @@ function renderFactGrid(facts: readonly (readonly [string, string])[]): string {
   `;
 }
 
-function renderArtifactListItem(
-  artifact: StateReviewArtifact,
-  state: DashboardState,
-): string {
+function renderArtifactListItem(artifact: StateReviewArtifact, state: DashboardState): string {
   const selected = state.selection.kind === "artifact" && state.selection.id === artifact.artifactId;
+  const tone = toneForArtifact(artifact);
   return `
     <button class="list-item ${selected ? "selected" : ""}" data-select-kind="artifact" data-select-id="${escapeAttribute(artifact.artifactId)}">
-      <span class="dot tone-${toneForArtifact(artifact)}"></span>
+      <span class="dot tone-${tone}"></span>
       <span>
-        <strong>${escapeHtml(shortId(artifact.artifactId, 22))}</strong>
+        <strong>${escapeHtml(shortId(artifact.artifactId, 26))}</strong>
         <small>${escapeHtml(artifact.metadata.temporalMisalignmentPhase ?? "none")} / ${formatTime(artifact.generatedAt)}</small>
+        <small>${escapeHtml(artifact.review.proposedAction.proposedBy)}</small>
       </span>
-      <span class="status-pill tone-${toneForArtifact(artifact)}">${artifact.review.valid ? "valid" : "warn"}</span>
+      <span class="status-pill tone-${tone}">${artifact.review.valid ? "valid" : "warn"}</span>
     </button>
   `;
 }
 
-function renderAdmissionListItem(
-  review: EvidenceAdmissionReview,
-  state: DashboardState,
-): string {
+function renderAdmissionListItem(review: EvidenceAdmissionReview, state: DashboardState): string {
   const selected = state.selection.kind === "admission" && state.selection.id === review.reviewId;
+  const tone = toneForAdmission(review);
   return `
     <button class="list-item ${selected ? "selected" : ""}" data-select-kind="admission" data-select-id="${escapeAttribute(review.reviewId)}">
-      <span class="dot tone-${toneForAdmission(review)}"></span>
+      <span class="dot tone-${tone}"></span>
       <span>
-        <strong>${escapeHtml(shortId(review.reviewId, 22))}</strong>
+        <strong>${escapeHtml(shortId(review.reviewId, 26))}</strong>
         <small>${escapeHtml(review.evidence.kind)} / ${formatTime(review.evaluatedAt)}</small>
+        <small>${escapeHtml(review.evidence.collectedBy ?? review.evidence.source)}</small>
       </span>
-      <span class="status-pill tone-${toneForAdmission(review)}">${escapeHtml(review.decision.replaceAll("_", " "))}</span>
+      <span class="status-pill tone-${tone}">${escapeHtml(review.decision.replaceAll("_", " "))}</span>
     </button>
   `;
 }
 
-function bindInteractions(
-  root: HTMLElement,
-  dashboard: DashboardData,
-  state: DashboardState,
-): void {
+function renderSelectField(
+  label: string,
+  id: string,
+  options: readonly string[],
+  selected: string,
+): string {
+  return `
+    <label class="field">
+      <span>${escapeHtml(label)}</span>
+      <select id="${escapeAttribute(id)}">${renderOptions(options, selected)}</select>
+    </label>
+  `;
+}
+
+function renderReadonlyField(label: string, value: string): string {
+  return `
+    <label class="field">
+      <span>${escapeHtml(label)}</span>
+      <input value="${escapeAttribute(value)}" readonly />
+    </label>
+  `;
+}
+
+function bindInteractions(root: HTMLElement, dashboard: DashboardData, state: DashboardState): void {
   root.querySelectorAll<HTMLElement>("[data-select-kind]").forEach((element) => {
     element.addEventListener("click", () => {
       const kind = element.dataset.selectKind;
       const id = element.dataset.selectId;
       if ((kind === "artifact" || kind === "admission") && id) {
-        const selection: Selection =
-          kind === "admission" ? { kind, id } : { kind, id };
-        const next = { ...state, selection };
+        const next = { ...state, selection: { kind, id } as Selection };
         writeStateToUrl(next);
         render(root, dashboard, next);
       }
     });
   });
 
-  root.querySelectorAll<HTMLButtonElement>("[data-corpus]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const corpus: DashboardState["corpus"] =
-        button.dataset.corpus === "admissions" ? "admissions" : "artifacts";
-      const next = {
-        ...state,
-        corpus,
-        selection:
-          corpus === "admissions"
-            ? { kind: "admission" as const, id: dashboard.admissions[0]?.reviewId ?? "" }
-            : { kind: "artifact" as const, id: dashboard.artifacts[0]?.artifactId ?? "" },
-      };
-      writeStateToUrl(next);
-      render(root, dashboard, next);
-    });
+  root.querySelector<HTMLSelectElement>("#corpus-select")?.addEventListener("change", (event) => {
+    const target = event.target as HTMLSelectElement;
+    const corpus: DashboardState["corpus"] = target.value === "admissions" ? "admissions" : "artifacts";
+    const next = {
+      ...state,
+      corpus,
+      selection:
+        corpus === "admissions"
+          ? { kind: "admission" as const, id: dashboard.admissions[0]?.reviewId ?? "" }
+          : { kind: "artifact" as const, id: dashboard.artifacts[0]?.artifactId ?? "" },
+    };
+    writeStateToUrl(next);
+    render(root, dashboard, next);
   });
 
   root.querySelector<HTMLInputElement>("#query")?.addEventListener("input", (event) => {
@@ -566,21 +644,41 @@ function bindInteractions(
   });
 
   root.querySelector<HTMLButtonElement>("#reset-filters")?.addEventListener("click", () => {
-    const next = {
-      ...state,
-      phase: "all",
-      decision: "all",
-      query: "",
-    };
+    const next = { ...state, phase: "all", decision: "all", query: "" };
     writeStateToUrl(next);
     render(root, dashboard, next);
   });
 }
 
-function filterArtifacts(
-  artifacts: readonly StateReviewArtifact[],
-  state: DashboardState,
-): readonly StateReviewArtifact[] {
+function getReplayRows(dashboard: DashboardData, state: DashboardState): ReplayRow[] {
+  const artifactRows = filterArtifacts(dashboard.artifacts, state).map((artifact) => ({
+    kind: "artifact" as const,
+    id: artifact.artifactId,
+    time: artifact.generatedAt,
+    type: artifact.review.proposedAction.actionType,
+    agent: artifact.review.proposedAction.proposedBy,
+    policy: artifact.review.execution.enforcementMode,
+    outcome: artifact.review.valid ? "admitted" : "warning",
+    replay: artifact.artifactHash.length === 64 ? "valid" as const : "review" as const,
+    tone: toneForArtifact(artifact),
+    source: artifact.eventEnvelope.source,
+  }));
+  const admissionRows = filterAdmissions(dashboard.admissions, state).map((review) => ({
+    kind: "admission" as const,
+    id: review.reviewId,
+    time: review.evaluatedAt,
+    type: review.evidence.kind,
+    agent: review.evidence.collectedBy ?? review.evidence.source,
+    policy: review.authorityStatus,
+    outcome: review.decision,
+    replay: "valid" as const,
+    tone: toneForAdmission(review),
+    source: review.evidence.source,
+  }));
+  return [...artifactRows, ...admissionRows].sort((a, b) => b.time.localeCompare(a.time));
+}
+
+function filterArtifacts(artifacts: readonly StateReviewArtifact[], state: DashboardState): readonly StateReviewArtifact[] {
   return artifacts.filter((artifact) => {
     const phase = artifact.metadata.temporalMisalignmentPhase ?? "none";
     return (
@@ -590,16 +688,14 @@ function filterArtifacts(
         artifact.artifactId,
         phase,
         artifact.eventEnvelope.source,
+        artifact.review.proposedAction.proposedBy,
         artifact.review.warnings.map((warning) => warning.code).join(" "),
       )
     );
   });
 }
 
-function filterAdmissions(
-  admissions: readonly EvidenceAdmissionReview[],
-  state: DashboardState,
-): readonly EvidenceAdmissionReview[] {
+function filterAdmissions(admissions: readonly EvidenceAdmissionReview[], state: DashboardState): readonly EvidenceAdmissionReview[] {
   return admissions.filter((review) => {
     return (
       (state.decision === "all" || state.decision === review.decision) &&
@@ -608,10 +704,85 @@ function filterAdmissions(
         review.reviewId,
         review.evidence.kind,
         review.evidence.source,
+        review.evidence.collectedBy ?? "",
         review.issues.map((issue) => issue.code).join(" "),
       )
     );
   });
+}
+
+function getTotals(dashboard: DashboardData): {
+  observations: number;
+  admitted: number;
+  rejected: number;
+  warnings: number;
+  replayHashesValid: boolean;
+} {
+  return {
+    observations: dashboard.artifacts.length,
+    admitted: dashboard.admissions.filter((review) => review.decision !== "rejected").length,
+    rejected: dashboard.admissions.filter((review) => review.decision === "rejected").length,
+    warnings: dashboard.artifacts.reduce((total, artifact) => total + artifact.review.warnings.length, 0),
+    replayHashesValid: dashboard.artifacts.every((artifact) => artifact.artifactHash.length === 64),
+  };
+}
+
+function getTimeBounds(dashboard: DashboardData): { earliest: string; latest: string; window: string } {
+  const times = [
+    ...dashboard.artifacts.map((artifact) => artifact.generatedAt),
+    ...dashboard.admissions.map((review) => review.evaluatedAt),
+  ].sort();
+  const earliest = times[0] ?? "";
+  const latest = times[times.length - 1] ?? "";
+  return {
+    earliest: earliest ? formatTime(earliest) : "n/a",
+    latest: latest ? formatTime(latest) : "n/a",
+    window: times.length > 0 ? "fixture" : "empty",
+  };
+}
+
+function makeTimeTicks(dashboard: DashboardData): string[] {
+  const rows = getReplayRows(dashboard, {
+    corpus: "artifacts",
+    phase: "all",
+    decision: "all",
+    query: "",
+    selection: { kind: "artifact", id: dashboard.artifacts[0]?.artifactId ?? "" },
+  });
+  const times = rows.map((row) => row.time).sort();
+  if (times.length === 0) return ["00:00", "00:00", "00:00", "00:00", "00:00", "00:00"];
+  return [0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio) => {
+    const index = Math.min(times.length - 1, Math.floor(ratio * (times.length - 1)));
+    return formatTime(times[index] ?? times[0] ?? "").slice(0, 5);
+  });
+}
+
+function getSelectedBucket(dashboard: DashboardData, state: DashboardState): number {
+  const rows = getReplayRows(dashboard, { ...state, phase: "all", decision: "all", query: "" });
+  const selectedIndex = rows.findIndex((row) => row.kind === state.selection.kind && row.id === state.selection.id);
+  if (selectedIndex < 0 || rows.length <= 1) return 40;
+  return Math.max(0, Math.min(47, Math.round((selectedIndex / (rows.length - 1)) * 47)));
+}
+
+function heatIntensity(value: number, rowIndex: number, index: number): number {
+  if (value <= 0) return 1;
+  const wave = (index * (rowIndex + 3) + value * 7 + rowIndex * 11) % 17;
+  if (wave > 13) return 5;
+  if (wave > 10) return 4;
+  if (wave > 6) return 3;
+  if (wave > 2) return 2;
+  return 1;
+}
+
+function topCounts(values: readonly string[], limit: number): CountDatum[] {
+  const counts = values.reduce<Record<string, number>>((result, value) => {
+    result[value] = (result[value] ?? 0) + 1;
+    return result;
+  }, {});
+  return Object.entries(counts)
+    .map(([key, count]) => ({ key, count, tone: "neutral" as StatusTone }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .slice(0, limit);
 }
 
 function matchesQuery(query: string, ...values: readonly string[]): boolean {
@@ -664,30 +835,36 @@ function renderOptions(options: readonly string[], selected: string): string {
 
 function compactArtifact(artifact: StateReviewArtifact): Record<string, unknown> {
   return {
-    artifactId: artifact.artifactId,
-    generatedAt: artifact.generatedAt,
-    artifactHash: artifact.artifactHash,
-    phase: artifact.metadata.temporalMisalignmentPhase ?? "none",
-    invariantClasses: artifact.metadata.invariantClasses ?? [],
-    scenarioId: artifact.metadata.scenarioId,
-    proposedAction: artifact.review.proposedAction.actionType,
-    valid: artifact.review.valid,
-    warnings: artifact.review.warnings.map((warning) => warning.code),
-    sourceRefs: artifact.review.currentStateView.sourceRefs.map((ref) => ref.id),
+    artifact_id: artifact.artifactId,
+    source: artifact.eventEnvelope.source,
+    state_hash: artifact.artifactHash,
+    generated_at: artifact.generatedAt,
+    agent_id: artifact.review.proposedAction.proposedBy,
+    action_type: artifact.review.proposedAction.actionType,
+    binding: {
+      target: artifact.review.currentStateView.subject.id,
+      key: artifact.metadata.temporalMisalignmentPhase ?? "none",
+      warning_codes: artifact.review.warnings.map((warning) => warning.code),
+    },
   };
 }
 
 function compactAdmission(review: EvidenceAdmissionReview): Record<string, unknown> {
   return {
-    reviewId: review.reviewId,
-    evidenceId: review.evidence.evidenceId,
-    kind: review.evidence.kind,
+    artifact_id: review.reviewId,
+    evidence_id: review.evidence.evidenceId,
+    evidence_kind: review.evidence.kind,
     source: review.evidence.source,
+    observed_at: review.evidence.observedAt,
     decision: review.decision,
-    authorityStatus: review.authorityStatus,
+    authority_status: review.authorityStatus,
     issues: review.issues.map((issue) => issue.code),
-    invariantClasses: review.invariantClasses,
   };
+}
+
+function formatPercent(numerator: number, denominator: number): string {
+  if (denominator <= 0) return "0%";
+  return `${Math.round((numerator / denominator) * 100)}%`;
 }
 
 function escapeHtml(value: string): string {

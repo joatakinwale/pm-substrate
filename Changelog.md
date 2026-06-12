@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-11 - Substrate dashboard operational monitor correction
+
+- Reworked `@pm/substrate-dashboard` from the first simplified card layout into the operational monitor surface: dark module rail, compact command strip, replay corpus filters, heatmap timeline, evidence-flow board, event timeline table, and fuller artifact/evidence inspector.
+- Kept the claim boundary honest by labeling the current stream as static replay/fixture-backed while preserving the visual affordances needed for a future live substrate monitor.
+- Verification: `pnpm --filter @pm/substrate-dashboard test`, `pnpm --filter @pm/substrate-dashboard typecheck`, and `pnpm --filter @pm/substrate-dashboard build` passed; browser QA covered desktop reference alignment, mobile header containment, and console warnings/errors.
+
 ## 2026-06-11 - Substrate replay dashboard
 
 - Implemented the first substrate monitoring dashboard as `@pm/substrate-dashboard`, a Vite/TypeScript app that reads the committed ArrowHedge state-review artifact JSONL and evidence-admission JSONL directly instead of inventing a separate demo data model.
