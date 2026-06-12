@@ -1,0 +1,19 @@
+{
+  "name": "@pm/substrate-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Operational visualization dashboard for pm-substrate replay artifacts and evidence-admission metrics.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.0"
+  }
+}
