@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-12 - Daily agent-state Arrowsmith v09
+
+- Added `research/daily-arrowsmith-agent-state/v09-agent-state-arrowsmith-2026-06-12.md` as the ninth numbered daily continuation.
+- Fast-forwarded from local `5bf4a67` to `origin/main` `bb2c38d` and corrected the v08 frontier after the ArrowHedge state-review artifact corpus, write-binding replay corpus, opt-in workflow evidence-binding gate, catalog verification hook, and replay dashboard had landed upstream.
+- Added fresh bridge evidence from EvoArena memory evolution, HyperTool executable tool wrappers, AgentBeats agentified assessment, TRACE compiled user corrections, MemRefine memory compaction, EurekAgent environment engineering, EpiBench workflow-state evaluation, runtime-enforcement foundations, shared mental-model project-team literature, POMDP task-completion updates, and agile cognitive offloading.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` with the corrected closed claims, downgraded overclaims, new claim-ledger items, metrics, and next implementation implication: durable write-binding verification catalogs plus transport coverage metrics.
+- Verification: `git diff --check` passed. No runtime code changed in this entry.
+
 ## 2026-06-11 - Write-binding review cleanup
 
 - Added an opt-in workflow `EvidenceBindingVerifier` hook plus `verifyInvocationEvidenceBindingAgainstCatalog()` so a runtime can reject bindings whose artifact id/hash, evidence review ids, tenant, workflow, or rejected-evidence policy disposition cannot be verified against a substrate-owned catalog.

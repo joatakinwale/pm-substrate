@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-11
+Last updated: 2026-06-12
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -13,7 +13,9 @@ The run is not complete until the intended research slice is committed on `main`
 
 LLM agents are statistical predictors promoted into actors. The state problem appears when parametric model state, prompt/inference state, memory/RAG state, tool-observation state, or inter-agent communication state is treated as current, sufficient, authoritative operational state. pm-substrate is the governed operational-state layer between statistical prediction and valid action.
 
-The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The durable artifact lifecycle and first external-evidence frontier are now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, an invariant-class `wouldBlock` policy matrix, and a committed replayable external-evidence admission JSONL corpus. The next proof boundary is runtime consumption plus policy validity: those evidence admissions must cross real capability/workflow write paths and live protocol/runtime handles without being mistaken for authority; release budgets, policy transitions, judge recall, skill-document governance, and real-run PM handoff agreement still need executable proof.
+The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The durable artifact lifecycle and first external-evidence frontier are now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, an invariant-class `wouldBlock` policy matrix, and committed replayable corpora for external-evidence admission, ArrowHedge state-review artifacts, and write-binding attempts.
+
+The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, or catalog-unverified evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The next proof boundary is durable verification stores and transport-wide adoption across every external write path, followed by live protocol/runtime revalidation, trajectory release budgets, policy-transition conformance, state-defect recall, skill/compiled-rule governance, and real-run PM handoff agreement.
 
 ## Versions
 
@@ -29,6 +31,7 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 | v06 | 2026-06-09 | `research/daily-arrowsmith-agent-state/v06-agent-state-arrowsmith-2026-06-09.md` | External evidence admission, protocol/tool task state, and team situation-awareness bridge | Audited v05 against same-day code and marked artifact lifecycle, observed read-set comparison, temporal fixtures, DB/fixture equivalence, and invariant policy as closed pure primitives; shifted the frontier to admitting MCP/tool/task, memory, world-model, monitoring, lineage, audit, attestation, and PM handoff evidence before action. |
 | v07 | 2026-06-10 | `research/daily-arrowsmith-agent-state/v07-agent-state-arrowsmith-2026-06-10.md` | External evidence admission v1, shared verified context, memory retention, and workflow consistency bridge | Confirmed v06's frontier against current code and added June 8-10 evidence from shared-context MAS, observability-safe memory retention, deployment-time memorization, long-horizon professional workflow benchmarks, MCP explicit state handles, and PM/high-reliability coordination sources; recommended a pure `ExternalStateEvidence` / `EvidenceAdmissionReview` code slice. |
 | v08 | 2026-06-11 | `research/daily-arrowsmith-agent-state/v08-agent-state-arrowsmith-2026-06-11.md` | Same-day main audit, committed replay closure, and evidence-action/policy bridge | Audited the June 10 upstream landing against remote `main`, closed the remaining durable-proof gap for evidence admission by committing and drift-testing the JSONL replay corpus, and shifted the research frontier to runtime evidence-action binding, ArrowHedge on-disk replay, trajectory release budgets, policy-transition conformance, state-defect recall, skill-document admission, live MCP revalidation, and real-run PM handoff agreement. |
+| v09 | 2026-06-12 | `research/daily-arrowsmith-agent-state/v09-agent-state-arrowsmith-2026-06-12.md` | Fast-forward implementation audit, write-binding/replay correction, and runtime-enforcement bridge | Audited upstream ArrowHedge artifact corpus, write-binding replay, opt-in workflow gate, catalog verifier, and replay dashboard; corrected stale v08 open claims; added new bridges from memory evolution, executable tool wrappers, agentified evals, compiled corrections, memory compaction, environment engineering, runtime-enforcement foundations, and PM risk/communication-under-uncertainty sources; recommended durable verification catalogs and transport coverage metrics. |
 
 ## Top Findings
 
@@ -67,6 +70,13 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 33. **Explicit policy conformance is separate from evidence currentness.** The finite-state social-simulation paper shows LLM action selection can drift from a reference policy; fresh evidence does not imply a valid workflow transition.
 34. **LLM judges need state-defect recall metrics.** The production transaction-agent study shows automated judges can miss cross-turn state and guardrail defects when rubrics route them to non-operational buckets.
 35. **Skill documents are governance evidence.** SkillAxe improves skill quality, but skill trigger/version/scope metadata must be admitted before skills silently affect valid action.
+36. **ArrowHedge state-review and write-binding replay corpora are now part of the proof boundary.** v09 corrects v08: the open question is no longer persistence for those lanes, but durable verification and runtime coverage.
+37. **Opt-in write binding is real but scoped.** Selected workflow dispatch can now block bad bindings, yet full mutation governance remains false until every external write transport uses a substrate-owned verifier.
+38. **Executable tool wrappers increase hidden-dependency risk.** HyperTool-style nested calls make subcall read/write refs part of the observed read-set problem.
+39. **Memory evolution and compaction need lineage.** Patches, supersession, deletion residue, and compaction decisions are state-bearing artifacts, not authority by themselves.
+40. **Compiled corrections and skills are policy evidence.** TRACE-style runtime rules and skill documents need owner, trigger, scope, version, and source admission before they affect valid action.
+41. **Runtime enforcement claims need monitorability classes.** Some invariants can be blocked before write; others are only detectable after execution or by audit/compensation.
+42. **PM status, risk, and handoff updates are actions under uncertainty.** Shared mental-model and POMDP communication work imply status announcements should be reviewed for stale risk, authority, and update cost.
 
 ## Source Changes
 
@@ -146,6 +156,15 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - MCP latest spec, roadmap, and SEP-2567 re-check: 2025-11-25 remains the latest dated spec page, task expiry/retry/audit gaps remain active roadmap items, and SEP-2567 leaves handles as ordinary strings rather than authoritative state.
 - Humans' ALMANAC and human-AI mental-model work: real PM handoffs should measure actor intent, partner intent, shared goal, and source/owner agreement rather than only synthetic handoff facets.
 
+### Added on 2026-06-12 v09
+
+- EvoArena/EvoMem: dynamic environments make memory patches and update histories first-class evidence; memory evolution still does not establish current authority.
+- HyperTool: executable MCP-style tool wrappers can hide nested read/write dependencies unless subcall refs are captured and bound.
+- AgentBeats and EpiBench: agentified assessment and deterministic scientific workflows strengthen state-defect recall, judge-routing, and intermediate artifact-gate metrics.
+- TRACE correction enforcement, MemRefine, and EurekAgent: compiled user corrections, memory compression, permissions, artifacts, budgets, and human supervision are governance/environment evidence lanes.
+- Schneider enforceable policies, edit automata, Clark-Wilson, and safety-progress runtime verification: blocking claims need explicit monitorability/enforceability and well-formed transaction boundaries.
+- Mohammed/Klimoski/Rentsch, Bierhals/Kohler/Badke-Schaub, cognitive offloading in agile teams, POMDP task-completion updates, and CHOIR organizational memory: PM handoff/status artifacts should measure structured source/owner/dependency agreement, risk capture, and communication cost under uncertainty.
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -168,6 +187,9 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - v08 narrows the remaining golden-artifact gap: evidence-admission reviews now have a committed replay corpus and drift test; the still-open on-disk corpus gap is ArrowHedge artifact persistence, not admission-review persistence.
 - v08 corrects the broader frontier: external evidence admission is now durable as a pure/replayable lane, while runtime evidence-action binding, release budgets, policy-transition conformance, state-defect recall, skill-document admission, live MCP revalidation, and real-run PM handoff agreement remain open.
 - v08 corrects the MCP status wording: the official spec page still shows 2025-11-25 as latest on 2026-06-11, while SEP-2567 is an official SEP; handles remain ordinary tool strings and explicit handle marking is left to future work.
+- v09 corrects v08's ArrowHedge persistence frontier: the ArrowHedge state-review artifact JSONL corpus is now committed and drift-tested.
+- v09 corrects v08's runtime evidence-action frontier: an opt-in workflow write-binding gate, write-binding replay corpus, explicit policy-block handling, and catalog verifier now exist; the remaining gap is durable verification stores and adoption by every external write transport.
+- v09 corrects dashboard language: the substrate dashboard is a replay monitor over committed corpora, not proof of live operational telemetry.
 
 ## Downgraded Claims
 
@@ -193,6 +215,11 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - LLM-as-judge agreement is downgraded as eval quality unless recall is measured against state-failure classes and gate-routing errors.
 - Skill self-refinement is downgraded as governance; skills remain instruction artifacts until version, trigger, scope, and fault coverage are admitted.
 - Fresh admitted evidence is downgraded as policy conformance; explicit workflow/policy transitions still need validation.
+- Self-attested evidence bindings are downgraded as mutation safety; catalog verification and durable store checks are required before broad governance claims.
+- Executable tool wrappers are downgraded as clean abstraction when they hide nested subcall dependencies from observed read-set capture.
+- Memory compression/evolution is downgraded as state validity unless source refs, supersession, patch lineage, and deletion residue remain replayable.
+- Agentified judges are downgraded as operational gates until state-defect recall and routing misses are measured against deterministic fixtures.
+- Artifact completeness is downgraded as PM handoff success unless risk capture, owner/source convergence, valid-next-action agreement, and rediscovery cost improve on real traces.
 
 ## Rejected Bridges
 
@@ -219,16 +246,19 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 
 ## Current Implementation Implications
 
-1. Consume evidence-admission reviews in capability/workflow runtime write paths before any side-effecting action claims stronger enforcement.
-2. Keep MCP-like task/tool annotations and explicit state handles in the admission lane; prove the same rules against live protocol/runtime handles, not only pure fixtures.
-3. Persist a canonical ArrowHedge on-disk artifact corpus so both the action-review lane and the evidence-admission lane have committed replay artifacts.
-4. Add trajectory release-budget fixtures with sink trust, data class, cumulative budget, release atoms, and declassification reason.
-5. Add explicit policy-transition conformance fixtures where fresh admitted evidence supports a fact but the proposed workflow transition is invalid.
-6. Add LLM-judge recall metrics for stale referents, stale owner/blocker, confirm-gate lockout, recovery/escalation failure, workflow-phase mismatch, and guardrail defects.
-7. Treat skill documents as external evidence when they affect action selection; start with trigger/version/scope fixtures before adding a broad abstraction.
-8. Run `comparePmHandoffAgreement` over real multi-agent ArrowHedge or automation runs and compare against rediscovery cost and time-to-valid-action.
-9. Keep invariant policy as advisory until a runtime enforcement boundary exists and false-block metrics are available.
-10. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
+1. Promote write binding from selected opt-in workflow paths to a transport-wide invariant for every external write-capable capability path.
+2. Add durable verification catalogs/stores for state-review artifact ids/hashes, evidence-admission review ids, tenant/workflow binding, and rejected-evidence policy disposition.
+3. Keep MCP-like task/tool annotations and explicit state handles in the admission lane; prove the same rules against live protocol/runtime handles, not only pure fixtures.
+4. Capture nested tool-wrapper subcall read/write refs so executable wrappers do not bypass observed read-set validation.
+5. Add memory patch, supersession, and compaction artifacts with source refs, deletion residue, and replay fidelity.
+6. Treat skill documents and compiled user-correction rules as external governance evidence; start with owner, trigger, scope, version, source, and fault-coverage fixtures.
+7. Classify invariants as pre-write enforceable, compensation-enforceable, monitorable-only, or offline-audit before presenting policy gates as blocks.
+8. Add trajectory release-budget fixtures with sink trust, data class, cumulative budget, release atoms, and declassification reason.
+9. Add explicit policy-transition conformance fixtures where fresh admitted evidence supports a fact but the proposed workflow transition is invalid.
+10. Add LLM-judge recall metrics for stale referents, stale owner/blocker, confirm-gate lockout, recovery/escalation failure, workflow-phase mismatch, and guardrail defects.
+11. Run `comparePmHandoffAgreement` over real multi-agent ArrowHedge or automation runs and compare against rediscovery cost and time-to-valid-action.
+12. Keep the dashboard claim boundary honest: static replay monitor now, live governance only after live stores/subscriptions feed it.
+13. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
 
 ## Metrics Queue
 
@@ -341,18 +371,35 @@ The immediate primitive now exists as a pure review and artifact boundary: `Curr
 - `handoff_goal_alignment_rate`
 - `partner_intent_resolution_rate`
 - `time_to_valid_action_after_handoff`
+- `write_binding_catalog_verification_rate`
+- `write_transport_binding_coverage`
+- `unverified_binding_block_rate`
+- `subtool_read_set_coverage`
+- `hidden_subcall_dependency_rate`
+- `memory_patch_replay_fidelity`
+- `memory_compaction_source_ref_coverage`
+- `compiled_rule_scope_violation_rate`
+- `skill_policy_binding_rate`
+- `invariant_enforcement_capability_coverage`
+- `release_budget_exceeded_rate`
+- `pm_risk_capture_rate`
+- `handoff_time_to_valid_action`
+- `status_reannouncement_stability`
 
 ## Next-Day Watchlist
 
-1. Inspect the smallest runtime boundary where `EvidenceAdmissionReview` ids can be required before workflow/capability writes.
-2. Persist a canonical ArrowHedge on-disk state-review artifact corpus alongside the now-committed admission-review JSONL corpus.
-3. Add a trajectory release-budget fixture family inspired by OCELOT: sink trust, data class, cumulative budget, release atoms, and declassification reason.
-4. Add explicit policy-transition fixtures where admitted evidence is current but the proposed workflow transition is invalid.
-5. Add state-defect recall metrics for LLM judges and route/gate failures: stale referent, stale owner/blocker, confirm-gate lockout, escalation failure, workflow mismatch.
-6. Treat skill documents as external evidence in one fixture path: version, trigger precision, scope, owner, and fault-coverage metadata.
-7. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, and cleanup metadata.
-8. Run PM handoff agreement on real multi-agent ArrowHedge or automation runs and compare to rediscovery cost and time-to-valid-action.
-9. Re-check primary code/data availability for OCELOT, Catching One in Five, the finite-state social-simulation paper, ContractBench, and STALE.
-10. Keep mutation blocking unclaimed until external side-effect gates exist beyond pure `wouldBlock` policy output.
-11. Audit the `automation-pre-ff-research-pm-substrate-2026-06-11` stash separately; do not apply it automatically during research continuation.
-12. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
+1. Inventory every workflow/capability write transport and mark whether it uses `evidenceBindingMode: "require_for_writes"`, advisory binding, or no binding provider.
+2. Build durable or fixture-backed `EvidenceBindingReferenceCatalog` sources from committed ArrowHedge state-review, evidence-admission, and write-binding JSONL.
+3. Add a drift test proving all non-intentionally-unverified write-binding replay rows verify against the catalog.
+4. Add one non-ArrowHedge write-capable fixture path to prove the binding gate is not profile-specific.
+5. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, and cleanup metadata.
+6. Capture nested tool-wrapper subcall read/write refs for HyperTool-style executable wrappers.
+7. Add memory patch/compaction fixtures with supersession, source refs, deletion residue, and replay-fidelity assertions.
+8. Treat skill documents and compiled corrections as external evidence in one fixture path: version, trigger precision, scope, owner, source, and fault-coverage metadata.
+9. Add a trajectory release-budget fixture family inspired by OCELOT: sink trust, data class, cumulative budget, release atoms, and declassification reason.
+10. Add explicit policy-transition fixtures where admitted evidence is current but the proposed workflow transition is invalid.
+11. Add state-defect recall metrics for LLM judges and route/gate failures: stale referent, stale owner/blocker, confirm-gate lockout, escalation failure, workflow mismatch.
+12. Run PM handoff agreement on real multi-agent ArrowHedge or automation runs and compare risk capture, rediscovery cost, and time-to-valid-action.
+13. Re-check primary code/data availability for OCELOT, Catching One in Five, finite-state social simulation, EvoArena, HyperTool, TRACE, MemRefine, ContractBench, and STALE.
+14. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage.
+15. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
