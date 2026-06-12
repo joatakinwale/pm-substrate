@@ -30,10 +30,15 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 button,
@@ -53,6 +58,8 @@ button {
 }
 
 .topbar {
+  width: 100%;
+  min-width: 0;
   min-height: 64px;
   display: grid;
   grid-template-columns: minmax(260px, 340px) 1fr;
@@ -95,15 +102,17 @@ button {
 }
 
 .status-strip {
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   align-items: stretch;
 }
 
 .metric {
+  min-width: 0;
+  overflow: hidden;
   padding: 10px 14px;
   border-right: 1px solid var(--line);
-  min-width: 0;
 }
 
 .metric-label {
@@ -131,6 +140,8 @@ button {
 }
 
 .workspace {
+  width: 100%;
+  min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-columns: 310px minmax(520px, 1fr) 360px;
@@ -302,6 +313,7 @@ button {
 
 .main-surface {
   min-width: 0;
+  max-width: 100%;
   overflow: auto;
   padding: 16px;
   display: grid;
@@ -759,6 +771,12 @@ pre {
 
   .status-strip {
     grid-template-columns: repeat(3, minmax(110px, 1fr));
+  }
+}
+
+@media (min-width: 1181px) and (max-width: 1500px) {
+  .surface-grid {
+    grid-template-columns: 1fr;
   }
 }
 
