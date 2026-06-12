@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-12 - Daily agent-state Arrowsmith v10
+
+- Added `research/daily-arrowsmith-agent-state/v10-agent-state-arrowsmith-2026-06-12.md` as the tenth numbered daily continuation.
+- Fetched `origin/main` and confirmed local/remote SHA parity at `76e8e2f30747822b7070b71b8df31431bd9d1c28` before writing; no merge conflict was present.
+- Audited the latest replay-backed verification catalog and write-transport coverage implementation as partially closing v09's recommended code slice, while keeping durable DB/substrate-store verification and all-real-transport enforcement open.
+- Added fresh bridges from certificate-bound admission, cross-channel delivery failures, memory-control-flow attacks, evidence-first diagnosis, state-based real-environment benchmarking, AgentOps, multi-agent marginal-utility evaluation, and human-AI teamwork/scaffolding field experiments.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` with new corrected/downgraded claims, metrics, watchlist items, and next implementation implications around durable admission certificates, target-side delivery confirmation, memory influence review, state-based final-environment checks, role-utility metrics, and PM protocol-burden measurement.
+- Verification: `git diff --check` passed. No runtime code changed in this entry.
+
 ## 2026-06-12 - Replay-backed verification catalogs and write-transport coverage
 
 - Added replay-corpus import helpers for evidence-admission reviews and write-binding records in `@pm/evals`, so the committed JSONL corpora are reusable verification inputs instead of drift-test outputs only.

@@ -32,6 +32,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 | v07 | 2026-06-10 | `research/daily-arrowsmith-agent-state/v07-agent-state-arrowsmith-2026-06-10.md` | External evidence admission v1, shared verified context, memory retention, and workflow consistency bridge | Confirmed v06's frontier against current code and added June 8-10 evidence from shared-context MAS, observability-safe memory retention, deployment-time memorization, long-horizon professional workflow benchmarks, MCP explicit state handles, and PM/high-reliability coordination sources; recommended a pure `ExternalStateEvidence` / `EvidenceAdmissionReview` code slice. |
 | v08 | 2026-06-11 | `research/daily-arrowsmith-agent-state/v08-agent-state-arrowsmith-2026-06-11.md` | Same-day main audit, committed replay closure, and evidence-action/policy bridge | Audited the June 10 upstream landing against remote `main`, closed the remaining durable-proof gap for evidence admission by committing and drift-testing the JSONL replay corpus, and shifted the research frontier to runtime evidence-action binding, ArrowHedge on-disk replay, trajectory release budgets, policy-transition conformance, state-defect recall, skill-document admission, live MCP revalidation, and real-run PM handoff agreement. |
 | v09 | 2026-06-12 | `research/daily-arrowsmith-agent-state/v09-agent-state-arrowsmith-2026-06-12.md` | Fast-forward implementation audit, write-binding/replay correction, and runtime-enforcement bridge | Audited upstream ArrowHedge artifact corpus, write-binding replay, opt-in workflow gate, catalog verifier, and replay dashboard; corrected stale v08 open claims; added new bridges from memory evolution, executable tool wrappers, agentified evals, compiled corrections, memory compaction, environment engineering, runtime-enforcement foundations, and PM risk/communication-under-uncertainty sources; recommended durable verification catalogs and transport coverage metrics. |
+| v10 | 2026-06-12 | `research/daily-arrowsmith-agent-state/v10-agent-state-arrowsmith-2026-06-12.md` | Post-catalog audit, certificate/delivery/memory-control bridge, and PM scaffolding correction | Audited the replay-backed verification catalog and write-transport coverage implementation now on `main`; marked the v09 code slice partially closed; added bridges from certificate-bound admission, cross-channel delivery failure, memory-control-flow attacks, evidence-first diagnosis, state-based real-environment benchmarking, AgentOps, MAS marginal-utility evaluation, and human-AI teamwork/scaffolding field experiments; shifted the next frontier to durable certificate/store verification, target-side delivery confirmation, memory influence review, state-based final-environment checks, role-utility metrics, and PM protocol-burden measurement. |
 
 ## Top Findings
 
@@ -77,6 +78,11 @@ The current frontier is now broader and more precise: selected write-capable wor
 40. **Compiled corrections and skills are policy evidence.** TRACE-style runtime rules and skill documents need owner, trigger, scope, version, and source admission before they affect valid action.
 41. **Runtime enforcement claims need monitorability classes.** Some invariants can be blocked before write; others are only detectable after execution or by audit/compensation.
 42. **PM status, risk, and handoff updates are actions under uncertainty.** Shared mental-model and POMDP communication work imply status announcements should be reviewed for stale risk, authority, and update cost.
+43. **Fixture-backed verification catalogs are now replay proof, not durable authority.** v10 corrects v09: committed corpora can now build and test an `EvidenceBindingReferenceCatalog`, but live stores, revocation, policy version, execution identity, and all-transport runtime adoption remain unproven.
+44. **Cross-channel delivery needs target-side confirmation.** Scheduled or delegated state writes can silently fail even when dispatch reports success; pm-substrate should admit delivery only after the target channel proves receipt.
+45. **Memory can steer control flow.** Retrieved memory that changes tool choice or action ordering is a control input, not passive context.
+46. **More agents need marginal-utility proof.** Multi-agent workflows should show unique evidence contribution, conflict reduction, or faster valid action against a single-agent baseline.
+47. **PM scaffolding has a burden budget.** Human-AI field experiments show collaboration protocols can improve some outcomes while harming quality, throughput, or diversity; handoff structure must be measured, not assumed good.
 
 ## Source Changes
 
@@ -165,6 +171,16 @@ The current frontier is now broader and more precise: selected write-capable wor
 - Schneider enforceable policies, edit automata, Clark-Wilson, and safety-progress runtime verification: blocking claims need explicit monitorability/enforceability and well-formed transaction boundaries.
 - Mohammed/Klimoski/Rentsch, Bierhals/Kohler/Badke-Schaub, cognitive offloading in agile teams, POMDP task-completion updates, and CHOIR organizational memory: PM handoff/status artifacts should measure structured source/owner/dependency agreement, risk capture, and communication cost under uncertainty.
 
+### Added on 2026-06-12 v10
+
+- Sovereign Assurance Boundary: certificate-bound admission strengthens the next write-binding frontier with evidence digests, policy versions, revocation epochs, execution identity, and validity windows.
+- Channel Fracture: scheduled/cross-agent memory and handoff writes need target-side delivery confirmation before they become admitted operational state.
+- LLM-as-an-Investigator: ambiguous operational requests should collect discriminating evidence before committing to action.
+- The Illusion of Multi-Agent Advantage: multi-agent workflows need role-utility and cost-per-valid-action metrics rather than assuming orchestration helps.
+- STAGE-Claw and Agent System Operations: state-based final-environment verification and anomaly/root-cause/resolution lifecycle fields should extend replay artifacts and dashboards.
+- Memory Control Flow Attacks and Externalization in LLM Agents: memory, skills, protocols, and harnesses are externalized infrastructure, but retrieved memory can steer tool control flow and must be admitted as an influence.
+- Collaborating with AI Agents and Scaffolding Human-AI Collaboration: PM handoff protocols should measure risk capture, rework, diversity, quality, and protocol burden because human-AI scaffolding effects are mixed.
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -190,6 +206,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 - v09 corrects v08's ArrowHedge persistence frontier: the ArrowHedge state-review artifact JSONL corpus is now committed and drift-tested.
 - v09 corrects v08's runtime evidence-action frontier: an opt-in workflow write-binding gate, write-binding replay corpus, explicit policy-block handling, and catalog verifier now exist; the remaining gap is durable verification stores and adoption by every external write transport.
 - v09 corrects dashboard language: the substrate dashboard is a replay monitor over committed corpora, not proof of live operational telemetry.
+- v10 corrects v09's recommended next slice: fixture-backed `EvidenceBindingReferenceCatalog` construction and write-transport coverage metrics now exist on `main`; durable DB/substrate-store-backed verification, certificate/revocation semantics, and all-real-transport adoption remain open.
 
 ## Downgraded Claims
 
@@ -220,6 +237,10 @@ The current frontier is now broader and more precise: selected write-capable wor
 - Memory compression/evolution is downgraded as state validity unless source refs, supersession, patch lineage, and deletion residue remain replayable.
 - Agentified judges are downgraded as operational gates until state-defect recall and routing misses are measured against deterministic fixtures.
 - Artifact completeness is downgraded as PM handoff success unless risk capture, owner/source convergence, valid-next-action agreement, and rediscovery cost improve on real traces.
+- Dispatch success is downgraded as delivery proof unless the target memory/task/handoff channel emits a replayable target-side confirmation.
+- Memory retrieval is downgraded as passive context when it changes tool choice or action ordering; it becomes a control-flow influence requiring admission.
+- Multi-agent orchestration is downgraded unless marginal role utility is measured against cost and single-agent baselines.
+- PM scaffolding is downgraded as an automatic good; protocol burden, quality, rework, and diversity must be measured.
 
 ## Rejected Bridges
 
@@ -247,7 +268,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 ## Current Implementation Implications
 
 1. Promote write binding from selected opt-in workflow paths to a transport-wide invariant for every external write-capable capability path.
-2. Add durable verification catalogs/stores for state-review artifact ids/hashes, evidence-admission review ids, tenant/workflow binding, and rejected-evidence policy disposition.
+2. Promote fixture-backed verification catalogs into durable verification stores or certificate-like admission artifacts for state-review artifact ids/hashes, evidence-admission review ids, tenant/workflow binding, rejected-evidence policy disposition, policy version, revocation epoch, execution identity, and validity window.
 3. Keep MCP-like task/tool annotations and explicit state handles in the admission lane; prove the same rules against live protocol/runtime handles, not only pure fixtures.
 4. Capture nested tool-wrapper subcall read/write refs so executable wrappers do not bypass observed read-set validation.
 5. Add memory patch, supersession, and compaction artifacts with source refs, deletion residue, and replay fidelity.
@@ -259,6 +280,9 @@ The current frontier is now broader and more precise: selected write-capable wor
 11. Run `comparePmHandoffAgreement` over real multi-agent ArrowHedge or automation runs and compare against rediscovery cost and time-to-valid-action.
 12. Keep the dashboard claim boundary honest: static replay monitor now, live governance only after live stores/subscriptions feed it.
 13. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
+14. Add target-side delivery confirmation for scheduled/subagent/memory/PM handoff writes before admitting them as shared operational state.
+15. Add memory-control-flow fixtures that distinguish memory used as evidence from memory used as instruction or tool-routing influence.
+16. Measure multi-agent role utility and PM protocol burden before expanding orchestration or handoff scaffolding.
 
 ## Metrics Queue
 
@@ -385,13 +409,29 @@ The current frontier is now broader and more precise: selected write-capable wor
 - `pm_risk_capture_rate`
 - `handoff_time_to_valid_action`
 - `status_reannouncement_stability`
+- `admission_certificate_verification_rate`
+- `revocation_epoch_miss_rate`
+- `channel_confirmation_coverage`
+- `silent_delivery_failure_rate`
+- `memory_steered_tool_rate`
+- `memory_control_override_block_rate`
+- `clarification_before_write_rate`
+- `premature_diagnosis_block_rate`
+- `agent_role_utility_rate`
+- `state_verification_program_pass_rate`
+- `artifact_to_final_state_consistency`
+- `anomaly_root_cause_link_rate`
+- `resolution_evidence_coverage`
+- `protocol_burden_cost`
+- `handoff_rework_rate`
+- `output_diversity_collapse_rate`
 
 ## Next-Day Watchlist
 
-1. Inventory every workflow/capability write transport and mark whether it uses `evidenceBindingMode: "require_for_writes"`, advisory binding, or no binding provider.
-2. Build durable or fixture-backed `EvidenceBindingReferenceCatalog` sources from committed ArrowHedge state-review, evidence-admission, and write-binding JSONL.
-3. Add a drift test proving all non-intentionally-unverified write-binding replay rows verify against the catalog.
-4. Add one non-ArrowHedge write-capable fixture path to prove the binding gate is not profile-specific.
+1. Inventory every real workflow/capability write transport and mark whether it uses `evidenceBindingMode: "require_for_writes"`, advisory binding, or no binding provider.
+2. Promote fixture-backed `EvidenceBindingReferenceCatalog` sources into durable DB-backed or substrate-store-backed sources, or a certificate-like replay artifact with policy/revocation fields.
+3. Add target-side channel confirmation fixtures for scheduled/subagent/memory/handoff writes.
+4. Add memory-control-flow fixtures that distinguish memory-as-fact from memory-as-instruction/tool-routing influence.
 5. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, and cleanup metadata.
 6. Capture nested tool-wrapper subcall read/write refs for HyperTool-style executable wrappers.
 7. Add memory patch/compaction fixtures with supersession, source refs, deletion residue, and replay-fidelity assertions.
