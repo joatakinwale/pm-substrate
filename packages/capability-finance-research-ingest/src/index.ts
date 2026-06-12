@@ -6,6 +6,7 @@ export {
 export {
   ARROWHEDGE_ENTITY_MAPPING,
   buildArrowHedgeCleanCurrentFixtureCase,
+  buildArrowHedgeCanonicalStateReviewArtifactCorpus,
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeCurrentStateViews,
   buildArrowHedgeIngestionPlan,
@@ -19,6 +20,7 @@ export {
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
   validateArrowHedgeTypedEventPayload,
+  type ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
   type ArrowHedgeCleanCurrentFixtureCaseInput,
   type ArrowHedgeCommonOperatingPictureState,
   type ArrowHedgeCurrentStateViewInput,

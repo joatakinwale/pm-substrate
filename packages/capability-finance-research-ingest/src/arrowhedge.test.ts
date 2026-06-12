@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildObservationContractFromCurrentStateView,
@@ -12,6 +13,7 @@ import { tenantId, timestamp } from "@pm/types";
 import {
   buildArrowHedgeIngestionPlan,
   buildArrowHedgeCleanCurrentFixtureCase,
+  buildArrowHedgeCanonicalStateReviewArtifactCorpus,
   buildArrowHedgeCurrentStateView,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
@@ -819,6 +821,46 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(corpus.jsonl).toBe(
       buildArrowHedgeStateReviewArtifactCorpus(phaseCases).jsonl,
     );
+  });
+
+  it("matches the committed ArrowHedge state-review artifact corpus JSONL", async () => {
+    const tenant = tenantId("tnt_arrowhedge_state_review_corpus");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_corpus",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const corpus = buildArrowHedgeCanonicalStateReviewArtifactCorpus({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const fixturePath = new URL(
+      "../../evals/fixtures/arrowhedge-state-review-artifacts.v1.jsonl",
+      import.meta.url,
+    );
+    const committed = readFileSync(fixturePath, "utf8");
+
+    expect(committed).toBe(corpus.jsonl);
+    expect(committed.trim().split("\n")).toHaveLength(corpus.artifacts.length);
+    expect(corpus.artifacts.map((artifact) => artifact.artifactId)).toEqual([
+      "artifact_arrowhedge_clean_current_accepted_001",
+      "artifact_arrowhedge_observation_to_action_stale_risk_001",
+      "artifact_arrowhedge_action_to_feedback_authority_001",
+      "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
+    ]);
   });
 
   it("emits a clean accepted/current artifact fixture as a positive metrics baseline", async () => {

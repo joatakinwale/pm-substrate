@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-11 - ArrowHedge on-disk state-review replay corpus
+
+- Implemented the next post-evidence-binding research-to-code slice for the remaining v08 frontier: a canonical ArrowHedge state-review artifact corpus that combines the clean accepted/current baseline with observation-to-action, action-to-feedback, and feedback-to-observation temporal drift artifacts.
+- Added `buildArrowHedgeCanonicalStateReviewArtifactCorpus()` to `@pm/capability-finance-research-ingest` so replay consumers and future dashboards can use the same source-of-truth corpus contract instead of duplicating fixture assembly.
+- Committed `packages/evals/fixtures/arrowhedge-state-review-artifacts.v1.jsonl` as the on-disk replay artifact beside the existing evidence-admission replay corpus, then added a drift test that regenerates the corpus and fails if the committed JSONL diverges.
+- Verification: red test first failed on missing `buildArrowHedgeCanonicalStateReviewArtifactCorpus`, then on the missing committed JSONL fixture; after implementation, `pnpm vitest run packages/capability-finance-research-ingest/src/arrowhedge.test.ts` passed (17 tests), `pnpm vitest run packages/capability-finance-research-ingest/src/arrowhedge.test.ts packages/evals/src/evidence-admission.test.ts` passed (28 tests), `pnpm --filter @pm/capability-finance-research-ingest build` exited 0, and `git diff --check` exited 0.
+
 ## 2026-06-11 - Workflow evidence-action binding gate
 
 - Implemented the next v08 research-to-code slice in `@pm/workflow`: an opt-in `evidenceBindingMode: "require_for_writes"` gate that validates write-capable capability invocations before dispatcher execution.

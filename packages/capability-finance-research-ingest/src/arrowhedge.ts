@@ -749,6 +749,9 @@ export interface ArrowHedgeTemporalMisalignmentFixtureCasesInput
   readonly proposedBy?: string;
 }
 
+export interface ArrowHedgeCanonicalStateReviewArtifactCorpusInput
+  extends ArrowHedgeTemporalMisalignmentFixtureCasesInput {}
+
 export interface ArrowHedgeStateReviewArtifactCorpus {
   readonly artifacts: readonly StateReviewArtifact[];
   readonly jsonl: string;
@@ -972,6 +975,18 @@ export function buildArrowHedgeStateReviewArtifactCorpus(
       buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact(artifact),
     ),
   };
+}
+
+export function buildArrowHedgeCanonicalStateReviewArtifactCorpus(
+  input: ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
+): ArrowHedgeStateReviewArtifactCorpus {
+  const cleanCase = buildArrowHedgeCleanCurrentFixtureCase(input);
+  const temporalCases = buildArrowHedgeTemporalMisalignmentFixtureCases(input);
+
+  return buildArrowHedgeStateReviewArtifactCorpus([
+    ...(cleanCase ? [cleanCase] : []),
+    ...temporalCases,
+  ]);
 }
 
 export function buildArrowHedgeTemporalMisalignmentFixtureCases(
