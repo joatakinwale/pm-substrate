@@ -7,8 +7,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import type {
   CapabilityId,
+  EmitDecl,
   EventId,
   TenantId,
+  WriteDecl,
   WorkflowId,
 } from "@pm/types";
 import { PostgresEventStore } from "@pm/events";
@@ -16,6 +18,7 @@ import { PostgresRegistry } from "@pm/registry";
 import { PostgresWorkflowRuntime } from "./postgres.js";
 import { WorkflowValidationError } from "./errors.js";
 import type {
+  InvocationEvidenceBinding,
   InvocationContext,
   InvocationDispatcher,
   InvocationResult,
@@ -86,14 +89,19 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     name: string,
     requiredPermissions: readonly string[] = [],
     inputSchema?: Readonly<Record<string, unknown>>,
+    options: {
+      readonly writesInterfaces?: readonly WriteDecl[];
+      readonly writesEdges?: readonly string[];
+      readonly emits?: readonly EmitDecl[];
+    } = {},
   ): Promise<void> => {
     await registry.register(tenantId, {
       id: `cap_${randomUUID()}` as CapabilityId,
       name,
       version: 1,
-      readsInterfaces: [], writesInterfaces: [],
-      readsEdges: [], writesEdges: [],
-      emits: [], subscribesTo: [], requiredPermissions,
+      readsInterfaces: [], writesInterfaces: options.writesInterfaces ?? [],
+      readsEdges: [], writesEdges: options.writesEdges ?? [],
+      emits: options.emits ?? [], subscribesTo: [], requiredPermissions,
       ...(inputSchema ? { inputSchema } : {}),
       description: "",
     });
@@ -447,6 +455,126 @@ describeIfDb("PostgresWorkflowRuntime", () => {
       requiredPermissions: ["secure.write"],
     });
     expect(dispatcher.calls.map((c) => c.capability)).toEqual(["secure/cap"]);
+  });
+
+  it("fails write-capable invoke nodes before dispatch when evidence binding is required and missing", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const runtime = new PostgresWorkflowRuntime({
+      pool,
+      registry,
+      events,
+      dispatcher,
+      evidenceBindingMode: "require_for_writes",
+    });
+    await registerCap(tenantId, "portfolio/accept", [], undefined, {
+      writesInterfaces: [
+        { interface: "PortfolioDecision", fields: ["status"], ownership: "owner" },
+      ],
+    });
+
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "evidence-bound-write",
+      version: 1,
+      nodes: [
+        { nodeId: "t", kind: "trigger", on: "decision.ready" },
+        { nodeId: "n", kind: "invoke", capability: "portfolio/accept", inputs: {} },
+      ],
+      edges: [{ from: "t", to: "n" }],
+    };
+    await runtime.install(doc);
+
+    const ev = await events.publish({
+      tenantId,
+      type: "decision.ready",
+      entityId: "decision_nvda",
+      emittedBy: "agent.runtime",
+      payloadSchema: "v1",
+      payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+
+    expect(dispatcher.calls).toEqual([]);
+
+    const run = await pool.query<{ status: string }>(
+      `SELECT status FROM workflow.runs WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    expect(run.rows[0]?.status).toBe("failed");
+
+    const dl = await pool.query<{ reason: string; error: Record<string, unknown> }>(
+      `SELECT reason, error FROM workflow.dead_letter WHERE tenant_id=$1`,
+      [tenantId],
+    );
+    expect(dl.rows[0]?.reason).toBe("evidence_binding_missing");
+    expect(dl.rows[0]?.error).toMatchObject({
+      error: "evidence_binding_missing",
+      issues: [
+        {
+          path: "/evidenceBinding",
+        },
+      ],
+    });
+  });
+
+  it("passes complete evidence bindings into write-capable dispatch contexts", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const evidenceBinding: InvocationEvidenceBinding = {
+      stateReviewArtifactId: "artifact_nvda_accept_001",
+      evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+      policyDisposition: {
+        evaluatedAt: "2026-06-11T16:00:00.000Z",
+        consequence: "high",
+        wouldBlock: false,
+        mode: "advisory",
+      },
+    };
+    const runtime = new PostgresWorkflowRuntime({
+      pool,
+      registry,
+      events,
+      dispatcher,
+      evidenceBindingMode: "require_for_writes",
+      evidenceBindingProvider: {
+        async bind(): Promise<InvocationEvidenceBinding> {
+          return evidenceBinding;
+        },
+      },
+    });
+    await registerCap(tenantId, "portfolio/accept", [], undefined, {
+      writesInterfaces: [
+        { interface: "PortfolioDecision", fields: ["status"], ownership: "owner" },
+      ],
+    });
+
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "evidence-bound-write-ok",
+      version: 1,
+      nodes: [
+        { nodeId: "t", kind: "trigger", on: "decision.ready" },
+        { nodeId: "n", kind: "invoke", capability: "portfolio/accept", inputs: {} },
+      ],
+      edges: [{ from: "t", to: "n" }],
+    };
+    await runtime.install(doc);
+
+    const ev = await events.publish({
+      tenantId,
+      type: "decision.ready",
+      entityId: "decision_nvda",
+      emittedBy: "agent.runtime",
+      payloadSchema: "v1",
+      payload: {},
+    });
+    await runtime.onEvent(tenantId, ev.id);
+
+    expect(dispatcher.calls).toHaveLength(1);
+    expect(dispatcher.calls[0]?.evidenceBinding).toEqual(evidenceBinding);
   });
 
   it("fails the step and does not dispatch when authorization denies", async () => {

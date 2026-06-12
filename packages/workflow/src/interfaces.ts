@@ -4,6 +4,16 @@ import type {
   TenantId,
   WorkflowId,
 } from "@pm/types";
+import type { InvocationEvidenceBinding } from "./evidence-binding.js";
+
+export type {
+  EvidenceBindingMode,
+  EvidenceBindingProvider,
+  EvidenceBindingRequest,
+  InvocationEvidenceBinding,
+  InvocationEvidenceConsequence,
+  InvocationEvidencePolicyDisposition,
+} from "./evidence-binding.js";
 
 export interface WorkflowDoc {
   readonly id: WorkflowId;
@@ -83,6 +93,12 @@ export interface InvocationContext {
   readonly tenantId: TenantId;
   readonly capability: string;
   readonly inputs: Readonly<Record<string, unknown>>;
+  /**
+   * Optional evidence-action binding for write-capable invocations. When the
+   * runtime is configured with `evidenceBindingMode: "require_for_writes"`,
+   * dispatch is denied unless this binding is present and complete.
+   */
+  readonly evidenceBinding?: InvocationEvidenceBinding;
   /** Event that triggered the run, for tracing/audit. */
   readonly triggerEvent: PMEvent;
   /** Workflow + node identification, for logs. */

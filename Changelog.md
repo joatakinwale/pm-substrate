@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-11 - Workflow evidence-action binding gate
+
+- Implemented the next v08 research-to-code slice in `@pm/workflow`: an opt-in `evidenceBindingMode: "require_for_writes"` gate that validates write-capable capability invocations before dispatcher execution.
+- Added `InvocationEvidenceBinding` / `EvidenceBindingProvider` contracts so runtime callers can attach `stateReviewArtifactId`, `evidenceAdmissionReviewIds`, and policy disposition to capability dispatch contexts.
+- Runtime behavior stays migration-safe by default (`off`) and explicitly scoped: the gate blocks missing or incomplete evidence bindings when enabled; it does not claim full production mutation enforcement or broader privacy/policy-transition closure.
+- Added focused tests for the pure binding validator, malformed provider output, and DB-runtime integration coverage for missing/present bindings; the DB runtime cases collect but skip without `PM_DATABASE_URL`.
+- Verification: red test first failed on missing `./evidence-binding.js`; then `pnpm vitest run packages/workflow/src/evidence-binding.test.ts` passed (3 tests), `pnpm exec tsc -p packages/workflow/tsconfig.json --noEmit --pretty false` exited 0, `./node_modules/.bin/esbuild packages/workflow/src/index.ts --bundle --platform=node --format=esm --external:pg --external:@pm/types --external:@pm/events --external:@pm/registry --outfile=/tmp/pm-workflow-evidence-binding-smoke.mjs` exited 0, and `pnpm vitest run packages/workflow/src/postgres.test.ts` collected 22 skipped DB tests because `PM_DATABASE_URL` was not set.
+- Sync limitation: a fresh `git fetch origin` could not authenticate (`could not read Username for 'https://github.com'`), `gh auth status` reported an invalid token, and the GitHub app returned 404 for this private repo; this implementation is therefore based on the clean local `main`/cached `origin/main` at `5bf4a67`.
+
 ## 2026-06-11 - Evidence-admission replay corpus and agent-state Arrowsmith v08
 
 - Added `buildEvidenceAdmissionReviewCorpus()` and `serializeEvidenceAdmissionReviewsJsonl()` in `packages/evals/src/evidence-admission.ts` so the external-evidence admission fixture set can be exported as deterministic JSONL instead of living only in memory.

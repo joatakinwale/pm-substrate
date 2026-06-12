@@ -50,3 +50,14 @@ export {
   type InputValidationCheck,
   type InputValidationDecision,
 } from "./input-validation.js";
+export {
+  validateInvocationEvidenceBinding,
+  type EvidenceBindingMode,
+  type EvidenceBindingProvider,
+  type EvidenceBindingRequest,
+  type EvidenceBindingValidationCheck,
+  type EvidenceBindingValidationDecision,
+  type InvocationEvidenceBinding,
+  type InvocationEvidenceConsequence,
+  type InvocationEvidencePolicyDisposition,
+} from "./evidence-binding.js";

@@ -42,6 +42,12 @@ import {
   acceptAllInputValidator,
   type InputValidator,
 } from "./input-validation.js";
+import {
+  validateInvocationEvidenceBinding,
+  type EvidenceBindingMode,
+  type EvidenceBindingProvider,
+  type InvocationEvidenceBinding,
+} from "./evidence-binding.js";
 import type {
   InvocationDispatcher,
   InvocationResult,
@@ -83,6 +89,14 @@ function canonicalize(v: unknown): string {
   return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalize(obj[k])).join(",") + "}";
 }
 
+function capabilityHasWriteSurface(capability: Capability): boolean {
+  return (
+    capability.writesInterfaces.length > 0 ||
+    capability.writesEdges.length > 0 ||
+    capability.emits.length > 0
+  );
+}
+
 interface WorkflowRow {
   id: string;
   tenant_id: string;
@@ -115,6 +129,13 @@ export interface RuntimeDeps {
    * `inputSchema` are unaffected regardless of which validator is wired.
    */
   readonly inputValidator?: InputValidator;
+  /**
+   * Research-to-code L018/v08: optional evidence-action binding before
+   * dispatching write-capable capability nodes. Default remains off so
+   * existing workflows keep migration compatibility.
+   */
+  readonly evidenceBindingMode?: EvidenceBindingMode;
+  readonly evidenceBindingProvider?: EvidenceBindingProvider;
 }
 
 export class PostgresWorkflowRuntime implements WorkflowRuntime {
@@ -125,6 +146,8 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
   readonly #strictContracts: boolean;
   readonly #authorizer: PermissionAuthorizer;
   readonly #inputValidator: InputValidator;
+  readonly #evidenceBindingMode: EvidenceBindingMode;
+  readonly #evidenceBindingProvider: EvidenceBindingProvider | undefined;
 
   constructor(deps: RuntimeDeps) {
     this.#pool = deps.pool;
@@ -134,6 +157,8 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     this.#strictContracts = deps.strictContracts ?? false;
     this.#authorizer = deps.authorizer ?? allowAllAuthorizer();
     this.#inputValidator = deps.inputValidator ?? acceptAllInputValidator();
+    this.#evidenceBindingMode = deps.evidenceBindingMode ?? "off";
+    this.#evidenceBindingProvider = deps.evidenceBindingProvider;
   }
 
   // -------------------------------------------------------------------------
@@ -409,6 +434,44 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
           return;
         }
 
+        const capabilityWrites = capabilityHasWriteSurface(capability);
+        const evidenceBindingRequired =
+          this.#evidenceBindingMode === "require_for_writes" && capabilityWrites;
+        let evidenceBinding: InvocationEvidenceBinding | undefined;
+        if (evidenceBindingRequired) {
+          const providedBinding = await this.#evidenceBindingProvider?.bind({
+            tenantId: doc.tenantId,
+            workflowId: doc.id,
+            workflowName: doc.name,
+            workflowVersion: doc.version,
+            nodeId: node.nodeId,
+            capability: node.capability,
+            inputs,
+            capabilityWrites,
+            triggerEventId: event.id,
+          });
+          const evidenceDecision = validateInvocationEvidenceBinding({
+            capabilityWrites,
+            evidenceBindingRequired,
+            evidenceBinding: providedBinding ?? null,
+          });
+          if (!evidenceDecision.valid) {
+            const errPayload = {
+              error: evidenceDecision.reason,
+              issues: evidenceDecision.issues,
+            };
+            await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+            await this.#writeDeadLetter({
+              tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+              nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+              inputs, attempts: 1, error: errPayload, reason: evidenceDecision.reason,
+            });
+            runStatus = "failed";
+            return;
+          }
+          evidenceBinding = providedBinding ?? undefined;
+        }
+
         // G8.3: retry loop. Default policy is single attempt (legacy).
         const policy = node.retry;
         const maxAttempts = policy && policy.maxAttempts > 0 ? policy.maxAttempts : 1;
@@ -423,6 +486,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
             triggerEvent: event,
             workflowId: doc.id,
             nodeId: node.nodeId,
+            ...(evidenceBinding !== undefined ? { evidenceBinding } : {}),
           });
           if (inv.success) break;
           if (attempt < maxAttempts && policy) {
@@ -510,7 +574,9 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       | "retry_exhausted"
       | "permission_denied"
       | "capability_not_found"
-      | "input_invalid";
+      | "input_invalid"
+      | "evidence_binding_missing"
+      | "evidence_binding_incomplete";
   }): Promise<void> {
     const id = `dl_${randomUUID()}`;
     await this.#pool.query(
