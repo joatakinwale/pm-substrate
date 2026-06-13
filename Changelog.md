@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-13 - Daily agent-state Arrowsmith v12
+
+- Added `research/daily-arrowsmith-agent-state/v12-agent-state-arrowsmith-2026-06-13.md` as the twelfth numbered daily continuation.
+- Confirmed local `HEAD`, local `origin/main`, and remote `main` all resolved to `00693bb5d8efd04c3f6beb441bc72faeb186d35d` before editing; two git fetch/status-style commands hung in this desktop shell and were interrupted after SHA parity was independently verified.
+- Audited v11's certificate-bound replay boundary against fresh memory-poisoning, memory-control-flow, formal workflow verification, trace-repair, multimodal-memory, W3C credential/status, MCP, OpenTelemetry, and human-AI teaming sources.
+- Kept the claim boundary strict: deterministic certificate refs are replay/catalog proof, not production signing, durable status authority, target-side delivery proof, all-transport enforcement, or safe memory governance.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` with new findings, source changes, corrected/downgraded claims, implementation implications, metrics, and watchlist items around durable certificate/status stores, target-side receipts, memory-write/read influence admission, policy-transition mini-specs, final-state checks, and PM protocol-burden metrics.
+- Verification: required-section scan and `git diff --check` passed. No runtime code changed in this entry.
+
 ## 2026-06-12 - Certificate-bound replay verification and tenant-aligned corpora
 
 - Added certificate-aware evidence-binding verification in `@pm/workflow`: invocation bindings can now carry an admission certificate id/digest, and catalog verification rejects digest drift, expired validity windows, revoked certificates, artifact mismatch, tenant/workflow mismatch, invalid policy/revocation metadata, and incomplete evidence-review coverage.
