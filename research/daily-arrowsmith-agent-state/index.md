@@ -93,6 +93,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 52. **Target receipts are separate evidence.** Dispatch logs prove attempted send; target-side receipt events are needed before scheduled, memory, subagent, or PM handoff writes become shared state.
 53. **Workflow verification should start as small transition specs.** Lean4Agent-style formalization is useful, but pm-substrate should first add deterministic policy-transition fixtures before broad formal-methods claims.
 54. **Multimodal PM memory needs participant/source roles.** H2HMem and M3Exam strengthen the need to preserve speaker, modality, source artifact, conflict, and unresolved-risk fields in handoffs.
+55. **Memory write/read taxonomy is now a pure tested primitive.** v13 adds a distinct `memory_write` evidence kind, memory intended-use and influence metadata, override-status warnings, and replay metrics for memory influence.
+56. **Persistent agent environments increase urgency, not authority.** OpenAI/Ona, AgentCore, GitHub reliability, and Copilot control-plane sources strengthen the runtime-state pressure while remaining evidence/context rather than operational truth.
 
 ## Source Changes
 
@@ -207,6 +209,14 @@ The current frontier is now broader and more precise: selected write-capable wor
 - MCP SEP-2260/2567/2577 and OpenTelemetry event semantic conventions: protocol correlation and receipt-event vocabulary are useful evidence lanes but remain non-authoritative until admitted.
 - National Academies human-AI teaming and Google transactive-memory framing: PM substrate claims should measure calibrated shared understanding, role knowledge, risk capture, and burden.
 
+### Added on 2026-06-15 v13
+
+- Repo-grounded memory taxonomy closure: `@pm/agent-state` now distinguishes `memory_write` from `memory_retrieval` and adds source channel, intended use, influence kind, and override status facets.
+- Repo-grounded replay closure: `@pm/evals` now carries hidden-instruction memory write, clean preference memory write, and overridden tool-routing memory retrieval fixtures, plus memory influence metrics.
+- Fresh source checks on MPBench and MEMFLOW keep the memory-write/admission and memory-read/control-flow bridge High for risk taxonomy while preserving preprint and implementation-scope limits.
+- GitHub Copilot control-plane, GitHub availability, OpenAI/Ona, and AWS AgentCore official sources strengthen the persistent-runtime and provider-policy context without promoting vendor state to substrate authority.
+- National Academies human-AI teaming and Google transactive-memory framing remain the PM bridge: memory governance should preserve source/channel/role/override status and be judged by risk capture, rework, and burden.
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -240,6 +250,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 - v12 strengthens v10/v11 memory-control claims: memory writes and retrieved memory influence are distinct surfaces, so memory-as-fact, memory-as-preference, memory-as-instruction, and memory-as-tool-routing must not be collapsed.
 - v12 corrects dispatch wording: successful workflow dispatch or log emission should be treated as an attempted write until the target channel emits an admitted receipt.
 - v13 partially closes v12's memory frontier: replayable evidence admission now distinguishes `memory_write` from `memory_retrieval`, classifies memory influence, and warns when control-surface memory lacks or violates override metadata; live memory-store/runtime enforcement is still open.
+- v13 keeps memory safety scoped: replay warnings are not durable memory status/deletion proof, not poisoned-memory denial, not write-binding consumption of memory influence, and not final target-state confirmation.
+- v13 corrects persistent-runtime framing: long-running cloud environments and provider controls are market/context evidence, not operational-state authority.
 
 ## Downgraded Claims
 
@@ -258,6 +270,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 - Boundary objects are downgraded as agreement proof unless invariant fields and agreement metrics show cross-role convergence.
 - Shared verified context is downgraded as authority unless every write has admission status, source refs, freshness, read/write discipline, and invalidation semantics.
 - Active/distributed/observability-safe memory is downgraded as operational-state proof; it improves retention and reasoning cost tradeoffs but cannot establish authority, deletion fidelity, or currentness alone.
+- Memory taxonomy is downgraded as a complete memory-safety solution; v13 proves pure admission/replay warnings only, while durable store currentness, deletion fidelity, write binding, and target receipts remain open.
+- Persistent agent environments are downgraded as authority; persistence and session continuity are useful capabilities but still require source, freshness, workflow, and receipt checks.
 - MCP 2026-07-28 release-candidate semantics are downgraded as current behavior until the final dated spec ships; they are useful design direction, not current protocol truth.
 - Multi-agent consensus remains downgraded after Consistency Illusion: answer agreement can hide incompatible grounds unless claims cite sources and stances.
 - Long-horizon benchmark final success rates are downgraded as sufficient state proof; pm-substrate needs intermediate artifact-sequence assertions for omitted stages and objective drift.
@@ -483,17 +497,24 @@ The current frontier is now broader and more precise: selected write-capable wor
 - `participant_source_role_coverage`
 - `handoff_conflict_preservation_rate`
 - `risk_capture_delta`
+- `memoryWriteCount`
+- `memoryControlInfluenceCount`
+- `memoryInfluenceKinds`
+- `memory_write_metadata_coverage`
+- `poisoned_memory_admission_escape_count`
+- `memory_backed_write_binding_coverage`
+- `override_escape_count`
 
 ## Next-Day Watchlist
 
-1. Choose the next code slice: durable certificate/status catalog, target-side receipt evidence, or memory-write/influence admission.
-2. Inspect `@pm/workflow` and `@pm/evals` for the smallest store-like abstraction that can load certificate status without pulling in DB dependencies.
-3. Decide whether target receipts belong in `ExternalStateEvidenceKind`, `InvocationEvidenceBinding`, or both.
-4. Add memory influence taxonomy before adding broad memory fixtures so fact/preference/instruction/tool-routing are not conflated.
-5. Re-check primary code/data availability for MPBench, MEMFLOW, Lean4Agent, HarnessFix, M3Exam, H2HMem, STATE-Bench, OCELOT, ContractBench, and STALE.
-6. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, cleanup metadata, and draft/final spec drift.
-7. Capture nested tool-wrapper subcall read/write refs for HyperTool-style executable wrappers.
-8. Add memory patch/compaction fixtures with supersession, source refs, deletion residue, and replay-fidelity assertions.
+1. Decide whether memory influence review belongs directly in `InvocationEvidenceBinding` or only in admitted evidence consumed by that binding.
+2. Add poisoned-memory denial cases, not only warn-first control-surface cases.
+3. Extend memory evolution/compaction lineage beyond write/read classification.
+4. Add target-side receipt evidence before memory write success can become admitted shared state.
+5. Inspect `@pm/workflow` and `@pm/evals` for the smallest store-like abstraction that can load certificate status without pulling in DB dependencies.
+6. Re-check primary code/data availability for MPBench, MEMFLOW, Lean4Agent, HarnessFix, M3Exam, H2HMem, STATE-Bench, OCELOT, ContractBench, and STALE.
+7. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, cleanup metadata, and draft/final spec drift.
+8. Capture nested tool-wrapper subcall read/write refs for HyperTool-style executable wrappers.
 9. Treat skill documents and compiled corrections as external evidence in one fixture path: version, trigger precision, scope, owner, source, and fault-coverage metadata.
 10. Add a trajectory release-budget fixture family inspired by OCELOT: sink trust, data class, cumulative budget, release atoms, and declassification reason.
 11. Add explicit policy-transition fixtures where admitted evidence is current but the proposed workflow transition is invalid.
