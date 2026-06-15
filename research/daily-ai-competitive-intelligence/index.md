@@ -1,11 +1,11 @@
 # Daily AI Competitive Intelligence Index
 
-Last updated: 2026-06-12
+Last updated: 2026-06-15
 Scope: major AI companies, workspace AI, enterprise AI, agent platforms, AI coding/productivity tools, and competitors that may overlap with pm-substrate's operational-state thesis.
 
 ## Current Baseline
 
-The first seven versioned runs are complete. The live competitive pattern is now stronger than simple “more evidence lanes”: major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, long-running runtime state, approval/policy mechanics, and evaluation/analytics, while also making agent work more persistent, searchable, and organization-governed. None of the fresh 2026-06-10 to 2026-06-12 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, observed-read-set comparison, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof. The strongest current delta is that persistence/governance pressure now has a stricter pm-substrate answer: committed replay rows are recomputed against a certificate-aware catalog, and cross-corpus tenant mismatches are treated as verification failures rather than harmless fixture noise.
+The first eight versioned runs are complete. The live competitive pattern is now stronger than simple “more evidence lanes”: major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, long-running runtime state, approval/policy mechanics, and evaluation/analytics, while also making agent work more persistent, searchable, and organization-governed. None of the fresh 2026-06-12 to 2026-06-15 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, observed-read-set comparison, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof. The strongest current delta is that governance surfaces kept widening while reliability and persistence remained imperfect, so the correct pm-substrate answer was to type memory evidence more strictly rather than invent a broader competitor taxonomy.
 
 Parallel-run reconciliation on 2026-06-08: `origin/main` created v01 while a local broader vendor scan was still running. v01 remains the canonical first version. The local scan is preserved as v02, and both lines of evidence are folded into this index and the shared research ledger.
 
@@ -38,6 +38,7 @@ Each run must:
 | v05 | 2026-06-11 | `research/daily-ai-competitive-intelligence/v05-ai-competitive-intelligence-2026-06-11.md` | No-newer-source correction and durable replay closure | Re-checked the 24-72 hour official window and found no stronger post-v04 source; translated that quiet period into the right code move by committing and drift-testing the external-evidence admission JSONL replay corpus. |
 | v06 | 2026-06-12 | `research/daily-ai-competitive-intelligence/v06-ai-competitive-intelligence-2026-06-12.md` | Persistence/governance continuation and verification-catalog closure | Added June 10-12 official deltas for GitHub searchable agent sessions and Agentic Workflows, Google Vault Gemini retention/holds, AWS AgentCore persistent shells/workflow embedding, and OpenAI’s Ona acquisition for persistent Codex environments; translated that pressure into committed-corpus-backed verification catalogs and write-transport coverage metrics. |
 | v07 | 2026-06-12 | `research/daily-ai-competitive-intelligence/v07-ai-competitive-intelligence-2026-06-12.md` | Certificate-bound replay hardening and tenant-alignment closure | Re-checked the same official window, found no stronger public vendor contradiction, and converted the v10 certificate/revocation frontier into workflow/evals code: certificate-aware catalog verification, deterministic replay certificates, recomputed committed-row replay, and tenant-aligned ArrowHedge corpora. |
+| v08 | 2026-06-15 | `research/daily-ai-competitive-intelligence/v08-ai-competitive-intelligence-2026-06-15.md` | Memory-governance continuation and official-window re-check | Re-checked the 2026-06-12 to 2026-06-15 official window, found stronger vendor governance controls but no stronger operational-state contradiction, and converted that pressure into memory-write admission plus memory-influence classification fixtures and metrics. |
 
 ## Top Deltas
 
@@ -57,6 +58,7 @@ Each run must:
 14. The absence of a stronger June 11 official contradiction is itself useful: implementation priority should stay on replayable evidence handling, not on inventing a new competitor taxonomy.
 15. The June 12 official pattern is persistent agent work under tighter enterprise governance: GitHub session recall + agentic workflows, Google Vault holds for Gemini, AWS persistent shells/workflows, and OpenAI persistent Codex environments all increase pressure on substrate-owned verification rather than raw persistence.
 16. v07 adds the stricter local answer to that pressure: persisted evidence is not reusable for writes unless certificate digest, policy version, revocation epoch, execution identity, validity window, tenant, workflow, artifact hash, and evidence-review coverage verify together.
+17. v08 adds the next local answer: persistent memory is not reusable evidence until memory writes declare source/intended use and recalled memory declares whether it is fact, preference, instruction, tool-routing, policy-like rule, or summary.
 
 ## Source Changes
 
@@ -115,6 +117,13 @@ Each run must:
 - Repo-grounded correction: the write-binding replay test now recomputes committed-row decisions against a fresh catalog instead of trusting stored `record.validation`.
 - Repo-grounded correction: strict replay exposed a tenant mismatch between evidence-admission reviews and ArrowHedge state-review/write-binding corpora; the evidence-admission corpus now uses the ArrowHedge state-review tenant.
 - Repo-grounded implementation: certificate-aware workflow verification and deterministic replay certificate ids/digests now turn the certificate/revocation pressure into executable catalog proof.
+
+### Added on 2026-06-15 v08
+
+- GitHub's June 12 official code-review controls increased organization-level governance and instruction/content configuration without exposing a portable action-review artifact boundary.
+- GitHub's newly published May 2026 availability report reinforced that cloud-agent/session persistence and code-review agents remain reliability-sensitive operating surfaces, not final-state truth.
+- OpenAI's June 11 Ona direction and AWS AgentCore's current runtime/memory/browser/code-interpreter docs kept the persistence/governance pattern intact rather than contradicting it.
+- Repo-grounded implementation: the competitive answer was memory evidence typing, not another vendor memo. `memory_write` now exists as a first-class evidence kind, memory influence is classified explicitly, and replay fixtures/metrics cover hidden-instruction writes, clean preference writes, and overridden tool-routing retrieval.
 
 ## Current Highest Threats
 

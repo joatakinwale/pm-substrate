@@ -245,6 +245,7 @@ describe("reviewExternalStateEvidence", () => {
       kind: "memory_retrieval",
       memory: {
         sourceModality: "text",
+        influenceKind: "fact",
         deletionResidueRisk: "high",
         staleInformationRisk: "medium",
       },
@@ -257,6 +258,68 @@ describe("reviewExternalStateEvidence", () => {
     expect(codes).toContain("memory_stale_information_risk");
     expect(codes).toContain("unverifiable_payload_integrity");
     expect(review.decision).toBe("admitted_with_warnings");
+  });
+
+  it("requires source-channel and intended-use metadata on memory writes", () => {
+    const review = reviewExternalStateEvidence(
+      baseEvidence({
+        kind: "memory_write",
+        memory: {
+          sourceModality: "text",
+          retentionPolicy: "workspace_long_term",
+          influenceKind: "instruction",
+        },
+      }),
+      baseContext(),
+    );
+
+    const codes = review.issues.map((issue) => issue.code);
+    expect(codes).toContain("memory_write_metadata_missing");
+    expect(codes).toContain("memory_control_override_status_missing");
+    expect(review.invariantClasses).toEqual(
+      expect.arrayContaining(["required_evidence"]),
+    );
+  });
+
+  it("requires influence classification on recalled memory before admission", () => {
+    const review = reviewExternalStateEvidence(
+      baseEvidence({
+        kind: "memory_retrieval",
+        memory: {
+          sourceModality: "text",
+          retentionPolicy: "workspace_long_term",
+          deletionResidueRisk: "low",
+          staleInformationRisk: "low",
+        },
+      }),
+      baseContext(),
+    );
+
+    expect(review.issues.map((issue) => issue.code)).toContain(
+      "memory_influence_kind_missing",
+    );
+  });
+
+  it("warns when tool-routing memory has already been overridden", () => {
+    const review = reviewExternalStateEvidence(
+      baseEvidence({
+        kind: "memory_retrieval",
+        memory: {
+          sourceModality: "text",
+          retentionPolicy: "workspace_long_term",
+          influenceKind: "tool_routing",
+          overrideStatus: "workflow_overridden",
+          deletionResidueRisk: "low",
+          staleInformationRisk: "low",
+        },
+      }),
+      baseContext(),
+    );
+
+    expect(review.issues.map((issue) => issue.code)).toContain(
+      "memory_control_overridden",
+    );
+    expect(review.invariantClasses).toContain("state_conflict");
   });
 
   it("flags omitted workflow stages and failed gates from traces (C027)", () => {

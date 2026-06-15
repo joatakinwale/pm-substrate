@@ -27,6 +27,7 @@ export type ExternalStateEvidenceKind =
   | "mcp_task"
   | "tool_annotation"
   | "memory_retrieval"
+  | "memory_write"
   | "monitoring_event"
   | "lineage_record"
   | "audit_event"
@@ -47,6 +48,25 @@ export type ExternalStateEvidenceKind =
   | "gateway_request";
 
 export type EvidenceRiskLevel = "none" | "low" | "medium" | "high";
+export type MemoryInfluenceKind =
+  | "fact"
+  | "preference"
+  | "instruction"
+  | "tool_routing"
+  | "policy_like_rule"
+  | "summary";
+export type MemoryIntendedUse =
+  | "observation"
+  | "summary"
+  | "preference"
+  | "rule"
+  | "decision"
+  | "derived_projection";
+export type MemoryOverrideStatus =
+  | "active"
+  | "user_overridden"
+  | "workflow_overridden"
+  | "superseded";
 
 /** Approval-currentness facet (competitive v04 / ledger C032). */
 export interface ApprovalEvidenceFacet {
@@ -60,7 +80,11 @@ export interface ApprovalEvidenceFacet {
 /** Observability-safe memory retention facet (Arrowsmith v07 / ledger C026). */
 export interface MemoryEvidenceFacet {
   readonly sourceModality?: string;
+  readonly sourceChannel?: string;
   readonly retentionPolicy?: string;
+  readonly intendedUse?: MemoryIntendedUse;
+  readonly influenceKind?: MemoryInfluenceKind;
+  readonly overrideStatus?: MemoryOverrideStatus;
   readonly deletionResidueRisk?: EvidenceRiskLevel;
   readonly observableFeatureBoundary?: string;
   readonly staleInformationRisk?: EvidenceRiskLevel;
@@ -159,6 +183,10 @@ export type EvidenceAdmissionIssueCode =
   | "policy_version_drift"
   | "sensitive_data_class_blocked"
   | "memory_retention_metadata_missing"
+  | "memory_write_metadata_missing"
+  | "memory_influence_kind_missing"
+  | "memory_control_override_status_missing"
+  | "memory_control_overridden"
   | "memory_deletion_residue_risk"
   | "memory_stale_information_risk"
   | "workflow_stage_omitted"
@@ -227,6 +255,7 @@ export interface AdmittedStateEvidence {
 
 const PAYLOAD_INTEGRITY_KINDS: readonly ExternalStateEvidenceKind[] = [
   "memory_retrieval",
+  "memory_write",
   "custom_store_record",
   "subagent_output",
 ];
@@ -412,6 +441,9 @@ export function invariantClassesForAdmissionIssue(
     case "source_missing":
     case "unverifiable_payload_integrity":
     case "memory_retention_metadata_missing":
+    case "memory_write_metadata_missing":
+    case "memory_influence_kind_missing":
+    case "memory_control_override_status_missing":
     case "pm_handoff_incomplete":
       return ["required_evidence"];
     case "future_observed_at":
@@ -430,6 +462,8 @@ export function invariantClassesForAdmissionIssue(
     case "approval_scope_mismatch":
     case "sensitive_data_class_blocked":
       return ["capability_contract"];
+    case "memory_control_overridden":
+      return ["state_conflict"];
     case "memory_deletion_residue_risk":
       return ["required_evidence"];
     case "workflow_stage_omitted":
@@ -530,7 +564,9 @@ function reviewMemoryFacet(
   evidence: ExternalStateEvidence,
   issues: EvidenceAdmissionIssue[],
 ): void {
-  if (evidence.kind !== "memory_retrieval") return;
+  if (evidence.kind !== "memory_retrieval" && evidence.kind !== "memory_write") {
+    return;
+  }
   const memory = evidence.memory;
 
   if (memory?.retentionPolicy === undefined) {
@@ -541,6 +577,51 @@ function reviewMemoryFacet(
       message:
         "Memory evidence has no retention policy metadata; observability-safe retention cannot be verified (C026).",
     });
+  }
+  if (
+    evidence.kind === "memory_write" &&
+    (memory?.sourceChannel === undefined || memory.intendedUse === undefined)
+  ) {
+    const missing: string[] = [];
+    if (memory?.sourceChannel === undefined) missing.push("sourceChannel");
+    if (memory?.intendedUse === undefined) missing.push("intendedUse");
+    issues.push({
+      code: "memory_write_metadata_missing",
+      severity: "warn",
+      path: "/memory",
+      message: `Memory-write evidence is missing write-admission metadata: ${missing.join(", ")}.`,
+    });
+  }
+  if (memory?.influenceKind === undefined) {
+    issues.push({
+      code: "memory_influence_kind_missing",
+      severity: "warn",
+      path: "/memory/influenceKind",
+      message:
+        "Memory evidence does not classify whether it is acting as fact, preference, instruction, tool-routing, policy-like rule, or summary.",
+    });
+  }
+  if (
+    memory?.influenceKind === "instruction" ||
+    memory?.influenceKind === "tool_routing" ||
+    memory?.influenceKind === "policy_like_rule"
+  ) {
+    if (memory.overrideStatus === undefined) {
+      issues.push({
+        code: "memory_control_override_status_missing",
+        severity: "warn",
+        path: "/memory/overrideStatus",
+        message:
+          "Control-influencing memory has no override-status metadata; current user/workflow overrides cannot be checked.",
+      });
+    } else if (memory.overrideStatus !== "active") {
+      issues.push({
+        code: "memory_control_overridden",
+        severity: "warn",
+        path: "/memory/overrideStatus",
+        message: `Control-influencing memory is marked ${memory.overrideStatus}; current instructions or workflow state override the recalled control signal.`,
+      });
+    }
   }
   if (memory?.deletionResidueRisk === "medium" || memory?.deletionResidueRisk === "high") {
     issues.push({

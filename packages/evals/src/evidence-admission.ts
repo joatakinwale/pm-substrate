@@ -155,6 +155,7 @@ export function buildEvidenceAdmissionFixtureCorpus(
         base("memory", "memory_retrieval", "agentcore://memory/long_term", {
           memory: {
             sourceModality: "chat_history",
+            influenceKind: "fact",
             deletionResidueRisk: "high",
             staleInformationRisk: "high",
           },
@@ -170,6 +171,76 @@ export function buildEvidenceAdmissionFixtureCorpus(
       ],
       notes:
         "Memory evidence without retention policy, with deletion residue and stale-information risk, is admitted only with explicit warnings.",
+    },
+    {
+      fixtureId: "memory-write-hidden-instruction",
+      frontierRef: "frontier#3 / C050-C056 memory write admission and control influence",
+      evidence: base("memory_write", "memory_write", "agentcore://memory/write", {
+        memory: {
+          sourceModality: "chat_history",
+          sourceChannel: "conversation.turn",
+          retentionPolicy: "workspace_long_term",
+          influenceKind: "instruction",
+        },
+      }),
+      context: context(),
+      expectedDecision: "admitted_with_warnings",
+      expectedIssueCodes: [
+        "memory_write_metadata_missing",
+        "memory_control_override_status_missing",
+      ],
+      notes:
+        "A memory write that can later act as an instruction must declare write intent and override status before it becomes reusable evidence.",
+    },
+    {
+      fixtureId: "memory-preference-write-clean",
+      frontierRef: "frontier#3 / C056 memory preference writes stay evidence-only",
+      evidence: base(
+        "memory_preference",
+        "memory_write",
+        "agentcore://memory/write",
+        {
+          memory: {
+            sourceModality: "profile",
+            sourceChannel: "user.preferences",
+            retentionPolicy: "workspace_long_term",
+            intendedUse: "preference",
+            influenceKind: "preference",
+            overrideStatus: "active",
+            deletionResidueRisk: "low",
+            staleInformationRisk: "low",
+          },
+        },
+      ),
+      context: context(),
+      expectedDecision: "admitted",
+      expectedIssueCodes: [],
+      notes:
+        "A typed user preference can be admitted cleanly when its write channel, intended use, and influence role are explicit.",
+    },
+    {
+      fixtureId: "memory-read-tool-routing-overridden",
+      frontierRef: "frontier#3 / C056 tool-routing memory respects current workflow overrides",
+      evidence: base(
+        "memory_routing",
+        "memory_retrieval",
+        "agentcore://memory/long_term",
+        {
+          memory: {
+            sourceModality: "chat_history",
+            retentionPolicy: "workspace_long_term",
+            influenceKind: "tool_routing",
+            overrideStatus: "workflow_overridden",
+            deletionResidueRisk: "low",
+            staleInformationRisk: "low",
+          },
+        },
+      ),
+      context: context(),
+      expectedDecision: "admitted_with_warnings",
+      expectedIssueCodes: ["memory_control_overridden"],
+      notes:
+        "Retrieved memory that would steer tool routing must not outrank current workflow instructions.",
     },
     {
       fixtureId: "monitoring-wait-condition",
@@ -465,6 +536,7 @@ export interface EvidenceAdmissionMetrics {
   readonly fixturePassRate: number;
   readonly decisions: Readonly<Record<EvidenceAdmissionDecision, number>>;
   readonly byKind: Readonly<Record<string, number>>;
+  readonly memoryInfluenceKinds: Readonly<Record<string, number>>;
   readonly issueCodeCounts: Readonly<Record<string, number>>;
   readonly invariantClassCounts: Readonly<Record<string, number>>;
   readonly wouldBlockAtHighConsequence: number;
@@ -472,6 +544,8 @@ export interface EvidenceAdmissionMetrics {
   /** PM distributed-state lane (frontier item 10). */
   readonly pmHandoffCount: number;
   readonly pmHandoffIncompleteCount: number;
+  readonly memoryWriteCount: number;
+  readonly memoryControlInfluenceCount: number;
   /** Monitoring lane (frontier item 5). */
   readonly prematureActionCount: number;
   readonly meanReactionTimeMs?: number;
@@ -487,12 +561,15 @@ export function analyzeEvidenceAdmissionFixtureResults(
     rejected: 0,
   };
   const byKind: Record<string, number> = {};
+  const memoryInfluenceKinds: Record<string, number> = {};
   const issueCodeCounts: Record<string, number> = {};
   const invariantClassCounts: Record<string, number> = {};
   let wouldBlockAtHighConsequence = 0;
   let allEvidenceOnly = true;
   let pmHandoffCount = 0;
   let pmHandoffIncompleteCount = 0;
+  let memoryWriteCount = 0;
+  let memoryControlInfluenceCount = 0;
   let prematureActionCount = 0;
   const reactionTimes: number[] = [];
   const fixtureById = new Map(fixtures.map((fixture) => [fixture.fixtureId, fixture]));
@@ -501,6 +578,11 @@ export function analyzeEvidenceAdmissionFixtureResults(
     const review = result.review;
     decisions[review.decision] += 1;
     byKind[review.evidence.kind] = (byKind[review.evidence.kind] ?? 0) + 1;
+    const memoryInfluenceKind = review.evidence.memory?.influenceKind;
+    if (memoryInfluenceKind !== undefined) {
+      memoryInfluenceKinds[memoryInfluenceKind] =
+        (memoryInfluenceKinds[memoryInfluenceKind] ?? 0) + 1;
+    }
     for (const issue of review.issues) {
       issueCodeCounts[issue.code] = (issueCodeCounts[issue.code] ?? 0) + 1;
     }
@@ -523,6 +605,16 @@ export function analyzeEvidenceAdmissionFixtureResults(
         pmHandoffIncompleteCount += 1;
       }
     }
+    if (review.evidence.kind === "memory_write") {
+      memoryWriteCount += 1;
+    }
+    if (
+      review.evidence.memory?.influenceKind === "instruction" ||
+      review.evidence.memory?.influenceKind === "tool_routing" ||
+      review.evidence.memory?.influenceKind === "policy_like_rule"
+    ) {
+      memoryControlInfluenceCount += 1;
+    }
     const monitoring = fixtureById.get(result.fixtureId)?.monitoring;
     if (monitoring !== undefined) {
       const delta =
@@ -543,12 +635,15 @@ export function analyzeEvidenceAdmissionFixtureResults(
     fixturePassRate: results.length === 0 ? 1 : passedFixtures / results.length,
     decisions,
     byKind,
+    memoryInfluenceKinds,
     issueCodeCounts,
     invariantClassCounts,
     wouldBlockAtHighConsequence,
     allEvidenceOnly,
     pmHandoffCount,
     pmHandoffIncompleteCount,
+    memoryWriteCount,
+    memoryControlInfluenceCount,
     prematureActionCount,
     ...(reactionTimes.length > 0
       ? {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-15 - Memory write admission and memory-influence replay closure
+
+- Added `memory_write` as a first-class `ExternalStateEvidenceKind` in `@pm/agent-state`, separating memory writes from memory retrievals instead of treating both as one generic memory lane.
+- Extended `MemoryEvidenceFacet` with `sourceChannel`, `intendedUse`, `influenceKind`, and `overrideStatus`, so memory evidence can now say whether it acts as fact, preference, instruction, tool-routing, policy-like rule, or summary.
+- Added admission warnings for missing memory-write metadata, missing influence classification, missing override status on control-influencing memory, and control memory already overridden by current workflow/user state.
+- Extended the replay corpus in `@pm/evals` with hidden-instruction memory writes, clean preference writes, and overridden tool-routing memory retrieval, then added matching coverage metrics (`memoryWriteCount`, `memoryControlInfluenceCount`, `memoryInfluenceKinds`).
+- Regenerated `packages/evals/fixtures/evidence-admission-reviews.v1.jsonl` so the committed admission-review corpus stays deterministic against the new memory contract.
+- Added `research/daily-arrowsmith-agent-state/v13-agent-state-arrowsmith-2026-06-15.md` and `research/daily-ai-competitive-intelligence/v08-ai-competitive-intelligence-2026-06-15.md`, then updated both chain indexes and the shared research ledger.
+- Verification: `pnpm exec tsc -p packages/agent-state/tsconfig.json --noEmit --pretty false`, `pnpm --filter @pm/evals typecheck`, `vitest run packages/agent-state/src/external-evidence.test.ts --reporter=basic` (33 passed), and `vitest run packages/evals/src/evidence-admission.test.ts --reporter=basic` (11 passed).
+
 ## 2026-06-13 - Daily agent-state Arrowsmith v12
 
 - Added `research/daily-arrowsmith-agent-state/v12-agent-state-arrowsmith-2026-06-13.md` as the twelfth numbered daily continuation.
