@@ -110,11 +110,14 @@ describe("write-binding replay corpus", () => {
       },
     );
     const records = importWriteBindingReplayRecordsJsonl(writeBindingReplayJsonl);
+    const evidenceAdmissionReviewCount = evidenceAdmissionReviewsJsonl
+      .split("\n")
+      .filter((line) => line.trim().length > 0).length;
 
     expect(metrics).toMatchObject({
       stateReviewArtifactCount: 4,
       stateReviewArtifactsBackedByCorpus: 4,
-      evidenceAdmissionReviewCount: 18,
+      evidenceAdmissionReviewCount,
       rejectedEvidenceAdmissionReviews: 2,
       admissionCertificateCount: 4,
       revokedAdmissionCertificateCount: 0,
@@ -123,7 +126,9 @@ describe("write-binding replay corpus", () => {
       bindingsWithAdmissionCertificates: 4,
     });
     expect(catalog.stateReviewArtifacts).toHaveLength(4);
-    expect(catalog.evidenceAdmissionReviews).toHaveLength(18);
+    expect(catalog.evidenceAdmissionReviews).toHaveLength(
+      evidenceAdmissionReviewCount,
+    );
     expect(catalog.admissionCertificates).toHaveLength(4);
 
     const decisionsByRecordId = new Map(

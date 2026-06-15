@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-15 - origin/main sync and replay-catalog count drift fix
+
+- Fast-forwarded local `main` to the latest `origin/main`, which added the `arrowhedgelab/` test project.
+- Fixed `packages/evals/src/write-binding.test.ts` so the evidence-binding catalog test derives the committed evidence-admission row count from `evidence-admission-reviews.v1.jsonl` instead of hard-coding the previous 18-row corpus after the memory-write admission lane expanded it to 21 rows.
+
 ## 2026-06-15 - Memory write admission and memory-influence replay closure
 
 - Added `memory_write` as a first-class `ExternalStateEvidenceKind` in `@pm/agent-state`, separating memory writes from memory retrievals instead of treating both as one generic memory lane.
