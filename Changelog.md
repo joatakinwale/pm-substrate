@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-16 - Agent-state Arrowsmith v15 status-currentness continuation
+
+- Fetched `origin/main`, verified local `HEAD`, local `origin/main`, and remote `main` at `ae3db140668fef2bd158f0078817d368693c9ea2`, and continued from the already-present same-day `v14` instead of creating a duplicate.
+- Added `research/daily-arrowsmith-agent-state/v15-agent-state-arrowsmith-2026-06-16.md` with the next Arrowsmith bridge: certificates, receipts, MCP task handles, and PM acknowledgements need decision-time status checks before they support valid action.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` with the v15 version row, C059 claim, L026 ledger entry, new source changes, rejected/downgraded bridges, and the current Implementation/Test Task Tree.
+- Claim boundary: this is a research-only continuation; no runtime code changed and no durable status store or final-state verifier is claimed.
+
 ## 2026-06-16 - Target-receipt evidence lane, daily AI v09, and agent-state Arrowsmith v14
 
 - Added a first-class `target_receipt` external-evidence kind in `@pm/agent-state` so receipt evidence is no longer collapsed into generic telemetry.

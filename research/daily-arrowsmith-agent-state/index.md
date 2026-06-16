@@ -15,7 +15,7 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 
 The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The durable artifact lifecycle and first external-evidence frontier are now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, an invariant-class `wouldBlock` policy matrix, and committed replayable corpora for external-evidence admission, ArrowHedge state-review artifacts, and write-binding attempts.
 
-The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closed the memory-write/read taxonomy seam. v14 now partly closes the target-receipt seam as a pure replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. The remaining proof boundary is durable certificate/status verification, durable live receipt/status stores, memory-store/runtime enforcement beyond replay fixtures, policy-transition checks, final-state verification, and PM protocol-burden measurement.
+The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closed the memory-write/read taxonomy seam. v14 partly closed the target-receipt seam as a pure replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. v15 now identifies status-currentness as the next authority boundary: certificates, receipts, MCP handles, task ids, and PM acknowledgements need decision-time status checks for revocation, suspension, refresh, staleness, status authority, and privacy/correlation risk. The remaining proof boundary is durable certificate/status verification, durable live receipt/status stores, memory-store/runtime enforcement beyond replay fixtures, policy-transition checks, final-state verification, and PM protocol-burden measurement.
 
 ## Versions
 
@@ -37,6 +37,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 | v12 | 2026-06-13 | `research/daily-arrowsmith-agent-state/v12-agent-state-arrowsmith-2026-06-13.md` | Status-bearing evidence, memory influence, target receipts, and PM burden bridge | Audited v11's certificate-bound replay boundary against new memory-poisoning, memory-control-flow, workflow-verification, multimodal-memory, VC/status, MCP, OpenTelemetry, and human-AI teaming sources; kept replay certificates scoped and shifted the next frontier to durable certificate/status stores, target-side receipts, memory-write/read influence admission, policy-transition mini-specs, final-state checks, and protocol-burden metrics. |
 | v13 | 2026-06-15 | `research/daily-arrowsmith-agent-state/v13-agent-state-arrowsmith-2026-06-15.md` | Memory write admission and memory-influence taxonomy closure | Converted v12's memory frontier into code: `memory_write` is now a first-class evidence kind, memory writes require source-channel/intended-use metadata, recalled memory is classified by influence kind, control-influencing memory needs override metadata, and replay fixtures/metrics now cover hidden-instruction writes, clean preference writes, and overridden tool-routing memory. |
 | v14 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v14-agent-state-arrowsmith-2026-06-16.md` | Target-receipt evidence closure and telemetry-gap correction | Converted the next open v12 frontier into code: `target_receipt` is now a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as admitted confirmation, and replay fixtures/metrics distinguish dispatch-only from applied target receipts. |
+| v15 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v15-agent-state-arrowsmith-2026-06-16.md` | Status-currentness bridge and durable status-store frontier | Continued from same-day v14 and shifted the next implementation frontier to decision-time status checks for replay certificates, target receipts, MCP task handles, and PM handoff acknowledgements. |
 
 ## Top Findings
 
@@ -97,6 +98,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 55. **Memory write/read taxonomy is now a pure tested primitive.** v13 adds a distinct `memory_write` evidence kind, memory intended-use and influence metadata, override-status warnings, and replay metrics for memory influence.
 56. **Persistent agent environments increase urgency, not authority.** OpenAI/Ona, AgentCore, GitHub reliability, and Copilot control-plane sources strengthen the runtime-state pressure while remaining evidence/context rather than operational truth.
 57. **Target receipt is now a pure tested primitive.** v14 adds a distinct `target_receipt` evidence kind, explicit receipt metadata, dispatch-only downgrade warnings, and replay metrics for dispatch-only versus applied target receipts.
+58. **Status-currentness is the next authority boundary.** v15 separates a certificate or receipt from its current status: revocation, suspension, refresh, checked-at time, status authority, and privacy/correlation risk must be checked before evidence supports valid action.
 
 ## Source Changes
 
@@ -226,6 +228,14 @@ The current frontier is now broader and more precise: selected write-capable wor
 - OpenAI's June 14 partner-network news extends governance/distribution surfaces without changing the operational-state proof boundary.
 - Repo-grounded receipt closure: `@pm/agent-state` now distinguishes `target_receipt` from generic telemetry, and `@pm/evals` now carries dispatch-only and applied receipt fixtures plus receipt-status metrics.
 
+### Added on 2026-06-16 v15
+
+- W3C Bitstring Status List v1.0 and Verifiable Credentials Overview strengthened the durable status-store frontier: evidence issuer, status authority, status purpose, validity period, revocation, suspension, refresh, and privacy/correlation concerns are separate from initial evidence admission.
+- MCP draft statelessness and SEP-2663 Tasks Extension strengthened the addressability-vs-authority correction: explicit state handles and task IDs are lookup keys for status/result checks, not operational state.
+- OpenTelemetry event semantics and span-event migration guidance strengthened the receipt/status event-shape requirement: evidence events need stable names, attributes, timestamps, and schema-drift handling.
+- STAGE-Claw and STATE-Bench strengthened final-state verification metrics: receipt-backed writes still need refreshed persistent-state checks.
+- PABU and Belief Memory strengthened the partial-observability bridge while preserving the implementation boundary: learned belief/memory can guide agents, but pm-substrate should enforce status/currentness with existing runtime evidence.
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -301,6 +311,9 @@ The current frontier is now broader and more precise: selected write-capable wor
 - Memory benchmark accuracy is downgraded as safety proof; recall and reasoning scores do not cover poisoning, control-flow steering, or valid-action governance.
 - Formal workflow verification is downgraded as source truth; it verifies modeled assumptions and transition semantics, not whether the evidence is current or authoritative.
 - Observability receipts are downgraded as authorization; target events can prove receipt/visibility, not valid permission to write.
+- Status-rich credentials are downgraded as direct production authority; they provide vocabulary for issuer/status/revocation/currentness, but pm-substrate still needs substrate-owned authority mapping and decision-time checks.
+- MCP task handles and explicit state handles are downgraded as durable truth; they are references that require admitted status/result lookup.
+- Belief-state or memory-model improvements are downgraded as substitutes for status checks; they estimate hidden state under partial observability but do not verify current operational authority.
 
 ## Rejected Bridges
 
@@ -327,6 +340,9 @@ The current frontier is now broader and more precise: selected write-capable wor
 21. Fixture admission certificates as production signing authority.
 22. Dispatch success as target-side delivery proof.
 23. Memory recall benchmark success as safe memory governance.
+24. Target receipts as final-state verification.
+25. MCP task IDs as current task authority.
+26. W3C status-list vocabulary as a mandate to become a VC platform.
 
 ## Current Implementation Implications
 
@@ -343,12 +359,15 @@ The current frontier is now broader and more precise: selected write-capable wor
 11. Run `comparePmHandoffAgreement` over real multi-agent ArrowHedge or automation runs and compare against rediscovery cost and time-to-valid-action.
 12. Keep the dashboard claim boundary honest: static replay monitor now, live governance only after live stores/subscriptions feed it.
 13. Make every daily research automation pull or remotely verify `main`, inspect new research/code, update the relevant chain-specific index and top-level `research/index.md`, commit, and push.
-14. Add target-side delivery confirmation for scheduled/subagent/memory/PM handoff writes before admitting them as shared operational state.
-15. Add memory-control-flow fixtures that distinguish memory used as evidence from memory used as instruction or tool-routing influence.
-16. Measure multi-agent role utility and PM protocol burden before expanding orchestration or handoff scaffolding.
-17. Promote replay certificates into a durable status source with issuer, proof, revocation, status checked-at, policy version, validity window, tenant/workflow, and execution identity.
-18. Preserve participant, role, modality, source artifact, conflict, and unresolved-risk fields in PM handoff memory rather than flattening into summaries.
-19. Add small deterministic policy-transition specs before broad formal workflow verification.
+14. Add pure `EvidenceStatusCheck` semantics before building a durable store: status authority, status purpose, checked-at time, validFrom/validUntil, status list/ref, stale policy, and privacy/correlation note.
+15. Feed status checks into replay certificates, target receipts, and MCP task handles before claiming live mutation governance.
+16. Add final-state verification fixtures only after status semantics are stable enough to distinguish valid, revoked, suspended, refresh-required, failed, stale, and superseded evidence.
+17. Add target-side delivery confirmation for scheduled/subagent/memory/PM handoff writes before admitting them as shared operational state.
+18. Add memory-control-flow fixtures that distinguish memory used as evidence from memory used as instruction or tool-routing influence.
+19. Measure multi-agent role utility and PM protocol burden before expanding orchestration or handoff scaffolding.
+20. Promote replay certificates into a durable status source with issuer, proof, revocation, status checked-at, policy version, validity window, tenant/workflow, and execution identity.
+21. Preserve participant, role, modality, source artifact, conflict, and unresolved-risk fields in PM handoff memory rather than flattening into summaries.
+22. Add small deterministic policy-transition specs before broad formal workflow verification.
 
 ## Metrics Queue
 
@@ -513,14 +532,25 @@ The current frontier is now broader and more precise: selected write-capable wor
 - `poisoned_memory_admission_escape_count`
 - `memory_backed_write_binding_coverage`
 - `override_escape_count`
+- `evidence_status_checked_rate`
+- `stale_status_reuse_count`
+- `revoked_certificate_block_rate`
+- `suspended_certificate_warning_count`
+- `status_authority_mismatch_count`
+- `status_lookup_latency_ms`
+- `status_event_schema_drift_count`
+- `handle_without_status_count`
+- `final_state_after_receipt_consistency_rate`
+- `state_mutation_false_positive_rate`
+- `rework_after_status_check_rate`
 
 ## Next-Day Watchlist
 
-1. Decide whether memory influence review belongs directly in `InvocationEvidenceBinding` or only in admitted evidence consumed by that binding.
-2. Add poisoned-memory denial cases, not only warn-first control-surface cases.
-3. Extend memory evolution/compaction lineage beyond write/read classification.
-4. Add target-side receipt evidence before memory write success can become admitted shared state.
-5. Inspect `@pm/workflow` and `@pm/evals` for the smallest store-like abstraction that can load certificate status without pulling in DB dependencies.
+1. Implement the smallest pure `EvidenceStatusCheck` type and test matrix before durable store work.
+2. Decide how status checks attach to `InvocationEvidenceBinding`, replay certificates, target receipts, MCP task handles, and PM handoff acknowledgements.
+3. Add valid, revoked, suspended, refresh-required, stale, failed, superseded, and authority-mismatch replay cases.
+4. Add status authority mismatch warnings before claiming any production certificate/status authority.
+5. Inspect `@pm/workflow` and `@pm/evals` for the smallest store-like abstraction that can load certificate and receipt status without pulling in DB dependencies.
 6. Re-check primary code/data availability for MPBench, MEMFLOW, Lean4Agent, HarnessFix, M3Exam, H2HMem, STATE-Bench, OCELOT, ContractBench, and STALE.
 7. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, cleanup metadata, and draft/final spec drift.
 8. Capture nested tool-wrapper subcall read/write refs for HyperTool-style executable wrappers.
@@ -529,5 +559,5 @@ The current frontier is now broader and more precise: selected write-capable wor
 11. Add explicit policy-transition fixtures where admitted evidence is current but the proposed workflow transition is invalid.
 12. Add state-defect recall metrics for LLM judges and route/gate failures: stale referent, stale owner/blocker, confirm-gate lockout, escalation failure, workflow mismatch.
 13. Run PM handoff agreement and protocol-burden metrics on real multi-agent ArrowHedge or automation runs.
-14. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage plus target receipt evidence.
+14. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage, status checks, and target receipt evidence.
 15. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
