@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-15
+Last updated: 2026-06-16
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -15,7 +15,7 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 
 The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The durable artifact lifecycle and first external-evidence frontier are now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, an invariant-class `wouldBlock` policy matrix, and committed replayable corpora for external-evidence admission, ArrowHedge state-review artifacts, and write-binding attempts.
 
-The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closes one previously open pure primitive from v12: memory writes and memory retrievals are now typed separately, recalled memory is classified as fact/preference/instruction/tool-routing/policy-like-rule/summary, and replay fixtures warn when control-influencing memory lacks override metadata or is already overridden. The remaining proof boundary is durable certificate/status verification, target-side receipt evidence, memory-store/runtime enforcement beyond replay fixtures, policy-transition checks, final-state verification, and PM protocol-burden measurement.
+The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closed the memory-write/read taxonomy seam. v14 now partly closes the target-receipt seam as a pure replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. The remaining proof boundary is durable certificate/status verification, durable live receipt/status stores, memory-store/runtime enforcement beyond replay fixtures, policy-transition checks, final-state verification, and PM protocol-burden measurement.
 
 ## Versions
 
@@ -36,6 +36,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 | v11 | 2026-06-12 | `research/daily-arrowsmith-agent-state/v11-agent-state-arrowsmith-2026-06-12.md` | Certificate-bound replay implementation and tenant-alignment correction | Converted v10's certificate-bound admission frontier into workflow/evals code; added certificate-aware catalog verification, deterministic replay certificate ids/digests, recomputed committed-row replay, and tenant-aligned ArrowHedge evidence-admission/write-binding/state-review corpora; kept signed production certificates, DB-backed stores, target-side delivery confirmation, memory-control-flow, and PM burden metrics open. |
 | v12 | 2026-06-13 | `research/daily-arrowsmith-agent-state/v12-agent-state-arrowsmith-2026-06-13.md` | Status-bearing evidence, memory influence, target receipts, and PM burden bridge | Audited v11's certificate-bound replay boundary against new memory-poisoning, memory-control-flow, workflow-verification, multimodal-memory, VC/status, MCP, OpenTelemetry, and human-AI teaming sources; kept replay certificates scoped and shifted the next frontier to durable certificate/status stores, target-side receipts, memory-write/read influence admission, policy-transition mini-specs, final-state checks, and protocol-burden metrics. |
 | v13 | 2026-06-15 | `research/daily-arrowsmith-agent-state/v13-agent-state-arrowsmith-2026-06-15.md` | Memory write admission and memory-influence taxonomy closure | Converted v12's memory frontier into code: `memory_write` is now a first-class evidence kind, memory writes require source-channel/intended-use metadata, recalled memory is classified by influence kind, control-influencing memory needs override metadata, and replay fixtures/metrics now cover hidden-instruction writes, clean preference writes, and overridden tool-routing memory. |
+| v14 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v14-agent-state-arrowsmith-2026-06-16.md` | Target-receipt evidence closure and telemetry-gap correction | Converted the next open v12 frontier into code: `target_receipt` is now a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as admitted confirmation, and replay fixtures/metrics distinguish dispatch-only from applied target receipts. |
 
 ## Top Findings
 
@@ -95,6 +96,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 54. **Multimodal PM memory needs participant/source roles.** H2HMem and M3Exam strengthen the need to preserve speaker, modality, source artifact, conflict, and unresolved-risk fields in handoffs.
 55. **Memory write/read taxonomy is now a pure tested primitive.** v13 adds a distinct `memory_write` evidence kind, memory intended-use and influence metadata, override-status warnings, and replay metrics for memory influence.
 56. **Persistent agent environments increase urgency, not authority.** OpenAI/Ona, AgentCore, GitHub reliability, and Copilot control-plane sources strengthen the runtime-state pressure while remaining evidence/context rather than operational truth.
+57. **Target receipt is now a pure tested primitive.** v14 adds a distinct `target_receipt` evidence kind, explicit receipt metadata, dispatch-only downgrade warnings, and replay metrics for dispatch-only versus applied target receipts.
 
 ## Source Changes
 
@@ -216,6 +218,13 @@ The current frontier is now broader and more precise: selected write-capable wor
 - Fresh source checks on MPBench and MEMFLOW keep the memory-write/admission and memory-read/control-flow bridge High for risk taxonomy while preserving preprint and implementation-scope limits.
 - GitHub Copilot control-plane, GitHub availability, OpenAI/Ona, and AWS AgentCore official sources strengthen the persistent-runtime and provider-policy context without promoting vendor state to substrate authority.
 - National Academies human-AI teaming and Google transactive-memory framing remain the PM bridge: memory governance should preserve source/channel/role/override status and be judged by risk capture, rework, and burden.
+
+### Added on 2026-06-16 v14
+
+- GitHub's June 15 Copilot usage-metrics update sharpened the telemetry gap: server-side confirmation can improve coverage while still lacking richer per-surface/per-feature detail.
+- AWS AgentCore's current June notes keep widening persistent runtime/session/workflow surfaces through interactive shells, harness embedding, and stateful gateway sessions.
+- OpenAI's June 14 partner-network news extends governance/distribution surfaces without changing the operational-state proof boundary.
+- Repo-grounded receipt closure: `@pm/agent-state` now distinguishes `target_receipt` from generic telemetry, and `@pm/evals` now carries dispatch-only and applied receipt fixtures plus receipt-status metrics.
 
 ## Corrected Claims
 

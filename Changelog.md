@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-16 - Target-receipt evidence lane, daily AI v09, and agent-state Arrowsmith v14
+
+- Added a first-class `target_receipt` external-evidence kind in `@pm/agent-state` so receipt evidence is no longer collapsed into generic telemetry.
+- Added `TargetReceiptEvidenceFacet` with `channel`, `correlatedDispatchId`, `receiptStatus`, `receiptId`, `targetSurface`, and `finalStateObserved`.
+- Added admission warnings for missing receipt metadata and for dispatch-only / acknowledgement-only pseudo-receipts, preserving the boundary that dispatch success is not delivery proof.
+- Extended `@pm/evals` with dispatch-only and clean applied target-receipt fixtures plus `targetReceiptCount`, `dispatchOnlyReceiptCount`, and `targetReceiptStatuses` replay metrics.
+- Regenerated `packages/evals/fixtures/evidence-admission-reviews.v1.jsonl` from the built package output so the committed corpus stays aligned with the new receipt lane.
+- Added `research/daily-ai-competitive-intelligence/v09-ai-competitive-intelligence-2026-06-16.md` and `research/daily-arrowsmith-agent-state/v14-agent-state-arrowsmith-2026-06-16.md`, updated both chain indexes plus `research/index.md`, and kept the task tree honest: target receipts are now implemented as a pure/replay primitive while durable live receipt/status stores and final-state verification remain open.
+- Verification: `pnpm vitest run packages/agent-state/src/external-evidence.test.ts --reporter=basic`; `pnpm vitest run packages/evals/src/evidence-admission.test.ts --reporter=basic`; `pnpm --filter @pm/agent-state build`; `pnpm --filter @pm/evals build`.
+
 ## 2026-06-15 - origin/main sync and replay-catalog count drift fix
 
 - Fast-forwarded local `main` to the latest `origin/main`, which added the `arrowhedgelab/` test project.

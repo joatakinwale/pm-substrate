@@ -243,6 +243,52 @@ export function buildEvidenceAdmissionFixtureCorpus(
         "Retrieved memory that would steer tool routing must not outrank current workflow instructions.",
     },
     {
+      fixtureId: "target-receipt-dispatch-only",
+      frontierRef: "frontier#11 / C049, C057 dispatch is not delivery proof",
+      evidence: base(
+        "target_receipt_dispatch",
+        "target_receipt",
+        "agentcore://gateway/dispatch_receipt",
+        {
+          targetReceipt: {
+            channel: "memory_store",
+            correlatedDispatchId: "dispatch_mem_001",
+            receiptStatus: "dispatched",
+            targetSurface: "agentcore-memory",
+          },
+        },
+      ),
+      context: context(),
+      expectedDecision: "admitted_with_warnings",
+      expectedIssueCodes: ["target_receipt_not_confirmed"],
+      notes:
+        "A dispatch log is admitted as evidence, but it does not count as target-side receipt or final application proof.",
+    },
+    {
+      fixtureId: "target-receipt-applied-clean",
+      frontierRef: "frontier#11 / C057 target-side receipt acknowledgement",
+      evidence: base(
+        "target_receipt_applied",
+        "target_receipt",
+        "otel://events/memory_write_applied",
+        {
+          targetReceipt: {
+            channel: "memory_store",
+            correlatedDispatchId: "dispatch_mem_002",
+            receiptStatus: "applied",
+            receiptId: "rcpt_mem_002",
+            targetSurface: "agentcore-memory",
+            finalStateObserved: true,
+          },
+        },
+      ),
+      context: context(),
+      expectedDecision: "admitted",
+      expectedIssueCodes: [],
+      notes:
+        "A target-side application receipt can be admitted cleanly when the target channel, dispatch correlation, and receipt status are explicit.",
+    },
+    {
       fixtureId: "monitoring-wait-condition",
       frontierRef: "frontier#5 monitoring/no-op wait condition",
       evidence: base("monitor", "monitoring_event", "arrowhedge://monitor/price_threshold", {
@@ -537,6 +583,7 @@ export interface EvidenceAdmissionMetrics {
   readonly decisions: Readonly<Record<EvidenceAdmissionDecision, number>>;
   readonly byKind: Readonly<Record<string, number>>;
   readonly memoryInfluenceKinds: Readonly<Record<string, number>>;
+  readonly targetReceiptStatuses: Readonly<Record<string, number>>;
   readonly issueCodeCounts: Readonly<Record<string, number>>;
   readonly invariantClassCounts: Readonly<Record<string, number>>;
   readonly wouldBlockAtHighConsequence: number;
@@ -546,6 +593,8 @@ export interface EvidenceAdmissionMetrics {
   readonly pmHandoffIncompleteCount: number;
   readonly memoryWriteCount: number;
   readonly memoryControlInfluenceCount: number;
+  readonly targetReceiptCount: number;
+  readonly dispatchOnlyReceiptCount: number;
   /** Monitoring lane (frontier item 5). */
   readonly prematureActionCount: number;
   readonly meanReactionTimeMs?: number;
@@ -562,6 +611,7 @@ export function analyzeEvidenceAdmissionFixtureResults(
   };
   const byKind: Record<string, number> = {};
   const memoryInfluenceKinds: Record<string, number> = {};
+  const targetReceiptStatuses: Record<string, number> = {};
   const issueCodeCounts: Record<string, number> = {};
   const invariantClassCounts: Record<string, number> = {};
   let wouldBlockAtHighConsequence = 0;
@@ -570,6 +620,8 @@ export function analyzeEvidenceAdmissionFixtureResults(
   let pmHandoffIncompleteCount = 0;
   let memoryWriteCount = 0;
   let memoryControlInfluenceCount = 0;
+  let targetReceiptCount = 0;
+  let dispatchOnlyReceiptCount = 0;
   let prematureActionCount = 0;
   const reactionTimes: number[] = [];
   const fixtureById = new Map(fixtures.map((fixture) => [fixture.fixtureId, fixture]));
@@ -582,6 +634,11 @@ export function analyzeEvidenceAdmissionFixtureResults(
     if (memoryInfluenceKind !== undefined) {
       memoryInfluenceKinds[memoryInfluenceKind] =
         (memoryInfluenceKinds[memoryInfluenceKind] ?? 0) + 1;
+    }
+    const targetReceiptStatus = review.evidence.targetReceipt?.receiptStatus;
+    if (targetReceiptStatus !== undefined) {
+      targetReceiptStatuses[targetReceiptStatus] =
+        (targetReceiptStatuses[targetReceiptStatus] ?? 0) + 1;
     }
     for (const issue of review.issues) {
       issueCodeCounts[issue.code] = (issueCodeCounts[issue.code] ?? 0) + 1;
@@ -615,6 +672,12 @@ export function analyzeEvidenceAdmissionFixtureResults(
     ) {
       memoryControlInfluenceCount += 1;
     }
+    if (review.evidence.kind === "target_receipt") {
+      targetReceiptCount += 1;
+      if (review.evidence.targetReceipt?.receiptStatus === "dispatched") {
+        dispatchOnlyReceiptCount += 1;
+      }
+    }
     const monitoring = fixtureById.get(result.fixtureId)?.monitoring;
     if (monitoring !== undefined) {
       const delta =
@@ -636,6 +699,7 @@ export function analyzeEvidenceAdmissionFixtureResults(
     decisions,
     byKind,
     memoryInfluenceKinds,
+    targetReceiptStatuses,
     issueCodeCounts,
     invariantClassCounts,
     wouldBlockAtHighConsequence,
@@ -644,6 +708,8 @@ export function analyzeEvidenceAdmissionFixtureResults(
     pmHandoffIncompleteCount,
     memoryWriteCount,
     memoryControlInfluenceCount,
+    targetReceiptCount,
+    dispatchOnlyReceiptCount,
     prematureActionCount,
     ...(reactionTimes.length > 0
       ? {

@@ -28,6 +28,7 @@ export type ExternalStateEvidenceKind =
   | "tool_annotation"
   | "memory_retrieval"
   | "memory_write"
+  | "target_receipt"
   | "monitoring_event"
   | "lineage_record"
   | "audit_event"
@@ -67,6 +68,12 @@ export type MemoryOverrideStatus =
   | "user_overridden"
   | "workflow_overridden"
   | "superseded";
+export type TargetReceiptStatus =
+  | "dispatched"
+  | "acknowledged"
+  | "delivered"
+  | "applied"
+  | "failed";
 
 /** Approval-currentness facet (competitive v04 / ledger C032). */
 export interface ApprovalEvidenceFacet {
@@ -88,6 +95,16 @@ export interface MemoryEvidenceFacet {
   readonly deletionResidueRisk?: EvidenceRiskLevel;
   readonly observableFeatureBoundary?: string;
   readonly staleInformationRisk?: EvidenceRiskLevel;
+}
+
+/** Target-side receipt facet (Arrowsmith v12 / ledger C049, C057). */
+export interface TargetReceiptEvidenceFacet {
+  readonly channel?: string;
+  readonly correlatedDispatchId?: string;
+  readonly receiptStatus?: TargetReceiptStatus;
+  readonly receiptId?: string;
+  readonly targetSurface?: string;
+  readonly finalStateObserved?: boolean;
 }
 
 /** Model/provider policy facet (competitive v03 / ledger C023). */
@@ -160,6 +177,7 @@ export interface ExternalStateEvidence {
   readonly payloadHash?: string;
   readonly approval?: ApprovalEvidenceFacet;
   readonly memory?: MemoryEvidenceFacet;
+  readonly targetReceipt?: TargetReceiptEvidenceFacet;
   readonly providerPolicy?: ProviderPolicyEvidenceFacet;
   readonly validation?: ValidationEvidenceFacet;
   readonly workflowTrace?: WorkflowTraceEvidenceFacet;
@@ -187,6 +205,8 @@ export type EvidenceAdmissionIssueCode =
   | "memory_influence_kind_missing"
   | "memory_control_override_status_missing"
   | "memory_control_overridden"
+  | "target_receipt_metadata_missing"
+  | "target_receipt_not_confirmed"
   | "memory_deletion_residue_risk"
   | "memory_stale_information_risk"
   | "workflow_stage_omitted"
@@ -369,6 +389,7 @@ export function reviewExternalStateEvidence(
   reviewApprovalCurrentness(evidence, context, issues);
   reviewProviderPolicy(evidence, context, issues);
   reviewMemoryFacet(evidence, issues);
+  reviewTargetReceipt(evidence, issues);
   reviewWorkflowTrace(evidence, context, issues);
   reviewIdentityAlignment(evidence, issues);
   reviewPmHandoff(evidence, issues);
@@ -444,6 +465,7 @@ export function invariantClassesForAdmissionIssue(
     case "memory_write_metadata_missing":
     case "memory_influence_kind_missing":
     case "memory_control_override_status_missing":
+    case "target_receipt_metadata_missing":
     case "pm_handoff_incomplete":
       return ["required_evidence"];
     case "future_observed_at":
@@ -458,6 +480,7 @@ export function invariantClassesForAdmissionIssue(
       return ["source_authority"];
     case "approval_revision_mismatch":
     case "approval_content_hash_mismatch":
+    case "target_receipt_not_confirmed":
       return ["state_conflict"];
     case "approval_scope_mismatch":
     case "sensitive_data_class_blocked":
@@ -640,6 +663,43 @@ function reviewMemoryFacet(
       severity: "warn",
       path: "/memory/staleInformationRisk",
       message: `Memory evidence carries ${memory.staleInformationRisk} stale-information risk and requires current-state revalidation before use.`,
+    });
+  }
+}
+
+function reviewTargetReceipt(
+  evidence: ExternalStateEvidence,
+  issues: EvidenceAdmissionIssue[],
+): void {
+  if (evidence.kind !== "target_receipt") {
+    return;
+  }
+
+  const receipt = evidence.targetReceipt;
+  const missing: string[] = [];
+  if (receipt?.channel === undefined) missing.push("channel");
+  if (receipt?.correlatedDispatchId === undefined) {
+    missing.push("correlatedDispatchId");
+  }
+  if (receipt?.receiptStatus === undefined) missing.push("receiptStatus");
+  if (missing.length > 0) {
+    issues.push({
+      code: "target_receipt_metadata_missing",
+      severity: "warn",
+      path: "/targetReceipt",
+      message: `Target receipt evidence is missing receipt metadata: ${missing.join(", ")}.`,
+    });
+  }
+
+  if (
+    receipt?.receiptStatus === "dispatched" ||
+    receipt?.receiptStatus === "acknowledged"
+  ) {
+    issues.push({
+      code: "target_receipt_not_confirmed",
+      severity: "warn",
+      path: "/targetReceipt/receiptStatus",
+      message: `Target receipt status ${receipt.receiptStatus} does not yet prove target-side delivery/application; dispatch proof stays separate from admitted receipt state.`,
     });
   }
 }

@@ -33,6 +33,7 @@ describe("evidence admission fixture corpus", () => {
       "tool_annotation",
       "memory_retrieval",
       "memory_write",
+      "target_receipt",
       "monitoring_event",
       "approval_record",
       "provider_policy",
@@ -92,6 +93,10 @@ describe("evidence admission fixture corpus", () => {
     expect(metrics.pmHandoffIncompleteCount).toBe(1);
     expect(metrics.memoryWriteCount).toBe(2);
     expect(metrics.memoryControlInfluenceCount).toBe(2);
+    expect(metrics.targetReceiptCount).toBe(2);
+    expect(metrics.dispatchOnlyReceiptCount).toBe(1);
+    expect(metrics.targetReceiptStatuses["dispatched"]).toBe(1);
+    expect(metrics.targetReceiptStatuses["applied"]).toBe(1);
     expect(metrics.memoryInfluenceKinds["fact"]).toBe(1);
     expect(metrics.memoryInfluenceKinds["instruction"]).toBe(1);
     expect(metrics.memoryInfluenceKinds["preference"]).toBe(1);
@@ -100,6 +105,7 @@ describe("evidence admission fixture corpus", () => {
     expect(metrics.issueCodeCounts["approval_revision_mismatch"]).toBe(1);
     expect(metrics.issueCodeCounts["memory_write_metadata_missing"]).toBe(1);
     expect(metrics.issueCodeCounts["memory_control_overridden"]).toBe(1);
+    expect(metrics.issueCodeCounts["target_receipt_not_confirmed"]).toBe(1);
     expect(metrics.wouldBlockAtHighConsequence).toBeGreaterThan(0);
     expect(metrics.invariantClassCounts["freshness_window"]).toBeGreaterThan(0);
   });

@@ -1,11 +1,11 @@
 # Daily AI Competitive Intelligence Index
 
-Last updated: 2026-06-15
+Last updated: 2026-06-16
 Scope: major AI companies, workspace AI, enterprise AI, agent platforms, AI coding/productivity tools, and competitors that may overlap with pm-substrate's operational-state thesis.
 
 ## Current Baseline
 
-The first eight versioned runs are complete. The live competitive pattern is now stronger than simple “more evidence lanes”: major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, long-running runtime state, approval/policy mechanics, and evaluation/analytics, while also making agent work more persistent, searchable, and organization-governed. None of the fresh 2026-06-12 to 2026-06-15 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, observed-read-set comparison, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof. The strongest current delta is that governance surfaces kept widening while reliability and persistence remained imperfect, so the correct pm-substrate answer was to type memory evidence more strictly rather than invent a broader competitor taxonomy.
+The first nine versioned runs are complete. The live competitive pattern is now stronger than simple “more evidence lanes”: major vendors are expanding agent control planes, enterprise plugin/tool governance, shared workspace context, external validation, provider/model policy, client surfaces, long-running runtime state, approval/policy mechanics, and evaluation/analytics, while also making agent work more persistent, searchable, and organization-governed. None of the fresh 2026-06-14 to 2026-06-16 official sources proved a full governed operational-state layer with original-observation review, source authority, read-set validation, observed-read-set comparison, workflow validity, and durable state-review artifacts. ServiceNow remains the highest direct threat baseline because its May 2026 Action Fabric/Context Engine/AI Control Tower language most closely overlaps with `pm-substrate`, but the public evidence is still vendor/product positioning rather than inspectable artifact-review proof. The strongest current delta is that telemetry and persistence surfaces kept widening while detail/currentness remained incomplete, so the correct pm-substrate answer was to type target-side receipt evidence rather than promote server-side activity or dispatch logs into shared-state truth.
 
 Parallel-run reconciliation on 2026-06-08: `origin/main` created v01 while a local broader vendor scan was still running. v01 remains the canonical first version. The local scan is preserved as v02, and both lines of evidence are folded into this index and the shared research ledger.
 
@@ -39,6 +39,7 @@ Each run must:
 | v06 | 2026-06-12 | `research/daily-ai-competitive-intelligence/v06-ai-competitive-intelligence-2026-06-12.md` | Persistence/governance continuation and verification-catalog closure | Added June 10-12 official deltas for GitHub searchable agent sessions and Agentic Workflows, Google Vault Gemini retention/holds, AWS AgentCore persistent shells/workflow embedding, and OpenAI’s Ona acquisition for persistent Codex environments; translated that pressure into committed-corpus-backed verification catalogs and write-transport coverage metrics. |
 | v07 | 2026-06-12 | `research/daily-ai-competitive-intelligence/v07-ai-competitive-intelligence-2026-06-12.md` | Certificate-bound replay hardening and tenant-alignment closure | Re-checked the same official window, found no stronger public vendor contradiction, and converted the v10 certificate/revocation frontier into workflow/evals code: certificate-aware catalog verification, deterministic replay certificates, recomputed committed-row replay, and tenant-aligned ArrowHedge corpora. |
 | v08 | 2026-06-15 | `research/daily-ai-competitive-intelligence/v08-ai-competitive-intelligence-2026-06-15.md` | Memory-governance continuation and official-window re-check | Re-checked the 2026-06-12 to 2026-06-15 official window, found stronger vendor governance controls but no stronger operational-state contradiction, and converted that pressure into memory-write admission plus memory-influence classification fixtures and metrics. |
+| v09 | 2026-06-16 | `research/daily-ai-competitive-intelligence/v09-ai-competitive-intelligence-2026-06-16.md` | Telemetry/runtime pressure continuation and target-receipt closure | Re-checked the 2026-06-14 to 2026-06-16 official window, found stronger server-side telemetry/runtime-session pressure but no stronger operational-state contradiction, and converted that pressure into a first-class `target_receipt` evidence lane plus replay fixtures and metrics. |
 
 ## Top Deltas
 
@@ -59,6 +60,7 @@ Each run must:
 15. The June 12 official pattern is persistent agent work under tighter enterprise governance: GitHub session recall + agentic workflows, Google Vault holds for Gemini, AWS persistent shells/workflows, and OpenAI persistent Codex environments all increase pressure on substrate-owned verification rather than raw persistence.
 16. v07 adds the stricter local answer to that pressure: persisted evidence is not reusable for writes unless certificate digest, policy version, revocation epoch, execution identity, validity window, tenant, workflow, artifact hash, and evidence-review coverage verify together.
 17. v08 adds the next local answer: persistent memory is not reusable evidence until memory writes declare source/intended use and recalled memory declares whether it is fact, preference, instruction, tool-routing, policy-like rule, or summary.
+18. v09 adds the next local answer: server-side telemetry and dispatch logs are not target confirmation, so receipt evidence now needs its own typed replay lane before shared-state promotion.
 
 ## Source Changes
 
@@ -125,6 +127,13 @@ Each run must:
 - OpenAI's June 11 Ona direction and AWS AgentCore's current runtime/memory/browser/code-interpreter docs kept the persistence/governance pattern intact rather than contradicting it.
 - Repo-grounded implementation: the competitive answer was memory evidence typing, not another vendor memo. `memory_write` now exists as a first-class evidence kind, memory influence is classified explicitly, and replay fixtures/metrics cover hidden-instruction writes, clean preference writes, and overridden tool-routing retrieval.
 
+### Added on 2026-06-16 v09
+
+- GitHub's June 15 Copilot usage-metrics update explicitly mixes server-side telemetry with client telemetry while still leaving richer per-surface/per-feature breakdowns incomplete for server-only users.
+- OpenAI's June 14 partner-network news extends governance/distribution reach without exposing a portable state-review artifact.
+- AWS AgentCore's current June release notes keep deepening persistent runtime/session/workflow surfaces through interactive shells, Step Functions harness embedding, and stateful gateway sessions.
+- Repo-grounded implementation: the competitive answer was target receipt evidence typing. `target_receipt` now exists as a first-class evidence kind, dispatch-only pseudo-receipts warn, and replay fixtures/metrics distinguish dispatch-only from applied target receipts.
+
 ## Current Highest Threats
 
 | Threat | Vendor | Why it matters | Current assessment |
@@ -168,7 +177,7 @@ Each run must:
 ## Current Implementation/Test Task Tree
 
 ```text
-competitive-intelligence frontier after v07
+competitive-intelligence frontier after v09
 |
 +-- T1 committed replay -> verification catalog
 |   |-- status: IMPLEMENTED 2026-06-12
@@ -185,17 +194,18 @@ competitive-intelligence frontier after v07
 |   |-- proof: workflow verifier rejects digest mismatch, expired validity, and revoked certificates
 |   `-- proof: write-binding replay rows carry deterministic certificate id/digest for complete candidate bindings
 |
-+-- T4 durable verification stores
++-- T4 target-side receipt evidence lane
+|   |-- status: IMPLEMENTED (pure/replay) 2026-06-16
+|   |-- proof: dispatch-only receipts now warn instead of reading as admitted target confirmation
+|   `-- proof: replay metrics distinguish dispatch-only from applied target receipts
+|
++-- T5 durable verification stores
 |   |-- source: GitHub/OpenAI/AWS persistent runtime/session pressure
-|   `-- next proof: DB-backed or substrate-store-backed catalog verification, not fixture-backed only
+|   `-- next proof: DB-backed or substrate-store-backed catalog/receipt verification, not fixture-backed only
 |
-+-- T5 transport-wide adoption
-|   |-- source: workflow/runtime persistence and org-governed automation
-|   `-- next proof: every external write-capable transport reports required/advisory/missing binding coverage
-|
-`-- T6 live runtime revalidation
-    |-- source: GitHub sessions, Google retention governance, AWS interactive shells, OpenAI persistent environments
-    `-- next proof: live handles/sessions/runtime state cannot bypass current-state review when replay data is stale or mismatched
+`-- T6 transport-wide runtime adoption
+    |-- source: workflow/runtime persistence and org-governed automation
+    `-- next proof: real write transports consume admitted receipt evidence before shared-state promotion
 ```
 
 ## Watchlist

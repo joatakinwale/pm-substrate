@@ -215,6 +215,66 @@ describe("reviewExternalStateEvidence", () => {
     expect(review.decision).toBe("admitted");
   });
 
+  it("warns when a target receipt is only dispatch evidence without target acknowledgement", () => {
+    const review = reviewExternalStateEvidence(
+      baseEvidence({
+        kind: "target_receipt",
+        source: "agentcore://gateway/dispatch_receipt",
+        targetReceipt: {
+          channel: "memory_store",
+          correlatedDispatchId: "dispatch_001",
+          receiptStatus: "dispatched",
+          targetSurface: "agentcore-memory",
+        },
+      }),
+      baseContext(),
+    );
+
+    const codes = review.issues.map((issue) => issue.code);
+    expect(codes).toContain("target_receipt_not_confirmed");
+    expect(review.decision).toBe("admitted_with_warnings");
+    expect(review.invariantClasses).toContain("state_conflict");
+  });
+
+  it("requires channel, dispatch correlation, and receipt status on target receipts", () => {
+    const review = reviewExternalStateEvidence(
+      baseEvidence({
+        kind: "target_receipt",
+        source: "agentcore://gateway/receipt",
+        targetReceipt: {
+          targetSurface: "agentcore-memory",
+        },
+      }),
+      baseContext(),
+    );
+
+    expect(review.issues.map((issue) => issue.code)).toContain(
+      "target_receipt_metadata_missing",
+    );
+    expect(review.invariantClasses).toContain("required_evidence");
+  });
+
+  it("admits confirmed target receipts that include target acknowledgement metadata", () => {
+    const review = reviewExternalStateEvidence(
+      baseEvidence({
+        kind: "target_receipt",
+        source: "otel://events/memory_write_applied",
+        targetReceipt: {
+          channel: "memory_store",
+          correlatedDispatchId: "dispatch_001",
+          receiptStatus: "applied",
+          receiptId: "rcpt_001",
+          targetSurface: "agentcore-memory",
+          finalStateObserved: true,
+        },
+      }),
+      baseContext(),
+    );
+
+    expect(review.decision).toBe("admitted");
+    expect(review.issues).toHaveLength(0);
+  });
+
   it("warns on provider policy version drift and blocked data classes (C023)", () => {
     const review = reviewExternalStateEvidence(
       baseEvidence({
