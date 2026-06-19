@@ -1,4 +1,5 @@
 import "./styles.css";
+import { fetchSnapshot, renderLive } from "./live.js";
 import {
   formatTime,
   loadDashboardData,
@@ -18,7 +19,7 @@ type Selection =
   | { readonly kind: "admission"; readonly id: string }
   | { readonly kind: "writeBinding"; readonly id: string };
 
-type DashboardView = "grid" | "list" | "flow" | "safe" | "data" | "trend" | "gear";
+type DashboardView = "live" | "grid" | "list" | "flow" | "safe" | "data" | "trend" | "gear";
 type TimelineResolution = "48" | "24" | "12";
 type TableMode = "full" | "compact";
 
@@ -57,6 +58,30 @@ if (!app) {
 
 writeStateToUrl(initialState, true);
 render(app, data, initialState);
+maybeMountLive(app, data, initialState);
+
+// Auto-refresh the live surface while it is the active view.
+let liveTimer: ReturnType<typeof setInterval> | null = null;
+function maybeMountLive(
+  root: HTMLElement,
+  dashboard: DashboardData,
+  state: DashboardState,
+): void {
+  if (liveTimer) {
+    clearInterval(liveTimer);
+    liveTimer = null;
+  }
+  if (state.view !== "live") return;
+  const mount = root.querySelector<HTMLElement>("#live-mount");
+  if (!mount) return;
+  const load = async () => {
+    const snap = await fetchSnapshot();
+    const current = root.querySelector<HTMLElement>("#live-mount");
+    if (current) renderLive(current, snap);
+  };
+  void load();
+  liveTimer = setInterval(() => void load(), 5000);
+}
 
 function render(root: HTMLElement, dashboard: DashboardData, state: DashboardState): void {
   root.innerHTML = `
@@ -78,6 +103,7 @@ function render(root: HTMLElement, dashboard: DashboardData, state: DashboardSta
 
 function renderAppRail(state: DashboardState): string {
   const items: ReadonlyArray<readonly [DashboardView, string, string]> = [
+    ["live", "Live", "LV"],
     ["grid", "Overview", "GR"],
     ["list", "Rows", "LI"],
     ["flow", "Evidence Flow", "FL"],
@@ -216,6 +242,9 @@ function renderLeftRail(dashboard: DashboardData, state: DashboardState): string
 }
 
 function renderMainSurface(dashboard: DashboardData, state: DashboardState): string {
+  if (state.view === "live") {
+    return `<main class="main-surface main-surface-live"><div id="live-mount"><div class="live-shell"><div class="live-banner warn">Loading live snapshot…</div></div></div></main>`;
+  }
   if (state.view === "list") {
     return `
       <main class="main-surface">
@@ -977,6 +1006,7 @@ function bindInteractions(root: HTMLElement, dashboard: DashboardData, state: Da
       const next = { ...state, view };
       writeStateToUrl(next);
       render(root, dashboard, next);
+      maybeMountLive(root, dashboard, next);
     });
   });
 
@@ -1401,6 +1431,7 @@ function parseResolution(value: string | null | undefined): TimelineResolution {
 
 function parseDashboardView(value: string | null | undefined): DashboardView {
   if (
+    value === "live" ||
     value === "list" ||
     value === "flow" ||
     value === "safe" ||
@@ -1410,7 +1441,7 @@ function parseDashboardView(value: string | null | undefined): DashboardView {
   ) {
     return value;
   }
-  return "grid";
+  return "live";
 }
 
 function renderOptions(options: readonly string[], selected: string): string {

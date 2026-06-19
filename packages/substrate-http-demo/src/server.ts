@@ -38,6 +38,7 @@ import { PostgresRegistry } from "@pm/registry";
 import { PostgresTenantDirectory } from "@pm/tenants";
 
 import { createSubstrateApp } from "@pm/substrate-http";
+import { arrowhedgeRoutes } from "./arrowhedge-route.js";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -77,6 +78,16 @@ const app = createSubstrateApp({
   projections,
   // Capability-specific domain event handlers register here per deployment.
   // The demo ships none: the substrate surface itself is the demonstration.
+  //
+  // Profile-specific ingest surfaces are injected as extra routes (the
+  // substrate library stays profile-agnostic). The ArrowHedgeLab finance
+  // bridge mounts at /tenants/:tenantId/arrowhedge.
+  extraRoutes: [
+    {
+      basePath: "arrowhedge",
+      router: arrowhedgeRoutes({ pool, graph, events, projections }),
+    },
+  ],
 });
 
 // ---------------------------------------------------------------------------

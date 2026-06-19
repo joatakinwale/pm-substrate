@@ -254,6 +254,15 @@ export interface ArrowHedgePlanContext {
   readonly profile: ProfileDefinition;
   readonly adapterStartedAt: Timestamp;
   readonly emittedBy?: string;
+  /**
+   * When true, deterministic graph node ids are namespaced by tenant. Graph
+   * node ids are globally unique across tenants, but content-addressed ids
+   * like `ticker:AAPL` are identical for every tenant ingesting the same
+   * real-world entity — which collides when more than one tenant shares a
+   * process (e.g. the live HTTP ingest route). Defaults to false to preserve
+   * legacy single-scope ids (and the committed fixture corpus).
+   */
+  readonly scopeNodeIdsByTenant?: boolean;
 }
 
 export interface ArrowHedgeExecutionResult {
@@ -335,7 +344,21 @@ const ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMAS: Readonly<
   ),
 );
 
-export function parseArrowHedgeSnapshot(input: unknown): ArrowHedgeParseResult {
+/**
+ * Parse + map an ArrowHedge snapshot into source entity records.
+ *
+ * `idScope` (optional) namespaces the deterministic node ids. Graph node ids
+ * are globally unique across tenants, but content-addressed ids like
+ * `ticker:AAPL` are identical for every tenant that ingests the same
+ * real-world entity — which collides when more than one tenant uses a shared
+ * process (e.g. the live HTTP ingest route). Passing the tenant id as idScope
+ * keeps node ids deterministic *within* a tenant while avoiding cross-tenant
+ * UUID collisions. Omitting it preserves the legacy single-scope behavior.
+ */
+export function parseArrowHedgeSnapshot(
+  input: unknown,
+  idScope?: string,
+): ArrowHedgeParseResult {
   const issues: ArrowHedgeValidationIssue[] = [];
   if (!isRecord(input)) {
     return {
@@ -387,7 +410,7 @@ export function parseArrowHedgeSnapshot(input: unknown): ArrowHedgeParseResult {
     records.push({
       sourceName,
       sourceRecordId,
-      id: stableEntityId(sourceRecordId),
+      id: stableEntityId(idScope ? `${idScope}:${sourceRecordId}` : sourceRecordId),
       observedAt: observedAt!,
       row,
     });
@@ -512,7 +535,10 @@ export function buildArrowHedgeIngestionPlan(
   input: unknown,
   ctx: ArrowHedgePlanContext,
 ): ArrowHedgeIngestionPlan {
-  const parsed = parseArrowHedgeSnapshot(input);
+  const parsed = parseArrowHedgeSnapshot(
+    input,
+    ctx.scopeNodeIdsByTenant ? ctx.tenantId : undefined,
+  );
   if (!parsed.valid || !parsed.snapshot) {
     return invalidPlan(parsed.issues, ctx, parsed.records.length || 1);
   }
@@ -924,7 +950,12 @@ export function buildArrowHedgeProposalReview(
       ...(input.observationContract !== undefined
         ? { observationContract: input.observationContract }
         : {}),
-      enforcementMode: input.enforcementMode ?? "advisory",
+      // Enforce by default: a failed read-set or observation-contract check
+      // must block the proposal, not merely warn. Advisory-by-default made the
+      // proposal-review layer non-enforcing (Audit 2026-06-19: the dashboard
+      // "policy" column showed allowed=true even on contract failures). Callers
+      // can still opt into "advisory" explicitly for shadow/observe-only runs.
+      enforcementMode: input.enforcementMode ?? "blocking",
     },
   );
 }
@@ -1514,7 +1545,17 @@ function buildTypedEvents(
     }),
   ];
 
-  if (decision.node.identity["accepted"] === true && !hasStateDisagreement(snapshot)) {
+  // Acceptance is gated by BOTH authority checks: a decision may only be
+  // accepted if there is no state disagreement AND the backing state is not
+  // stale. Previously only disagreement was checked, so a stale-but-agreeing
+  // decision emitted BOTH accepted and blocked.stale_state for the same
+  // decision — the stale protection was advisory, not enforced. (Audit
+  // 2026-06-18: GOOG/NVDA/TSLA were accepted while also stale-blocked.)
+  if (
+    decision.node.identity["accepted"] === true &&
+    !hasStateDisagreement(snapshot) &&
+    !isStale(snapshot)
+  ) {
     events.push(
       typedEvent({
         tenantId,

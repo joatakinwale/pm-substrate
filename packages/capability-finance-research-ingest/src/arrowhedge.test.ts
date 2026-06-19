@@ -565,10 +565,13 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       mode: "warn",
       valid: false,
       execution: {
-        allowed: true,
-        blocking: false,
-        enforcementMode: "advisory",
-        reason: "advisory_warn_first_v1",
+        // Enforced by default (2026-06-19): a failed read-set / observation
+        // contract on a stale-blocked view now BLOCKS the proposal instead of
+        // merely warning. This is the proposal-review enforcement gate.
+        allowed: false,
+        blocking: true,
+        enforcementMode: "blocking",
+        reason: "blocking_policy_failed",
       },
       currentStateView: {
         workflowPosition: "blocked_stale_state",
@@ -586,6 +589,59 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(review?.observationEvaluation.currentStateViewId).toBe(
       "arrowhedge_cop_review:AAPL:current_state_view",
     );
+  });
+
+  it("allows explicit advisory opt-out on the same failing proposal (shadow mode)", async () => {
+    const tenant = tenantId("tnt_arrowhedge_advisory_optout");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_advisory",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+    const originalView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const originalObservation =
+      buildObservationContractFromCurrentStateView(originalView);
+
+    const review = buildArrowHedgeProposalReview({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId: "dec_aapl_buy_120" },
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      // Explicit opt-out: same failing input, but caller asked for advisory.
+      enforcementMode: "advisory",
+    });
+
+    // Same view is still invalid, but advisory mode does not block.
+    expect(review).toMatchObject({
+      valid: false,
+      execution: {
+        allowed: true,
+        blocking: false,
+        enforcementMode: "advisory",
+        reason: "advisory_warn_first_v1",
+      },
+    });
   });
 
   it("builds a replayable ArrowHedge state-review artifact with ticker provenance", async () => {
@@ -641,9 +697,9 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       review: {
         valid: false,
         execution: {
-          allowed: true,
-          blocking: false,
-          enforcementMode: "advisory",
+          allowed: false,
+          blocking: true,
+          enforcementMode: "blocking",
         },
       },
     });

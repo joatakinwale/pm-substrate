@@ -471,12 +471,18 @@ importers:
 
   packages/substrate-http-demo:
     dependencies:
+      '@pm/capability-finance-research-ingest':
+        specifier: workspace:*
+        version: link:../capability-finance-research-ingest
       '@pm/events':
         specifier: workspace:*
         version: link:../events
       '@pm/graph':
         specifier: workspace:*
         version: link:../graph
+      '@pm/profile-finance-research':
+        specifier: workspace:*
+        version: link:../profile-finance-research
       '@pm/profile-registry':
         specifier: workspace:*
         version: link:../profile-registry

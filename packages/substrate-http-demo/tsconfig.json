@@ -36,6 +36,12 @@
     },
     {
       "path": "../substrate-http"
+    },
+    {
+      "path": "../capability-finance-research-ingest"
+    },
+    {
+      "path": "../profile-finance-research"
     }
   ]
 }

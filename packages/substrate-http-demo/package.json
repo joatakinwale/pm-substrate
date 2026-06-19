@@ -14,6 +14,8 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
+    "@pm/capability-finance-research-ingest": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
     "@pm/events": "workspace:*",
     "@pm/graph": "workspace:*",
     "@pm/profile-registry": "workspace:*",
