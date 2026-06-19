@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-16
+Last updated: 2026-06-19
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -15,7 +15,7 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 
 The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The durable artifact lifecycle and first external-evidence frontier are now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, an invariant-class `wouldBlock` policy matrix, and committed replayable corpora for external-evidence admission, ArrowHedge state-review artifacts, and write-binding attempts.
 
-The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closed the memory-write/read taxonomy seam. v14 partly closed the target-receipt seam as a pure replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. v15 now identifies status-currentness as the next authority boundary: certificates, receipts, MCP handles, task ids, and PM acknowledgements need decision-time status checks for revocation, suspension, refresh, staleness, status authority, and privacy/correlation risk. The remaining proof boundary is durable certificate/status verification, durable live receipt/status stores, memory-store/runtime enforcement beyond replay fixtures, policy-transition checks, final-state verification, and PM protocol-burden measurement.
+The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closed the memory-write/read taxonomy seam. v14 partly closed the target-receipt seam as a pure replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. v15 identifies status-currentness as the next authority boundary: certificates, receipts, MCP handles, task ids, and PM acknowledgements need decision-time status checks for revocation, suspension, refresh, staleness, status authority, and privacy/correlation risk. v16 adds a stricter enforcement correction from the local June 18 ArrowHedge live-bridge audit: a block event is not proof of mutation prevention unless the action lifecycle has a mutually exclusive terminal outcome. The remaining proof boundary is terminal outcome partitioning, durable certificate/status verification, durable live receipt/status stores, memory-store/runtime enforcement beyond replay fixtures, policy-transition checks, final-state verification, and PM protocol-burden measurement.
 
 ## Versions
 
@@ -38,6 +38,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 | v13 | 2026-06-15 | `research/daily-arrowsmith-agent-state/v13-agent-state-arrowsmith-2026-06-15.md` | Memory write admission and memory-influence taxonomy closure | Converted v12's memory frontier into code: `memory_write` is now a first-class evidence kind, memory writes require source-channel/intended-use metadata, recalled memory is classified by influence kind, control-influencing memory needs override metadata, and replay fixtures/metrics now cover hidden-instruction writes, clean preference writes, and overridden tool-routing memory. |
 | v14 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v14-agent-state-arrowsmith-2026-06-16.md` | Target-receipt evidence closure and telemetry-gap correction | Converted the next open v12 frontier into code: `target_receipt` is now a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as admitted confirmation, and replay fixtures/metrics distinguish dispatch-only from applied target receipts. |
 | v15 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v15-agent-state-arrowsmith-2026-06-16.md` | Status-currentness bridge and durable status-store frontier | Continued from same-day v14 and shifted the next implementation frontier to decision-time status checks for replay certificates, target receipts, MCP task handles, and PM handoff acknowledgements. |
+| v16 | 2026-06-19 | `research/daily-arrowsmith-agent-state/v16-agent-state-arrowsmith-2026-06-19.md` | Terminal enforcement correction and live-bridge audit bridge | Added the correction that stale-state detection or block-event emission is not enough; action lifecycles need mutually exclusive terminal outcomes, dashboard metric provenance, and status checks wired into the action gate. |
 
 ## Top Findings
 
@@ -99,6 +100,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 56. **Persistent agent environments increase urgency, not authority.** OpenAI/Ona, AgentCore, GitHub reliability, and Copilot control-plane sources strengthen the runtime-state pressure while remaining evidence/context rather than operational truth.
 57. **Target receipt is now a pure tested primitive.** v14 adds a distinct `target_receipt` evidence kind, explicit receipt metadata, dispatch-only downgrade warnings, and replay metrics for dispatch-only versus applied target receipts.
 58. **Status-currentness is the next authority boundary.** v15 separates a certificate or receipt from its current status: revocation, suspension, refresh, checked-at time, status authority, and privacy/correlation risk must be checked before evidence supports valid action.
+59. **Block events are not enforcement unless terminal outcomes partition.** v16 corrects the live ArrowHedge bridge boundary: detected stale state, emitted block records, and suppressed actions are separate claims until one stable action id has exactly one terminal outcome.
 
 ## Source Changes
 
@@ -236,6 +238,14 @@ The current frontier is now broader and more precise: selected write-capable wor
 - STAGE-Claw and STATE-Bench strengthened final-state verification metrics: receipt-backed writes still need refreshed persistent-state checks.
 - PABU and Belief Memory strengthened the partial-observability bridge while preserving the implementation boundary: learned belief/memory can guide agents, but pm-substrate should enforce status/currentness with existing runtime evidence.
 
+### Added on 2026-06-19 v16
+
+- Runtime Compliance Verification for AI Agents / C-Trace strengthened the bridge from post-hoc traces to runtime compliance checks: constraints should be represented and checked in the execution path before side effects.
+- Formal Modeling of LLM Agents' Context strengthened typed context modeling: a prompt/context window is not a substitute for `currentStateView`, observation contract, and terminal transition semantics.
+- Searching for Synergy in Shared Workspace Human-AI Collaboration and Formalising Human-in-the-Loop strengthened the PM burden/oversight correction: shared state and human approval need role/status scaffolding, not generic dashboard exposure.
+- ToolGate strengthened the contract-gated execution bridge: preconditions and postconditions should gate tool invocation and state commits, which maps to terminal outcome partitioning for ArrowHedge decisions.
+- Local June 18 ArrowHedge bridge and dashboard audits added repo-grounded evidence: seeded stale actions were detected, but pre-fix events could emit both accepted and blocked outcomes for the same decision. This corrects the claim boundary from "block observed" to "block is terminal."
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -271,6 +281,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 - v13 partially closes v12's memory frontier: replayable evidence admission now distinguishes `memory_write` from `memory_retrieval`, classifies memory influence, and warns when control-surface memory lacks or violates override metadata; live memory-store/runtime enforcement is still open.
 - v13 keeps memory safety scoped: replay warnings are not durable memory status/deletion proof, not poisoned-memory denial, not write-binding consumption of memory influence, and not final target-state confirmation.
 - v13 corrects persistent-runtime framing: long-running cloud environments and provider controls are market/context evidence, not operational-state authority.
+- v16 corrects the local live-bridge proof boundary: an emitted `workflow.blocked.stale_state` event is not itself proof that a stale decision was suppressed. Terminal outcome partitioning must prove accepted/blocked/rejected/held are mutually exclusive for a stable decision id.
+- v16 keeps the June 18 bridge scoped as local/uncommitted evidence until those implementation files, experiment outputs, and dashboard semantics are published on `main`.
 
 ## Downgraded Claims
 
@@ -314,6 +326,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 - Status-rich credentials are downgraded as direct production authority; they provide vocabulary for issuer/status/revocation/currentness, but pm-substrate still needs substrate-owned authority mapping and decision-time checks.
 - MCP task handles and explicit state handles are downgraded as durable truth; they are references that require admitted status/result lookup.
 - Belief-state or memory-model improvements are downgraded as substitutes for status checks; they estimate hidden state under partial observability but do not verify current operational authority.
+- Block-event counts are downgraded as enforcement proof unless the action lifecycle suppresses the competing action and the dashboard can reconcile proposed -> terminal outcome counts.
+- Shared-workspace UX is downgraded as PM coordination proof unless role clarity, owner/source agreement, stale status handling, rework, and protocol burden are measured.
 
 ## Rejected Bridges
 
@@ -343,6 +357,7 @@ The current frontier is now broader and more precise: selected write-capable wor
 24. Target receipts as final-state verification.
 25. MCP task IDs as current task authority.
 26. W3C status-list vocabulary as a mandate to become a VC platform.
+27. Block-event emission as mutation enforcement when an accepted event can still coexist for the same action id.
 
 ## Current Implementation Implications
 
@@ -368,6 +383,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 20. Promote replay certificates into a durable status source with issuer, proof, revocation, status checked-at, policy version, validity window, tenant/workflow, and execution identity.
 21. Preserve participant, role, modality, source artifact, conflict, and unresolved-risk fields in PM handoff memory rather than flattening into summaries.
 22. Add small deterministic policy-transition specs before broad formal workflow verification.
+23. Add terminal outcome partitioning before broad live-governance claims: one decision/action id should emit exactly one terminal state, and block-class outcomes must suppress accepted/write outcomes unless explicitly advisory.
+24. Make dashboard metrics query-traceable and lifecycle-aware: stale blocks should be a gate-failure cause, not a separate double-counted KPI.
 
 ## Metrics Queue
 
@@ -543,21 +560,27 @@ The current frontier is now broader and more precise: selected write-capable wor
 - `final_state_after_receipt_consistency_rate`
 - `state_mutation_false_positive_rate`
 - `rework_after_status_check_rate`
+- `terminal_outcome_partition_violation_count`
+- `decision_funnel_reconciliation_rate`
+- `gate_failure_cause_coverage`
+- `block_without_suppression_count`
+- `handoff_supersession_caught_rate`
 
 ## Next-Day Watchlist
 
-1. Implement the smallest pure `EvidenceStatusCheck` type and test matrix before durable store work.
-2. Decide how status checks attach to `InvocationEvidenceBinding`, replay certificates, target receipts, MCP task handles, and PM handoff acknowledgements.
+1. Add a terminal-outcome partition helper/test before durable status-store work: stale-but-agreeing ArrowHedge decisions must be proposed + blocked, not accepted + blocked.
+2. Implement the smallest pure `EvidenceStatusCheck` type and attach it to the terminal decision envelope, `InvocationEvidenceBinding`, replay certificates, target receipts, MCP task handles, and PM handoff acknowledgements.
 3. Add valid, revoked, suspended, refresh-required, stale, failed, superseded, and authority-mismatch replay cases.
 4. Add status authority mismatch warnings before claiming any production certificate/status authority.
-5. Inspect `@pm/workflow` and `@pm/evals` for the smallest store-like abstraction that can load certificate and receipt status without pulling in DB dependencies.
-6. Re-check primary code/data availability for MPBench, MEMFLOW, Lean4Agent, HarnessFix, M3Exam, H2HMem, STATE-Bench, OCELOT, ContractBench, and STALE.
-7. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, cleanup metadata, and draft/final spec drift.
-8. Capture nested tool-wrapper subcall read/write refs for HyperTool-style executable wrappers.
-9. Treat skill documents and compiled corrections as external evidence in one fixture path: version, trigger precision, scope, owner, source, and fault-coverage metadata.
-10. Add a trajectory release-budget fixture family inspired by OCELOT: sink trust, data class, cumulative budget, release atoms, and declassification reason.
-11. Add explicit policy-transition fixtures where admitted evidence is current but the proposed workflow transition is invalid.
-12. Add state-defect recall metrics for LLM judges and route/gate failures: stale referent, stale owner/blocker, confirm-gate lockout, escalation failure, workflow mismatch.
-13. Run PM handoff agreement and protocol-burden metrics on real multi-agent ArrowHedge or automation runs.
-14. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage, status checks, and target receipt evidence.
-15. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
+5. Make dashboard metrics query-traceable and reconciled: proposed = accepted + rejected + blocked + held for a defined decision set.
+6. Inspect `@pm/workflow` and `@pm/evals` for the smallest store-like abstraction that can load certificate and receipt status without pulling in DB dependencies.
+7. Re-check primary code/data availability for MPBench, MEMFLOW, Lean4Agent, HarnessFix, M3Exam, H2HMem, STATE-Bench, OCELOT, ContractBench, and STALE.
+8. Exercise MCP admission against a local/live fixture server for handle expiry, annotation trust, task-result revalidation, cleanup metadata, and draft/final spec drift.
+9. Capture nested tool-wrapper subcall read/write refs for HyperTool-style executable wrappers.
+10. Treat skill documents and compiled corrections as external evidence in one fixture path: version, trigger precision, scope, owner, source, and fault-coverage metadata.
+11. Add a trajectory release-budget fixture family inspired by OCELOT: sink trust, data class, cumulative budget, release atoms, and declassification reason.
+12. Add explicit policy-transition fixtures where admitted evidence is current but the proposed workflow transition is invalid.
+13. Add state-defect recall metrics for LLM judges and route/gate failures: stale referent, stale owner/blocker, confirm-gate lockout, escalation failure, workflow mismatch.
+14. Run PM handoff agreement and protocol-burden metrics on real multi-agent ArrowHedge or automation runs.
+15. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage, status checks, target receipt evidence, and terminal outcome partition tests.
+16. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.

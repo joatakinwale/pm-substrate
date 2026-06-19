@@ -1,6 +1,6 @@
 # pm-substrate Research Ledger
 
-Last updated: 2026-06-16
+Last updated: 2026-06-19
 Purpose: single shared ledger for research produced by humans, Codex runs, and scheduled automations.
 
 This file is the cross-stream research current-state view. Chain-specific indexes still own detailed version history, but this ledger records the main claims, status changes, and implementation implications across all research streams.
@@ -26,7 +26,7 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 
 | Stream | Index | Current status | Next action |
 | --- | --- | --- | --- |
-| Agent-state Arrowsmith | `research/daily-arrowsmith-agent-state/index.md` | Active. v12 audited v11's certificate-bound replay proof against June 2026 memory-poisoning, memory-control-flow, workflow-verification, multimodal-memory, credential/status, MCP, OpenTelemetry, and human-AI teaming sources. v13 closed the memory-write/read taxonomy seam, v14 partly closed the target-receipt seam, and v15 now makes status-currentness the next authority boundary. | Add pure evidence-status checks for certificates, receipts, task handles, and PM handoffs before durable stores; then measure final-state consistency plus PM protocol burden. |
+| Agent-state Arrowsmith | `research/daily-arrowsmith-agent-state/index.md` | Active. v13 closed the memory-write/read taxonomy seam, v14 partly closed the target-receipt seam, v15 made status-currentness the next authority boundary, and v16 corrected the live-bridge enforcement boundary: a stale-state block event is not proof of protection unless accepted/blocked/rejected/held terminal outcomes are mutually exclusive for a stable decision id. | Add terminal outcome partitioning and pure evidence-status checks before durable stores; then measure final-state consistency, dashboard metric provenance, and PM protocol burden. |
 | AI competitive intelligence | `research/daily-ai-competitive-intelligence/index.md` | Active. v01 baseline-plus-delta run found fast vendor movement in agent control planes, context expansion, enterprise plugin/tool governance, and evaluation; v02 preserved a parallel broader scan covering Atlassian, Asana, Cursor, Slack/Salesforce, Cognition, and deeper OpenAI/GitHub/AWS signals; v03 added June 9 official deltas for third-party coding-agent validation, model/provider policy, client-surface expansion, and runtime/eval pressure; v04 added June 10 evidence-lane deltas for Copilot CLI security review, Google approval-currentness/policy mutation, AWS AgentCore registry/OBO/memory/trace/eval lanes, OpenAI Agent Builder/Evals wind-down, and Cursor custom stores/subagents; v05 re-checked the 24-72 hour official window on June 11 and found no stronger contradiction, so the right next step stayed durable replay rather than new taxonomy; v06 added June 10-12 persistence/governance deltas for GitHub searchable sessions and Agentic Workflows, Google Vault Gemini retention/holds, AWS AgentCore persistent shells/workflow embedding, and OpenAI’s Ona acquisition for persistent Codex environments; v07 hardened that response with certificate-bound replay and tenant-aligned corpus verification; v08 converted memory-governance pressure into typed memory admission; v09 converted telemetry/runtime pressure into typed target-receipt evidence. | Keep vendor-runtime falsification tied to substrate-owned verification reuse: extend fixture-backed certificates and receipts into durable stores, then continue live protocol/runtime checks against official technical docs. |
 | First-principles agent-state | `research/agent-from-numbers-to-state-arrowsmith_2026-06-04.md` | Precursor. Established model/prompt/memory state vs operational state. | Use as baseline framing for every agent-state comparison. |
 | Cross-disciplinary state/interoperability | `research/cross-disciplinary-state-interoperability-arrowsmith_2026-06-03.md` | Foundational bridge. | Continue extracting mechanisms only when they map to executable substrate checks. |
@@ -96,15 +96,16 @@ This protocol is itself an agent-state test: multiple actors are writing observa
 | C057 | Target-side receipt is distinct from dispatch success. | Confirmed as evidence bridge, partly implemented | Agent-state Arrowsmith v12-v14; OpenTelemetry event semantics and cross-channel delivery framing | `target_receipt` now exists as a first-class evidence kind with replay fixtures and dispatch-only downgrade warnings; next add durable live receipt/status stores and final-state verification. |
 | C058 | PM handoff memory must preserve participant/source roles and burden metrics. | Confirmed as PM bridge | Agent-state Arrowsmith v12; H2HMem, M3Exam, human-AI teaming, transactive memory | Preserve participant, role, modality, conflict, and unresolved risk fields; measure risk capture, rework, and protocol burden. |
 | C059 | Evidence status must be checked at decision time. | Confirmed as next implementation frontier | Agent-state Arrowsmith v15; W3C Bitstring Status List, VC Overview, MCP draft/tasks, OpenTelemetry events, STAGE-Claw, STATE-Bench | Add `EvidenceStatusCheck`-style semantics for status authority, purpose, checkedAt, validity window, revocation/suspension/refresh, stale policy, and privacy/correlation risk before reusing certificates or receipts for writes. |
+| C060 | Block events are not enforcement unless terminal outcomes partition. | Confirmed as corrected frontier | Agent-state Arrowsmith v16; local June 18 ArrowHedge bridge/dashboard audit; ToolGate; Runtime Compliance Verification | Add a terminal action outcome envelope and tests proving stale/blocked decisions suppress accepted/write outcomes; dashboards must reconcile proposed -> accepted/rejected/blocked/held by stable decision id. |
 
 ## Current Implementation Frontier
 
-Status note (2026-06-16): the previous 20-item frontier was implemented as pure tested primitives on 2026-06-10 in `@pm/agent-state` (`external-evidence.ts`), `@pm/evals` (`evidence-admission.ts`), and `@pm/capability-finance-research-ingest` (clean-current fixture). June 11 work committed replay corpora for evidence admission, ArrowHedge state-review artifacts, and write-binding attempts. The selected workflow runtime gate now blocks missing, incomplete, explicitly policy-blocked, opt-in catalog-unverified, and certificate-invalid evidence bindings before write-capable dispatch when `evidenceBindingMode: "require_for_writes"` is enabled. v11 added certificate-aware catalog verification, deterministic replay certificate ids/digests, recomputed committed-row replay, and tenant-aligned cross-corpus fixtures. v13 partially closed the v12 memory frontier as a pure/replay primitive. v14 partially closed the v12 receipt frontier as a pure/replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. v15 is research-only and shifts the next smallest implementation frontier to status-currentness: pure checks for status authority, purpose, checkedAt, validity window, revocation/suspension/refresh, stale policy, and privacy/correlation risk before certificates, receipts, task handles, or PM acknowledgements support writes. The stricter remaining proof is durable certificate/status verification, durable live receipt/status stores, live memory-store/runtime enforcement, policy-transition mini-specs, final-state consistency checks, and PM protocol-burden measurement before broader mutation-governance claims.
+Status note (2026-06-19): the previous 20-item frontier was implemented as pure tested primitives on 2026-06-10 in `@pm/agent-state` (`external-evidence.ts`), `@pm/evals` (`evidence-admission.ts`), and `@pm/capability-finance-research-ingest` (clean-current fixture). June 11 work committed replay corpora for evidence admission, ArrowHedge state-review artifacts, and write-binding attempts. The selected workflow runtime gate now blocks missing, incomplete, explicitly policy-blocked, opt-in catalog-unverified, and certificate-invalid evidence bindings before write-capable dispatch when `evidenceBindingMode: "require_for_writes"` is enabled. v11 added certificate-aware catalog verification, deterministic replay certificate ids/digests, recomputed committed-row replay, and tenant-aligned cross-corpus fixtures. v13 partially closed the v12 memory frontier as a pure/replay primitive. v14 partially closed the v12 receipt frontier as a pure/replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. v15 is research-only and shifts the next smallest implementation frontier to status-currentness: pure checks for status authority, purpose, checkedAt, validity window, revocation/suspension/refresh, stale policy, and privacy/correlation risk before certificates, receipts, task handles, or PM acknowledgements support writes. v16 adds a correction from local June 18 live-bridge evidence: stale-state detection and block-event emission must be terminally enforced, not merely observed beside an accepted decision. The stricter remaining proof is terminal outcome partitioning, durable certificate/status verification, durable live receipt/status stores, live memory-store/runtime enforcement, policy-transition mini-specs, final-state consistency checks, dashboard metric provenance, and PM protocol-burden measurement before broader mutation-governance claims.
 
 ## Current Implementation/Test Task Tree
 
 ```text
-research-to-code frontier after 2026-06-16
+research-to-code frontier after 2026-06-19
 |
 +-- T1 replay-backed verification catalogs
 |   |-- status: IMPLEMENTED 2026-06-12
@@ -119,16 +120,19 @@ research-to-code frontier after 2026-06-16
 |   |-- proof: `target_receipt` exists as a first-class evidence kind
 |   `-- proof: dispatch-only pseudo-receipts warn and replay metrics distinguish dispatch-only from applied receipts
 |
-+-- T4 durable certificate/status stores
++-- T4 terminal outcome partitioning
+|   `-- next proof: accepted/blocked/rejected/held are mutually exclusive per stable action id, with stale blocks suppressing accepted/write outcomes
+|
++-- T5 durable certificate/status stores
 |   `-- next proof: substrate-owned live verification source for certificate status and revocation
 |
-+-- T5 durable receipt/status stores
++-- T6 durable receipt/status stores
 |   `-- next proof: substrate-owned live receipt lookup rather than fixture-backed receipt assertions only
 |
-+-- T6 evidence status-currentness checks
++-- T7 evidence status-currentness checks
 |   `-- next proof: pure status-check contract covering revocation, suspension, refresh, checkedAt, authority, stale policy, and privacy/correlation risk
 |
-`-- T7 final-state verification + PM burden
+`-- T8 final-state verification + PM burden
     |-- next proof: refresh current state after receipt-backed writes and measure whether the added protocol lowers silent failure/rework
 ```
 
@@ -151,12 +155,13 @@ Remaining frontier:
 15. Competitive falsification attempts against vendor technical/SDK docs (ServiceNow dev portal, Atlassian Forge/Rovo, Asana developers) instead of press-release surfaces; add a plug-in-comparator scan (embedded iPaaS, schema-mapping vendors) against the zero-substrate-edit criterion.
 16. Add target-side delivery confirmation for scheduled/subagent/memory/PM handoff writes before those writes become admitted operational state.
 17. Add PM protocol-burden and role-utility metrics before expanding handoff scaffolding or multi-agent orchestration.
-18. ~~Update front-door docs (`README.md`, `docs/roadmap.md`, `docs/validation.md`) to the rewrite thesis so research and automation anchor on the current objective.~~ **Done 2026-06-10** — all four front-door docs rewritten (incl. `docs/architecture.md`); wedding-era packages removed from the workspace; validation re-anchored to ArrowHedge T1–T8 + 12 metrics (see Changelog "Wedding-era retirement").
+18. Add terminal outcome partition tests before claiming live governance from block events or dashboard gate counts.
+19. ~~Update front-door docs (`README.md`, `docs/roadmap.md`, `docs/validation.md`) to the rewrite thesis so research and automation anchor on the current objective.~~ **Done 2026-06-10** — all four front-door docs rewritten (incl. `docs/architecture.md`); wedding-era packages removed from the workspace; validation re-anchored to ArrowHedge T1–T8 + 12 metrics (see Changelog "Wedding-era retirement").
 
 ## Current Task Tree
 
 ```text
-pm-substrate implementation frontier (updated 2026-06-12, post-L020)
+pm-substrate implementation frontier (updated 2026-06-19, post-L027)
 |
 +-- external evidence admission ............ IMPLEMENTED (pure) 2026-06-10
 |   `-- next proof: wire admission into capability/workflow write paths; live MCP revalidation
@@ -197,6 +202,8 @@ pm-substrate implementation frontier (updated 2026-06-12, post-L020)
 |   |-- proof: `memory_write` now requires source-channel/intended-use metadata
 |   |-- proof: recalled memory is classified as fact/preference/instruction/tool-routing/policy-like-rule/summary
 |   `-- proof: replay corpus + metrics now cover hidden-instruction writes, clean preference writes, and overridden tool-routing retrieval
++-- terminal outcome partitioning .......... NEW
+|   `-- next proof: one stable decision id cannot produce both accepted and blocked terminal outcomes
 +-- nested tool read/write capture ......... NEW
 |   `-- next proof: subcall refs for executable tool wrappers
 +-- memory evolution/compaction artifacts .. NEW
@@ -247,13 +254,14 @@ pm-substrate implementation frontier (updated 2026-06-12, post-L020)
 | L024 | 2026-06-15 | Competitive-intelligence v08, agent-state Arrowsmith v13, and code implementation on `main` | L023 plus official 2026-06-12 to 2026-06-15 vendor re-check | Re-checked the latest official vendor window, found stronger governance/configuration surfaces but no stronger artifact-review contradiction, and converted the open v12 memory frontier into code: `memory_write` admission metadata, explicit memory influence kinds, override-status warnings for control-surface memory, replay fixtures/metrics, and regenerated committed admission-review JSONL. | Extend the new memory lane with poisoned/stale denial cases and write-binding/runtime enforcement, then return to durable certificate/status stores and target-side receipt evidence. |
 | L025 | 2026-06-16 | Competitive-intelligence v09, agent-state Arrowsmith v14, and code implementation on `main` | L024 plus official 2026-06-14 to 2026-06-16 telemetry/runtime re-check | Re-checked the latest official vendor window, found stronger server-side telemetry/runtime-session pressure but no stronger artifact-review contradiction, and converted the open v12 receipt frontier into code: `target_receipt` admission metadata, dispatch-only downgrade warnings, replay fixtures/metrics, and regenerated committed admission-review JSONL. | Extend the new receipt lane into durable live receipt/status stores and final-state verification, then return to durable certificate/status stores and PM burden measurement. |
 | L026 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v15-agent-state-arrowsmith-2026-06-16.md` | L025 plus W3C status, MCP stateless/tasks, OpenTelemetry event-shape, state-based benchmark, belief-memory, and PM/team cognition review | Continued from same-day v14 rather than duplicating it; identified status-currentness as the next authority boundary for replay certificates, target receipts, MCP task handles, and PM handoff acknowledgements. No runtime code changed. | Add a pure `EvidenceStatusCheck` contract and replay matrix before durable stores: valid, revoked, suspended, refresh-required, stale, failed, superseded, authority-mismatch, and privacy/correlation cases. |
+| L027 | 2026-06-19 | `research/daily-arrowsmith-agent-state/v16-agent-state-arrowsmith-2026-06-19.md` | L026 plus local June 18 ArrowHedge live-bridge/dashboard audit and runtime-compliance/shared-workspace sources | Corrected the enforcement proof boundary: a stale-state block event can coexist with accepted action events unless terminal outcomes partition. Local uncommitted bridge work is useful evidence but not published `main` behavior. | Add terminal action outcome envelope/tests, query-traced dashboard metrics, and then attach `EvidenceStatusCheck` to that action gate before durable stores. |
 
 ## Open Watchlist
 
 1. Continue daily AI competitive-intelligence monitoring for fresh primary evidence that vendors expose portable original-observation/read-set/action-review artifacts.
 2. Inspect whether OpenAI, Anthropic, Microsoft, Google, AWS, ServiceNow, Atlassian, Asana, Cursor, Slack/Salesforce, or other major vendors are solving currentness, authority, provenance, workflow validity, and pre-action review, or only memory/RAG/context/session/workflow/audit.
 3. Expand opt-in write binding across every external write transport and require durable catalog verification before claiming broad mutation enforcement.
-4. Add pure evidence-status checks, then promote the committed-corpus-backed certificate/catalog verification into durable DB-backed or substrate-store-backed verification sources for state-review artifact ids/hashes, evidence-admission review ids, tenant/workflow binding, rejected-evidence policy disposition, policy version, revocation epoch, execution identity, status authority, checkedAt, revocation/suspension/refresh, and validity windows.
+4. Add terminal outcome partitioning and pure evidence-status checks, then promote the committed-corpus-backed certificate/catalog verification into durable DB-backed or substrate-store-backed verification sources for state-review artifact ids/hashes, evidence-admission review ids, tenant/workflow binding, rejected-evidence policy disposition, policy version, revocation epoch, execution identity, status authority, checkedAt, revocation/suspension/refresh, and validity windows.
 5. Add trajectory release-budget, policy-transition conformance, and LLM-judge state-defect recall fixtures.
 6. Treat future merge conflicts, fetch failures, Git object warnings, or stale local research as evidence for the substrate thesis and record how they were reconciled.
 7. Watch whether GitHub exposes machine-readable third-party-agent validation artifacts that can be admitted as external evidence.

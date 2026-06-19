@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-19 - Agent-state Arrowsmith v16 terminal enforcement correction
+
+- Fetched `origin/main`, ran `git pull --ff-only origin main`, and verified local `HEAD`, `origin/main`, and `FETCH_HEAD` at `bf7d021bcadf93ad536f161d440d62fb2f7ff6bc` before writing.
+- Added `research/daily-arrowsmith-agent-state/v16-agent-state-arrowsmith-2026-06-19.md` with the next Arrowsmith bridge: stale-state detection, block-event emission, and actual mutation prevention are separate claims unless accepted/blocked/rejected/held outcomes partition by stable action id.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` with the v16 version row, C060 claim, L027 ledger entry, source changes, corrected/downgraded claims, metrics, and the revised next code slice.
+- Claim boundary: this is a research-only continuation. The June 18 ArrowHedge live-bridge/dashboard work remains local uncommitted repo evidence in this worktree, not published `main` behavior; terminal outcome partitioning and `EvidenceStatusCheck` are still next implementation work.
+
 ## 2026-06-16 - Agent-state Arrowsmith v15 status-currentness continuation
 
 - Fetched `origin/main`, verified local `HEAD`, local `origin/main`, and remote `main` at `ae3db140668fef2bd158f0078817d368693c9ea2`, and continued from the already-present same-day `v14` instead of creating a duplicate.
