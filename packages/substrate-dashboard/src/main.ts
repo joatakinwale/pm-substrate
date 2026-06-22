@@ -1,5 +1,6 @@
 import "./styles.css";
 import { fetchSnapshot, renderLive } from "./live.js";
+import { renderStory } from "./story.js";
 import {
   formatTime,
   loadDashboardData,
@@ -49,7 +50,11 @@ interface ReplayRow {
 }
 
 const data = loadDashboardData();
-const initialState = readStateFromUrl(data);
+// Always land on the Live view. Stale bookmarks/cached URLs from earlier
+// builds carried ?view=grid (the fixture explorer) and made the phone open
+// to the wrong screen. Live is the primary surface for the with/without-
+// substrate A/B metrics, so force it on first load.
+const initialState = { ...readStateFromUrl(data), view: "live" as const };
 const app = document.querySelector<HTMLDivElement>("#app");
 
 if (!app) {
@@ -75,15 +80,44 @@ function maybeMountLive(
   const mount = root.querySelector<HTMLElement>("#live-mount");
   if (!mount) return;
   const load = async () => {
-    const snap = await fetchSnapshot();
-    const current = root.querySelector<HTMLElement>("#live-mount");
-    if (current) renderLive(current, snap);
+    try {
+      const snap = await fetchSnapshot();
+      const current = root.querySelector<HTMLElement>("#live-mount");
+      if (current) renderLive(current, snap);
+    } catch (err) {
+      const current = root.querySelector<HTMLElement>("#live-mount");
+      if (current) {
+        const msg = err instanceof Error ? `${err.message}` : String(err);
+        current.innerHTML = `<div class="live-shell"><div class="live-banner bad">Render error: ${msg.replace(/[<>&]/g, "")}</div></div>`;
+      }
+    }
   };
   void load();
   liveTimer = setInterval(() => void load(), 5000);
 }
 
 function render(root: HTMLElement, dashboard: DashboardData, state: DashboardState): void {
+  // LIVE view gets its own clean, full-screen layout: a slim top nav + the
+  // live A/B story content. The fixture-explorer chrome (command bar, replay-
+  // corpus left rail, artifact inspector) is NOT drawn here — it was burying
+  // the story behind "REPLAY CORPUS / POLICY SAFETY" on phones.
+  if (state.view === "live") {
+    // Story page: renders synchronously from the bundled corpus — no network,
+    // no "Loading" hang. Plain-English story first; live backend metrics load
+    // underneath when the backend is reachable.
+    root.innerHTML = `
+      <div class="live-page">
+        ${renderLiveTopNav(state)}
+        <div id="story-mount"></div>
+        <div id="live-mount" class="live-mount-secondary"><div class="live-shell"><div class="live-banner warn">Loading live backend metrics…</div></div></div>
+      </div>
+    `;
+    const storyMount = root.querySelector<HTMLElement>("#story-mount");
+    if (storyMount) renderStory(storyMount, dashboard);
+    bindInteractions(root, dashboard, state);
+    return;
+  }
+
   root.innerHTML = `
     <div class="monitor-shell">
       ${renderAppRail(state)}
@@ -128,6 +162,32 @@ function renderAppRail(state: DashboardState): string {
       </div>
     </nav>
   `;
+}
+
+function renderLiveTopNav(state: DashboardState): string {
+  // Slim header for the live full-screen page. Keeps a link back to the
+  // fixture-explorer views without dragging the whole desktop chrome in.
+  const links: ReadonlyArray<readonly [DashboardView, string]> = [
+    ["live", "Live"],
+    ["grid", "Overview"],
+    ["list", "Rows"],
+    ["flow", "Evidence Flow"],
+    ["safe", "Policy Safety"],
+    ["data", "Replay Data"],
+    ["gear", "Diagnostics"],
+  ];
+  return `
+    <nav class="live-topnav">
+      <span class="live-topnav-brand">pm-substrate · <strong>Live Monitor</strong></span>
+      <div class="live-topnav-links">
+        ${links
+          .map(
+            ([view, label]) =>
+              `<button class="live-topnav-link ${state.view === view ? "active" : ""}" data-view="${view}">${escapeHtml(label)}</button>`,
+          )
+          .join("")}
+      </div>
+    </nav>`;
 }
 
 function renderCommandBar(dashboard: DashboardData): string {
@@ -1432,6 +1492,7 @@ function parseResolution(value: string | null | undefined): TimelineResolution {
 function parseDashboardView(value: string | null | undefined): DashboardView {
   if (
     value === "live" ||
+    value === "grid" ||
     value === "list" ||
     value === "flow" ||
     value === "safe" ||

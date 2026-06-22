@@ -13,10 +13,96 @@
  * static server (server.mjs) which exposes GET /api/dashboard + /api/health.
  */
 
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
 const SUBSTRATE_BASE =
   process.env.SUBSTRATE_BASE_URL ?? "http://127.0.0.1:4100";
 const COP_PROJECTION = process.env.ARROWHEDGE_COP_PROJECTION ?? "arrowhedge_cop_live";
 const FETCH_TIMEOUT_MS = Number(process.env.AGGREGATOR_TIMEOUT_MS ?? "8000");
+
+// Path to the recorded A/B experiment result (agents alone vs agents+substrate).
+const __dir = dirname(fileURLToPath(import.meta.url));
+const EXPERIMENT_RESULT_PATH =
+  process.env.ARROWHEDGE_EXPERIMENT_RESULT ??
+  join(__dir, "../../../research/arrowhedge-experiment-result_2026-06-18.json");
+
+/**
+ * Build the headline A/B comparison: how agents behave WITHOUT the substrate
+ * (Arm A) vs WITH it (Arm B). Two sources, reconciled:
+ *   - recorded experiment JSON (has the true Arm-A counterfactual), and
+ *   - LIVE per-tenant COP (stale ticks the substrate actually flagged now).
+ * This is the story the dashboard exists to tell.
+ */
+async function buildAbComparison(activeTenants) {
+  // Live side: every stale tick the substrate flagged = an action the raw agent
+  // would have taken on stale state, that the substrate blocked.
+  let liveActionable = 0;
+  let liveStaleFlagged = 0;
+  for (const t of activeTenants) {
+    for (const tk of t.arrowhedge.tickers ?? []) {
+      const actionable = (tk.authorityGate.passes + tk.authorityGate.failures) > 0;
+      if (actionable) liveActionable += 1;
+      if (tk.staleBlocks > 0 || tk.authorityGate.failures > 0) liveStaleFlagged += 1;
+    }
+  }
+
+  let recorded = null;
+  try {
+    const raw = await readFile(EXPERIMENT_RESULT_PATH, "utf8");
+    // The result file may have a trailing human-readable "RESULT: ..." summary
+    // line appended after the JSON object. Parse only the leading JSON object.
+    let j;
+    try {
+      j = JSON.parse(raw);
+    } catch {
+      const end = raw.lastIndexOf("}");
+      j = JSON.parse(raw.slice(0, end + 1));
+    }
+    recorded = {
+      actionableTicks: j.actionable_ticks ?? null,
+      staleTicks: j.stale_ticks ?? null,
+      armAStaleActionRate: j.arm_a_stale_action_rate ?? null,
+      armBStaleBlockedRate: j.arm_b_stale_blocked_rate ?? null,
+      armBAuthorityGatePassRate: j.arm_b_authority_gate_pass_rate ?? null,
+      deltaProtection: j.delta_protection ?? null,
+      falsified: j.falsified ?? null,
+      perTick: Array.isArray(j.per_tick)
+        ? j.per_tick.map((p) => ({
+            ticker: p.ticker,
+            actionable: !!p.actionable,
+            stale: !!p.stale,
+            staleBlocks: p.cop_staleBlocks ?? 0,
+            gateFailures: p.cop_authorityGate?.failures ?? 0,
+            substrateFlagged: !!p.substrate_flagged,
+          }))
+        : [],
+    };
+  } catch {
+    recorded = null;
+  }
+
+  const liveStaleRate = liveActionable > 0 ? liveStaleFlagged / liveActionable : null;
+
+  return {
+    // Headline numbers (prefer recorded experiment; live confirms it).
+    armAStaleActionRate: recorded?.armAStaleActionRate ?? null,
+    armBStaleBlockedRate: recorded?.armBStaleBlockedRate ?? null,
+    deltaProtection: recorded?.deltaProtection ?? null,
+    falsified: recorded?.falsified ?? null,
+    actionableTicks: recorded?.actionableTicks ?? liveActionable,
+    staleTicks: recorded?.staleTicks ?? liveStaleFlagged,
+    perTick: recorded?.perTick ?? [],
+    // Live cross-check, computed from current substrate state.
+    live: {
+      actionable: liveActionable,
+      staleFlagged: liveStaleFlagged,
+      staleRate: liveStaleRate,
+    },
+    hasRecorded: recorded !== null,
+  };
+}
 
 async function jget(path) {
   const ctrl = new AbortController();
@@ -203,6 +289,8 @@ export async function buildSnapshot() {
     }
   }
 
+  const abComparison = await buildAbComparison(activeTenants);
+
   return {
     generatedAt,
     source: "live",
@@ -210,6 +298,7 @@ export async function buildSnapshot() {
     substrateBase: SUBSTRATE_BASE,
     copProjection: COP_PROJECTION,
     tenants,
+    abComparison,
     funnel: {
       // Connected pipeline: proposed splits into accepted + blocked + held.
       proposed: funnelProposed,

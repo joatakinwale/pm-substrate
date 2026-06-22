@@ -109,9 +109,16 @@ const server = createServer(async (req, res) => {
       if (!extname(filePath)) filePath = join(DIST, "index.html");
     }
     const body = await readFile(filePath);
+    const ext = extname(filePath);
+    // HTML must never be stale (it points at the hashed JS/CSS bundles). Hashed
+    // assets are content-addressed so they're safe to cache hard.
+    const isHtml = ext === ".html" || filePath.endsWith("index.html");
+    const cacheControl = isHtml
+      ? "no-store, no-cache, must-revalidate, max-age=0"
+      : "public, max-age=31536000, immutable";
     res.writeHead(200, {
-      "content-type": MIME[extname(filePath)] ?? "application/octet-stream",
-      "cache-control": "no-cache",
+      "content-type": MIME[ext] ?? "application/octet-stream",
+      "cache-control": cacheControl,
     });
     res.end(body);
   } catch {

@@ -72,6 +72,27 @@ export interface TenantSnapshot {
   };
 }
 
+export interface AbPerTick {
+  ticker: string;
+  actionable: boolean;
+  stale: boolean;
+  staleBlocks: number;
+  gateFailures: number;
+  substrateFlagged: boolean;
+}
+
+export interface AbComparison {
+  armAStaleActionRate: number | null;
+  armBStaleBlockedRate: number | null;
+  deltaProtection: number | null;
+  falsified: boolean | null;
+  actionableTicks: number | null;
+  staleTicks: number | null;
+  perTick: AbPerTick[];
+  live: { actionable: number; staleFlagged: number; staleRate: number | null };
+  hasRecorded: boolean;
+}
+
 export interface LiveSnapshot {
   generatedAt: string;
   source: string;
@@ -80,6 +101,7 @@ export interface LiveSnapshot {
   copProjection?: string;
   error?: string;
   tenants: TenantSnapshot[];
+  abComparison?: AbComparison;
   funnel: {
     proposed: number;
     accepted: number;
@@ -180,6 +202,12 @@ export function renderLive(root: HTMLElement, snap: LiveSnapshot | null): void {
   root.innerHTML = `
     <div class="live-shell">
       ${banner}
+
+      <!-- ============ PLAIN-ENGLISH EXPLAINER ============ -->
+      ${renderExplainer(snap)}
+
+      <!-- ============ THE STORY: agents WITH vs WITHOUT the substrate ============ -->
+      ${renderAbComparison(snap)}
 
       <!-- ============ HEADLINE: connected decision funnel ============ -->
       ${renderFunnel(snap)}
@@ -295,6 +323,121 @@ export function renderLive(root: HTMLElement, snap: LiveSnapshot | null): void {
  * asserted visually; legacy/pre-fix tenants with accepted+blocked overlap are
  * segregated into their own band and excluded from the headline counts.
  */
+/**
+ * Plain-English explainer band. Answers "what am I looking at?" in one
+ * paragraph with the actual live numbers, no jargon. This is the first thing
+ * on the page so a non-engineer immediately understands what it proves.
+ */
+function renderExplainer(snap: LiveSnapshot): string {
+  const f = snap.funnel;
+  const blocked = f.blocked;
+  const proposed = f.proposed;
+  const accepted = f.accepted;
+  const held = f.held;
+  return `
+    <section class="explainer">
+      <h1 class="explainer-title">What this shows</h1>
+      <p class="explainer-lead">
+        AI trading agents proposed <strong>${proposed}</strong> trade decisions across ${f.activeTenantCount} live run(s).
+        Our system — the “substrate” — checks every decision against the latest verified data before it’s allowed through.
+      </p>
+      <ul class="explainer-points">
+        <li><span class="dot tone-bg-good"></span><strong>${accepted} accepted</strong> — backed by fresh, agreeing data, allowed to proceed.</li>
+        <li><span class="dot tone-bg-bad"></span><strong>${blocked} blocked</strong> — the agent tried to act on <em>stale data</em>; the substrate stopped it.</li>
+        <li><span class="dot tone-bg-warn"></span><strong>${held} held</strong> — no actionable trade (the agent chose to wait).</li>
+      </ul>
+      <p class="explainer-takeaway">
+        <strong>The point:</strong> without this system, those <strong>${blocked}</strong> stale-data trade(s) would have executed.
+        The substrate caught them. That’s the safety layer this research is proving.
+      </p>
+    </section>`;
+}
+
+/**
+ * THE STORY panel: agents WITHOUT the substrate (Arm A) vs WITH it (Arm B).
+ * This is the head-to-head the whole research exists to show. Arm A is the
+ * recorded counterfactual (what raw agents did with no gate); Arm B is the
+ * substrate-gated outcome. A live cross-check (computed from current substrate
+ * state) sits underneath so the headline is never just a frozen fixture.
+ */
+function renderAbComparison(snap: LiveSnapshot): string {
+  const ab = snap.abComparison;
+  if (!ab) return "";
+
+  const armA = ab.armAStaleActionRate;
+  const armB = ab.armBStaleBlockedRate;
+  const delta = ab.deltaProtection;
+  const verdict =
+    ab.falsified === false ? "NOT FALSIFIED — substrate protection confirmed"
+    : ab.falsified === true ? "FALSIFIED — no measurable protection"
+    : "inconclusive";
+  const verdictTone: Tone = ab.falsified === false ? "good" : ab.falsified === true ? "bad" : "warn";
+
+  const perTickRows = ab.perTick.length
+    ? ab.perTick
+        .map((p) => {
+          const armACell = !p.actionable
+            ? `<span class="pill tone-neutral">no trade</span>`
+            : p.stale
+              ? `<span class="pill tone-bad">acts on STALE</span>`
+              : `<span class="pill tone-good">acts on fresh</span>`;
+          const armBCell = !p.actionable
+            ? `<span class="pill tone-neutral">no trade</span>`
+            : p.substrateFlagged
+              ? `<span class="pill tone-good">BLOCKED ✓</span>`
+              : `<span class="pill tone-good">allowed (fresh)</span>`;
+          return `<tr>
+            <td><strong>${esc(p.ticker)}</strong></td>
+            <td>${armACell}</td>
+            <td>${armBCell}</td>
+            <td class="${p.stale ? "tone-bad" : ""}">${p.stale ? "stale" : "fresh"}</td>
+          </tr>`;
+        })
+        .join("")
+    : `<tr><td colspan="4" class="empty">No recorded experiment ticks.</td></tr>`;
+
+  const liveLine =
+    ab.live.staleRate === null
+      ? `Live cross-check: no actionable decisions in current substrate state yet.`
+      : `Live cross-check (right now, from the running substrate): ${ab.live.staleFlagged}/${ab.live.actionable} actionable decisions were stale and blocked (${pct(ab.live.staleRate)}).`;
+
+  return `
+    <section class="live-domain domain-ab">
+      <header class="live-domain-head">
+        <h1>The Story — Agents WITHOUT vs WITH the Substrate</h1>
+        <span>Head-to-head over ${ab.actionableTicks ?? "—"} actionable decision(s), ${ab.staleTicks ?? "—"} on stale state. <strong class="tone-${verdictTone}">${esc(verdict)}</strong></span>
+      </header>
+
+      <div class="ab-headline">
+        <div class="ab-arm ab-arm-a">
+          <span class="ab-arm-label">WITHOUT substrate (raw agents)</span>
+          <strong class="ab-arm-value tone-bad">${pct(armA)}</strong>
+          <span class="ab-arm-detail">of actionable trades fired on <em>stale</em> data</span>
+        </div>
+        <div class="ab-vs">vs</div>
+        <div class="ab-arm ab-arm-b">
+          <span class="ab-arm-label">WITH substrate</span>
+          <strong class="ab-arm-value tone-good">${pct(armB)}</strong>
+          <span class="ab-arm-detail">of those stale trades were <em>blocked</em></span>
+        </div>
+        <div class="ab-vs">=</div>
+        <div class="ab-arm ab-arm-delta">
+          <span class="ab-arm-label">bad trades prevented</span>
+          <strong class="ab-arm-value tone-good">${delta ?? "—"}</strong>
+          <span class="ab-arm-detail">stale actions the substrate stopped</span>
+        </div>
+      </div>
+
+      <div class="live-table-wrap">
+        <table class="live-table ab-table">
+          <thead><tr><th>Ticker</th><th>Without substrate</th><th>With substrate</th><th>Risk state</th></tr></thead>
+          <tbody>${perTickRows}</tbody>
+        </table>
+      </div>
+      <p class="ab-live-line">${esc(liveLine)}</p>
+    </section>`;
+}
+
 function renderFunnel(snap: LiveSnapshot): string {
   const fn = snap.funnel;
   const max = Math.max(1, fn.proposed);
@@ -368,7 +511,22 @@ function renderFunnel(snap: LiveSnapshot): string {
 }
 
 function shortTenant(id: string): string {
-  return id.replace(/^tnt_/, "").replace(/_\d{9,}$/, (m) => "·" + m.slice(-4));
+  // Turn cryptic tenant ids (tnt_liveab_1781906240) into human labels.
+  const m = id.match(/^tnt_([a-z0-9]+?)_?\d{9,}$/i) ?? id.match(/^tnt_([a-z0-9]+)$/i);
+  const key = (m?.[1] ?? id).toLowerCase();
+  const names: Record<string, string> = {
+    liveab: "Live A/B run",
+    live: "Live agent run",
+    fixed: "Fixed-gate verify",
+    enforced: "Enforced run",
+    verify: "Verify run",
+    result: "Result run",
+    exp: "Experiment",
+    exp2: "Experiment 2",
+    pitool: "Pi-tool run",
+  };
+  const short = id.replace(/^tnt_/, "").replace(/_\d{9,}$/, (mm) => "·" + mm.slice(-4));
+  return names[key] ?? short;
 }
 function signalTone(signal: string | null): Tone {
   if (signal === "buy") return "good";
