@@ -50,6 +50,7 @@ export type {
   CapabilityHandler,
   GraphWalkContext,
   GraphWriteAuthorityContext,
+  GraphWriteAuthorityResolution,
   ApplyContext,
   EmitContext,
   IdempotencyTable,

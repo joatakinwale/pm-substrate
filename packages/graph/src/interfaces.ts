@@ -6,7 +6,10 @@ import type {
   ProfileBinding,
   TenantId,
 } from "@pm/types";
-import type { GraphWriteAuthorityRef } from "./write-authority.js";
+import type {
+  GraphWriteAuthorityRef,
+  GraphWriteAuthoritySubstrateRecord,
+} from "./write-authority.js";
 
 export interface GraphReader {
   /** Read a node, scoped to its tenant. Null if not found. */
@@ -68,6 +71,7 @@ export interface GraphWriter {
     tenantId: TenantId,
     id: EdgeId,
     writeAuthorityRef?: GraphWriteAuthorityRef,
+    writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord,
   ): Promise<void>;
 }
 
@@ -83,6 +87,7 @@ export interface CreateNodeInput {
   readonly identity: Readonly<Record<string, unknown>>;
   readonly schemaVersion: number;
   readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 export interface UpdateNodeInput {
@@ -91,6 +96,7 @@ export interface UpdateNodeInput {
   readonly identity: Readonly<Record<string, unknown>>;
   readonly expectedSchemaVersion: number;
   readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 export interface CreateEdgeInput {
@@ -100,6 +106,7 @@ export interface CreateEdgeInput {
   readonly toId: EntityId;
   readonly attrs: Readonly<Record<string, unknown>>;
   readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 export interface Graph extends GraphReader, GraphWriter {}

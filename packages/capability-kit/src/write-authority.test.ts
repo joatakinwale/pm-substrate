@@ -3,6 +3,7 @@ import {
   GraphWriteAuthorityError,
   type GraphWriteAuthorityPolicy,
   type GraphWriteAuthorityRef,
+  type GraphWriteAuthoritySubstrateRecord,
 } from "@pm/graph";
 import type { EntityId, TenantId, Timestamp } from "@pm/types";
 import {
@@ -46,9 +47,32 @@ const validAuthority = (): GraphWriteAuthorityRef => ({
   },
 });
 
+const validSubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
+  authorityKind: "workflow_action_outcome_envelope",
+  envelopeId: "env_capability_authority",
+  actionId: "act_capability_authority",
+  terminalOutcome: "accepted",
+  providerCertificateId: "cert_capability_authority",
+  providerCertificateDigest: "sha256:capability_authority",
+  providerCertificateStatusRef: {
+    certificateId: "cert_capability_authority",
+    certificateDigest: "sha256:capability_authority",
+    status: "valid",
+    statusSequence: 1,
+    statusEventHash: "sha256:status_event",
+    statusUpdatedAt: checkedAt,
+    checkedAt,
+  },
+});
+
 const strictPolicy: GraphWriteAuthorityPolicy = {
   requireAuthorityRef: true,
   requireProviderCertificateStatusRef: true,
+};
+
+const strictStorePolicy: GraphWriteAuthorityPolicy = {
+  ...strictPolicy,
+  requireSubstrateRecord: true,
 };
 
 const makeClient = (): FakeClient => {
@@ -196,6 +220,74 @@ describe("defineCapability graph write authority", () => {
 
     expect(applyAuthorityRef).toBe(authorityRef);
     expect(order).toEqual(["authority", "apply"]);
+    expect(client.calls).toEqual([
+      "BEGIN",
+      "INSERT_IDEMPOTENCY",
+      "SELECT_FOR_UPDATE",
+      "UPDATE_GRAPH_NODES",
+      "COMMIT",
+      "RELEASE",
+    ]);
+  });
+
+  it("rejects before apply when strict policy requires a substrate record", async () => {
+    const client = makeClient();
+    let applyCalled = false;
+
+    const handler = defineCapability(
+      makeSpec({
+        graphWriteAuthority: async () => validAuthority(),
+        apply: async () => {
+          applyCalled = true;
+          return {
+            nextIdentity: { targetScore: 1 },
+            applyResult: { newScore: 1 },
+          };
+        },
+      }),
+      makeDeps(client, strictStorePolicy),
+    );
+
+    await expect(handler.handle(tenantId, { key: "payload-4" })).rejects.toThrow(
+      GraphWriteAuthorityError,
+    );
+
+    expect(applyCalled).toBe(false);
+    expect(client.calls).toEqual([
+      "BEGIN",
+      "INSERT_IDEMPOTENCY",
+      "SELECT_FOR_UPDATE",
+      "ROLLBACK",
+      "RELEASE",
+    ]);
+  });
+
+  it("accepts a matched substrate record and passes it through apply", async () => {
+    const client = makeClient();
+    const authorityRef = validAuthority();
+    const substrateRecord = validSubstrateRecord();
+    let applySubstrateRecord: GraphWriteAuthoritySubstrateRecord | undefined;
+
+    const handler = defineCapability(
+      makeSpec({
+        graphWriteAuthority: async () => ({
+          authorityRef,
+          substrateRecord,
+        }),
+        apply: async ({ writeAuthoritySubstrateRecord }) => {
+          applySubstrateRecord = writeAuthoritySubstrateRecord;
+          return {
+            nextIdentity: { targetScore: 1 },
+            applyResult: { newScore: 1 },
+          };
+        },
+      }),
+      makeDeps(client, strictStorePolicy),
+    );
+
+    await handler.handle(tenantId, { key: "payload-5" });
+
+    expect(applySubstrateRecord).toBe(substrateRecord);
     expect(client.calls).toEqual([
       "BEGIN",
       "INSERT_IDEMPOTENCY",

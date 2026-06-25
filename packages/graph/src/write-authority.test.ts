@@ -6,6 +6,7 @@ import {
   GraphWriteAuthorityError,
   validateGraphWriteAuthority,
   type GraphWriteAuthorityRef,
+  type GraphWriteAuthoritySubstrateRecord,
 } from "./write-authority.js";
 
 const tenantId = "tnt_graph_authority" as TenantId;
@@ -14,6 +15,24 @@ const edgeId = "edg_graph_authority" as EdgeId;
 const checkedAt = "2026-06-25T00:00:00.000Z" as Timestamp;
 
 const validAuthority = (): GraphWriteAuthorityRef => ({
+  authorityKind: "workflow_action_outcome_envelope",
+  envelopeId: "env_graph_authority",
+  actionId: "act_graph_authority",
+  terminalOutcome: "accepted",
+  providerCertificateId: "cert_graph_authority",
+  providerCertificateDigest: "sha256:graph_authority",
+  providerCertificateStatusRef: {
+    certificateId: "cert_graph_authority",
+    certificateDigest: "sha256:graph_authority",
+    status: "valid",
+    statusSequence: 1,
+    statusEventHash: "sha256:status_event",
+    statusUpdatedAt: checkedAt,
+    checkedAt,
+  },
+});
+
+const validSubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
   authorityKind: "workflow_action_outcome_envelope",
   envelopeId: "env_graph_authority",
   actionId: "act_graph_authority",
@@ -103,6 +122,50 @@ describe("validateGraphWriteAuthority", () => {
       }),
     ).toThrow(GraphWriteAuthorityError);
   });
+
+  it("requires a matching substrate record when configured", () => {
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validAuthority(),
+        substrateRecord: validSubstrateRecord(),
+        policy: {
+          requireAuthorityRef: true,
+          requireProviderCertificateStatusRef: true,
+          requireSubstrateRecord: true,
+        },
+      }),
+    ).toEqual([]);
+
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validAuthority(),
+        policy: {
+          requireAuthorityRef: true,
+          requireProviderCertificateStatusRef: true,
+          requireSubstrateRecord: true,
+        },
+      }).map((issue) => issue.code),
+    ).toContain("graph_write_authority_substrate_record_missing");
+  });
+
+  it("rejects a substrate record that does not match the cited envelope", () => {
+    const issues = validateGraphWriteAuthority({
+      authorityRef: validAuthority(),
+      substrateRecord: {
+        ...validSubstrateRecord(),
+        actionId: "act_other",
+      },
+      policy: {
+        requireAuthorityRef: true,
+        requireProviderCertificateStatusRef: true,
+        requireSubstrateRecord: true,
+      },
+    });
+
+    expect(issues.map((issue) => issue.code)).toContain(
+      "graph_write_authority_substrate_record_mismatch",
+    );
+  });
 });
 
 describe("PostgresGraph write authority policy", () => {
@@ -117,6 +180,22 @@ describe("PostgresGraph write authority policy", () => {
         writeAuthorityPolicy: {
           requireAuthorityRef: true,
           requireProviderCertificateStatusRef: true,
+        },
+      },
+    );
+
+  const strictStoreGraph = () =>
+    new PostgresGraph(
+      {
+        query: () => {
+          throw new Error("authority guard should run before SQL");
+        },
+      } as never,
+      {
+        writeAuthorityPolicy: {
+          requireAuthorityRef: true,
+          requireProviderCertificateStatusRef: true,
+          requireSubstrateRecord: true,
         },
       },
     );
@@ -172,5 +251,17 @@ describe("PostgresGraph write authority policy", () => {
     await expect(strictGraph().deleteEdge(tenantId, edgeId)).rejects.toBeInstanceOf(
       GraphWriteAuthorityError,
     );
+  });
+
+  it("rejects createNode before SQL when the substrate record is missing", async () => {
+    await expect(
+      strictStoreGraph().createNode({
+        tenantId,
+        profile: { tier1: "Engagement", profile: null, concrete: "Engagement" },
+        identity: {},
+        schemaVersion: 1,
+        writeAuthorityRef: validAuthority(),
+      }),
+    ).rejects.toBeInstanceOf(GraphWriteAuthorityError);
   });
 });

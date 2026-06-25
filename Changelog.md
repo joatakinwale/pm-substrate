@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-25 - Store-backed write authority
+
+- Added `research/daily-arrowsmith-agent-state/v43-store-backed-write-authority-2026-06-25.md`, answering RQ44 and replacing it with RQ45: how real workflow/runtime adapters should inject store-backed graph write-authority resolutions.
+- Added `GraphWriteAuthoritySubstrateRecord` and `GraphWriteAuthorityPolicy.requireSubstrateRecord` to `@pm/graph`.
+- Extended graph mutation inputs and `PostgresGraph` guards so strict policies can validate a matched substrate record before graph SQL.
+- Added `GraphWriteAuthorityResolution` to `@pm/capability-kit`, allowing graph authority resolvers to return `{ authorityRef, substrateRecord }`.
+- Passed `writeAuthoritySubstrateRecord` through capability apply/emit contexts.
+- Added graph and capability-kit tests proving missing/mismatched substrate records are rejected before SQL/apply, while matched records pass.
+- Claim boundary: strict policies can now reject forged valid-looking authority refs by requiring substrate-record matches, but real workflow/runtime adapters still need to source those records from stores.
+
 ## 2026-06-25 - Capability kit write authority
 
 - Added `research/daily-arrowsmith-agent-state/v42-capability-kit-write-authority-2026-06-25.md`, answering RQ43 and replacing it with RQ44: how graph write-authority refs should be bound to substrate-stored envelopes/status records.

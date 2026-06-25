@@ -13,6 +13,7 @@ import {
   type Graph,
   type GraphWriteAuthorityPolicy,
   type GraphWriteAuthorityRef,
+  type GraphWriteAuthoritySubstrateRecord,
 } from "@pm/graph";
 import type { EventPublisher, PublishInput } from "@pm/events";
 import type { EntityId, TenantId } from "@pm/types";
@@ -88,6 +89,7 @@ export interface GraphWriteAuthorityContext<TPayload> {
 export interface ApplyContext<TPayload>
   extends GraphWriteAuthorityContext<TPayload> {
   readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 /**
@@ -100,6 +102,12 @@ export interface EmitContext<TPayload, TApplyResult> {
   readonly targetId: EntityId;
   readonly applyResult: TApplyResult;
   readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
+}
+
+export interface GraphWriteAuthorityResolution {
+  readonly authorityRef: GraphWriteAuthorityRef;
+  readonly substrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 /**
@@ -175,9 +183,10 @@ export interface CapabilitySpec<TPayload, TApplyResult = void> {
     ctx: GraphWriteAuthorityContext<TPayload>,
   ) =>
     | GraphWriteAuthorityRef
+    | GraphWriteAuthorityResolution
     | null
     | undefined
-    | Promise<GraphWriteAuthorityRef | null | undefined>;
+    | Promise<GraphWriteAuthorityRef | GraphWriteAuthorityResolution | null | undefined>;
 
   /**
    * Optional. Build the event to emit inside the same transaction.
@@ -324,6 +333,9 @@ export function defineCapability<TPayload, TApplyResult = void>(
         // Step 3 — FOR UPDATE + apply (only if both target and apply exist).
         let applyResult: TApplyResult | undefined;
         let writeAuthorityRef: GraphWriteAuthorityRef | undefined;
+        let writeAuthoritySubstrateRecord:
+          | GraphWriteAuthoritySubstrateRecord
+          | undefined;
         if (spec.apply && targetId !== null) {
           const sel = await c.query<NodeRow>(
             `SELECT id, identity, schema_version
@@ -347,11 +359,21 @@ export function defineCapability<TPayload, TApplyResult = void>(
             currentSchemaVersion: row.schema_version,
             client: c,
           };
-          writeAuthorityRef =
+          const writeAuthorityResolution =
             (await spec.graphWriteAuthority?.(authorityContext)) ?? undefined;
+          if (isGraphWriteAuthorityResolution(writeAuthorityResolution)) {
+            writeAuthorityRef = writeAuthorityResolution.authorityRef;
+            writeAuthoritySubstrateRecord =
+              writeAuthorityResolution.substrateRecord;
+          } else {
+            writeAuthorityRef = writeAuthorityResolution;
+          }
           assertGraphWriteAuthority({
             ...(writeAuthorityRef !== undefined
               ? { authorityRef: writeAuthorityRef }
+              : {}),
+            ...(writeAuthoritySubstrateRecord !== undefined
+              ? { substrateRecord: writeAuthoritySubstrateRecord }
               : {}),
             ...(deps.graphWriteAuthorityPolicy !== undefined
               ? { policy: deps.graphWriteAuthorityPolicy }
@@ -361,6 +383,9 @@ export function defineCapability<TPayload, TApplyResult = void>(
           const applied = await spec.apply({
             ...authorityContext,
             ...(writeAuthorityRef !== undefined ? { writeAuthorityRef } : {}),
+            ...(writeAuthoritySubstrateRecord !== undefined
+              ? { writeAuthoritySubstrateRecord }
+              : {}),
           });
 
           if (applied !== null) {
@@ -393,6 +418,9 @@ export function defineCapability<TPayload, TApplyResult = void>(
             // undefined and they'd see it). Trade-off intentional.
             applyResult: applyResult as TApplyResult,
             ...(writeAuthorityRef !== undefined ? { writeAuthorityRef } : {}),
+            ...(writeAuthoritySubstrateRecord !== undefined
+              ? { writeAuthoritySubstrateRecord }
+              : {}),
           });
           if (ev !== null) {
             await events.publishWith(c, {
@@ -414,3 +442,10 @@ export function defineCapability<TPayload, TApplyResult = void>(
     },
   };
 }
+
+const isGraphWriteAuthorityResolution = (
+  value: GraphWriteAuthorityRef | GraphWriteAuthorityResolution | undefined,
+): value is GraphWriteAuthorityResolution =>
+  typeof value === "object" &&
+  value !== null &&
+  "authorityRef" in value;

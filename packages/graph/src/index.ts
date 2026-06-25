@@ -47,5 +47,6 @@ export {
   type GraphWriteAuthorityIssueCode,
   type GraphWriteAuthorityPolicy,
   type GraphWriteAuthorityRef,
+  type GraphWriteAuthoritySubstrateRecord,
   type GraphWriteProviderCertificateStatusRef,
 } from "./write-authority.js";

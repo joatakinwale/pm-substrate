@@ -52,6 +52,7 @@ import {
   assertGraphWriteAuthority,
   type GraphWriteAuthorityPolicy,
   type GraphWriteAuthorityRef,
+  type GraphWriteAuthoritySubstrateRecord,
 } from "./write-authority.js";
 
 /**
@@ -70,6 +71,17 @@ const isGraphWriteAuthorityRef = (
   value !== null &&
   (value as { readonly authorityKind?: unknown }).authorityKind ===
     "workflow_action_outcome_envelope";
+
+const isGraphWriteAuthoritySubstrateRecord = (
+  value: unknown,
+): value is GraphWriteAuthoritySubstrateRecord =>
+  typeof value === "object" &&
+  value !== null &&
+  (value as { readonly authorityKind?: unknown }).authorityKind ===
+    "workflow_action_outcome_envelope" &&
+  typeof (value as { readonly terminalOutcome?: unknown }).terminalOutcome ===
+    "string" &&
+  typeof (value as { readonly envelopeId?: unknown }).envelopeId === "string";
 
 /**
  * Optional dependency on a profile validator. When supplied, every node
@@ -241,7 +253,10 @@ export class PostgresGraph implements Graph {
     input: CreateNodeInput,
     tx?: pg.ClientBase,
   ): Promise<CreateNodeResult> {
-    this.#assertWriteAuthority(input.writeAuthorityRef);
+    this.#assertWriteAuthority(
+      input.writeAuthorityRef,
+      input.writeAuthoritySubstrateRecord,
+    );
 
     // -----------------------------------------------------------------------
     // 1. Validate caller-supplied ID if present.
@@ -335,7 +350,10 @@ export class PostgresGraph implements Graph {
     input: UpdateNodeInput,
     tx?: pg.ClientBase,
   ): Promise<NodeBase> {
-    this.#assertWriteAuthority(input.writeAuthorityRef);
+    this.#assertWriteAuthority(
+      input.writeAuthorityRef,
+      input.writeAuthoritySubstrateRecord,
+    );
 
     // Validate the proposed identity against the tenant's installed
     // profiles. We need the existing node to know the profile binding
@@ -386,7 +404,10 @@ export class PostgresGraph implements Graph {
     input: CreateEdgeInput,
     tx?: pg.ClientBase,
   ): Promise<Edge> {
-    this.#assertWriteAuthority(input.writeAuthorityRef);
+    this.#assertWriteAuthority(
+      input.writeAuthorityRef,
+      input.writeAuthoritySubstrateRecord,
+    );
 
     if (this.#validatorFactory) {
       // Look up the concrete types of the from/to nodes + count existing
@@ -448,16 +469,28 @@ export class PostgresGraph implements Graph {
     tenantId: TenantId,
     id: EdgeId,
     writeAuthorityRefOrTx?: GraphWriteAuthorityRef | pg.ClientBase,
+    writeAuthoritySubstrateRecordOrTx?:
+      | GraphWriteAuthoritySubstrateRecord
+      | pg.ClientBase,
     tx?: pg.ClientBase,
   ): Promise<void> {
     const writeAuthorityRef = isGraphWriteAuthorityRef(writeAuthorityRefOrTx)
       ? writeAuthorityRefOrTx
       : undefined;
-    const queryClient = isGraphWriteAuthorityRef(writeAuthorityRefOrTx)
-      ? tx
-      : writeAuthorityRefOrTx;
+    const writeAuthoritySubstrateRecord =
+      isGraphWriteAuthoritySubstrateRecord(writeAuthoritySubstrateRecordOrTx)
+        ? writeAuthoritySubstrateRecordOrTx
+        : undefined;
+    const queryClient = !isGraphWriteAuthorityRef(writeAuthorityRefOrTx)
+      ? writeAuthorityRefOrTx
+      : !isGraphWriteAuthoritySubstrateRecord(writeAuthoritySubstrateRecordOrTx)
+        ? writeAuthoritySubstrateRecordOrTx
+        : tx;
 
-    this.#assertWriteAuthority(writeAuthorityRef);
+    this.#assertWriteAuthority(
+      writeAuthorityRef,
+      writeAuthoritySubstrateRecord,
+    );
 
     const q = this.#q(queryClient);
     const r = await q.query(
@@ -476,9 +509,13 @@ export class PostgresGraph implements Graph {
   // Internal
   // -------------------------------------------------------------------------
 
-  #assertWriteAuthority(authorityRef?: GraphWriteAuthorityRef): void {
+  #assertWriteAuthority(
+    authorityRef?: GraphWriteAuthorityRef,
+    substrateRecord?: GraphWriteAuthoritySubstrateRecord,
+  ): void {
     assertGraphWriteAuthority({
       ...(authorityRef !== undefined ? { authorityRef } : {}),
+      ...(substrateRecord !== undefined ? { substrateRecord } : {}),
       ...(this.#writeAuthorityPolicy !== undefined
         ? { policy: this.#writeAuthorityPolicy }
         : {}),
