@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Runner authority recovery generation
+
+- Added `research/daily-arrowsmith-agent-state/v49-runner-authority-recovery-generation-2026-06-25.md`, answering RQ50 and replacing it with RQ51: adding provider-status-bearing authority metadata to accepted Axis A/C runner-produced packets.
+- Added `auditEvalEventsGraphWriteAuthority()` and recovery summaries to `@pm/evals`.
+- Added `scripts/authority-recovery.ts` to compose `PostgresEvalEventStore` with `graphWriteAuthorityResolverFromWorkflowEnvelopeStore()` under strict graph authority policy.
+- Updated deterministic and live local-lab runner scripts to persist packets, generate store-derived strict authority recovery summaries, then persist EvalEvents.
+- Added tests for batch recovery summaries and verified the deterministic local-lab runner still executes without `PM_DATABASE_URL`.
+- Claim boundary: runner recovery generation now exists, but accepted Axis A/C runner-produced packets still need provider-status-bearing metadata before strict recoveries can pass; Axis B remains blocked.
+
 ## 2026-06-25 - Proof packet authority gate
 
 - Added `research/daily-arrowsmith-agent-state/v48-proof-packet-authority-gate-2026-06-25.md`, answering RQ49 and replacing it with RQ50: generating authority recoveries from real Axis A/C runner store/resolver calls.

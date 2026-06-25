@@ -25,6 +25,8 @@ v47 update: `@pm/evals` now has `auditEvalEventGraphWriteAuthority()`, a structu
 
 v48 update: `ThreeAxisProofPacket` now has an opt-in authority-recovery gate. When `requireAuthorityRecovery` is enabled, terminal-proof-backed events need valid authority recoveries with expected statuses before the proof packet can remain `verified`. Missing, invalid, or wrong-status recoveries make the packet unverified. The remaining proof boundary is making Axis A/C runner scripts generate those recoveries from real packet stores and store-backed resolvers.
 
+v49 update: local-lab runner scripts now generate store-derived authority recovery summaries after packet persistence by composing `PostgresEvalEventStore` with `graphWriteAuthorityResolverFromWorkflowEnvelopeStore()` under strict graph policy. `@pm/evals` now has batch authority auditing. The remaining proof boundary is making accepted Axis A/C runner-produced packets carry real provider-status-bearing authority metadata so those store-derived recoveries can pass the strict proof-packet gate.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -79,6 +81,7 @@ v48 update: `ThreeAxisProofPacket` now has an opt-in authority-recovery gate. Wh
 | v46 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v46-authority-metadata-packet-recovery-2026-06-25.md` | Authority metadata packet recovery | Answered RQ47, added RQ48, and preserved provider-status authority metadata through canonical packets and eval-store recovery. |
 | v47 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v47-strict-authority-recovery-audit-2026-06-25.md` | Strict authority recovery audit | Answered RQ48, added RQ49, added a strict authority recovery audit primitive, and gave ArrowHedge accepted replay packets provider-status metadata. |
 | v48 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v48-proof-packet-authority-gate-2026-06-25.md` | Proof packet authority gate | Answered RQ49, added RQ50, and made proof packets optionally require strict authority recoveries before verified status. |
+| v49 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v49-runner-authority-recovery-generation-2026-06-25.md` | Runner authority recovery generation | Answered RQ50, added RQ51, and wired local-lab runners to generate store-derived strict authority recovery summaries. |
 
 ## Top Findings
 

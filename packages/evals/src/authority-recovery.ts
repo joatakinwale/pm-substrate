@@ -68,6 +68,19 @@ export interface EvalGraphWriteAuthorityRecovery {
   readonly issues: readonly string[];
 }
 
+export interface EvalGraphWriteAuthorityRecoverySummary {
+  readonly totalEvents: number;
+  readonly auditedEvents: number;
+  readonly validRecoveries: number;
+  readonly invalidRecoveries: number;
+  readonly byStatus: Readonly<Record<EvalGraphWriteAuthorityRecoveryStatus, number>>;
+}
+
+export interface EvalGraphWriteAuthorityRecoverySuite {
+  readonly recoveries: readonly EvalGraphWriteAuthorityRecovery[];
+  readonly summary: EvalGraphWriteAuthorityRecoverySummary;
+}
+
 export async function auditEvalEventGraphWriteAuthority(input: {
   readonly event: EvalEvent;
   readonly store: EvalGraphWriteAuthorityEnvelopeStore;
@@ -189,6 +202,32 @@ export async function auditEvalEventGraphWriteAuthority(input: {
   };
 }
 
+export async function auditEvalEventsGraphWriteAuthority(input: {
+  readonly events: readonly EvalEvent[];
+  readonly store: EvalGraphWriteAuthorityEnvelopeStore;
+  readonly resolveAcceptedAuthority: EvalGraphWriteAuthorityResolver;
+  readonly policy: GraphWriteAuthorityPolicy;
+}): Promise<EvalGraphWriteAuthorityRecoverySuite> {
+  const auditableEvents = input.events.filter((event) =>
+    event.substrateRefs.some((ref) => ref.kind === "action_outcome_envelope"),
+  );
+  const recoveries = await Promise.all(
+    auditableEvents.map((event) =>
+      auditEvalEventGraphWriteAuthority({
+        event,
+        store: input.store,
+        resolveAcceptedAuthority: input.resolveAcceptedAuthority,
+        policy: input.policy,
+      }),
+    ),
+  );
+
+  return {
+    recoveries,
+    summary: summarizeRecoveries(input.events.length, recoveries),
+  };
+}
+
 async function auditRefusedTerminalOutcome(input: {
   readonly runId: string;
   readonly scenarioId: string;
@@ -273,3 +312,36 @@ const issueMessages = (issues: readonly GraphWriteAuthorityIssue[]): readonly st
 
 const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err);
+
+function summarizeRecoveries(
+  totalEvents: number,
+  recoveries: readonly EvalGraphWriteAuthorityRecovery[],
+): EvalGraphWriteAuthorityRecoverySummary {
+  const byStatus = Object.fromEntries(
+    RECOVERY_STATUSES.map((status) => [status, 0]),
+  ) as Record<EvalGraphWriteAuthorityRecoveryStatus, number>;
+  let validRecoveries = 0;
+  for (const recovery of recoveries) {
+    byStatus[recovery.status] += 1;
+    if (recovery.valid) validRecoveries += 1;
+  }
+
+  return {
+    totalEvents,
+    auditedEvents: recoveries.length,
+    validRecoveries,
+    invalidRecoveries: recoveries.length - validRecoveries,
+    byStatus,
+  };
+}
+
+const RECOVERY_STATUSES = [
+  "accepted_authority_recovered",
+  "terminal_outcome_refused_authority",
+  "missing_action_outcome_ref",
+  "ambiguous_action_outcome_ref",
+  "missing_authority_packet",
+  "unexpected_terminal_authority",
+  "authority_resolution_failed",
+  "authority_policy_rejected",
+] as const satisfies readonly EvalGraphWriteAuthorityRecoveryStatus[];

@@ -4,12 +4,12 @@ import pg from "pg";
 import {
   buildDynamicLocalAgentLabEvalSuite,
   PostgresEvalEventStore,
-  recordDynamicLocalAgentLabEvalSuite,
 } from "../packages/evals/src/index.js";
 import {
   SCENARIOS,
   runSuite,
 } from "../packages/local-agent-lab/src/index.js";
+import { auditPersistedEvalEventAuthority } from "./authority-recovery.js";
 
 const databaseUrl = env["PM_DATABASE_URL"];
 if (!databaseUrl) {
@@ -48,10 +48,18 @@ console.log(JSON.stringify({
 const pool = new pg.Pool({ connectionString: databaseUrl });
 try {
   const store = new PostgresEvalEventStore(pool);
-  await recordDynamicLocalAgentLabEvalSuite(store, evalSuite);
+  await store.recordActionOutcomeEnvelopes(evalSuite.actionOutcomeEnvelopes);
+  const authorityRecovery = await auditPersistedEvalEventAuthority(
+    store,
+    evalSuite.events,
+  );
+  await store.recordMany(evalSuite.events);
   console.log(
     `persisted ${evalSuite.actionOutcomeEnvelopes.length} action outcome packets and ${evalSuite.events.length} live eval events`,
   );
+  console.log(JSON.stringify({
+    authorityRecovery: authorityRecovery.summary,
+  }, null, 2));
 } finally {
   await pool.end();
 }

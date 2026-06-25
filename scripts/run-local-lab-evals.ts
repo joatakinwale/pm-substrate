@@ -5,6 +5,7 @@ import {
   PostgresEvalEventStore,
   runLocalLabPairedEvals,
 } from "../packages/evals/src/index.js";
+import { auditPersistedEvalEventAuthority } from "./authority-recovery.js";
 
 const suite = runLocalLabPairedEvals();
 
@@ -28,10 +29,17 @@ if (databaseUrl) {
   try {
     const store = new PostgresEvalEventStore(pool);
     await store.recordActionOutcomeEnvelopes(suite.actionOutcomeEnvelopes);
+    const authorityRecovery = await auditPersistedEvalEventAuthority(
+      store,
+      suite.events,
+    );
     await store.recordMany(suite.events);
     console.log(
       `persisted ${suite.actionOutcomeEnvelopes.length} action outcome packets and ${suite.events.length} eval events`,
     );
+    console.log(JSON.stringify({
+      authorityRecovery: authorityRecovery.summary,
+    }, null, 2));
   } finally {
     await pool.end();
   }

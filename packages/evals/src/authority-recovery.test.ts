@@ -10,7 +10,10 @@ import {
 import type { GraphWriteAuthorityPolicy } from "@pm/graph";
 import type { TenantId, Timestamp } from "@pm/types";
 
-import { auditEvalEventGraphWriteAuthority } from "./authority-recovery.js";
+import {
+  auditEvalEventsGraphWriteAuthority,
+  auditEvalEventGraphWriteAuthority,
+} from "./authority-recovery.js";
 import type { EvalGraphWriteAuthorityResolver } from "./authority-recovery.js";
 import {
   evalEvent,
@@ -105,6 +108,63 @@ describe("auditEvalEventGraphWriteAuthority", () => {
       terminalOutcome: "accepted",
       issueCodes: ["graph_write_provider_certificate_status_ref_missing"],
     });
+  });
+
+  it("audits only events with outcome refs and summarizes batch recoveries", async () => {
+    const accepted = acceptedEnvelopeWithProviderStatus();
+    const missingProvider = acceptedEnvelopeWithoutProviderStatus();
+    const envelopes = new Map(
+      [accepted, missingProvider].map((envelope) => [
+        envelope.substrateRefs.find((ref) => ref.kind === "action_outcome_envelope")!.id,
+        envelope,
+      ]),
+    );
+    const store = new PostgresEvalEventStore({
+      query: async (_sql: string, values?: readonly unknown[]) => ({
+        rows: [{ envelope: envelopes.get(String(values?.[1])) }],
+      }),
+    });
+    const acceptedEvent = authorityEvent({
+      axis: "finance",
+      envelope: accepted,
+      runId: "run_axis_a_authority_recovered",
+      scenarioId: "arrowhedge-authority-recovered",
+    });
+    const missingProviderEvent = authorityEvent({
+      axis: "finance",
+      envelope: missingProvider,
+      runId: "run_axis_a_missing_provider_status",
+      scenarioId: "arrowhedge-missing-provider-status",
+    });
+    const { operationalTerminalOutcome: _terminal, ...eventWithoutTerminal } =
+      acceptedEvent;
+    const noOutcomeRefEvent = evalEvent({
+      ...eventWithoutTerminal,
+      runId: "run_no_outcome_ref",
+      substrateRefs: [evalEvidenceRef("event", "evt_no_outcome_ref")],
+    });
+
+    const suite = await auditEvalEventsGraphWriteAuthority({
+      events: [acceptedEvent, missingProviderEvent, noOutcomeRefEvent],
+      store,
+      resolveAcceptedAuthority: resolverFromStore(store),
+      policy: strictPolicy,
+    });
+
+    expect(suite.summary).toMatchObject({
+      totalEvents: 3,
+      auditedEvents: 2,
+      validRecoveries: 1,
+      invalidRecoveries: 1,
+      byStatus: {
+        accepted_authority_recovered: 1,
+        authority_policy_rejected: 1,
+      },
+    });
+    expect(suite.recoveries.map((recovery) => recovery.runId)).toEqual([
+      "run_axis_a_authority_recovered",
+      "run_axis_a_missing_provider_status",
+    ]);
   });
 });
 
