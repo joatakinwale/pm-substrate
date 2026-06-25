@@ -20,6 +20,7 @@ import {
   defineCapability,
   type CapabilityHandler,
   type CapabilityRuntimeDeps,
+  type GraphWriteAuthorityResolver,
 } from "@pm/capability-kit";
 import type { EntityId, TenantId } from "@pm/types";
 
@@ -51,6 +52,13 @@ export interface LeadScoringRuntimeDeps extends CapabilityRuntimeDeps {
    * Pre-G10 callers passed this through; preserved for back-compat.
    */
   readonly emittedBy?: string;
+
+  /**
+   * Optional workflow/runtime adapter hook. Strict graph write-authority
+   * policy can require this resolver to return a store-backed authority
+   * resolution before the rollup mutates graph.nodes.
+   */
+  readonly graphWriteAuthority?: GraphWriteAuthorityResolver<LeadScoringEventPayload>;
 }
 
 interface LeadScoringApplyResult {
@@ -125,6 +133,10 @@ export class LeadScoringHandler {
             applyResult: { newTotalLeadsScored: newCount },
           };
         },
+
+        ...(deps.graphWriteAuthority !== undefined
+          ? { graphWriteAuthority: deps.graphWriteAuthority }
+          : {}),
 
         // Emit: agency.lead.scored
         emit: ({ tenantId, payload, targetId, applyResult }) => ({

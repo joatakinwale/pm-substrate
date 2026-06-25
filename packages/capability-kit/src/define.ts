@@ -110,6 +110,15 @@ export interface GraphWriteAuthorityResolution {
   readonly substrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
+export type GraphWriteAuthorityResolver<TPayload> = (
+  ctx: GraphWriteAuthorityContext<TPayload>,
+) =>
+  | GraphWriteAuthorityRef
+  | GraphWriteAuthorityResolution
+  | null
+  | undefined
+  | Promise<GraphWriteAuthorityRef | GraphWriteAuthorityResolution | null | undefined>;
+
 /**
  * Capability spec. All fields except `idempotency` and `extractIdempotencyKey`
  * are optional, in roughly the order you'd typically need them:
@@ -179,14 +188,7 @@ export interface CapabilitySpec<TPayload, TApplyResult = void> {
    * resolver must produce evidence satisfying that policy before `apply`
    * receives control or the kit executes `UPDATE graph.nodes`.
    */
-  readonly graphWriteAuthority?: (
-    ctx: GraphWriteAuthorityContext<TPayload>,
-  ) =>
-    | GraphWriteAuthorityRef
-    | GraphWriteAuthorityResolution
-    | null
-    | undefined
-    | Promise<GraphWriteAuthorityRef | GraphWriteAuthorityResolution | null | undefined>;
+  readonly graphWriteAuthority?: GraphWriteAuthorityResolver<TPayload>;
 
   /**
    * Optional. Build the event to emit inside the same transaction.

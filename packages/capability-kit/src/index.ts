@@ -51,9 +51,16 @@ export type {
   GraphWalkContext,
   GraphWriteAuthorityContext,
   GraphWriteAuthorityResolution,
+  GraphWriteAuthorityResolver,
   ApplyContext,
   EmitContext,
   IdempotencyTable,
 } from "./define.js";
 
 export { defineCapability, NoopOnConflict } from "./define.js";
+export {
+  graphWriteAuthorityResolutionFromWorkflowEnvelope,
+  GraphWriteAuthorityResolutionError,
+  type WorkflowGraphWriteAuthorityEnvelope,
+  type WorkflowGraphWriteAuthorityStatusRef,
+} from "./workflow-authority.js";

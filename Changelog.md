@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Workflow authority injection
+
+- Added `research/daily-arrowsmith-agent-state/v44-workflow-authority-injection-2026-06-25.md`, answering RQ45 and replacing it with RQ46: how Axis A/B/C runners should enable strict authority policies with store-sourced resolutions.
+- Exported `GraphWriteAuthorityResolver` from `@pm/capability-kit`.
+- Added `graphWriteAuthorityResolutionFromWorkflowEnvelope()` to convert an accepted workflow envelope into matched graph authority and substrate-record refs without adding a workflow dependency.
+- Added `LeadScoringRuntimeDeps.graphWriteAuthority` and passed it into the lead-scoring capability spec.
+- Added tests proving blocked/missing workflow envelopes do not become write authority, accepted envelopes build matched authority records, and lead scoring can run under strict store-backed graph authority policy when the runtime injects a resolution.
+- Claim boundary: this wires a real capability adapter hook, but end-to-end three-axis verification still requires scenario runners to source authority from packet/status stores; Axis B remains blocked until PluggedInSocial or accepted authoritative fixtures exist.
+
 ## 2026-06-25 - Store-backed write authority
 
 - Added `research/daily-arrowsmith-agent-state/v43-store-backed-write-authority-2026-06-25.md`, answering RQ44 and replacing it with RQ45: how real workflow/runtime adapters should inject store-backed graph write-authority resolutions.
