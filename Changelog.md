@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-25 - Capability kit write authority
+
+- Added `research/daily-arrowsmith-agent-state/v42-capability-kit-write-authority-2026-06-25.md`, answering RQ43 and replacing it with RQ44: how graph write-authority refs should be bound to substrate-stored envelopes/status records.
+- Added `GraphWriteAuthorityContext`, optional `CapabilitySpec.graphWriteAuthority`, optional `CapabilityRuntimeDeps.graphWriteAuthorityPolicy`, and optional `writeAuthorityRef` on capability apply/emit contexts.
+- Updated `defineCapability()` so strict graph authority policy is resolved and checked after target-row lock and before capability `apply` or raw `UPDATE graph.nodes`.
+- Added database-free capability-kit tests proving existing behavior remains unchanged without policy, strict policy rejects before `apply`/`UPDATE`, and valid refs pass through `apply` before update.
+- Claim boundary: capability-kit raw graph updates can now enforce graph write authority when policy is enabled, but refs still need substrate-store validation before forgery-resistant end-to-end claims.
+
 ## 2026-06-25 - Graph write authority refs
 
 - Added `research/daily-arrowsmith-agent-state/v41-graph-write-authority-ref-2026-06-25.md`, answering RQ42 and replacing it with RQ43: how capability-kit raw graph writes should propagate graph write-authority refs.

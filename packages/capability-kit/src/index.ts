@@ -49,6 +49,7 @@ export type {
   CapabilityRuntimeDeps,
   CapabilityHandler,
   GraphWalkContext,
+  GraphWriteAuthorityContext,
   ApplyContext,
   EmitContext,
   IdempotencyTable,

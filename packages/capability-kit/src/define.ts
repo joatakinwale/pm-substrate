@@ -8,7 +8,12 @@
  * See packages/capability-kit/src/index.ts for context.
  */
 
-import type { Graph } from "@pm/graph";
+import {
+  assertGraphWriteAuthority,
+  type Graph,
+  type GraphWriteAuthorityPolicy,
+  type GraphWriteAuthorityRef,
+} from "@pm/graph";
 import type { EventPublisher, PublishInput } from "@pm/events";
 import type { EntityId, TenantId } from "@pm/types";
 import pg from "pg";
@@ -62,17 +67,27 @@ export interface GraphWalkContext<TPayload> {
 }
 
 /**
- * Reads provided to the apply step. After a successful FOR UPDATE the kit
- * passes you the locked row's identity and schemaVersion plus the same
- * tenantId/payload/client for downstream queries.
+ * Reads provided to the graph write-authority resolver. The kit calls this
+ * after it locks the target row and before it gives capability code the
+ * chance to apply or emit side effects for that graph write.
  */
-export interface ApplyContext<TPayload> {
+export interface GraphWriteAuthorityContext<TPayload> {
   readonly tenantId: TenantId;
   readonly payload: TPayload;
   readonly targetId: EntityId;
   readonly currentIdentity: Identity;
   readonly currentSchemaVersion: number;
   readonly client: pg.ClientBase;
+}
+
+/**
+ * Reads provided to the apply step. After a successful FOR UPDATE the kit
+ * passes you the locked row's identity and schemaVersion plus the same
+ * tenantId/payload/client for downstream queries.
+ */
+export interface ApplyContext<TPayload>
+  extends GraphWriteAuthorityContext<TPayload> {
+  readonly writeAuthorityRef?: GraphWriteAuthorityRef;
 }
 
 /**
@@ -84,6 +99,7 @@ export interface EmitContext<TPayload, TApplyResult> {
   readonly payload: TPayload;
   readonly targetId: EntityId;
   readonly applyResult: TApplyResult;
+  readonly writeAuthorityRef?: GraphWriteAuthorityRef;
 }
 
 /**
@@ -150,6 +166,20 @@ export interface CapabilitySpec<TPayload, TApplyResult = void> {
   } | null>;
 
   /**
+   * Optional. Resolve the graph write-authority ref for the locked target
+   * update. If the runtime deps enable `graphWriteAuthorityPolicy`, this
+   * resolver must produce evidence satisfying that policy before `apply`
+   * receives control or the kit executes `UPDATE graph.nodes`.
+   */
+  readonly graphWriteAuthority?: (
+    ctx: GraphWriteAuthorityContext<TPayload>,
+  ) =>
+    | GraphWriteAuthorityRef
+    | null
+    | undefined
+    | Promise<GraphWriteAuthorityRef | null | undefined>;
+
+  /**
    * Optional. Build the event to emit inside the same transaction.
    * Returning `null` means "no event for this case" (rare but valid).
    */
@@ -163,6 +193,7 @@ export interface CapabilityRuntimeDeps {
   readonly pool: pg.Pool;
   readonly graph: Graph;
   readonly events: EventPublisher;
+  readonly graphWriteAuthorityPolicy?: GraphWriteAuthorityPolicy;
 }
 
 /** Compiled capability — call `.handle(tenantId, payload)` to run it. */
@@ -292,6 +323,7 @@ export function defineCapability<TPayload, TApplyResult = void>(
 
         // Step 3 — FOR UPDATE + apply (only if both target and apply exist).
         let applyResult: TApplyResult | undefined;
+        let writeAuthorityRef: GraphWriteAuthorityRef | undefined;
         if (spec.apply && targetId !== null) {
           const sel = await c.query<NodeRow>(
             `SELECT id, identity, schema_version
@@ -307,13 +339,28 @@ export function defineCapability<TPayload, TApplyResult = void>(
             );
           }
 
-          const applied = await spec.apply({
+          const authorityContext: GraphWriteAuthorityContext<TPayload> = {
             tenantId,
             payload,
             targetId,
             currentIdentity: row.identity,
             currentSchemaVersion: row.schema_version,
             client: c,
+          };
+          writeAuthorityRef =
+            (await spec.graphWriteAuthority?.(authorityContext)) ?? undefined;
+          assertGraphWriteAuthority({
+            ...(writeAuthorityRef !== undefined
+              ? { authorityRef: writeAuthorityRef }
+              : {}),
+            ...(deps.graphWriteAuthorityPolicy !== undefined
+              ? { policy: deps.graphWriteAuthorityPolicy }
+              : {}),
+          });
+
+          const applied = await spec.apply({
+            ...authorityContext,
+            ...(writeAuthorityRef !== undefined ? { writeAuthorityRef } : {}),
           });
 
           if (applied !== null) {
@@ -345,6 +392,7 @@ export function defineCapability<TPayload, TApplyResult = void>(
             // user wired apply (otherwise `applyResult` would be
             // undefined and they'd see it). Trade-off intentional.
             applyResult: applyResult as TApplyResult,
+            ...(writeAuthorityRef !== undefined ? { writeAuthorityRef } : {}),
           });
           if (ev !== null) {
             await events.publishWith(c, {
