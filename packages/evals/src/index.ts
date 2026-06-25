@@ -43,6 +43,17 @@ export {
   type WorkflowGraphWriteAuthorityProviderCertificateStatusRef,
 } from "./persistence/index.js";
 export {
+  auditEvalEventGraphWriteAuthority,
+  type EvalGraphWriteAuthorityEnvelope,
+  type EvalGraphWriteAuthorityEnvelopeLookup,
+  type EvalGraphWriteAuthorityEnvelopeStore,
+  type EvalGraphWriteAuthorityRecovery,
+  type EvalGraphWriteAuthorityRecoveryStatus,
+  type EvalGraphWriteAuthorityResolveInput,
+  type EvalGraphWriteAuthorityResolver,
+  type EvalGraphWriteAuthorityResolution,
+} from "./authority-recovery.js";
+export {
   analyzeActionProposalReviews,
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,

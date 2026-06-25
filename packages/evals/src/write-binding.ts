@@ -20,7 +20,9 @@ import {
   type Capability,
 } from "@pm/registry";
 import type {
+  CapabilityId,
   TenantId,
+  TerminalAdmissionProviderCertificate,
   TerminalAdmissionProviderManifest,
   Timestamp,
   WriteContract,
@@ -34,6 +36,7 @@ import {
   type EvidenceBindingStateReviewArtifactRef,
   type EvidenceBindingMode,
   type EvidenceBindingVerificationDecision,
+  type InvocationActionOutcomeProviderCertificateStatusRef,
   type InvocationEvidenceBinding,
 } from "@pm/workflow";
 
@@ -257,6 +260,55 @@ const ARROWHEDGE_SUBJECT: StateRef = {
   id: "arrowhedge_cop_corpus:AAPL",
   label: "ArrowHedge COP AAPL",
 };
+
+const ARROWHEDGE_TERMINAL_PROVIDER = {
+  providerId: "finance-research.arrowhedge.action-outcome-envelope.v1",
+  kind: "action_outcome_envelope",
+  contractVersion: { major: 1, minor: 0, patch: 0 },
+  packageName: "@pm/capability-finance-research-ingest",
+  exportName: "buildArrowHedgeActionOutcomeEnvelope",
+  actionTypes: ["risk.refresh", "portfolio.decision.accept"],
+  profiles: ["finance-research"],
+  evidenceRefKinds: ["state_review_artifact"],
+  substrateRefKinds: ["action_outcome_envelope", "workflow_run"],
+} as const;
+
+const ARROWHEDGE_TERMINAL_PROVIDER_MANIFEST = {
+  ...ARROWHEDGE_TERMINAL_PROVIDER,
+  availability: "available",
+} as const satisfies TerminalAdmissionProviderManifest;
+
+const ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE = {
+  schemaVersion: "pm.terminal_admission_provider_certificate.v1",
+  certificateId: "tapc_arrowhedge_write_binding_replay_001",
+  certificateDigest: "sha256:arrowhedge_write_binding_replay_001",
+  issuer: "registry.install",
+  issuedAt: "2026-06-11T15:59:00.000Z" as Timestamp,
+  validUntil: "2026-06-11T17:00:00.000Z" as Timestamp,
+  status: "valid",
+  subject: {
+    capabilityId: "cap_arrowhedge_write_binding_replay" as CapabilityId,
+    capabilityName: "risk/refresh",
+    capabilityVersion: 1,
+    writeInterface: "RiskRefresh",
+    writeFields: ["risk.currentPrice", "risk.maxShares"],
+    writeOwnership: "owner",
+    providerId: ARROWHEDGE_TERMINAL_PROVIDER.providerId,
+  },
+  provider: ARROWHEDGE_TERMINAL_PROVIDER,
+  manifest: ARROWHEDGE_TERMINAL_PROVIDER_MANIFEST,
+  manifestDigest: "sha256:arrowhedge_terminal_provider_manifest",
+} as const satisfies TerminalAdmissionProviderCertificate;
+
+const ARROWHEDGE_TERMINAL_PROVIDER_STATUS_REF = {
+  certificateId: ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE.certificateId,
+  certificateDigest: ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE.certificateDigest,
+  status: "valid",
+  statusSequence: 1,
+  statusEventHash: "sha256:arrowhedge_terminal_provider_status_event_001",
+  statusUpdatedAt: "2026-06-11T15:59:30.000Z",
+  checkedAt: "2026-06-11T16:00:00.000Z",
+} as const satisfies InvocationActionOutcomeProviderCertificateStatusRef;
 
 const ARROWHEDGE_ARTIFACTS = {
   clean: {
@@ -1004,6 +1056,14 @@ function buildRecord(input: {
             })),
           },
         });
+  const providerCertificate =
+    validation.valid && input.bindingKind === "complete_advisory"
+      ? ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE
+      : undefined;
+  const providerCertificateStatusRef =
+    providerCertificate === undefined
+      ? undefined
+      : ARROWHEDGE_TERMINAL_PROVIDER_STATUS_REF;
   const workflowActionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
     request: {
       tenantId: ARROWHEDGE_TENANT,
@@ -1019,6 +1079,10 @@ function buildRecord(input: {
     evidenceBinding: invocationEvidenceBinding,
     evidenceDecision: validation,
     generatedAt: input.generatedAt,
+    ...(providerCertificate !== undefined ? { providerCertificate } : {}),
+    ...(providerCertificateStatusRef !== undefined
+      ? { providerCertificateStatusRef }
+      : {}),
   });
   const actionOutcomeEnvelope = promoteWorkflowInvocationOutcomeEnvelope({
     workflowEnvelope: workflowActionOutcomeEnvelope,

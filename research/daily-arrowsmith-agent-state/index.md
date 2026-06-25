@@ -21,6 +21,8 @@ v45 update: `@pm/capability-kit` now has a store-backed resolver factory that lo
 
 v46 update: canonical `ActionOutcomeEnvelope` packets now preserve provider certificate id/digest/status refs, and `PostgresEvalEventStore` can recover the structural workflow-authority envelope shape by tenant/envelope id. The remaining proof boundary is composing that recovery with strict graph/capability policy inside Axis A/C runners while Axis B remains explicitly blocked.
 
+v47 update: `@pm/evals` now has `auditEvalEventGraphWriteAuthority()`, a structural runner/audit primitive that recovers an EvalEvent's outcome packet, composes with a store-backed authority resolver such as `graphWriteAuthorityResolverFromWorkflowEnvelopeStore()`, validates strict graph authority policy, and distinguishes accepted recovered authority from blocked terminal outcomes that correctly refuse authority. The accepted ArrowHedge write-binding replay packet now carries provider-status metadata. The remaining proof boundary is making Axis A/C live/scenario runners require this audit as a gate and feed the result into proof packets; Axis B remains blocked until PluggedInSocial or accepted authoritative fixtures exist.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -73,6 +75,7 @@ v46 update: canonical `ActionOutcomeEnvelope` packets now preserve provider cert
 | v44 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v44-workflow-authority-injection-2026-06-25.md` | Workflow authority injection | Answered RQ45, added RQ46, added a structural workflow-envelope authority connector, and injected graph write authority into the real lead-scoring capability adapter. |
 | v45 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v45-store-backed-authority-resolver-2026-06-25.md` | Store backed authority resolver | Answered RQ46, added RQ47, and added a resolver factory that loads workflow envelopes from a store before returning graph authority. |
 | v46 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v46-authority-metadata-packet-recovery-2026-06-25.md` | Authority metadata packet recovery | Answered RQ47, added RQ48, and preserved provider-status authority metadata through canonical packets and eval-store recovery. |
+| v47 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v47-strict-authority-recovery-audit-2026-06-25.md` | Strict authority recovery audit | Answered RQ48, added RQ49, added a strict authority recovery audit primitive, and gave ArrowHedge accepted replay packets provider-status metadata. |
 
 ## Top Findings
 

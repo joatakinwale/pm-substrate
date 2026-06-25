@@ -228,6 +228,9 @@ importers:
       '@pm/agent-state':
         specifier: workspace:*
         version: link:../agent-state
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@pm/registry':
         specifier: workspace:*
         version: link:../registry
@@ -238,6 +241,9 @@ importers:
         specifier: workspace:*
         version: link:../workflow
     devDependencies:
+      '@pm/capability-kit':
+        specifier: workspace:*
+        version: link:../capability-kit
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

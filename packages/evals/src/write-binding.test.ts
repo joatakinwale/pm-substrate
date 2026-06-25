@@ -71,6 +71,25 @@ describe("write-binding replay corpus", () => {
       "blocked",
       "blocked",
     ]);
+    expect(corpus.records[0]?.actionOutcomeEnvelope).toMatchObject({
+      providerCertificateId: "tapc_arrowhedge_write_binding_replay_001",
+      providerCertificateDigest: "sha256:arrowhedge_write_binding_replay_001",
+      providerCertificateStatusRef: {
+        certificateId: "tapc_arrowhedge_write_binding_replay_001",
+        certificateDigest: "sha256:arrowhedge_write_binding_replay_001",
+        status: "valid",
+        statusSequence: 1,
+        statusEventHash: "sha256:arrowhedge_terminal_provider_status_event_001",
+        statusUpdatedAt: "2026-06-11T15:59:30.000Z",
+        checkedAt: "2026-06-11T16:00:00.000Z",
+      },
+    });
+    expect(
+      corpus.records.slice(1).every(
+        (record) =>
+          record.actionOutcomeEnvelope.providerCertificateStatusRef === undefined,
+      ),
+    ).toBe(true);
     expect(
       corpus.records.every((record) =>
         record.actionOutcomeEnvelope.substrateRefs.some(

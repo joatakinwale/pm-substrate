@@ -74,6 +74,7 @@ export {
   type InvocationActionOutcomeAdmissionRejectionReason,
   type InvocationActionOutcomeAdmissionRequest,
   type InvocationActionOutcomeEnvelope,
+  type InvocationActionOutcomeProviderCertificateStatusRef,
   type InvocationActionOutcomeProviderCertificateProvider,
   type InvocationActionTerminalOutcome,
   type InvocationEvidenceBinding,

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Strict authority recovery audit
+
+- Added `research/daily-arrowsmith-agent-state/v47-strict-authority-recovery-audit-2026-06-25.md`, answering RQ48 and replacing it with RQ49: how strict authority recovery becomes a required Axis A/C runner/proof-packet gate.
+- Added `auditEvalEventGraphWriteAuthority()` in `@pm/evals` to recover an EvalEvent's outcome packet, compose with a store-backed authority resolver, and validate strict graph authority policy.
+- Added provider certificate status metadata to the accepted ArrowHedge write-binding replay packet and regenerated the golden replay JSONL.
+- Exported `InvocationActionOutcomeProviderCertificateStatusRef` from `@pm/workflow` for public replay/runner use.
+- Added tests proving accepted provider-status-backed recovery passes, blocked Axis C packets refuse write authority, and accepted packets missing provider status fail strict policy.
+- Claim boundary: strict authority recovery is now executable as a codebase primitive, but Axis A/C runners still need to require it as a gate and Axis B remains blocked until PluggedInSocial or accepted authoritative fixtures exist.
+
 ## 2026-06-25 - Authority metadata packet recovery
 
 - Added `research/daily-arrowsmith-agent-state/v46-authority-metadata-packet-recovery-2026-06-25.md`, answering RQ47 and replacing it with RQ48: how Axis A/C runners should compose packet recovery with strict authority policy.
