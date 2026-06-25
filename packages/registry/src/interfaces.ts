@@ -226,6 +226,49 @@ export interface TerminalAdmissionProviderCertificateStatusRecord {
   readonly supersededByCertificateId?: string;
 }
 
+export interface TerminalAdmissionProviderCertificateStatusEvent {
+  readonly tenantId: TenantId;
+  readonly certificateId: string;
+  readonly sequence: number;
+  readonly fromStatus?: TerminalAdmissionProviderCertificateStatus;
+  readonly toStatus: TerminalAdmissionProviderCertificateStatus;
+  readonly statusUpdatedAt: Timestamp;
+  readonly recordedAt: Timestamp;
+  readonly statusReason?: string;
+  readonly supersededByCertificateId?: string;
+  readonly previousEventHash?: string;
+  readonly eventHash: string;
+}
+
+export type TerminalAdmissionProviderCertificateStatusEventReplayIssueCode =
+  | "status_event_certificate_mismatch"
+  | "status_event_sequence_gap"
+  | "status_event_previous_hash_mismatch"
+  | "status_event_hash_invalid"
+  | "status_event_time_regression"
+  | "status_event_from_status_mismatch"
+  | "status_event_missing_at_checked_time";
+
+export interface TerminalAdmissionProviderCertificateStatusEventReplayIssue {
+  readonly code: TerminalAdmissionProviderCertificateStatusEventReplayIssueCode;
+  readonly certificateId: string;
+  readonly message: string;
+  readonly expected?: string;
+  readonly actual?: string;
+}
+
+export interface TerminalAdmissionProviderCertificateStatusEventReplayInput {
+  readonly record: TerminalAdmissionProviderCertificateStatusRecord;
+  readonly events: readonly TerminalAdmissionProviderCertificateStatusEvent[];
+  readonly checkedAt: Timestamp;
+}
+
+export interface TerminalAdmissionProviderCertificateStatusEventReplayDecision {
+  readonly valid: boolean;
+  readonly issues: readonly TerminalAdmissionProviderCertificateStatusEventReplayIssue[];
+  readonly record?: TerminalAdmissionProviderCertificateStatusRecord;
+}
+
 export interface TerminalAdmissionProviderCertificateRecordInput {
   readonly tenantId: TenantId;
   readonly certificate: TerminalAdmissionProviderCertificate;
@@ -249,11 +292,21 @@ export interface TerminalAdmissionProviderCertificateLookupInput {
   readonly certificateId: string;
 }
 
+export interface TerminalAdmissionProviderCertificateRecordAtInput
+  extends TerminalAdmissionProviderCertificateLookupInput {
+  readonly checkedAt: Timestamp;
+}
+
 export interface TerminalAdmissionProviderCertificateFindCurrentInput {
   readonly tenantId: TenantId;
   readonly capabilityName: string;
   readonly providerId?: string;
   readonly checkedAt?: Timestamp;
+}
+
+export interface TerminalAdmissionProviderCertificateStatusEventListInput {
+  readonly tenantId: TenantId;
+  readonly certificateId: string;
 }
 
 export interface TerminalAdmissionProviderCertificateStatusRecordValidationInput {
@@ -272,9 +325,17 @@ export interface TerminalAdmissionProviderCertificateStatusStore {
     input: TerminalAdmissionProviderCertificateLookupInput,
   ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null>;
 
+  getCertificateRecordAt(
+    input: TerminalAdmissionProviderCertificateRecordAtInput,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null>;
+
   setCertificateStatus(
     input: TerminalAdmissionProviderCertificateStatusUpdateInput,
   ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null>;
+
+  listCertificateStatusEvents(
+    input: TerminalAdmissionProviderCertificateStatusEventListInput,
+  ): Promise<readonly TerminalAdmissionProviderCertificateStatusEvent[]>;
 
   findCurrentCertificate(
     input: TerminalAdmissionProviderCertificateFindCurrentInput,
@@ -554,6 +615,142 @@ export const terminalAdmissionProviderCertificateDigest = (
 ): string => {
   const { certificateDigest: _certificateDigest, ...digestible } = certificate;
   return sha256(stableJson(digestible));
+};
+
+export const terminalAdmissionProviderCertificateStatusEventHash = (
+  event: Omit<TerminalAdmissionProviderCertificateStatusEvent, "eventHash">,
+): string => sha256(stableJson(event));
+
+export const replayTerminalAdmissionProviderCertificateStatusAt = (
+  input: TerminalAdmissionProviderCertificateStatusEventReplayInput,
+): TerminalAdmissionProviderCertificateStatusEventReplayDecision => {
+  const certificateId = input.record.certificate.certificateId;
+  const events = [...input.events].sort((a, b) => a.sequence - b.sequence);
+  const issues: TerminalAdmissionProviderCertificateStatusEventReplayIssue[] = [];
+  let previousHash: string | undefined;
+  let previousStatus: TerminalAdmissionProviderCertificateStatus | undefined;
+  let previousStatusUpdatedAt: Timestamp | undefined;
+  let eventAtCheckedTime:
+    | TerminalAdmissionProviderCertificateStatusEvent
+    | undefined;
+
+  events.forEach((event, index) => {
+    if (
+      event.tenantId !== input.record.tenantId ||
+      event.certificateId !== certificateId
+    ) {
+      issues.push({
+        code: "status_event_certificate_mismatch",
+        certificateId,
+        message: `Terminal-admission provider certificate status event ${event.eventHash} is not bound to the replayed certificate.`,
+        expected: `${input.record.tenantId}/${certificateId}`,
+        actual: `${event.tenantId}/${event.certificateId}`,
+      });
+    }
+
+    const expectedSequence = index + 1;
+    if (event.sequence !== expectedSequence) {
+      issues.push({
+        code: "status_event_sequence_gap",
+        certificateId,
+        message: `Terminal-admission provider certificate status event sequence ${event.sequence} is not contiguous.`,
+        expected: String(expectedSequence),
+        actual: String(event.sequence),
+      });
+    }
+
+    if (event.previousEventHash !== previousHash) {
+      issues.push({
+        code: "status_event_previous_hash_mismatch",
+        certificateId,
+        message: `Terminal-admission provider certificate status event ${event.sequence} does not link to the previous event hash.`,
+        ...(previousHash !== undefined ? { expected: previousHash } : {}),
+        ...(event.previousEventHash !== undefined
+          ? { actual: event.previousEventHash }
+          : {}),
+      });
+    }
+
+    const { eventHash: _eventHash, ...eventBody } = event;
+    const actualHash =
+      terminalAdmissionProviderCertificateStatusEventHash(eventBody);
+    if (actualHash !== event.eventHash) {
+      issues.push({
+        code: "status_event_hash_invalid",
+        certificateId,
+        message: `Terminal-admission provider certificate status event ${event.sequence} hash is invalid.`,
+        expected: event.eventHash,
+        actual: actualHash,
+      });
+    }
+
+    if (
+      previousStatusUpdatedAt !== undefined &&
+      Date.parse(event.statusUpdatedAt) <
+        Date.parse(previousStatusUpdatedAt)
+    ) {
+      issues.push({
+        code: "status_event_time_regression",
+        certificateId,
+        message: `Terminal-admission provider certificate status event ${event.sequence} moves status time backward.`,
+        expected: previousStatusUpdatedAt,
+        actual: event.statusUpdatedAt,
+      });
+    }
+
+    if (event.sequence > 1 && event.fromStatus !== previousStatus) {
+      issues.push({
+        code: "status_event_from_status_mismatch",
+        certificateId,
+        message: `Terminal-admission provider certificate status event ${event.sequence} does not transition from the previous status.`,
+        ...(previousStatus !== undefined ? { expected: previousStatus } : {}),
+        ...(event.fromStatus !== undefined ? { actual: event.fromStatus } : {}),
+      });
+    }
+
+    if (Date.parse(event.statusUpdatedAt) <= Date.parse(input.checkedAt)) {
+      eventAtCheckedTime = event;
+    }
+
+    previousHash = event.eventHash;
+    previousStatus = event.toStatus;
+    previousStatusUpdatedAt = event.statusUpdatedAt;
+  });
+
+  if (eventAtCheckedTime === undefined) {
+    issues.push({
+      code: "status_event_missing_at_checked_time",
+      certificateId,
+      message: `No terminal-admission provider certificate status event was current at ${input.checkedAt}.`,
+      actual: input.checkedAt,
+    });
+  }
+
+  const replayedRecord =
+    eventAtCheckedTime === undefined
+      ? undefined
+      : {
+          tenantId: input.record.tenantId,
+          certificate: input.record.certificate,
+          currentStatus: eventAtCheckedTime.toStatus,
+          statusUpdatedAt: eventAtCheckedTime.statusUpdatedAt,
+          recordedAt: eventAtCheckedTime.recordedAt,
+          ...(eventAtCheckedTime.statusReason !== undefined
+            ? { statusReason: eventAtCheckedTime.statusReason }
+            : {}),
+          ...(eventAtCheckedTime.supersededByCertificateId !== undefined
+            ? {
+                supersededByCertificateId:
+                  eventAtCheckedTime.supersededByCertificateId,
+              }
+            : {}),
+        };
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    ...(replayedRecord !== undefined ? { record: replayedRecord } : {}),
+  };
 };
 
 export const issueTerminalAdmissionProviderCertificates = (

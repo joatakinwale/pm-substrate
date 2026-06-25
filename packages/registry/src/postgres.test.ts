@@ -59,6 +59,10 @@ describeIfDb("PostgresRegistry", () => {
 
   afterAll(async () => {
     await pool.query(
+      `DELETE FROM registry.terminal_admission_provider_certificate_status_events WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    await pool.query(
       `DELETE FROM registry.terminal_admission_provider_certificates WHERE tenant_id = $1`,
       [tenantId],
     );
@@ -237,5 +241,44 @@ describeIfDb("PostgresRegistry", () => {
       currentStatus: "revoked",
       statusReason: "provider implementation key rotated",
     });
+
+    await expect(
+      restartedStore.findCurrentCertificate({
+        tenantId,
+        capabilityName: "test/provider-cert-store",
+        checkedAt: timestamp("2026-06-25T10:30:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      certificate: {
+        certificateId: certificate!.certificateId,
+      },
+      currentStatus: "valid",
+    });
+    await expect(
+      restartedStore.getCertificateRecordAt({
+        tenantId,
+        certificateId: certificate!.certificateId,
+        checkedAt: timestamp("2026-06-25T10:50:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      currentStatus: "revoked",
+      statusReason: "provider implementation key rotated",
+    });
+    await expect(
+      restartedStore.listCertificateStatusEvents({
+        tenantId,
+        certificateId: certificate!.certificateId,
+      }),
+    ).resolves.toMatchObject([
+      {
+        sequence: 1,
+        toStatus: "valid",
+      },
+      {
+        sequence: 2,
+        fromStatus: "valid",
+        toStatus: "revoked",
+      },
+    ]);
   });
 });

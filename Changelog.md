@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Provider certificate status event replay
+
+- Added `research/daily-arrowsmith-agent-state/v39-provider-certificate-status-event-replay-2026-06-25.md`, answering RQ40 and replacing it with RQ41: how workflow action-outcome evidence should bind the exact provider-certificate status event sequence/hash used at dispatch.
+- Added append-only `TerminalAdmissionProviderCertificateStatusEvent` types, replay issue/decision types, deterministic status-event hashing, and `replayTerminalAdmissionProviderCertificateStatusAt()` to `@pm/registry`.
+- Added migration `0022_registry_terminal_provider_certificate_status_events.sql` for tenant/certificate-partitioned status-event streams with sequence, previous hash, event hash, status time, and recorded time.
+- Updated `PostgresTerminalAdmissionProviderCertificateStore` so certificate recording appends an initial status event, status updates append transition events, projection updates happen transactionally, and `checkedAt` lookup reconstructs status from replay.
+- Added pure registry tests proving a certificate can replay as valid before later revocation, replay as revoked after revocation, and reject tampered status events.
+- Claim boundary: status replay now improves the substrate primitive, but workflow envelopes do not yet cite the exact status-event sequence/hash, Axis A remains incomplete, and Axis B remains blocked until PluggedInSocial or accepted authoritative fixtures exist.
+
 ## 2026-06-25 - Provider certificate status store
 
 - Added `research/daily-arrowsmith-agent-state/v38-provider-certificate-status-store-2026-06-25.md`, answering RQ39 and replacing it with RQ40: how provider certificate status transitions should become append-only and replayable.

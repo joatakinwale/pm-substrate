@@ -29,13 +29,18 @@ import type {
 import { isSubscribeContract } from "@pm/types";
 import pg from "pg";
 import {
+  replayTerminalAdmissionProviderCertificateStatusAt,
+  terminalAdmissionProviderCertificateStatusEventHash,
   verifyTerminalAdmissionProviderCertificateIntegrity,
   verifyTerminalAdmissionProviderCertificateStatusRecord,
   type Capability,
   type Registry,
   type TerminalAdmissionProviderCertificateFindCurrentInput,
   type TerminalAdmissionProviderCertificateLookupInput,
+  type TerminalAdmissionProviderCertificateRecordAtInput,
   type TerminalAdmissionProviderCertificateRecordInput,
+  type TerminalAdmissionProviderCertificateStatusEvent,
+  type TerminalAdmissionProviderCertificateStatusEventListInput,
   type TerminalAdmissionProviderCertificateStatusRecord,
   type TerminalAdmissionProviderCertificateStatusStore,
   type TerminalAdmissionProviderCertificateStatusUpdateInput,
@@ -98,6 +103,12 @@ const CERTIFICATE_SELECT_COLS = `
   tenant_id, certificate_id, certificate_digest, subject_capability_name,
   subject_provider_id, certificate, current_status, status_reason,
   superseded_by_certificate_id, status_updated_at, recorded_at
+`;
+
+const CERTIFICATE_STATUS_EVENT_SELECT_COLS = `
+  tenant_id, certificate_id, status_sequence, from_status, to_status,
+  status_reason, superseded_by_certificate_id, status_updated_at, recorded_at,
+  previous_event_hash, event_hash
 `;
 
 export class PostgresRegistry implements Registry {
@@ -257,6 +268,20 @@ interface CertificateRow {
   recorded_at: Date | string;
 }
 
+interface CertificateStatusEventRow {
+  tenant_id: string;
+  certificate_id: string;
+  status_sequence: string | number;
+  from_status: TerminalAdmissionProviderCertificateStatus | null;
+  to_status: TerminalAdmissionProviderCertificateStatus;
+  status_reason: string | null;
+  superseded_by_certificate_id: string | null;
+  status_updated_at: Date | string;
+  recorded_at: Date | string;
+  previous_event_hash: string | null;
+  event_hash: string;
+}
+
 const timestampFromDb = (value: Date | string): Timestamp =>
   (value instanceof Date ? value.toISOString() : new Date(value).toISOString()) as Timestamp;
 
@@ -274,6 +299,29 @@ const rowToCertificateStatusRecord = (
     : {}),
 });
 
+const rowToCertificateStatusEvent = (
+  row: CertificateStatusEventRow,
+): TerminalAdmissionProviderCertificateStatusEvent => ({
+  tenantId: row.tenant_id as TenantId,
+  certificateId: row.certificate_id,
+  sequence:
+    typeof row.status_sequence === "number"
+      ? row.status_sequence
+      : Number.parseInt(row.status_sequence, 10),
+  ...(row.from_status !== null ? { fromStatus: row.from_status } : {}),
+  toStatus: row.to_status,
+  statusUpdatedAt: timestampFromDb(row.status_updated_at),
+  recordedAt: timestampFromDb(row.recorded_at),
+  ...(row.status_reason !== null ? { statusReason: row.status_reason } : {}),
+  ...(row.superseded_by_certificate_id !== null
+    ? { supersededByCertificateId: row.superseded_by_certificate_id }
+    : {}),
+  ...(row.previous_event_hash !== null
+    ? { previousEventHash: row.previous_event_hash }
+    : {}),
+  eventHash: row.event_hash,
+});
+
 export class PostgresTerminalAdmissionProviderCertificateStore
   implements TerminalAdmissionProviderCertificateStatusStore {
   readonly #pool: pg.Pool;
@@ -285,6 +333,16 @@ export class PostgresTerminalAdmissionProviderCertificateStore
   async recordCertificate(
     input: TerminalAdmissionProviderCertificateRecordInput,
     tx?: pg.ClientBase,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord> {
+    if (tx !== undefined) return this.#recordCertificate(input, tx);
+    return this.#withTransaction((client) =>
+      this.#recordCertificate(input, client)
+    );
+  }
+
+  async #recordCertificate(
+    input: TerminalAdmissionProviderCertificateRecordInput,
+    tx: pg.ClientBase,
   ): Promise<TerminalAdmissionProviderCertificateStatusRecord> {
     const integrity = verifyTerminalAdmissionProviderCertificateIntegrity(
       input.certificate,
@@ -311,6 +369,33 @@ export class PostgresTerminalAdmissionProviderCertificateStore
       ) {
         throw new Error(
           `terminal-admission provider certificate ${input.certificate.certificateId} already exists with a different digest`,
+        );
+      }
+      const events = await this.listCertificateStatusEvents(
+        {
+          tenantId: input.tenantId,
+          certificateId: input.certificate.certificateId,
+        },
+        tx,
+      );
+      if (events.length === 0) {
+        await this.#appendCertificateStatusEvent(
+          {
+            tenantId: input.tenantId,
+            certificateId: input.certificate.certificateId,
+            toStatus: existing.currentStatus,
+            statusUpdatedAt: existing.statusUpdatedAt,
+            ...(existing.statusReason !== undefined
+              ? { statusReason: existing.statusReason }
+              : {}),
+            ...(existing.supersededByCertificateId !== undefined
+              ? {
+                  supersededByCertificateId:
+                    existing.supersededByCertificateId,
+                }
+              : {}),
+          },
+          tx,
         );
       }
       return existing;
@@ -340,6 +425,21 @@ export class PostgresTerminalAdmissionProviderCertificateStore
         input.statusUpdatedAt,
       ],
     );
+    await this.#appendCertificateStatusEvent(
+      {
+        tenantId: input.tenantId,
+        certificateId: input.certificate.certificateId,
+        toStatus: currentStatus,
+        statusUpdatedAt: input.statusUpdatedAt,
+        ...(input.statusReason !== undefined
+          ? { statusReason: input.statusReason }
+          : {}),
+        ...(input.supersededByCertificateId !== undefined
+          ? { supersededByCertificateId: input.supersededByCertificateId }
+          : {}),
+      },
+      tx,
+    );
     return rowToCertificateStatusRecord(result.rows[0]!);
   }
 
@@ -360,11 +460,70 @@ export class PostgresTerminalAdmissionProviderCertificateStore
       : null;
   }
 
+  async getCertificateRecordAt(
+    input: TerminalAdmissionProviderCertificateRecordAtInput,
+    tx?: pg.ClientBase,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null> {
+    const current = await this.getCertificateRecord(input, tx);
+    if (current === null) return null;
+
+    const replay = replayTerminalAdmissionProviderCertificateStatusAt({
+      record: current,
+      events: await this.listCertificateStatusEvents(input, tx),
+      checkedAt: input.checkedAt,
+    });
+    return replay.valid ? replay.record ?? null : null;
+  }
+
   async setCertificateStatus(
     input: TerminalAdmissionProviderCertificateStatusUpdateInput,
     tx?: pg.ClientBase,
   ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null> {
+    if (tx !== undefined) return this.#setCertificateStatus(input, tx);
+    return this.#withTransaction((client) =>
+      this.#setCertificateStatus(input, client)
+    );
+  }
+
+  async #setCertificateStatus(
+    input: TerminalAdmissionProviderCertificateStatusUpdateInput,
+    tx: pg.ClientBase,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null> {
     const q = this.#q(tx);
+    const existingResult = await q.query<CertificateRow>(
+      `SELECT ${CERTIFICATE_SELECT_COLS}
+         FROM registry.terminal_admission_provider_certificates
+        WHERE tenant_id = $1 AND certificate_id = $2
+        LIMIT 1
+        FOR UPDATE`,
+      [input.tenantId, input.certificateId],
+    );
+    if (existingResult.rows[0] === undefined) return null;
+
+    const existing = rowToCertificateStatusRecord(existingResult.rows[0]);
+    if (Date.parse(input.statusUpdatedAt) < Date.parse(existing.statusUpdatedAt)) {
+      throw new Error(
+        `terminal-admission provider certificate ${input.certificateId} status update is older than the current status projection`,
+      );
+    }
+
+    await this.#appendCertificateStatusEvent(
+      {
+        tenantId: input.tenantId,
+        certificateId: input.certificateId,
+        fromStatus: existing.currentStatus,
+        toStatus: input.status,
+        statusUpdatedAt: input.statusUpdatedAt,
+        ...(input.statusReason !== undefined
+          ? { statusReason: input.statusReason }
+          : {}),
+        ...(input.supersededByCertificateId !== undefined
+          ? { supersededByCertificateId: input.supersededByCertificateId }
+          : {}),
+      },
+      tx,
+    );
+
     const result = await q.query<CertificateRow>(
       `UPDATE registry.terminal_admission_provider_certificates
           SET current_status = $3,
@@ -387,6 +546,21 @@ export class PostgresTerminalAdmissionProviderCertificateStore
       : null;
   }
 
+  async listCertificateStatusEvents(
+    input: TerminalAdmissionProviderCertificateStatusEventListInput,
+    tx?: pg.ClientBase,
+  ): Promise<readonly TerminalAdmissionProviderCertificateStatusEvent[]> {
+    const q = this.#q(tx);
+    const result = await q.query<CertificateStatusEventRow>(
+      `SELECT ${CERTIFICATE_STATUS_EVENT_SELECT_COLS}
+         FROM registry.terminal_admission_provider_certificate_status_events
+        WHERE tenant_id = $1 AND certificate_id = $2
+        ORDER BY status_sequence ASC`,
+      [input.tenantId, input.certificateId],
+    );
+    return result.rows.map(rowToCertificateStatusEvent);
+  }
+
   async findCurrentCertificate(
     input: TerminalAdmissionProviderCertificateFindCurrentInput,
     tx?: pg.ClientBase,
@@ -396,6 +570,41 @@ export class PostgresTerminalAdmissionProviderCertificateStore
     const providerClause =
       input.providerId === undefined ? "" : "AND subject_provider_id = $3";
     if (input.providerId !== undefined) params.push(input.providerId);
+
+    if (input.checkedAt !== undefined) {
+      const result = await q.query<CertificateRow>(
+        `SELECT ${CERTIFICATE_SELECT_COLS}
+           FROM registry.terminal_admission_provider_certificates
+          WHERE tenant_id = $1
+            AND subject_capability_name = $2
+            ${providerClause}
+          ORDER BY status_updated_at DESC, recorded_at DESC`,
+        params,
+      );
+
+      for (const row of result.rows) {
+        const currentRecord = rowToCertificateStatusRecord(row);
+        const record = await this.getCertificateRecordAt(
+          {
+            tenantId: currentRecord.tenantId,
+            certificateId: currentRecord.certificate.certificateId,
+            checkedAt: input.checkedAt,
+          },
+          tx,
+        );
+        if (record === null) continue;
+        const decision = verifyTerminalAdmissionProviderCertificateStatusRecord({
+          record,
+          checkedAt: input.checkedAt,
+          capabilityName: input.capabilityName,
+          ...(input.providerId !== undefined
+            ? { providerId: input.providerId }
+            : {}),
+        });
+        if (decision.valid) return record;
+      }
+      return null;
+    }
 
     const result = await q.query<CertificateRow>(
       `SELECT ${CERTIFICATE_SELECT_COLS}
@@ -420,6 +629,108 @@ export class PostgresTerminalAdmissionProviderCertificateStore
       if (decision.valid) return record;
     }
     return null;
+  }
+
+  async #appendCertificateStatusEvent(
+    input: {
+      readonly tenantId: TenantId;
+      readonly certificateId: string;
+      readonly fromStatus?: TerminalAdmissionProviderCertificateStatus;
+      readonly toStatus: TerminalAdmissionProviderCertificateStatus;
+      readonly statusUpdatedAt: Timestamp;
+      readonly statusReason?: string;
+      readonly supersededByCertificateId?: string;
+    },
+    tx: pg.ClientBase,
+  ): Promise<TerminalAdmissionProviderCertificateStatusEvent> {
+    const q = this.#q(tx);
+    const latestResult = await q.query<CertificateStatusEventRow>(
+      `SELECT ${CERTIFICATE_STATUS_EVENT_SELECT_COLS}
+         FROM registry.terminal_admission_provider_certificate_status_events
+        WHERE tenant_id = $1 AND certificate_id = $2
+        ORDER BY status_sequence DESC
+        LIMIT 1
+        FOR UPDATE`,
+      [input.tenantId, input.certificateId],
+    );
+    const latest = latestResult.rows[0]
+      ? rowToCertificateStatusEvent(latestResult.rows[0])
+      : null;
+    if (
+      latest !== null &&
+      Date.parse(input.statusUpdatedAt) < Date.parse(latest.statusUpdatedAt)
+    ) {
+      throw new Error(
+        `terminal-admission provider certificate ${input.certificateId} status event is older than the latest status event`,
+      );
+    }
+
+    const sequence = latest === null ? 1 : latest.sequence + 1;
+    const recordedAt = new Date().toISOString() as Timestamp;
+    const eventBody: Omit<
+      TerminalAdmissionProviderCertificateStatusEvent,
+      "eventHash"
+    > = {
+      tenantId: input.tenantId,
+      certificateId: input.certificateId,
+      sequence,
+      ...(input.fromStatus !== undefined
+        ? { fromStatus: input.fromStatus }
+        : {}),
+      toStatus: input.toStatus,
+      statusUpdatedAt: input.statusUpdatedAt,
+      recordedAt,
+      ...(input.statusReason !== undefined
+        ? { statusReason: input.statusReason }
+        : {}),
+      ...(input.supersededByCertificateId !== undefined
+        ? { supersededByCertificateId: input.supersededByCertificateId }
+        : {}),
+      ...(latest !== null ? { previousEventHash: latest.eventHash } : {}),
+    };
+    const eventHash =
+      terminalAdmissionProviderCertificateStatusEventHash(eventBody);
+
+    const result = await q.query<CertificateStatusEventRow>(
+      `INSERT INTO registry.terminal_admission_provider_certificate_status_events (
+         tenant_id, certificate_id, status_sequence, from_status, to_status,
+         status_reason, superseded_by_certificate_id, status_updated_at,
+         recorded_at, previous_event_hash, event_hash
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING ${CERTIFICATE_STATUS_EVENT_SELECT_COLS}`,
+      [
+        eventBody.tenantId,
+        eventBody.certificateId,
+        eventBody.sequence,
+        eventBody.fromStatus ?? null,
+        eventBody.toStatus,
+        eventBody.statusReason ?? null,
+        eventBody.supersededByCertificateId ?? null,
+        eventBody.statusUpdatedAt,
+        eventBody.recordedAt,
+        eventBody.previousEventHash ?? null,
+        eventHash,
+      ],
+    );
+    return rowToCertificateStatusEvent(result.rows[0]!);
+  }
+
+  async #withTransaction<T>(
+    fn: (tx: pg.ClientBase) => Promise<T>,
+  ): Promise<T> {
+    const client = await this.#pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await fn(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   #q(tx?: pg.ClientBase): Querier {

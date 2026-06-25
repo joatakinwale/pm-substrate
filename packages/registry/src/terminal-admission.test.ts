@@ -4,11 +4,14 @@ import {
   issueTerminalAdmissionProviderCertificates,
   listTerminalAdmissionProviderBindings,
   normalizeCapability,
+  replayTerminalAdmissionProviderCertificateStatusAt,
+  terminalAdmissionProviderCertificateStatusEventHash,
   verifyTerminalAdmissionProviderCertificate,
   verifyTerminalAdmissionProviderCertificateStatusRecord,
   verifyTerminalAdmissionProviderBindings,
   verifyTerminalAdmissionProviderRef,
   type Capability,
+  type TerminalAdmissionProviderCertificateStatusEvent,
 } from "./interfaces.js";
 
 const cap = (overrides: Partial<Capability> = {}): Capability => ({
@@ -411,5 +414,139 @@ describe("terminal-admission provider metadata", () => {
     expect(decision.issues.map((issue) => issue.code)).toEqual([
       "certificate_revoked",
     ]);
+  });
+
+  it("replays append-only certificate status events at decision time", () => {
+    const capability = cap({
+      writesInterfaces: [
+        {
+          interface: "Event",
+          fields: ["kind"],
+          ownership: "contributor",
+          terminalAdmissionProviders: [
+            {
+              providerId: "test.status-replay-envelope.v1",
+              kind: "action_outcome_envelope",
+              contractVersion: { major: 1, minor: 0, patch: 0 },
+              packageName: "@pm/test-capability",
+              exportName: "buildStatusReplayEnvelope",
+              actionTypes: ["event.accept"],
+            },
+          ],
+        },
+      ],
+    });
+    const [certificate] = issueTerminalAdmissionProviderCertificates(
+      [capability],
+      [
+        {
+          providerId: "test.status-replay-envelope.v1",
+          kind: "action_outcome_envelope",
+          contractVersion: { major: 1, minor: 0, patch: 0 },
+          packageName: "@pm/test-capability",
+          exportName: "buildStatusReplayEnvelope",
+          actionTypes: ["event.accept"],
+          availability: "available",
+        },
+      ],
+      {
+        issuer: "registry.install",
+        issuedAt: timestamp("2026-06-25T10:00:00.000Z"),
+        validUntil: timestamp("2026-06-25T11:00:00.000Z"),
+      },
+    ).issuedCertificates;
+    const tenantId = "tnt_terminal_cert_replay" as TenantId;
+    const initialBody = {
+      tenantId,
+      certificateId: certificate!.certificateId,
+      sequence: 1,
+      toStatus: "valid",
+      statusUpdatedAt: timestamp("2026-06-25T10:00:00.000Z"),
+      recordedAt: timestamp("2026-06-25T10:00:01.000Z"),
+    } as const satisfies Omit<
+      TerminalAdmissionProviderCertificateStatusEvent,
+      "eventHash"
+    >;
+    const initialEvent = {
+      ...initialBody,
+      eventHash: terminalAdmissionProviderCertificateStatusEventHash(
+        initialBody,
+      ),
+    };
+    const revokedBody = {
+      tenantId,
+      certificateId: certificate!.certificateId,
+      sequence: 2,
+      fromStatus: "valid",
+      toStatus: "revoked",
+      statusUpdatedAt: timestamp("2026-06-25T10:45:00.000Z"),
+      recordedAt: timestamp("2026-06-25T10:45:01.000Z"),
+      statusReason: "provider implementation key rotated",
+      previousEventHash: initialEvent.eventHash,
+    } as const satisfies Omit<
+      TerminalAdmissionProviderCertificateStatusEvent,
+      "eventHash"
+    >;
+    const revokedEvent = {
+      ...revokedBody,
+      eventHash: terminalAdmissionProviderCertificateStatusEventHash(
+        revokedBody,
+      ),
+    };
+    const latestProjection = {
+      tenantId,
+      certificate: certificate!,
+      currentStatus: "revoked",
+      statusUpdatedAt: timestamp("2026-06-25T10:45:00.000Z"),
+      statusReason: "provider implementation key rotated",
+    } as const;
+
+    const beforeRevocation = replayTerminalAdmissionProviderCertificateStatusAt({
+      record: latestProjection,
+      events: [initialEvent, revokedEvent],
+      checkedAt: timestamp("2026-06-25T10:30:00.000Z"),
+    });
+    expect(beforeRevocation.valid).toBe(true);
+    expect(beforeRevocation.record?.currentStatus).toBe("valid");
+    expect(
+      verifyTerminalAdmissionProviderCertificateStatusRecord({
+        record: beforeRevocation.record!,
+        checkedAt: timestamp("2026-06-25T10:30:00.000Z"),
+        capabilityName: "test.terminal-admission",
+        providerId: "test.status-replay-envelope.v1",
+      }).valid,
+    ).toBe(true);
+
+    const afterRevocation = replayTerminalAdmissionProviderCertificateStatusAt({
+      record: latestProjection,
+      events: [initialEvent, revokedEvent],
+      checkedAt: timestamp("2026-06-25T10:50:00.000Z"),
+    });
+    expect(afterRevocation.valid).toBe(true);
+    expect(afterRevocation.record?.currentStatus).toBe("revoked");
+    expect(
+      verifyTerminalAdmissionProviderCertificateStatusRecord({
+        record: afterRevocation.record!,
+        checkedAt: timestamp("2026-06-25T10:50:00.000Z"),
+        capabilityName: "test.terminal-admission",
+        providerId: "test.status-replay-envelope.v1",
+      }).issues.map((issue) => issue.code),
+    ).toEqual(["certificate_revoked"]);
+
+    const tamperedReplay = replayTerminalAdmissionProviderCertificateStatusAt({
+      record: latestProjection,
+      events: [
+        initialEvent,
+        {
+          ...revokedEvent,
+          statusReason: "tampered reason",
+        },
+      ],
+      checkedAt: timestamp("2026-06-25T10:50:00.000Z"),
+    });
+    expect(tamperedReplay.valid).toBe(false);
+    expect(tamperedReplay.issues.map((issue) => issue.code)).toContain(
+      "status_event_hash_invalid",
+    );
   });
 });
