@@ -160,15 +160,21 @@ export {
   type ThreeAxisCoverageReport,
 } from "./three-axis-coverage.js";
 export {
+  buildStrictThreeAxisProofPacketAssembly,
   buildStrictThreeAxisProofPacket,
   buildThreeAxisProofPacket,
+  type StrictThreeAxisProofPacketAssembly,
+  type StrictThreeAxisProofPacketAssemblyInput,
   type StrictThreeAxisProofPacketInput,
+  type StrictThreeAxisProofPacketSourceBundle,
   type ThreeAxisAuthorityRecoveryGate,
   type ThreeAxisAuthorityRecoveryObligation,
   type ThreeAxisProofPacket,
   type ThreeAxisProofPacketCellRef,
   type ThreeAxisProofPacketInput,
   type ThreeAxisProofPacketSource,
+  type ThreeAxisProofPacketSourceRecoveryProvenance,
+  type ThreeAxisProofPacketSourceRecoveryStatus,
   type ThreeAxisProofPacketStatus,
 } from "./three-axis-proof-packet.js";
 export {

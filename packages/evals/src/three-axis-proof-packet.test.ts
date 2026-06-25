@@ -16,6 +16,7 @@ import {
 } from "./schema.js";
 import type { EvalGraphWriteAuthorityRecovery } from "./authority-recovery.js";
 import {
+  buildStrictThreeAxisProofPacketAssembly,
   buildStrictThreeAxisProofPacket,
   buildThreeAxisProofPacket,
 } from "./three-axis-proof-packet.js";
@@ -320,6 +321,159 @@ describe("three-axis proof packet", () => {
       invalidObligations: [],
     });
   });
+
+  it("assembles all-axis strict proof packets with per-source recovery provenance", () => {
+    const financeEvents = FAILURE_CLASSES.flatMap((failureClass) =>
+      pairedEvents({
+        axis: "finance",
+        failureClass,
+        scenarioId: `finance-${failureClass}`,
+        substrateResult: "pass",
+        evidenceStage: "paired_behavioral_improvement",
+      }),
+    );
+    const marketingEvents = FAILURE_CLASSES.flatMap((failureClass) =>
+      pairedEvents({
+        axis: "marketing",
+        failureClass,
+        scenarioId: `marketing-${failureClass}`,
+        substrateResult: "pass",
+        evidenceStage: "paired_behavioral_improvement",
+      }),
+    );
+    const localLabEvents = FAILURE_CLASSES.flatMap((failureClass) =>
+      pairedEvents({
+        axis: "local_lab",
+        failureClass,
+        scenarioId: `local_lab-${failureClass}`,
+        substrateResult: "pass",
+        evidenceStage: "live_run",
+      }),
+    );
+
+    const assembly = buildStrictThreeAxisProofPacketAssembly({
+      packetId: "three_axis_proof_all_axis_assembly",
+      generatedAt: observedAt,
+      sourceBundles: [
+        sourceBundle("axis-a-finance", "finance", financeEvents),
+        sourceBundle("axis-b-marketing", "marketing", marketingEvents),
+        sourceBundle("axis-c-local-lab", "local_lab", localLabEvents),
+      ],
+    });
+
+    expect(assembly.packet.status).toBe("verified");
+    expect(assembly.sourceRecoveries).toEqual([
+      expect.objectContaining({
+        sourceId: "axis-a-finance",
+        axis: "finance",
+        recoveryStatus: "provided",
+        eventCount: 20,
+        obligationCount: 20,
+        recoveryCount: 20,
+        invalidRecoveries: 0,
+      }),
+      expect.objectContaining({
+        sourceId: "axis-b-marketing",
+        axis: "marketing",
+        recoveryStatus: "provided",
+        eventCount: 20,
+        obligationCount: 20,
+        recoveryCount: 20,
+        invalidRecoveries: 0,
+      }),
+      expect.objectContaining({
+        sourceId: "axis-c-local-lab",
+        axis: "local_lab",
+        recoveryStatus: "provided",
+        eventCount: 20,
+        obligationCount: 20,
+        recoveryCount: 20,
+        invalidRecoveries: 0,
+      }),
+    ]);
+  });
+
+  it("keeps missing source recovery visible in all-axis assembly", () => {
+    const events = FAILURE_CLASSES.flatMap((failureClass) =>
+      pairedEvents({
+        axis: "local_lab",
+        failureClass,
+        scenarioId: `local_lab-${failureClass}`,
+        substrateResult: "pass",
+        evidenceStage: "live_run",
+      }),
+    );
+
+    const assembly = buildStrictThreeAxisProofPacketAssembly({
+      packetId: "three_axis_proof_missing_source_recovery",
+      generatedAt: observedAt,
+      sourceBundles: [
+        {
+          source: {
+            sourceId: "axis-c-local-lab-no-db",
+            axis: "local_lab",
+            eventCount: events.length,
+          },
+          events,
+        },
+      ],
+    });
+
+    expect(assembly.packet.status).toBe("unverified");
+    expect(assembly.sourceRecoveries).toEqual([
+      {
+        sourceId: "axis-c-local-lab-no-db",
+        axis: "local_lab",
+        eventCount: 20,
+        obligationCount: 20,
+        recoveryStatus: "missing_required",
+      },
+    ]);
+    expect(
+      assembly.packet.authorityRecoveryGate.invalidObligations.every(
+        (obligation) => obligation.reason === "missing_authority_recovery",
+      ),
+    ).toBe(true);
+  });
+
+  it("preserves Axis B blocker sources without requiring authority recovery", () => {
+    const axisBBlocked = buildMarketingAxisBBlockedEval({
+      tenantId,
+      observedAt,
+    });
+
+    const assembly = buildStrictThreeAxisProofPacketAssembly({
+      packetId: "three_axis_proof_axis_b_blocker_source",
+      generatedAt: observedAt,
+      sourceBundles: [
+        {
+          source: {
+            sourceId: "axis-b-blocked",
+            axis: "marketing",
+            eventCount: 1,
+          },
+          events: [axisBBlocked],
+        },
+      ],
+    });
+
+    expect(assembly.packet.status).toBe("blocked");
+    expect(assembly.packet.blockedAxes).toEqual(["marketing"]);
+    expect(assembly.packet.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: true,
+      obligationCount: 0,
+    });
+    expect(assembly.sourceRecoveries).toEqual([
+      {
+        sourceId: "axis-b-blocked",
+        axis: "marketing",
+        eventCount: 1,
+        obligationCount: 0,
+        recoveryStatus: "not_required",
+      },
+    ]);
+  });
 });
 
 function pairedEvents(input: {
@@ -417,5 +571,44 @@ function authorityRecoveryForEvent(
     substrateRefs: event.substrateRefs,
     issueCodes: [],
     issues: [],
+  };
+}
+
+function sourceBundle(
+  sourceId: string,
+  axis: EvalAxis,
+  events: readonly EvalEvent[],
+) {
+  const recoveries = events.map(authorityRecoveryForEvent);
+  return {
+    source: {
+      sourceId,
+      axis,
+      eventCount: events.length,
+    },
+    events,
+    authorityRecoverySuite: {
+      recoveries,
+      summary: {
+        totalEvents: events.length,
+        auditedEvents: recoveries.length,
+        validRecoveries: recoveries.length,
+        invalidRecoveries: 0,
+        byStatus: {
+          accepted_authority_recovered: recoveries.filter(
+            (recovery) => recovery.status === "accepted_authority_recovered",
+          ).length,
+          terminal_outcome_refused_authority: recoveries.filter(
+            (recovery) => recovery.status === "terminal_outcome_refused_authority",
+          ).length,
+          missing_action_outcome_ref: 0,
+          ambiguous_action_outcome_ref: 0,
+          missing_authority_packet: 0,
+          unexpected_terminal_authority: 0,
+          authority_resolution_failed: 0,
+          authority_policy_rejected: 0,
+        },
+      },
+    },
   };
 }

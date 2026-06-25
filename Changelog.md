@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-25 - All-axis proof-packet assembler
+
+- Added `research/daily-arrowsmith-agent-state/v52-all-axis-proof-packet-assembler-2026-06-25.md`, answering RQ53 and replacing it with RQ54: real ArrowHedge finance source bundles with persisted packets and recoveries.
+- Added `buildStrictThreeAxisProofPacketAssembly()` to `@pm/evals`.
+- Added source-bundle and source-recovery provenance types so strict proof packets preserve whether each source provided recovery, missed required recovery, or required no recovery.
+- Added tests for all-axis verified assembly, missing required source recovery, and Axis B blocker sources that remain blocked without synthetic recovery obligations.
+- Claim boundary: all-axis assembly exists as a primitive, but Axis A still needs real persisted/recovered finance source bundles and Axis B remains blocked.
+
 ## 2026-06-25 - Strict runner proof-packet consumption
 
 - Added `research/daily-arrowsmith-agent-state/v51-strict-runner-proof-packet-consumption-2026-06-25.md`, answering RQ52 and replacing it with RQ53: all-axis proof-packet assembly with per-source recovery provenance.

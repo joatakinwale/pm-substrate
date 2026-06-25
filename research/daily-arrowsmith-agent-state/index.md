@@ -31,6 +31,8 @@ v50 update: `@pm/agent-state` now has a reusable `buildActionOutcomeProviderAuth
 
 v51 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacket()`, and local-lab runner scripts print strict proof-packet summaries before and after persisted authority recovery. No-DB deterministic output now remains explicitly unverified with missing authority-recovery obligations instead of implying strict proof. The remaining proof boundary is an all-axis proof-packet assembler that combines Axis A, Axis C, and Axis B blocker/fixture sources with per-source recovery provenance.
 
+v52 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacketAssembly()`, which accepts source bundles, validates declared event counts, builds one strict proof packet, and returns per-source recovery provenance (`provided`, `missing_required`, or `not_required`). Axis B blocker sources remain blocked without synthetic recovery obligations. The remaining proof boundary is producing real Axis A ArrowHedge finance source bundles with persisted packets and recovery suites.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -88,6 +90,7 @@ v51 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacket()`, and loc
 | v49 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v49-runner-authority-recovery-generation-2026-06-25.md` | Runner authority recovery generation | Answered RQ50, added RQ51, and wired local-lab runners to generate store-derived strict authority recovery summaries. |
 | v50 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v50-local-lab-provider-authority-metadata-2026-06-25.md` | Local-lab provider authority metadata | Answered RQ51, added RQ52, and made accepted Axis C packets carry provider-status authority metadata that strict recovery can validate. |
 | v51 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v51-strict-runner-proof-packet-consumption-2026-06-25.md` | Strict runner proof-packet consumption | Answered RQ52, added RQ53, and made runner proof summaries consume authority recovery suites or expose missing recovery obligations. |
+| v52 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v52-all-axis-proof-packet-assembler-2026-06-25.md` | All-axis proof-packet assembler | Answered RQ53, added RQ54, and added per-source recovery provenance for strict all-axis proof-packet assembly. |
 
 ## Top Findings
 

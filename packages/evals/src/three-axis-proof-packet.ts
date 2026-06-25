@@ -52,6 +52,40 @@ export interface StrictThreeAxisProofPacketInput
   readonly authorityRecoverySuite: EvalGraphWriteAuthorityRecoverySuite;
 }
 
+export interface StrictThreeAxisProofPacketSourceBundle {
+  readonly source: ThreeAxisProofPacketSource;
+  readonly events: readonly EvalEvent[];
+  readonly authorityRecoverySuite?: EvalGraphWriteAuthorityRecoverySuite;
+}
+
+export type ThreeAxisProofPacketSourceRecoveryStatus =
+  | "provided"
+  | "missing_required"
+  | "not_required";
+
+export interface ThreeAxisProofPacketSourceRecoveryProvenance {
+  readonly sourceId: string;
+  readonly axis?: EvalAxis;
+  readonly eventCount: number;
+  readonly obligationCount: number;
+  readonly recoveryStatus: ThreeAxisProofPacketSourceRecoveryStatus;
+  readonly recoveryCount?: number;
+  readonly validRecoveries?: number;
+  readonly invalidRecoveries?: number;
+}
+
+export interface StrictThreeAxisProofPacketAssemblyInput {
+  readonly packetId?: string;
+  readonly generatedAt: Timestamp;
+  readonly sourceBundles: readonly StrictThreeAxisProofPacketSourceBundle[];
+  readonly coverageOptions?: ThreeAxisCoverageOptions;
+}
+
+export interface StrictThreeAxisProofPacketAssembly {
+  readonly packet: ThreeAxisProofPacket;
+  readonly sourceRecoveries: readonly ThreeAxisProofPacketSourceRecoveryProvenance[];
+}
+
 export interface ThreeAxisAuthorityRecoveryObligation {
   readonly runId: string;
   readonly axis: EvalAxis;
@@ -160,6 +194,35 @@ export function buildStrictThreeAxisProofPacket(
   });
 }
 
+export function buildStrictThreeAxisProofPacketAssembly(
+  input: StrictThreeAxisProofPacketAssemblyInput,
+): StrictThreeAxisProofPacketAssembly {
+  const events = input.sourceBundles.flatMap((bundle) => {
+    assertSourceEventCount(bundle);
+    return [...bundle.events];
+  });
+  const sources = input.sourceBundles.map((bundle) => bundle.source);
+  const authorityRecoveries = input.sourceBundles.flatMap(
+    (bundle) => bundle.authorityRecoverySuite?.recoveries ?? [],
+  );
+  const packet = buildThreeAxisProofPacket({
+    ...(input.packetId !== undefined ? { packetId: input.packetId } : {}),
+    generatedAt: input.generatedAt,
+    events,
+    sources,
+    ...(input.coverageOptions !== undefined
+      ? { coverageOptions: input.coverageOptions }
+      : {}),
+    authorityRecoveries,
+    requireAuthorityRecovery: true,
+  });
+
+  return {
+    packet,
+    sourceRecoveries: input.sourceBundles.map(sourceRecoveryProvenance),
+  };
+}
+
 function allCells(report: ThreeAxisCoverageReport) {
   return EVAL_AXES.flatMap((axis) =>
     FAILURE_CLASSES.map((failureClass) => report.byCell[axis][failureClass]),
@@ -260,4 +323,42 @@ function authorityRecoveryObligations(
       },
     ];
   });
+}
+
+function assertSourceEventCount(
+  bundle: StrictThreeAxisProofPacketSourceBundle,
+): void {
+  if (bundle.source.eventCount !== bundle.events.length) {
+    throw new Error(
+      `three-axis proof source ${bundle.source.sourceId} declares ${bundle.source.eventCount} events but received ${bundle.events.length}`,
+    );
+  }
+}
+
+function sourceRecoveryProvenance(
+  bundle: StrictThreeAxisProofPacketSourceBundle,
+): ThreeAxisProofPacketSourceRecoveryProvenance {
+  const obligations = authorityRecoveryObligations(bundle.events);
+  const suite = bundle.authorityRecoverySuite;
+  const recoveryStatus: ThreeAxisProofPacketSourceRecoveryStatus =
+    suite !== undefined
+      ? "provided"
+      : obligations.length > 0
+        ? "missing_required"
+        : "not_required";
+
+  return {
+    sourceId: bundle.source.sourceId,
+    ...(bundle.source.axis !== undefined ? { axis: bundle.source.axis } : {}),
+    eventCount: bundle.events.length,
+    obligationCount: obligations.length,
+    recoveryStatus,
+    ...(suite !== undefined
+      ? {
+          recoveryCount: suite.recoveries.length,
+          validRecoveries: suite.summary.validRecoveries,
+          invalidRecoveries: suite.summary.invalidRecoveries,
+        }
+      : {}),
+  };
 }
