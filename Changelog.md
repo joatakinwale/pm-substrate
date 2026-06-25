@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Local-lab provider authority metadata
+
+- Added `research/daily-arrowsmith-agent-state/v50-local-lab-provider-authority-metadata-2026-06-25.md`, answering RQ51 and replacing it with RQ52: feeding runner-generated authority recoveries into strict proof packets.
+- Added `buildActionOutcomeProviderAuthority()` to `@pm/agent-state`.
+- Added a default local-agent-lab authority provider and optional engine override so accepted dynamic Axis C packets carry provider certificate/status metadata while blocked packets expose no write authority.
+- Added provider-status metadata to deterministic local-lab accepted packets.
+- Added tests proving accepted local-lab packets carry status refs, blocked packets do not, and deterministic strict recovery passes with one accepted recovery plus blocked terminal refusals.
+- Claim boundary: Axis C accepted packets now support strict recovery, but strict three-axis proof packets still need runner-generated recoveries as inputs; Axis B remains blocked.
+
 ## 2026-06-25 - Runner authority recovery generation
 
 - Added `research/daily-arrowsmith-agent-state/v49-runner-authority-recovery-generation-2026-06-25.md`, answering RQ50 and replacing it with RQ51: adding provider-status-bearing authority metadata to accepted Axis A/C runner-produced packets.

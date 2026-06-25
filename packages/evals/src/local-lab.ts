@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 import {
   buildActionOutcomeEnvelope,
+  buildActionOutcomeProviderAuthority,
   stateRef,
   type ActionOutcomeEnvelope,
+  type ActionOutcomeProviderAuthority,
   type ActionTerminalOutcome,
 } from "@pm/agent-state";
 import type { TenantId, Timestamp } from "@pm/types";
@@ -70,6 +72,16 @@ export interface LocalLabSuiteResult {
 
 const DEFAULT_TENANT = "tnt_local_lab" as TenantId;
 const DEFAULT_OBSERVED_AT = "2026-06-02T18:00:00.000Z" as Timestamp;
+const LOCAL_LAB_TERMINAL_PROVIDER_CERTIFICATE_ID =
+  "tapc_local_lab_terminal_provider_v1";
+const LOCAL_LAB_TERMINAL_PROVIDER_CERTIFICATE_DIGEST =
+  "sha256:local_lab_terminal_provider_v1";
+const LOCAL_LAB_TERMINAL_PROVIDER_STATUS_EVENT_ID =
+  "evt_local_lab_terminal_provider_status_v1";
+const LOCAL_LAB_TERMINAL_PROVIDER_STATUS_EVENT_HASH =
+  "sha256:local_lab_terminal_provider_status_v1";
+const LOCAL_LAB_TERMINAL_PROVIDER_STATUS_UPDATED_AT =
+  "2026-06-25T00:00:00.000Z" as Timestamp;
 
 export const LOCAL_LAB_SCENARIOS = [
   {
@@ -287,6 +299,10 @@ function buildLocalLabActionOutcomeEnvelope(input: {
 
   const terminalOutcome =
     input.scenario.actionOutcomeTerminalOutcome ?? "blocked";
+  const authority =
+    terminalOutcome === "accepted"
+      ? localLabActionOutcomeAuthority(input.observedAt)
+      : undefined;
   const blockingCauses =
     terminalOutcome === "blocked"
       ? [
@@ -311,6 +327,20 @@ function buildLocalLabActionOutcomeEnvelope(input: {
     evidenceAdmissionReviewIds: [
       `local_lab:${input.scenario.scenarioId}:evidence_review`,
     ],
+    ...(authority !== undefined
+      ? {
+          statusCheckRefs: [
+            stateRef(
+              "event",
+              LOCAL_LAB_TERMINAL_PROVIDER_STATUS_EVENT_ID,
+              "Local lab terminal provider status",
+            ),
+          ],
+          providerCertificateId: authority.providerCertificateId,
+          providerCertificateDigest: authority.providerCertificateDigest,
+          providerCertificateStatusRef: authority.providerCertificateStatusRef,
+        }
+      : {}),
     requestedTerminalOutcome: terminalOutcome,
     decidedAt: input.observedAt,
     decidedBy: "local-lab:substrate-eval",
@@ -324,6 +354,18 @@ function buildLocalLabActionOutcomeEnvelope(input: {
       ),
     ],
     blockingCauses,
+  });
+}
+
+function localLabActionOutcomeAuthority(
+  checkedAt: Timestamp,
+): ActionOutcomeProviderAuthority {
+  return buildActionOutcomeProviderAuthority({
+    certificateId: LOCAL_LAB_TERMINAL_PROVIDER_CERTIFICATE_ID,
+    certificateDigest: LOCAL_LAB_TERMINAL_PROVIDER_CERTIFICATE_DIGEST,
+    statusEventHash: LOCAL_LAB_TERMINAL_PROVIDER_STATUS_EVENT_HASH,
+    statusUpdatedAt: LOCAL_LAB_TERMINAL_PROVIDER_STATUS_UPDATED_AT,
+    checkedAt,
   });
 }
 

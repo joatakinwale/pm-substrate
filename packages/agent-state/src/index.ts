@@ -435,6 +435,40 @@ export interface ActionOutcomeProviderCertificateStatusRef {
   readonly checkedAt: Timestamp | string;
 }
 
+export interface ActionOutcomeProviderAuthority {
+  readonly providerCertificateId: string;
+  readonly providerCertificateDigest: string;
+  readonly providerCertificateStatusRef: ActionOutcomeProviderCertificateStatusRef;
+}
+
+export interface ActionOutcomeProviderAuthorityInput {
+  readonly certificateId: string;
+  readonly certificateDigest: string;
+  readonly statusEventHash: string;
+  readonly statusUpdatedAt: Timestamp | string;
+  readonly checkedAt: Timestamp | string;
+  readonly status?: TerminalAdmissionProviderCertificateStatus;
+  readonly statusSequence?: number;
+}
+
+export function buildActionOutcomeProviderAuthority(
+  input: ActionOutcomeProviderAuthorityInput,
+): ActionOutcomeProviderAuthority {
+  return {
+    providerCertificateId: input.certificateId,
+    providerCertificateDigest: input.certificateDigest,
+    providerCertificateStatusRef: {
+      certificateId: input.certificateId,
+      certificateDigest: input.certificateDigest,
+      status: input.status ?? "valid",
+      statusSequence: input.statusSequence ?? 1,
+      statusEventHash: input.statusEventHash,
+      statusUpdatedAt: input.statusUpdatedAt,
+      checkedAt: input.checkedAt,
+    },
+  };
+}
+
 export interface ActionOutcomeEnvelope {
   readonly schemaVersion: typeof ACTION_OUTCOME_ENVELOPE_SCHEMA_VERSION;
   readonly tenantId: TenantId;

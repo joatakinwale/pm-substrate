@@ -52,6 +52,26 @@ describe("local-agent-lab action outcome packets", () => {
 
     expect(envelope.terminalOutcome).toBe("accepted");
     expect(envelope.blockingCauses).toEqual([]);
+    expect(envelope.providerCertificateId).toBe(
+      "tapc_local_agent_lab_terminal_provider_v1",
+    );
+    expect(envelope.providerCertificateDigest).toBe(
+      "sha256:local_agent_lab_terminal_provider_v1",
+    );
+    expect(envelope.providerCertificateStatusRef).toMatchObject({
+      certificateId: "tapc_local_agent_lab_terminal_provider_v1",
+      certificateDigest: "sha256:local_agent_lab_terminal_provider_v1",
+      status: "valid",
+      statusSequence: 1,
+      statusEventHash: "sha256:local_agent_lab_terminal_provider_status_v1",
+      statusUpdatedAt: "2026-06-25T00:00:00.000Z",
+      checkedAt: "2026-06-25T18:00:00.000Z",
+    });
+    expect(envelope.statusCheckRefs).toContainEqual({
+      kind: "event",
+      id: "evt_local_agent_lab_terminal_provider_status_v1",
+      label: "Local agent lab terminal provider status",
+    });
     expect(
       envelope.substrateRefs.some(
         (ref) =>
@@ -89,6 +109,10 @@ describe("local-agent-lab action outcome packets", () => {
     });
 
     expect(envelope.terminalOutcome).toBe("blocked");
+    expect(envelope.providerCertificateId).toBeUndefined();
+    expect(envelope.providerCertificateDigest).toBeUndefined();
+    expect(envelope.providerCertificateStatusRef).toBeUndefined();
+    expect(envelope.statusCheckRefs).toEqual([]);
     expect(envelope.blockingCauses).toHaveLength(1);
     expect(envelope.blockingCauses[0]).toMatchObject({
       source: "policy",

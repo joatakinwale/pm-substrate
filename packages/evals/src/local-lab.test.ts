@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { verifyActionOutcomeEnvelopeHash } from "@pm/agent-state";
+import {
+  verifyActionOutcomeEnvelopeHash,
+  type ActionOutcomeEnvelope,
+} from "@pm/agent-state";
+import { graphWriteAuthorityResolutionFromWorkflowEnvelope } from "@pm/capability-kit";
+import type { GraphWriteAuthorityPolicy } from "@pm/graph";
 
+import {
+  auditEvalEventsGraphWriteAuthority,
+  type EvalGraphWriteAuthorityEnvelope,
+  type EvalGraphWriteAuthorityEnvelopeStore,
+  type EvalGraphWriteAuthorityResolver,
+} from "./authority-recovery.js";
 import {
   LOCAL_LAB_SCENARIOS,
   assertCompleteLocalLabPairs,
@@ -37,6 +48,18 @@ describe("local-lab paired evals", () => {
     expect(pair.actionOutcomeEnvelopes).toHaveLength(1);
     expect(verifyActionOutcomeEnvelopeHash(pair.actionOutcomeEnvelopes[0]!).valid).toBe(true);
     expect(pair.actionOutcomeEnvelopes[0]!.terminalOutcome).toBe("accepted");
+    expect(pair.actionOutcomeEnvelopes[0]!.providerCertificateId).toBe(
+      "tapc_local_lab_terminal_provider_v1",
+    );
+    expect(pair.actionOutcomeEnvelopes[0]!.providerCertificateStatusRef).toMatchObject({
+      certificateId: "tapc_local_lab_terminal_provider_v1",
+      certificateDigest: "sha256:local_lab_terminal_provider_v1",
+      status: "valid",
+      statusSequence: 1,
+      statusEventHash: "sha256:local_lab_terminal_provider_status_v1",
+      statusUpdatedAt: "2026-06-25T00:00:00.000Z",
+      checkedAt: "2026-06-02T18:00:00.000Z",
+    });
     expect(
       pair.actionOutcomeEnvelopes[0]!.substrateRefs.some(
         (ref) =>
@@ -101,6 +124,31 @@ describe("local-lab paired evals", () => {
     ]);
   });
 
+  it("recovers deterministic local-lab authority from provider-status-bearing packets", async () => {
+    const suite = runLocalLabPairedEvals();
+    const { store, resolveAcceptedAuthority } = authorityHarness(
+      suite.actionOutcomeEnvelopes,
+    );
+
+    const recovery = await auditEvalEventsGraphWriteAuthority({
+      events: suite.events,
+      store,
+      resolveAcceptedAuthority,
+      policy: strictGraphAuthorityPolicy,
+    });
+
+    expect(recovery.summary).toMatchObject({
+      totalEvents: LOCAL_LAB_SCENARIOS.length * 2,
+      auditedEvents: LOCAL_LAB_SCENARIOS.length,
+      validRecoveries: LOCAL_LAB_SCENARIOS.length,
+      invalidRecoveries: 0,
+      byStatus: {
+        accepted_authority_recovered: 1,
+        terminal_outcome_refused_authority: 2,
+      },
+    });
+  });
+
   it("rejects incomplete paired local-lab evidence", () => {
     const suite = runLocalLabPairedEvals();
     const missingSubstrateArm = suite.events.filter((e) => e.runArm !== "substrate");
@@ -110,3 +158,81 @@ describe("local-lab paired evals", () => {
     );
   });
 });
+
+const strictGraphAuthorityPolicy = {
+  requireAuthorityRef: true,
+  requireProviderCertificateStatusRef: true,
+  requireSubstrateRecord: true,
+} as const satisfies GraphWriteAuthorityPolicy;
+
+type LocalLabAuthorityEnvelope = EvalGraphWriteAuthorityEnvelope &
+  Pick<
+    ActionOutcomeEnvelope,
+    | "providerCertificateId"
+    | "providerCertificateDigest"
+    | "providerCertificateStatusRef"
+  >;
+
+function authorityHarness(packets: readonly ActionOutcomeEnvelope[]): {
+  readonly store: EvalGraphWriteAuthorityEnvelopeStore;
+  readonly resolveAcceptedAuthority: EvalGraphWriteAuthorityResolver;
+} {
+  const envelopesByRef = new Map<string, LocalLabAuthorityEnvelope>();
+  for (const packet of packets) {
+    for (const ref of packet.substrateRefs) {
+      if (ref.kind !== "action_outcome_envelope") continue;
+      envelopesByRef.set(
+        `${packet.tenantId}:${ref.id}`,
+        localLabAuthorityEnvelope(packet, ref.id),
+      );
+    }
+  }
+
+  const findEnvelope = (tenantId: string, envelopeId: string) =>
+    envelopesByRef.get(`${tenantId}:${envelopeId}`);
+  const store: EvalGraphWriteAuthorityEnvelopeStore = {
+    getWorkflowActionOutcomeEnvelope: async ({ tenantId, envelopeId }) =>
+      findEnvelope(tenantId, envelopeId),
+  };
+  const resolveAcceptedAuthority: EvalGraphWriteAuthorityResolver = async ({
+    tenantId,
+    envelopeId,
+    expectedActionId,
+  }) => {
+    const envelope = findEnvelope(String(tenantId), envelopeId);
+    if (envelope === undefined) {
+      throw new Error(`missing local-lab authority envelope ${envelopeId}`);
+    }
+    if (
+      expectedActionId !== undefined &&
+      envelope.actionId !== expectedActionId
+    ) {
+      throw new Error(
+        `local-lab envelope ${envelopeId} action ${envelope.actionId} does not match ${expectedActionId}`,
+      );
+    }
+    return graphWriteAuthorityResolutionFromWorkflowEnvelope(envelope);
+  };
+
+  return { store, resolveAcceptedAuthority };
+}
+
+function localLabAuthorityEnvelope(
+  packet: ActionOutcomeEnvelope,
+  envelopeId: string,
+): LocalLabAuthorityEnvelope {
+  return {
+    envelopeId,
+    actionId: packet.actionId,
+    terminalOutcome: packet.terminalOutcome,
+    ...(packet.providerCertificateId !== undefined
+      ? { providerCertificateId: packet.providerCertificateId }
+      : {}),
+    ...(packet.providerCertificateDigest !== undefined
+      ? { providerCertificateDigest: packet.providerCertificateDigest }
+      : {}),
+    ...(packet.providerCertificateStatusRef !== undefined
+      ? { providerCertificateStatusRef: packet.providerCertificateStatusRef }
+      : {}),
+  };
+}

@@ -10,8 +10,11 @@
 import { createHash } from "node:crypto";
 import {
   buildActionOutcomeEnvelope,
+  buildActionOutcomeProviderAuthority,
   stateRef,
   type ActionOutcomeEnvelope,
+  type ActionOutcomeProviderAuthority,
+  type ActionTerminalOutcome,
 } from "@pm/agent-state";
 import type { Timestamp } from "@pm/types";
 import { World } from "./world.js";
@@ -53,7 +56,43 @@ export interface EngineConfig {
   readonly databaseUrl: string;
   readonly ollama?: OllamaClient;
   readonly retainWorlds?: boolean;
+  readonly actionOutcomeAuthorityProvider?: LocalAgentLabActionOutcomeAuthorityProvider;
 }
+
+export interface LocalAgentLabActionOutcomeAuthorityInput {
+  readonly spec: Pick<ScenarioSpec, "scenarioId" | "failureClass">;
+  readonly arm: Arm;
+  readonly tenantId: string;
+  readonly terminalOutcome: ActionTerminalOutcome;
+  readonly checkedAt: Timestamp;
+}
+
+export type LocalAgentLabActionOutcomeAuthorityProvider = (
+  input: LocalAgentLabActionOutcomeAuthorityInput,
+) => ActionOutcomeProviderAuthority | undefined;
+
+const LOCAL_AGENT_LAB_TERMINAL_PROVIDER_CERTIFICATE_ID =
+  "tapc_local_agent_lab_terminal_provider_v1";
+const LOCAL_AGENT_LAB_TERMINAL_PROVIDER_CERTIFICATE_DIGEST =
+  "sha256:local_agent_lab_terminal_provider_v1";
+const LOCAL_AGENT_LAB_TERMINAL_PROVIDER_STATUS_EVENT_ID =
+  "evt_local_agent_lab_terminal_provider_status_v1";
+const LOCAL_AGENT_LAB_TERMINAL_PROVIDER_STATUS_EVENT_HASH =
+  "sha256:local_agent_lab_terminal_provider_status_v1";
+const LOCAL_AGENT_LAB_TERMINAL_PROVIDER_STATUS_UPDATED_AT =
+  "2026-06-25T00:00:00.000Z" as Timestamp;
+
+export const defaultLocalAgentLabActionOutcomeAuthorityProvider:
+  LocalAgentLabActionOutcomeAuthorityProvider = (input) => {
+    if (input.terminalOutcome !== "accepted") return undefined;
+    return buildActionOutcomeProviderAuthority({
+      certificateId: LOCAL_AGENT_LAB_TERMINAL_PROVIDER_CERTIFICATE_ID,
+      certificateDigest: LOCAL_AGENT_LAB_TERMINAL_PROVIDER_CERTIFICATE_DIGEST,
+      statusEventHash: LOCAL_AGENT_LAB_TERMINAL_PROVIDER_STATUS_EVENT_HASH,
+      statusUpdatedAt: LOCAL_AGENT_LAB_TERMINAL_PROVIDER_STATUS_UPDATED_AT,
+      checkedAt: input.checkedAt,
+    });
+  };
 
 async function runArm(
   spec: ScenarioSpec,
@@ -79,6 +118,9 @@ async function runArm(
       action,
       outcome,
       result,
+      ...(cfg.actionOutcomeAuthorityProvider !== undefined
+        ? { authorityProvider: cfg.actionOutcomeAuthorityProvider }
+        : {}),
     });
 
     // admitted transitions for this run = full tenant log length.
@@ -181,8 +223,17 @@ export function buildLocalAgentLabActionOutcomeEnvelope(input: {
   readonly action: IntendedAction;
   readonly outcome: AdmitOutcome;
   readonly result: EvalResult;
+  readonly authorityProvider?: LocalAgentLabActionOutcomeAuthorityProvider;
 }): ActionOutcomeEnvelope {
   const terminalOutcome = input.outcome.admitted ? "accepted" : "blocked";
+  const authority = (input.authorityProvider ??
+    defaultLocalAgentLabActionOutcomeAuthorityProvider)({
+      spec: input.spec,
+      arm: input.arm,
+      tenantId: input.tenantId,
+      terminalOutcome,
+      checkedAt: input.decidedAt,
+    });
   const envelopeId = `outcome_local_agent_lab_${input.spec.scenarioId}_${input.arm}`;
   const evidenceRefs = [
     stateRef("document", `local-agent-lab:${input.spec.scenarioId}:observation`),
@@ -208,6 +259,20 @@ export function buildLocalAgentLabActionOutcomeEnvelope(input: {
     evidenceAdmissionReviewIds: [
       `local_agent_lab:${input.spec.scenarioId}:${input.arm}:evidence_review`,
     ],
+    ...(authority !== undefined
+      ? {
+          statusCheckRefs: [
+            stateRef(
+              "event",
+              LOCAL_AGENT_LAB_TERMINAL_PROVIDER_STATUS_EVENT_ID,
+              "Local agent lab terminal provider status",
+            ),
+          ],
+          providerCertificateId: authority.providerCertificateId,
+          providerCertificateDigest: authority.providerCertificateDigest,
+          providerCertificateStatusRef: authority.providerCertificateStatusRef,
+        }
+      : {}),
     requestedTerminalOutcome: terminalOutcome,
     decidedAt: input.decidedAt,
     decidedBy: `local-agent-lab:${input.arm}`,

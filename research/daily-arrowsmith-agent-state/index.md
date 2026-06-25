@@ -27,6 +27,8 @@ v48 update: `ThreeAxisProofPacket` now has an opt-in authority-recovery gate. Wh
 
 v49 update: local-lab runner scripts now generate store-derived authority recovery summaries after packet persistence by composing `PostgresEvalEventStore` with `graphWriteAuthorityResolverFromWorkflowEnvelopeStore()` under strict graph policy. `@pm/evals` now has batch authority auditing. The remaining proof boundary is making accepted Axis A/C runner-produced packets carry real provider-status-bearing authority metadata so those store-derived recoveries can pass the strict proof-packet gate.
 
+v50 update: `@pm/agent-state` now has a reusable `buildActionOutcomeProviderAuthority()` helper, dynamic local-agent-lab accepted packets carry local provider certificate/status metadata, deterministic local-lab accepted packets do the same, and strict local-lab authority recovery now passes over generated packets. The remaining proof boundary is feeding runner-generated `authorityRecoveries` into `buildThreeAxisProofPacket({ requireAuthorityRecovery: true })` without hiding Axis B blockers or no-DB runner gaps.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -82,6 +84,7 @@ v49 update: local-lab runner scripts now generate store-derived authority recove
 | v47 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v47-strict-authority-recovery-audit-2026-06-25.md` | Strict authority recovery audit | Answered RQ48, added RQ49, added a strict authority recovery audit primitive, and gave ArrowHedge accepted replay packets provider-status metadata. |
 | v48 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v48-proof-packet-authority-gate-2026-06-25.md` | Proof packet authority gate | Answered RQ49, added RQ50, and made proof packets optionally require strict authority recoveries before verified status. |
 | v49 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v49-runner-authority-recovery-generation-2026-06-25.md` | Runner authority recovery generation | Answered RQ50, added RQ51, and wired local-lab runners to generate store-derived strict authority recovery summaries. |
+| v50 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v50-local-lab-provider-authority-metadata-2026-06-25.md` | Local-lab provider authority metadata | Answered RQ51, added RQ52, and made accepted Axis C packets carry provider-status authority metadata that strict recovery can validate. |
 
 ## Top Findings
 

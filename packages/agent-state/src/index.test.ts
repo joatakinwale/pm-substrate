@@ -5,6 +5,7 @@ import {
   buildObservationContractFromCurrentStateView,
   buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
   buildActionOutcomeEnvelope,
+  buildActionOutcomeProviderAuthority,
   buildActionOutcomeTerminalIndex,
   buildReadSetFromCurrentStateView,
   buildStateReviewArtifact,
@@ -94,6 +95,30 @@ const actionOutcomeEnvelope = (
   });
 
 describe("@pm/agent-state read-set validation", () => {
+  it("builds provider authority metadata with a status ref bound to the certificate", () => {
+    expect(
+      buildActionOutcomeProviderAuthority({
+        certificateId: "cert_local_lab_terminal_provider",
+        certificateDigest: "sha256:local_lab_terminal_provider",
+        statusEventHash: "sha256:local_lab_terminal_status_event",
+        statusUpdatedAt: timestamp("2026-06-25T18:00:00.000Z"),
+        checkedAt: timestamp("2026-06-25T18:01:00.000Z"),
+      }),
+    ).toEqual({
+      providerCertificateId: "cert_local_lab_terminal_provider",
+      providerCertificateDigest: "sha256:local_lab_terminal_provider",
+      providerCertificateStatusRef: {
+        certificateId: "cert_local_lab_terminal_provider",
+        certificateDigest: "sha256:local_lab_terminal_provider",
+        status: "valid",
+        statusSequence: 1,
+        statusEventHash: "sha256:local_lab_terminal_status_event",
+        statusUpdatedAt: "2026-06-25T18:00:00.000Z",
+        checkedAt: "2026-06-25T18:01:00.000Z",
+      },
+    });
+  });
+
   it("builds read-set entries from every current-state source ref", () => {
     expect(buildReadSetFromCurrentStateView(baseView(), "authority:test")).toEqual([
       {

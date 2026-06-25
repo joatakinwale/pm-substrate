@@ -25,6 +25,7 @@ export type {
 } from "./scenario.js";
 export {
   buildLocalAgentLabActionOutcomeEnvelope,
+  defaultLocalAgentLabActionOutcomeAuthorityProvider,
   runScenario,
   runSuite,
 } from "./engine.js";
@@ -33,6 +34,8 @@ export type {
   ScenarioRun,
   SuiteResult,
   EngineConfig,
+  LocalAgentLabActionOutcomeAuthorityInput,
+  LocalAgentLabActionOutcomeAuthorityProvider,
 } from "./engine.js";
 export { SCENARIOS, scenarioById } from "./registry.js";
 export { staleObservationScenario } from "./scenarios/stale-observation.js";
