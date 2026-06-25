@@ -7,6 +7,7 @@ import type {
 } from "@pm/types";
 import type {
   InvocationActionOutcomeEnvelope,
+  InvocationActionOutcomeProviderCertificateStatusRef,
   InvocationEvidenceBinding,
 } from "./evidence-binding.js";
 
@@ -22,7 +23,10 @@ export type {
   InvocationActionOutcomeAdmissionRejectionReason,
   InvocationActionOutcomeAdmissionRequest,
   InvocationActionOutcomeEnvelope,
+  InvocationActionOutcomeProviderCertificateLookup,
+  InvocationActionOutcomeProviderCertificateLookupResult,
   InvocationActionOutcomeProviderCertificateProvider,
+  InvocationActionOutcomeProviderCertificateStatusRef,
   InvocationActionTerminalOutcome,
   InvocationEvidenceBinding,
   InvocationEvidenceConsequence,
@@ -120,6 +124,7 @@ export interface InvocationContext {
    */
   readonly actionOutcomeEnvelope?: InvocationActionOutcomeEnvelope;
   readonly actionOutcomeProviderCertificate?: TerminalAdmissionProviderCertificate;
+  readonly actionOutcomeProviderCertificateStatusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
   /** Event that triggered the run, for tracing/audit. */
   readonly triggerEvent: PMEvent;
   /** Workflow + node identification, for logs. */

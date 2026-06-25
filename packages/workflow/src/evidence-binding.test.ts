@@ -187,18 +187,29 @@ describe("workflow evidence-action binding", () => {
 
   it("carries provider certificate identity in action outcome envelopes", () => {
     const certificate = providerCertificate();
+    const statusRef = {
+      certificateId: certificate.certificateId,
+      certificateDigest: certificate.certificateDigest,
+      status: "valid" as const,
+      statusSequence: 1,
+      statusEventHash: "e".repeat(64),
+      statusUpdatedAt: "2026-06-25T04:00:00.000Z",
+      checkedAt: "2026-06-25T05:00:00.000Z",
+    };
     const envelope = buildInvocationActionOutcomeEnvelope({
       request: request(),
       evidenceBinding: binding(),
       evidenceDecision: { valid: true },
       generatedAt: "2026-06-25T05:00:00.000Z",
       providerCertificate: certificate,
+      providerCertificateStatusRef: statusRef,
     });
 
     expect(envelope).toMatchObject({
       terminalOutcome: "accepted",
       providerCertificateId: certificate.certificateId,
       providerCertificateDigest: certificate.certificateDigest,
+      providerCertificateStatusRef: statusRef,
     });
   });
 

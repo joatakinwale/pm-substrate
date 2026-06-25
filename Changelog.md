@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Workflow status ref binding
+
+- Added `research/daily-arrowsmith-agent-state/v40-workflow-status-ref-binding-2026-06-25.md`, answering RQ41 and replacing it with RQ42: how non-workflow graph/capability writes should consume provider-certificate status refs.
+- Added `InvocationActionOutcomeProviderCertificateStatusRef` and provider lookup result types to `@pm/workflow`.
+- Added `providerCertificateStatusRef` to workflow action outcome envelopes, admission requests, and dispatcher invocation context.
+- Updated the registry-backed workflow certificate-store adapter to derive status refs from provider-certificate status events at `checkedAt`.
+- Added runtime consistency checks that reject status refs bound to a different certificate id, digest, or decision time.
+- Claim boundary: workflow-routed writes can now carry exact provider-certificate status event refs, but direct graph/capability write paths still need the same boundary before broad mutation-governance claims.
+
 ## 2026-06-25 - Provider certificate status event replay
 
 - Added `research/daily-arrowsmith-agent-state/v39-provider-certificate-status-event-replay-2026-06-25.md`, answering RQ40 and replacing it with RQ41: how workflow action-outcome evidence should bind the exact provider-certificate status event sequence/hash used at dispatch.

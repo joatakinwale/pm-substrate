@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type {
   TerminalAdmissionProviderCertificate,
+  TerminalAdmissionProviderCertificateStatus,
   Timestamp,
 } from "@pm/types";
 
@@ -32,6 +33,25 @@ export interface InvocationEvidenceBinding {
   readonly policyDisposition: InvocationEvidencePolicyDisposition;
 }
 
+export interface InvocationActionOutcomeProviderCertificateStatusRef {
+  readonly certificateId: string;
+  readonly certificateDigest: string;
+  readonly status: TerminalAdmissionProviderCertificateStatus;
+  readonly statusSequence: number;
+  readonly statusEventHash: string;
+  readonly statusUpdatedAt: string;
+  readonly checkedAt: string;
+}
+
+export interface InvocationActionOutcomeProviderCertificateLookupResult {
+  readonly certificate: TerminalAdmissionProviderCertificate;
+  readonly statusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
+}
+
+export type InvocationActionOutcomeProviderCertificateLookup =
+  | TerminalAdmissionProviderCertificate
+  | InvocationActionOutcomeProviderCertificateLookupResult;
+
 export interface EvidenceBindingRequest {
   readonly tenantId: string;
   readonly workflowId: string;
@@ -62,6 +82,7 @@ export interface InvocationActionOutcomeEnvelope {
   readonly evidenceAdmissionReviewIds: readonly string[];
   readonly providerCertificateId?: string;
   readonly providerCertificateDigest?: string;
+  readonly providerCertificateStatusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
   readonly evidenceDecision: {
     readonly valid: boolean;
     readonly reason?: EvidenceBindingFailureReason;
@@ -91,6 +112,7 @@ export interface InvocationActionOutcomeAdmissionRequest {
   readonly request: EvidenceBindingRequest;
   readonly envelope: InvocationActionOutcomeEnvelope;
   readonly providerCertificate?: TerminalAdmissionProviderCertificate;
+  readonly providerCertificateStatusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
 }
 
 export interface InvocationActionOutcomeAdmissionPort {
@@ -109,7 +131,7 @@ export interface InvocationActionOutcomeProviderCertificateProvider {
   getCertificate(
     request: EvidenceBindingRequest,
     checkedAt?: Timestamp,
-  ): Promise<TerminalAdmissionProviderCertificate | null | undefined>;
+  ): Promise<InvocationActionOutcomeProviderCertificateLookup | null | undefined>;
 }
 
 export interface EvidenceBindingVerifier {
@@ -208,6 +230,7 @@ export function buildInvocationActionOutcomeEnvelope(input: {
   readonly evidenceDecision: EvidenceBindingVerificationDecision;
   readonly generatedAt: string;
   readonly providerCertificate?: TerminalAdmissionProviderCertificate;
+  readonly providerCertificateStatusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
 }): InvocationActionOutcomeEnvelope {
   const actionId = [
     input.request.tenantId,
@@ -229,6 +252,7 @@ export function buildInvocationActionOutcomeEnvelope(input: {
     evidenceAdmissionReviewIds,
     providerCertificateId: input.providerCertificate?.certificateId,
     providerCertificateDigest: input.providerCertificate?.certificateDigest,
+    providerCertificateStatusRef: input.providerCertificateStatusRef,
     evidenceDecision: input.evidenceDecision,
   };
   const envelopeId = `outcome_${createHash("sha256")
@@ -261,6 +285,9 @@ export function buildInvocationActionOutcomeEnvelope(input: {
           providerCertificateId: input.providerCertificate.certificateId,
           providerCertificateDigest: input.providerCertificate.certificateDigest,
         }
+      : {}),
+    ...(input.providerCertificateStatusRef !== undefined
+      ? { providerCertificateStatusRef: input.providerCertificateStatusRef }
       : {}),
     evidenceDecision: input.evidenceDecision.valid
       ? { valid: true }

@@ -62,7 +62,10 @@ import {
   type InvocationActionOutcomeAdmissionDecision,
   type InvocationActionOutcomeAdmissionPort,
   type InvocationActionOutcomeEnvelope,
+  type InvocationActionOutcomeProviderCertificateLookup,
+  type InvocationActionOutcomeProviderCertificateLookupResult,
   type InvocationActionOutcomeProviderCertificateProvider,
+  type InvocationActionOutcomeProviderCertificateStatusRef,
   type InvocationEvidenceBinding,
 } from "./evidence-binding.js";
 import type {
@@ -88,11 +91,13 @@ type ActionOutcomeProviderCertificateDecision =
   | {
       readonly valid: true;
       readonly certificate?: TerminalAdmissionProviderCertificate;
+      readonly statusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
     }
   | {
       readonly valid: false;
       readonly reason: "provider_certificate_missing" | "provider_certificate_invalid";
       readonly certificate?: TerminalAdmissionProviderCertificate;
+      readonly statusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
       readonly evidenceDecision: EvidenceBindingRejectionDecision;
     };
 
@@ -107,6 +112,37 @@ function backoffDelay(policy: RetryPolicy, attempt: number): number {
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   return new Promise((res) => setTimeout(res, ms));
+}
+
+function isProviderCertificateLookupResult(
+  value: InvocationActionOutcomeProviderCertificateLookup,
+): value is InvocationActionOutcomeProviderCertificateLookupResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "certificate" in value
+  );
+}
+
+function statusRefFromEvent(input: {
+  readonly certificate: TerminalAdmissionProviderCertificate;
+  readonly checkedAt: Timestamp;
+  readonly event: {
+    readonly sequence: number;
+    readonly toStatus: TerminalAdmissionProviderCertificate["status"];
+    readonly statusUpdatedAt: Timestamp;
+    readonly eventHash: string;
+  };
+}): InvocationActionOutcomeProviderCertificateStatusRef {
+  return {
+    certificateId: input.certificate.certificateId,
+    certificateDigest: input.certificate.certificateDigest,
+    status: input.event.toStatus,
+    statusSequence: input.event.sequence,
+    statusEventHash: input.event.eventHash,
+    statusUpdatedAt: input.event.statusUpdatedAt,
+    checkedAt: input.checkedAt,
+  };
 }
 
 /**
@@ -223,13 +259,38 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       (deps.actionOutcomeProviderCertificateStore
         ? {
             getCertificate: async (request, checkedAt) => {
+              const store = deps.actionOutcomeProviderCertificateStore!;
               const record =
-                await deps.actionOutcomeProviderCertificateStore!.findCurrentCertificate({
+                await store.findCurrentCertificate({
                   tenantId: request.tenantId as TenantId,
                   capabilityName: request.capability,
                   ...(checkedAt !== undefined ? { checkedAt } : {}),
                 });
-              return record?.certificate ?? null;
+              if (record === null) return null;
+              if (checkedAt === undefined) return record.certificate;
+              const events = await store.listCertificateStatusEvents({
+                tenantId: request.tenantId as TenantId,
+                certificateId: record.certificate.certificateId,
+              });
+              const statusEvent = [...events]
+                .filter(
+                  (event) =>
+                    Date.parse(event.statusUpdatedAt) <= Date.parse(checkedAt),
+                )
+                .sort((a, b) => a.sequence - b.sequence)
+                .at(-1);
+              return {
+                certificate: record.certificate,
+                ...(statusEvent !== undefined
+                  ? {
+                      statusRef: statusRefFromEvent({
+                        certificate: record.certificate,
+                        checkedAt,
+                        event: statusEvent,
+                      }),
+                    }
+                  : {}),
+              };
             },
           }
         : undefined);
@@ -519,6 +580,9 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         let actionOutcomeProviderCertificate:
           | TerminalAdmissionProviderCertificate
           | undefined;
+        let actionOutcomeProviderCertificateStatusRef:
+          | InvocationActionOutcomeProviderCertificateStatusRef
+          | undefined;
         if (evidenceBindingRequired) {
           const bindingRequest: EvidenceBindingRequest = {
             tenantId: doc.tenantId,
@@ -547,11 +611,18 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
               ...(actionOutcomeProviderCertificate !== undefined
                 ? { providerCertificate: actionOutcomeProviderCertificate }
                 : {}),
+              ...(actionOutcomeProviderCertificateStatusRef !== undefined
+                ? {
+                    providerCertificateStatusRef:
+                      actionOutcomeProviderCertificateStatusRef,
+                  }
+                : {}),
             });
             const admissionRejection = await this.#admitActionOutcomeEnvelope(
               bindingRequest,
               actionOutcomeEnvelope,
               actionOutcomeProviderCertificate,
+              actionOutcomeProviderCertificateStatusRef,
             );
             if (admissionRejection) {
               const errPayload = this.#actionOutcomeAdmissionErrorPayload(
@@ -596,11 +667,18 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
                 ...(actionOutcomeProviderCertificate !== undefined
                   ? { providerCertificate: actionOutcomeProviderCertificate }
                   : {}),
+                ...(actionOutcomeProviderCertificateStatusRef !== undefined
+                  ? {
+                      providerCertificateStatusRef:
+                        actionOutcomeProviderCertificateStatusRef,
+                    }
+                  : {}),
               });
               const admissionRejection = await this.#admitActionOutcomeEnvelope(
                 bindingRequest,
                 actionOutcomeEnvelope,
                 actionOutcomeProviderCertificate,
+                actionOutcomeProviderCertificateStatusRef,
               );
               if (admissionRejection) {
                 const errPayload = this.#actionOutcomeAdmissionErrorPayload(
@@ -639,6 +717,8 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
           if (!providerCertificateDecision.valid) {
             actionOutcomeProviderCertificate =
               providerCertificateDecision.certificate;
+            actionOutcomeProviderCertificateStatusRef =
+              providerCertificateDecision.statusRef;
             actionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
               request: bindingRequest,
               evidenceBinding: providedBinding ?? null,
@@ -647,11 +727,18 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
               ...(actionOutcomeProviderCertificate !== undefined
                 ? { providerCertificate: actionOutcomeProviderCertificate }
                 : {}),
+              ...(actionOutcomeProviderCertificateStatusRef !== undefined
+                ? {
+                    providerCertificateStatusRef:
+                      actionOutcomeProviderCertificateStatusRef,
+                  }
+                : {}),
             });
             const admissionRejection = await this.#admitActionOutcomeEnvelope(
               bindingRequest,
               actionOutcomeEnvelope,
               actionOutcomeProviderCertificate,
+              actionOutcomeProviderCertificateStatusRef,
             );
             if (admissionRejection) {
               const errPayload = this.#actionOutcomeAdmissionErrorPayload(
@@ -683,6 +770,8 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
           }
           actionOutcomeProviderCertificate =
             providerCertificateDecision.certificate;
+          actionOutcomeProviderCertificateStatusRef =
+            providerCertificateDecision.statusRef;
           actionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
             request: bindingRequest,
             evidenceBinding: providedBinding ?? null,
@@ -691,11 +780,18 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
             ...(actionOutcomeProviderCertificate !== undefined
               ? { providerCertificate: actionOutcomeProviderCertificate }
               : {}),
+            ...(actionOutcomeProviderCertificateStatusRef !== undefined
+              ? {
+                  providerCertificateStatusRef:
+                    actionOutcomeProviderCertificateStatusRef,
+                }
+              : {}),
           });
           const admissionRejection = await this.#admitActionOutcomeEnvelope(
             bindingRequest,
             actionOutcomeEnvelope,
             actionOutcomeProviderCertificate,
+            actionOutcomeProviderCertificateStatusRef,
           );
           if (admissionRejection) {
             const errPayload = this.#actionOutcomeAdmissionErrorPayload(
@@ -734,6 +830,12 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
               : {}),
             ...(actionOutcomeProviderCertificate !== undefined
               ? { actionOutcomeProviderCertificate }
+              : {}),
+            ...(actionOutcomeProviderCertificateStatusRef !== undefined
+              ? {
+                  actionOutcomeProviderCertificateStatusRef:
+                    actionOutcomeProviderCertificateStatusRef,
+                }
               : {}),
           });
           if (inv.success) break;
@@ -784,6 +886,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     request: EvidenceBindingRequest,
     envelope: InvocationActionOutcomeEnvelope,
     providerCertificate?: TerminalAdmissionProviderCertificate,
+    providerCertificateStatusRef?: InvocationActionOutcomeProviderCertificateStatusRef,
   ): Promise<InvocationActionOutcomeAdmissionRejectionDecision | null> {
     if (!this.#actionOutcomeAdmission) return null;
     try {
@@ -792,6 +895,9 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         envelope,
         ...(providerCertificate !== undefined
           ? { providerCertificate }
+          : {}),
+        ...(providerCertificateStatusRef !== undefined
+          ? { providerCertificateStatusRef }
           : {}),
       });
       return decision.admitted ? null : decision;
@@ -833,9 +939,12 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       };
     }
 
-    let certificate: TerminalAdmissionProviderCertificate | null | undefined;
+    let lookup:
+      | InvocationActionOutcomeProviderCertificateLookup
+      | null
+      | undefined;
     try {
-      certificate = await provider.getCertificate(request, checkedAt);
+      lookup = await provider.getCertificate(request, checkedAt);
     } catch (error) {
       return {
         valid: false,
@@ -856,7 +965,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       };
     }
 
-    if (certificate === null || certificate === undefined) {
+    if (lookup === null || lookup === undefined) {
       if (!this.#requireActionOutcomeProviderCertificate) {
         return { valid: true };
       }
@@ -877,6 +986,36 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       };
     }
 
+    const lookupResult = isProviderCertificateLookupResult(lookup)
+      ? lookup
+      : { certificate: lookup };
+    const { certificate } = lookupResult;
+    const statusRef = lookupResult.statusRef;
+    if (
+      statusRef !== undefined &&
+      (statusRef.certificateId !== certificate.certificateId ||
+        statusRef.certificateDigest !== certificate.certificateDigest ||
+        statusRef.checkedAt !== checkedAt)
+    ) {
+      return {
+        valid: false,
+        reason: "provider_certificate_invalid",
+        certificate,
+        statusRef,
+        evidenceDecision: {
+          valid: false,
+          reason: "provider_certificate_invalid",
+          issues: [
+            {
+              path: "/providerCertificate/statusRef",
+              message:
+                "terminal-admission provider certificate status ref does not match the certificate or checkedAt time",
+            },
+          ],
+        },
+      };
+    }
+
     const certificateDecision = verifyTerminalAdmissionProviderCertificate({
       certificate,
       checkedAt,
@@ -887,6 +1026,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         valid: false,
         reason: "provider_certificate_invalid",
         certificate,
+        ...(statusRef !== undefined ? { statusRef } : {}),
         evidenceDecision: {
           valid: false,
           reason: "provider_certificate_invalid",
@@ -898,7 +1038,11 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       };
     }
 
-    return { valid: true, certificate };
+    return {
+      valid: true,
+      certificate,
+      ...(statusRef !== undefined ? { statusRef } : {}),
+    };
   }
 
   #actionOutcomeAdmissionErrorPayload(

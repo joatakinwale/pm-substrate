@@ -697,9 +697,20 @@ describeIfDb("PostgresWorkflowRuntime", () => {
         },
       },
       actionOutcomeProviderCertificateProvider: {
-        async getCertificate(request) {
+        async getCertificate(request, checkedAt) {
           certificateRequests.push(request);
-          return certificate;
+          return {
+            certificate,
+            statusRef: {
+              certificateId: certificate.certificateId,
+              certificateDigest: certificate.certificateDigest,
+              status: "valid",
+              statusSequence: 1,
+              statusEventHash: "e".repeat(64),
+              statusUpdatedAt: "2026-06-25T10:00:00.000Z",
+              checkedAt: checkedAt!,
+            },
+          };
         },
       },
       requireActionOutcomeProviderCertificate: true,
@@ -731,12 +742,32 @@ describeIfDb("PostgresWorkflowRuntime", () => {
 
     expect(certificateRequests).toHaveLength(1);
     expect(admissions[0]?.providerCertificate).toEqual(certificate);
+    expect(admissions[0]?.providerCertificateStatusRef).toMatchObject({
+      certificateId: certificate.certificateId,
+      certificateDigest: certificate.certificateDigest,
+      statusSequence: 1,
+      statusEventHash: "e".repeat(64),
+    });
     expect(dispatcher.calls).toHaveLength(1);
     expect(dispatcher.calls[0]?.actionOutcomeProviderCertificate).toEqual(certificate);
+    expect(
+      dispatcher.calls[0]?.actionOutcomeProviderCertificateStatusRef,
+    ).toMatchObject({
+      certificateId: certificate.certificateId,
+      certificateDigest: certificate.certificateDigest,
+      statusSequence: 1,
+      statusEventHash: "e".repeat(64),
+    });
     expect(dispatcher.calls[0]?.actionOutcomeEnvelope).toMatchObject({
       terminalOutcome: "accepted",
       providerCertificateId: certificate.certificateId,
       providerCertificateDigest: certificate.certificateDigest,
+      providerCertificateStatusRef: {
+        certificateId: certificate.certificateId,
+        certificateDigest: certificate.certificateDigest,
+        statusSequence: 1,
+        statusEventHash: "e".repeat(64),
+      },
       evidenceDecision: { valid: true },
     });
   });
