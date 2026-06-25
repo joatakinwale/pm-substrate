@@ -1,8 +1,13 @@
 import {
   auditEvalEventsGraphWriteAuthority,
+  buildStrictThreeAxisProofPacket,
+  buildThreeAxisProofPacket,
   type EvalEvent,
   type EvalGraphWriteAuthorityResolver,
+  type EvalGraphWriteAuthorityRecoverySuite,
   type PostgresEvalEventStore,
+  type ThreeAxisProofPacket,
+  type ThreeAxisProofPacketSource,
 } from "../packages/evals/src/index.js";
 import {
   graphWriteAuthorityResolverFromWorkflowEnvelopeStore,
@@ -25,6 +30,51 @@ export async function auditPersistedEvalEventAuthority(
     resolveAcceptedAuthority: authorityResolverFromStore(store),
     policy: STRICT_GRAPH_AUTHORITY_POLICY,
   });
+}
+
+export function buildStrictRunnerProofPacket(input: {
+  readonly packetId?: string;
+  readonly generatedAt: ThreeAxisProofPacket["generatedAt"];
+  readonly events: readonly EvalEvent[];
+  readonly sources: readonly ThreeAxisProofPacketSource[];
+  readonly authorityRecoverySuite?: EvalGraphWriteAuthorityRecoverySuite;
+}): ThreeAxisProofPacket {
+  if (input.authorityRecoverySuite !== undefined) {
+    return buildStrictThreeAxisProofPacket({
+      ...(input.packetId !== undefined ? { packetId: input.packetId } : {}),
+      generatedAt: input.generatedAt,
+      events: input.events,
+      sources: input.sources,
+      authorityRecoverySuite: input.authorityRecoverySuite,
+    });
+  }
+
+  return buildThreeAxisProofPacket({
+    ...(input.packetId !== undefined ? { packetId: input.packetId } : {}),
+    generatedAt: input.generatedAt,
+    events: input.events,
+    sources: input.sources,
+    authorityRecoveries: [],
+    requireAuthorityRecovery: true,
+  });
+}
+
+export function summarizeThreeAxisProofPacket(packet: ThreeAxisProofPacket) {
+  return {
+    packetId: packet.packetId,
+    status: packet.status,
+    eventCount: packet.eventCount,
+    verifiedAxes: packet.verifiedAxes,
+    blockedAxes: packet.blockedAxes,
+    unverifiedAxes: packet.unverifiedAxes,
+    verifiedCells: packet.verifiedCells.length,
+    terminalProofBackedScenarioPassCells:
+      packet.terminalProofBackedScenarioPassCells.length,
+    blockedCells: packet.blockedCells.length,
+    missingCells: packet.missingCells.length,
+    unverifiedCells: packet.unverifiedCells.length,
+    authorityRecoveryGate: packet.authorityRecoveryGate,
+  };
 }
 
 function authorityResolverFromStore(

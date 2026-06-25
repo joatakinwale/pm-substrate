@@ -10,6 +10,7 @@ import {
 } from "./schema.js";
 import type {
   EvalGraphWriteAuthorityRecovery,
+  EvalGraphWriteAuthorityRecoverySuite,
   EvalGraphWriteAuthorityRecoveryStatus,
 } from "./authority-recovery.js";
 import {
@@ -41,6 +42,14 @@ export interface ThreeAxisProofPacketInput {
   readonly coverageOptions?: ThreeAxisCoverageOptions;
   readonly authorityRecoveries?: readonly EvalGraphWriteAuthorityRecovery[];
   readonly requireAuthorityRecovery?: boolean;
+}
+
+export interface StrictThreeAxisProofPacketInput
+  extends Omit<
+    ThreeAxisProofPacketInput,
+    "authorityRecoveries" | "requireAuthorityRecovery"
+  > {
+  readonly authorityRecoverySuite: EvalGraphWriteAuthorityRecoverySuite;
 }
 
 export interface ThreeAxisAuthorityRecoveryObligation {
@@ -138,6 +147,17 @@ export function buildThreeAxisProofPacket(
   };
 
   return packet;
+}
+
+export function buildStrictThreeAxisProofPacket(
+  input: StrictThreeAxisProofPacketInput,
+): ThreeAxisProofPacket {
+  const { authorityRecoverySuite, ...proofInput } = input;
+  return buildThreeAxisProofPacket({
+    ...proofInput,
+    authorityRecoveries: authorityRecoverySuite.recoveries,
+    requireAuthorityRecovery: true,
+  });
 }
 
 function allCells(report: ThreeAxisCoverageReport) {

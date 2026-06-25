@@ -4,12 +4,17 @@ import pg from "pg";
 import {
   buildDynamicLocalAgentLabEvalSuite,
   PostgresEvalEventStore,
+  type ThreeAxisProofPacketSource,
 } from "../packages/evals/src/index.js";
 import {
   SCENARIOS,
   runSuite,
 } from "../packages/local-agent-lab/src/index.js";
-import { auditPersistedEvalEventAuthority } from "./authority-recovery.js";
+import {
+  auditPersistedEvalEventAuthority,
+  buildStrictRunnerProofPacket,
+  summarizeThreeAxisProofPacket,
+} from "./authority-recovery.js";
 
 const databaseUrl = env["PM_DATABASE_URL"];
 if (!databaseUrl) {
@@ -22,6 +27,20 @@ const dynamicSuite = await runSuite(SCENARIOS, {
   retainWorlds: true,
 });
 const evalSuite = buildDynamicLocalAgentLabEvalSuite(dynamicSuite);
+const proofGeneratedAt =
+  evalSuite.events.at(-1)?.observedAt ?? "2026-06-25T00:00:00.000Z";
+const proofSources = [
+  {
+    sourceId: "axis-c-local-agent-lab-live",
+    axis: "local_lab",
+    eventCount: evalSuite.events.length,
+  },
+] as const satisfies readonly ThreeAxisProofPacketSource[];
+const prePersistenceProofPacket = buildStrictRunnerProofPacket({
+  generatedAt: proofGeneratedAt,
+  events: evalSuite.events,
+  sources: proofSources,
+});
 
 console.log(JSON.stringify({
   scenarios: dynamicSuite.runs.length,
@@ -43,6 +62,10 @@ console.log(JSON.stringify({
     missingFailureClasses: evalSuite.liveCoverage.missingFailureClasses,
   },
   byFailureClass: evalSuite.metrics.byFailureClass,
+  authorityRecovery: {
+    status: "not_run_before_persisted_packet_store",
+  },
+  strictProofPacket: summarizeThreeAxisProofPacket(prePersistenceProofPacket),
 }, null, 2));
 
 const pool = new pg.Pool({ connectionString: databaseUrl });
@@ -54,11 +77,18 @@ try {
     evalSuite.events,
   );
   await store.recordMany(evalSuite.events);
+  const strictProofPacket = buildStrictRunnerProofPacket({
+    generatedAt: proofGeneratedAt,
+    events: evalSuite.events,
+    sources: proofSources,
+    authorityRecoverySuite: authorityRecovery,
+  });
   console.log(
     `persisted ${evalSuite.actionOutcomeEnvelopes.length} action outcome packets and ${evalSuite.events.length} live eval events`,
   );
   console.log(JSON.stringify({
     authorityRecovery: authorityRecovery.summary,
+    strictProofPacket: summarizeThreeAxisProofPacket(strictProofPacket),
   }, null, 2));
 } finally {
   await pool.end();

@@ -15,7 +15,10 @@ import {
   type RunArm,
 } from "./schema.js";
 import type { EvalGraphWriteAuthorityRecovery } from "./authority-recovery.js";
-import { buildThreeAxisProofPacket } from "./three-axis-proof-packet.js";
+import {
+  buildStrictThreeAxisProofPacket,
+  buildThreeAxisProofPacket,
+} from "./three-axis-proof-packet.js";
 
 const tenantId = "tnt_three_axis_packet" as TenantId;
 const observedAt = "2026-06-25T23:00:00.000Z" as Timestamp;
@@ -265,6 +268,57 @@ describe("three-axis proof packet", () => {
         reason: "unexpected_authority_recovery_status",
       }),
     ]);
+  });
+
+  it("builds strict proof packets from a runner authority recovery suite", () => {
+    const events = (["finance", "marketing", "local_lab"] as const).flatMap((axis) =>
+      FAILURE_CLASSES.flatMap((failureClass) =>
+        pairedEvents({
+          axis,
+          failureClass,
+          scenarioId: `${axis}-${failureClass}`,
+          substrateResult: "pass",
+          evidenceStage:
+            axis === "local_lab" ? "live_run" : "paired_behavioral_improvement",
+        }),
+      ),
+    );
+    const recoveries = events.map(authorityRecoveryForEvent);
+
+    const packet = buildStrictThreeAxisProofPacket({
+      packetId: "three_axis_proof_strict_runner_suite",
+      generatedAt: observedAt,
+      events,
+      sources: [{ sourceId: "strict-runner-suite", eventCount: events.length }],
+      authorityRecoverySuite: {
+        recoveries,
+        summary: {
+          totalEvents: events.length,
+          auditedEvents: recoveries.length,
+          validRecoveries: recoveries.length,
+          invalidRecoveries: 0,
+          byStatus: {
+            accepted_authority_recovered: recoveries.length,
+            terminal_outcome_refused_authority: 0,
+            missing_action_outcome_ref: 0,
+            ambiguous_action_outcome_ref: 0,
+            missing_authority_packet: 0,
+            unexpected_terminal_authority: 0,
+            authority_resolution_failed: 0,
+            authority_policy_rejected: 0,
+          },
+        },
+      },
+    });
+
+    expect(packet.status).toBe("verified");
+    expect(packet.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: true,
+      obligationCount: recoveries.length,
+      validObligations: recoveries.length,
+      invalidObligations: [],
+    });
   });
 });
 

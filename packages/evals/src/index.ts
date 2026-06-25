@@ -160,7 +160,9 @@ export {
   type ThreeAxisCoverageReport,
 } from "./three-axis-coverage.js";
 export {
+  buildStrictThreeAxisProofPacket,
   buildThreeAxisProofPacket,
+  type StrictThreeAxisProofPacketInput,
   type ThreeAxisAuthorityRecoveryGate,
   type ThreeAxisAuthorityRecoveryObligation,
   type ThreeAxisProofPacket,

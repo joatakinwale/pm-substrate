@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Strict runner proof-packet consumption
+
+- Added `research/daily-arrowsmith-agent-state/v51-strict-runner-proof-packet-consumption-2026-06-25.md`, answering RQ52 and replacing it with RQ53: all-axis proof-packet assembly with per-source recovery provenance.
+- Added `buildStrictThreeAxisProofPacket()` to `@pm/evals`.
+- Added runner helpers to build and summarize strict proof packets from authority recovery suites.
+- Updated deterministic and live local-lab runners to print strict proof summaries before persistence and after store-derived authority recovery.
+- Verified the no-DB deterministic runner stays explicitly `unverified` with missing authority-recovery obligations instead of claiming strict proof.
+- Claim boundary: strict proof-packet consumption exists for runner recovery suites, but all-axis assembly and Axis B unblock remain open.
+
 ## 2026-06-25 - Local-lab provider authority metadata
 
 - Added `research/daily-arrowsmith-agent-state/v50-local-lab-provider-authority-metadata-2026-06-25.md`, answering RQ51 and replacing it with RQ52: feeding runner-generated authority recoveries into strict proof packets.
