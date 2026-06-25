@@ -202,6 +202,36 @@ describe("PostgresEvalEventStore", () => {
       },
     ]);
   });
+
+  it("recovers graph write-authority envelope metadata from stored packets", async () => {
+    const envelope = acceptedActionOutcomeEnvelopeWithProviderStatus();
+    const db = {
+      query: async () => ({ rows: [{ envelope }] }),
+    };
+    const store = new PostgresEvalEventStore(db);
+
+    const recovered = await store.getWorkflowActionOutcomeEnvelope({
+      tenantId: event.tenantId,
+      envelopeId: "outcome_eval_packet_accepted_001",
+    });
+
+    expect(recovered).toEqual({
+      envelopeId: "outcome_eval_packet_accepted_001",
+      actionId: "action_eval_packet_accepted_001",
+      terminalOutcome: "accepted",
+      providerCertificateId: "cert_eval_terminal_provider",
+      providerCertificateDigest: "sha256:eval_terminal_provider",
+      providerCertificateStatusRef: {
+        certificateId: "cert_eval_terminal_provider",
+        certificateDigest: "sha256:eval_terminal_provider",
+        status: "valid",
+        statusSequence: 3,
+        statusEventHash: "sha256:eval_status_event",
+        statusUpdatedAt: "2026-05-27T14:59:00.000Z",
+        checkedAt: "2026-05-27T15:00:00.000Z",
+      },
+    });
+  });
 });
 
 function actionOutcomeEnvelope(): ActionOutcomeEnvelope {
@@ -231,6 +261,40 @@ function actionOutcomeEnvelope(): ActionOutcomeEnvelope {
         message: "Stale observation cannot support accepted write.",
         refs: [stateRef("event", "evt_price_refresh")],
       },
+    ],
+  });
+}
+
+function acceptedActionOutcomeEnvelopeWithProviderStatus(): ActionOutcomeEnvelope {
+  return buildActionOutcomeEnvelope({
+    tenantId: event.tenantId,
+    actionId: "action_eval_packet_accepted_001",
+    subject: stateRef("projection", "arrowhedge_cop:AAPL"),
+    proposalReviewId: "proposal_review_eval_packet_accepted_001",
+    stateReviewArtifactHash: "b".repeat(64),
+    evidenceAdmissionReviewIds: ["ev_eval_packet:admission_review"],
+    providerCertificateId: "cert_eval_terminal_provider",
+    providerCertificateDigest: "sha256:eval_terminal_provider",
+    providerCertificateStatusRef: {
+      certificateId: "cert_eval_terminal_provider",
+      certificateDigest: "sha256:eval_terminal_provider",
+      status: "valid",
+      statusSequence: 3,
+      statusEventHash: "sha256:eval_status_event",
+      statusUpdatedAt: "2026-05-27T14:59:00.000Z",
+      checkedAt: "2026-05-27T15:00:00.000Z",
+    },
+    requestedTerminalOutcome: "accepted",
+    decidedAt: event.observedAt,
+    decidedBy: "test:evaluations",
+    evidenceRefs: [stateRef("event", "evt_price_refresh")],
+    substrateRefs: [
+      stateRef(
+        "action_outcome_envelope",
+        "outcome_eval_packet_accepted_001",
+        "Eval test accepted outcome packet",
+      ),
+      stateRef("workflow_run", "wf_eval_packet"),
     ],
   });
 }

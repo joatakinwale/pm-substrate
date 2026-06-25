@@ -1,4 +1,8 @@
-import type { TenantId, Timestamp } from "@pm/types";
+import type {
+  TenantId,
+  TerminalAdmissionProviderCertificateStatus,
+  Timestamp,
+} from "@pm/types";
 
 import type { EvidenceAdmissionReview } from "./external-evidence.js";
 
@@ -421,6 +425,16 @@ export interface ActionOutcomeBlockingCause {
   readonly invariantClasses?: readonly StateReviewInvariantClass[];
 }
 
+export interface ActionOutcomeProviderCertificateStatusRef {
+  readonly certificateId: string;
+  readonly certificateDigest: string;
+  readonly status: TerminalAdmissionProviderCertificateStatus;
+  readonly statusSequence: number;
+  readonly statusEventHash: string;
+  readonly statusUpdatedAt: Timestamp | string;
+  readonly checkedAt: Timestamp | string;
+}
+
 export interface ActionOutcomeEnvelope {
   readonly schemaVersion: typeof ACTION_OUTCOME_ENVELOPE_SCHEMA_VERSION;
   readonly tenantId: TenantId;
@@ -430,6 +444,9 @@ export interface ActionOutcomeEnvelope {
   readonly stateReviewArtifactHash: string;
   readonly evidenceAdmissionReviewIds: readonly string[];
   readonly statusCheckRefs: readonly StateRef[];
+  readonly providerCertificateId?: string;
+  readonly providerCertificateDigest?: string;
+  readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
   readonly policyTransitionRef?: StateRef;
   readonly terminalOutcome: ActionTerminalOutcome;
   readonly decidedAt: Timestamp;
@@ -453,6 +470,9 @@ export interface ActionOutcomeEnvelopeInput {
   readonly stateReviewArtifactHash: string;
   readonly evidenceAdmissionReviewIds?: readonly string[];
   readonly statusCheckRefs?: readonly StateRef[];
+  readonly providerCertificateId?: string;
+  readonly providerCertificateDigest?: string;
+  readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
   readonly policyTransitionRef?: StateRef;
   readonly requestedTerminalOutcome: ActionTerminalOutcome;
   readonly decidedAt: Timestamp;
@@ -481,6 +501,9 @@ export interface WorkflowInvocationActionOutcomeEnvelopeSource {
   readonly stateReviewArtifactId?: string;
   readonly stateReviewArtifactHash?: string;
   readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly providerCertificateId?: string;
+  readonly providerCertificateDigest?: string;
+  readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
   readonly evidenceDecision: {
     readonly valid: boolean;
     readonly reason?: string;
@@ -620,6 +643,9 @@ export interface ActionOutcomeInvariantCore {
   readonly terminalOutcome: ActionTerminalOutcome;
   readonly proposalReviewId: string;
   readonly stateReviewArtifactHash: string;
+  readonly providerCertificateId?: string;
+  readonly providerCertificateDigest?: string;
+  readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
   readonly evidenceAdmissionReviewIds: readonly string[];
   readonly statusCheckRefs: readonly StateRef[];
   readonly blockingCauseCodes: readonly string[];
@@ -799,6 +825,15 @@ export function buildActionOutcomeEnvelope(
     stateReviewArtifactHash: input.stateReviewArtifactHash,
     evidenceAdmissionReviewIds,
     statusCheckRefs: uniqueStateRefs(input.statusCheckRefs ?? []),
+    ...(input.providerCertificateId !== undefined
+      ? { providerCertificateId: input.providerCertificateId }
+      : {}),
+    ...(input.providerCertificateDigest !== undefined
+      ? { providerCertificateDigest: input.providerCertificateDigest }
+      : {}),
+    ...(input.providerCertificateStatusRef !== undefined
+      ? { providerCertificateStatusRef: input.providerCertificateStatusRef }
+      : {}),
     ...(input.policyTransitionRef !== undefined
       ? { policyTransitionRef: input.policyTransitionRef }
       : {}),
@@ -896,6 +931,15 @@ export function promoteWorkflowInvocationOutcomeEnvelope(
     evidenceAdmissionReviewIds: workflowEnvelope.evidenceAdmissionReviewIds,
     ...(input.statusCheckRefs !== undefined
       ? { statusCheckRefs: input.statusCheckRefs }
+      : {}),
+    ...(workflowEnvelope.providerCertificateId !== undefined
+      ? { providerCertificateId: workflowEnvelope.providerCertificateId }
+      : {}),
+    ...(workflowEnvelope.providerCertificateDigest !== undefined
+      ? { providerCertificateDigest: workflowEnvelope.providerCertificateDigest }
+      : {}),
+    ...(workflowEnvelope.providerCertificateStatusRef !== undefined
+      ? { providerCertificateStatusRef: workflowEnvelope.providerCertificateStatusRef }
       : {}),
     ...(input.policyTransitionRef !== undefined
       ? { policyTransitionRef: input.policyTransitionRef }
@@ -1207,6 +1251,15 @@ export function projectActionOutcomeEnvelopeForRole(
       terminalOutcome: envelope.terminalOutcome,
       proposalReviewId: envelope.proposalReviewId,
       stateReviewArtifactHash: envelope.stateReviewArtifactHash,
+      ...(envelope.providerCertificateId !== undefined
+        ? { providerCertificateId: envelope.providerCertificateId }
+        : {}),
+      ...(envelope.providerCertificateDigest !== undefined
+        ? { providerCertificateDigest: envelope.providerCertificateDigest }
+        : {}),
+      ...(envelope.providerCertificateStatusRef !== undefined
+        ? { providerCertificateStatusRef: envelope.providerCertificateStatusRef }
+        : {}),
       evidenceAdmissionReviewIds: envelope.evidenceAdmissionReviewIds,
       statusCheckRefs: envelope.statusCheckRefs,
       blockingCauseCodes: envelope.blockingCauses.map((cause) => cause.code),
@@ -1236,6 +1289,18 @@ export function validateActionOutcomeRoleProjection(
   }
   if (core.stateReviewArtifactHash !== envelope.stateReviewArtifactHash) {
     issues.push("stateReviewArtifactHash changed");
+  }
+  if (core.providerCertificateId !== envelope.providerCertificateId) {
+    issues.push("providerCertificateId changed");
+  }
+  if (core.providerCertificateDigest !== envelope.providerCertificateDigest) {
+    issues.push("providerCertificateDigest changed");
+  }
+  if (
+    canonicalStringify(core.providerCertificateStatusRef) !==
+    canonicalStringify(envelope.providerCertificateStatusRef)
+  ) {
+    issues.push("providerCertificateStatusRef changed");
   }
   if (!sameStringSet(core.evidenceAdmissionReviewIds, envelope.evidenceAdmissionReviewIds)) {
     issues.push("evidenceAdmissionReviewIds changed");

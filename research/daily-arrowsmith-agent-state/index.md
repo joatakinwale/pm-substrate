@@ -19,6 +19,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 
 v45 update: `@pm/capability-kit` now has a store-backed resolver factory that loads workflow envelopes by tenant/envelope id before returning graph authority. The remaining proof boundary is preserving/recovering provider-status authority metadata from canonical packet stores, filling Axis A, and keeping Axis B blocked until PluggedInSocial or accepted authoritative fixture runs exist.
 
+v46 update: canonical `ActionOutcomeEnvelope` packets now preserve provider certificate id/digest/status refs, and `PostgresEvalEventStore` can recover the structural workflow-authority envelope shape by tenant/envelope id. The remaining proof boundary is composing that recovery with strict graph/capability policy inside Axis A/C runners while Axis B remains explicitly blocked.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -70,6 +72,7 @@ v45 update: `@pm/capability-kit` now has a store-backed resolver factory that lo
 | v43 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v43-store-backed-write-authority-2026-06-25.md` | Store backed write authority | Answered RQ44, added RQ45, and added substrate-record matching so strict graph/capability authority cannot rely on forged valid-looking refs. |
 | v44 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v44-workflow-authority-injection-2026-06-25.md` | Workflow authority injection | Answered RQ45, added RQ46, added a structural workflow-envelope authority connector, and injected graph write authority into the real lead-scoring capability adapter. |
 | v45 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v45-store-backed-authority-resolver-2026-06-25.md` | Store backed authority resolver | Answered RQ46, added RQ47, and added a resolver factory that loads workflow envelopes from a store before returning graph authority. |
+| v46 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v46-authority-metadata-packet-recovery-2026-06-25.md` | Authority metadata packet recovery | Answered RQ47, added RQ48, and preserved provider-status authority metadata through canonical packets and eval-store recovery. |
 
 ## Top Findings
 
@@ -457,6 +460,10 @@ v45 update: `@pm/capability-kit` now has a store-backed resolver factory that lo
 ### Added on 2026-06-25 v45
 
 - RQ46 answered from runtime-model and runtime-verification papers: scenario runners should use a store-backed monitor/resolver that rejects missing, blocked, or mismatched workflow envelopes before graph mutation.
+
+### Added on 2026-06-25 v46
+
+- RQ47 answered from data-provenance, lineage, and secure-provenance papers: provider certificate status refs are part of the canonical terminal packet lineage and must be recoverable after amnesiac resume.
 
 ## Corrected Claims
 

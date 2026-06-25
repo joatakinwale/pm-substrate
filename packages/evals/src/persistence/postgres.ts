@@ -1,5 +1,6 @@
 import {
   verifyActionOutcomeEnvelopeHash,
+  type ActionOutcomeProviderCertificateStatusRef,
   type ActionOutcomeEnvelope,
 } from "@pm/agent-state";
 import {
@@ -26,6 +27,30 @@ export interface ActionOutcomeEnvelopeStoreRecovery {
   readonly terminalOutcome?: ActionOutcomeEnvelope["terminalOutcome"];
   readonly outcomeHash?: string;
   readonly reason?: "missing_packet" | "invalid_outcome_hash";
+}
+
+export interface WorkflowGraphWriteAuthorityEnvelopeLookup {
+  readonly tenantId: string;
+  readonly envelopeId: string;
+}
+
+export interface WorkflowGraphWriteAuthorityProviderCertificateStatusRef {
+  readonly certificateId: string;
+  readonly certificateDigest: string;
+  readonly status: "valid" | "revoked" | "superseded";
+  readonly statusSequence: number;
+  readonly statusEventHash: string;
+  readonly statusUpdatedAt: string;
+  readonly checkedAt: string;
+}
+
+export interface WorkflowGraphWriteAuthorityEnvelopePacket {
+  readonly envelopeId: string;
+  readonly actionId: string;
+  readonly terminalOutcome: "accepted" | "blocked" | "rejected" | "held";
+  readonly providerCertificateId?: string;
+  readonly providerCertificateDigest?: string;
+  readonly providerCertificateStatusRef?: WorkflowGraphWriteAuthorityProviderCertificateStatusRef;
 }
 
 export class PostgresEvalEventStore {
@@ -179,6 +204,48 @@ export class PostgresEvalEventStore {
     return envelope;
   }
 
+  async getWorkflowActionOutcomeEnvelope(
+    lookup: WorkflowGraphWriteAuthorityEnvelopeLookup,
+  ): Promise<WorkflowGraphWriteAuthorityEnvelopePacket | undefined> {
+    const envelope = await this.getActionOutcomeEnvelopeByRef(
+      lookup.tenantId as EvalEvent["tenantId"],
+      {
+        kind: "action_outcome_envelope",
+        id: lookup.envelopeId,
+      },
+    );
+    if (envelope === undefined) return undefined;
+    if (
+      envelope.terminalOutcome !== "accepted" &&
+      envelope.terminalOutcome !== "blocked" &&
+      envelope.terminalOutcome !== "rejected" &&
+      envelope.terminalOutcome !== "held"
+    ) {
+      throw new Error(
+        `ActionOutcomeEnvelope ${lookup.envelopeId} terminal outcome ${envelope.terminalOutcome} cannot authorize graph writes`,
+      );
+    }
+
+    return {
+      envelopeId: lookup.envelopeId,
+      actionId: envelope.actionId,
+      terminalOutcome: envelope.terminalOutcome,
+      ...(envelope.providerCertificateId !== undefined
+        ? { providerCertificateId: envelope.providerCertificateId }
+        : {}),
+      ...(envelope.providerCertificateDigest !== undefined
+        ? { providerCertificateDigest: envelope.providerCertificateDigest }
+        : {}),
+      ...(envelope.providerCertificateStatusRef !== undefined
+        ? {
+            providerCertificateStatusRef: workflowProviderStatusRef(
+              envelope.providerCertificateStatusRef,
+            ),
+          }
+        : {}),
+    };
+  }
+
   async resolveActionOutcomeRefs(
     event: EvalEvent,
   ): Promise<readonly ActionOutcomeEnvelopeStoreRecovery[]> {
@@ -224,4 +291,18 @@ function actionOutcomeEnvelopeRefs(
     });
   }
   return refs;
+}
+
+function workflowProviderStatusRef(
+  ref: ActionOutcomeProviderCertificateStatusRef,
+): WorkflowGraphWriteAuthorityProviderCertificateStatusRef {
+  return {
+    certificateId: ref.certificateId,
+    certificateDigest: ref.certificateDigest,
+    status: ref.status,
+    statusSequence: ref.statusSequence,
+    statusEventHash: ref.statusEventHash,
+    statusUpdatedAt: String(ref.statusUpdatedAt),
+    checkedAt: String(ref.checkedAt),
+  };
 }

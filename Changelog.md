@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-06-25 - Authority metadata packet recovery
+
+- Added `research/daily-arrowsmith-agent-state/v46-authority-metadata-packet-recovery-2026-06-25.md`, answering RQ47 and replacing it with RQ48: how Axis A/C runners should compose packet recovery with strict authority policy.
+- Added optional provider certificate id, digest, and status-ref fields to canonical `ActionOutcomeEnvelope` packets and their hash payloads.
+- Updated workflow outcome promotion so provider certificate status refs survive into canonical packets.
+- Added provider authority metadata to action-outcome role projection invariant cores and validation.
+- Added `PostgresEvalEventStore.getWorkflowActionOutcomeEnvelope()` plus structural recovery types so eval packet stores can recover the workflow-authority envelope shape without importing capability-kit.
+- Added tests for provider-status preservation through promotion, projection tamper detection, and eval-store recovery.
+- Claim boundary: packet recovery now preserves strict authority metadata, but Axis A/C runners still need to compose it with strict graph/capability policy; Axis B remains blocked until PluggedInSocial or accepted authoritative fixtures exist.
+
 ## 2026-06-25 - Store-backed authority resolver
 
 - Added `research/daily-arrowsmith-agent-state/v45-store-backed-authority-resolver-2026-06-25.md`, answering RQ46 and replacing it with RQ47: how canonical packet stores should preserve/recover provider-status authority metadata.

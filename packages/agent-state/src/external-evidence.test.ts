@@ -956,6 +956,15 @@ describe("ActionOutcomeEnvelope terminal normal form", () => {
   });
 
   it("promotes an accepted workflow runtime envelope into the canonical action outcome proof", () => {
+    const providerCertificateStatusRef = {
+      certificateId: "cert_arrowhedge_terminal_provider",
+      certificateDigest: "sha256:arrowhedge_terminal_provider",
+      status: "valid" as const,
+      statusSequence: 4,
+      statusEventHash: "sha256:provider_status_event",
+      statusUpdatedAt: "2026-06-10T14:59:00.000Z",
+      checkedAt: "2026-06-10T15:00:00.000Z",
+    };
     const workflowEnvelope: WorkflowInvocationActionOutcomeEnvelopeSource = {
       schemaVersion: "pm.workflow.action_outcome_envelope.v1",
       envelopeId: "outcome_workflow_accept_001",
@@ -972,6 +981,9 @@ describe("ActionOutcomeEnvelope terminal normal form", () => {
       stateReviewArtifactId: "artifact_msft_outcome",
       stateReviewArtifactHash: "hash_msft_artifact_runtime",
       evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+      providerCertificateId: "cert_arrowhedge_terminal_provider",
+      providerCertificateDigest: "sha256:arrowhedge_terminal_provider",
+      providerCertificateStatusRef,
       evidenceDecision: { valid: true },
     };
 
@@ -987,6 +999,15 @@ describe("ActionOutcomeEnvelope terminal normal form", () => {
     expect(outcome.evidenceAdmissionReviewIds).toEqual([
       "ev_security:admission_review",
     ]);
+    expect(outcome.providerCertificateId).toBe(
+      "cert_arrowhedge_terminal_provider",
+    );
+    expect(outcome.providerCertificateDigest).toBe(
+      "sha256:arrowhedge_terminal_provider",
+    );
+    expect(outcome.providerCertificateStatusRef).toEqual(
+      providerCertificateStatusRef,
+    );
     expect(outcome.substrateRefs).toContainEqual({
       kind: "action_outcome_envelope",
       id: "outcome_workflow_accept_001",
@@ -1002,6 +1023,29 @@ describe("ActionOutcomeEnvelope terminal normal form", () => {
       id: "artifact_msft_outcome",
     });
     expect(verifyActionOutcomeEnvelopeHash(outcome).valid).toBe(true);
+
+    const projection = projectActionOutcomeEnvelopeForRole(outcome, "operator");
+    expect(projection.core.providerCertificateStatusRef).toEqual(
+      providerCertificateStatusRef,
+    );
+    expect(validateActionOutcomeRoleProjection(outcome, projection)).toEqual({
+      valid: true,
+      issues: [],
+    });
+
+    const tamperedProjection = {
+      ...projection,
+      core: {
+        ...projection.core,
+        providerCertificateStatusRef: {
+          ...providerCertificateStatusRef,
+          status: "revoked" as const,
+        },
+      },
+    };
+    expect(
+      validateActionOutcomeRoleProjection(outcome, tamperedProjection).issues,
+    ).toContain("providerCertificateStatusRef changed");
   });
 
   it("promotes a blocked workflow runtime envelope without inventing a second terminal claim", () => {
