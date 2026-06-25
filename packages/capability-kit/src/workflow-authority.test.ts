@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   graphWriteAuthorityResolutionFromWorkflowEnvelope,
+  graphWriteAuthorityResolverFromWorkflowEnvelopeStore,
   GraphWriteAuthorityResolutionError,
   type WorkflowGraphWriteAuthorityEnvelope,
+  type WorkflowGraphWriteAuthorityEnvelopeLookup,
 } from "./workflow-authority.js";
 
 const acceptedEnvelope = (): WorkflowGraphWriteAuthorityEnvelope => ({
@@ -60,5 +62,128 @@ describe("graphWriteAuthorityResolutionFromWorkflowEnvelope", () => {
     expect(() => graphWriteAuthorityResolutionFromWorkflowEnvelope(undefined)).toThrow(
       GraphWriteAuthorityResolutionError,
     );
+  });
+});
+
+describe("graphWriteAuthorityResolverFromWorkflowEnvelopeStore", () => {
+  it("loads an accepted workflow envelope from a store before building authority", async () => {
+    const envelope = acceptedEnvelope();
+    const lookups: WorkflowGraphWriteAuthorityEnvelopeLookup[] = [];
+    const resolver = graphWriteAuthorityResolverFromWorkflowEnvelopeStore<{
+      readonly envelopeId: string;
+      readonly expectedActionId: string;
+    }>({
+      store: {
+        async getWorkflowActionOutcomeEnvelope(lookup) {
+          lookups.push(lookup);
+          return envelope;
+        },
+      },
+      envelopeId: ({ payload }) => payload.envelopeId,
+      expectedActionId: ({ payload }) => payload.expectedActionId,
+    });
+
+    const resolution = await resolver({
+      tenantId: "tnt_workflow_authority" as never,
+      payload: {
+        envelopeId: envelope.envelopeId,
+        expectedActionId: envelope.actionId,
+      },
+      targetId: "ent_target" as never,
+      currentIdentity: {},
+      currentSchemaVersion: 1,
+      client: {} as never,
+    });
+
+    expect(lookups).toEqual([
+      {
+        tenantId: "tnt_workflow_authority",
+        envelopeId: envelope.envelopeId,
+      },
+    ]);
+    expect(resolution).toMatchObject({
+      authorityRef: {
+        envelopeId: envelope.envelopeId,
+        actionId: envelope.actionId,
+        terminalOutcome: "accepted",
+      },
+      substrateRecord: {
+        envelopeId: envelope.envelopeId,
+        actionId: envelope.actionId,
+        terminalOutcome: "accepted",
+      },
+    });
+  });
+
+  it("rejects a missing stored workflow envelope", async () => {
+    const resolver = graphWriteAuthorityResolverFromWorkflowEnvelopeStore({
+      store: {
+        async getWorkflowActionOutcomeEnvelope() {
+          return undefined;
+        },
+      },
+      envelopeId: () => "env_missing",
+    });
+
+    await expect(
+      resolver({
+        tenantId: "tnt_workflow_authority" as never,
+        payload: {},
+        targetId: "ent_target" as never,
+        currentIdentity: {},
+        currentSchemaVersion: 1,
+        client: {} as never,
+      }),
+    ).rejects.toThrow(GraphWriteAuthorityResolutionError);
+  });
+
+  it("rejects a stored envelope for the wrong action id", async () => {
+    const envelope = acceptedEnvelope();
+    const resolver = graphWriteAuthorityResolverFromWorkflowEnvelopeStore({
+      store: {
+        async getWorkflowActionOutcomeEnvelope() {
+          return envelope;
+        },
+      },
+      envelopeId: () => envelope.envelopeId,
+      expectedActionId: () => "act_different",
+    });
+
+    await expect(
+      resolver({
+        tenantId: "tnt_workflow_authority" as never,
+        payload: {},
+        targetId: "ent_target" as never,
+        currentIdentity: {},
+        currentSchemaVersion: 1,
+        client: {} as never,
+      }),
+    ).rejects.toThrow(GraphWriteAuthorityResolutionError);
+  });
+
+  it("rejects a stored blocked envelope", async () => {
+    const envelope: WorkflowGraphWriteAuthorityEnvelope = {
+      ...acceptedEnvelope(),
+      terminalOutcome: "blocked",
+    };
+    const resolver = graphWriteAuthorityResolverFromWorkflowEnvelopeStore({
+      store: {
+        async getWorkflowActionOutcomeEnvelope() {
+          return envelope;
+        },
+      },
+      envelopeId: () => envelope.envelopeId,
+    });
+
+    await expect(
+      resolver({
+        tenantId: "tnt_workflow_authority" as never,
+        payload: {},
+        targetId: "ent_target" as never,
+        currentIdentity: {},
+        currentSchemaVersion: 1,
+        client: {} as never,
+      }),
+    ).rejects.toThrow(GraphWriteAuthorityResolutionError);
   });
 });

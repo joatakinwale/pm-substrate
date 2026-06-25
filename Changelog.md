@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-25 - Store-backed authority resolver
+
+- Added `research/daily-arrowsmith-agent-state/v45-store-backed-authority-resolver-2026-06-25.md`, answering RQ46 and replacing it with RQ47: how canonical packet stores should preserve/recover provider-status authority metadata.
+- Added `WorkflowGraphWriteAuthorityEnvelopeLookup`, `WorkflowGraphWriteAuthorityEnvelopeStore`, and `StoredWorkflowGraphWriteAuthorityResolverOptions` to `@pm/capability-kit`.
+- Added `graphWriteAuthorityResolverFromWorkflowEnvelopeStore()` so capability/runtime adapters can load workflow envelopes by tenant/envelope id, verify expected action ids, and reject missing, blocked, mismatched, or wrong-action envelopes before graph mutation.
+- Updated the lead-scoring strict graph-authority test to use the store-backed resolver instead of returning hand-built authority refs.
+- Claim boundary: the resolver makes runner wiring possible, but strict amnesiac recovery still needs canonical packet stores to preserve or recover provider-certificate status refs; Axis B remains blocked until PluggedInSocial or accepted authoritative fixtures exist.
+
 ## 2026-06-25 - Workflow authority injection
 
 - Added `research/daily-arrowsmith-agent-state/v44-workflow-authority-injection-2026-06-25.md`, answering RQ45 and replacing it with RQ46: how Axis A/B/C runners should enable strict authority policies with store-sourced resolutions.

@@ -60,7 +60,11 @@ export type {
 export { defineCapability, NoopOnConflict } from "./define.js";
 export {
   graphWriteAuthorityResolutionFromWorkflowEnvelope,
+  graphWriteAuthorityResolverFromWorkflowEnvelopeStore,
   GraphWriteAuthorityResolutionError,
+  type StoredWorkflowGraphWriteAuthorityResolverOptions,
   type WorkflowGraphWriteAuthorityEnvelope,
+  type WorkflowGraphWriteAuthorityEnvelopeLookup,
+  type WorkflowGraphWriteAuthorityEnvelopeStore,
   type WorkflowGraphWriteAuthorityStatusRef,
 } from "./workflow-authority.js";

@@ -1,5 +1,7 @@
 import type {
+  GraphWriteAuthorityContext,
   GraphWriteAuthorityResolution,
+  GraphWriteAuthorityResolver,
 } from "./define.js";
 
 export interface WorkflowGraphWriteAuthorityStatusRef {
@@ -19,6 +21,27 @@ export interface WorkflowGraphWriteAuthorityEnvelope {
   readonly providerCertificateId?: string;
   readonly providerCertificateDigest?: string;
   readonly providerCertificateStatusRef?: WorkflowGraphWriteAuthorityStatusRef;
+}
+
+export interface WorkflowGraphWriteAuthorityEnvelopeLookup {
+  readonly tenantId: string;
+  readonly envelopeId: string;
+}
+
+export interface WorkflowGraphWriteAuthorityEnvelopeStore {
+  getWorkflowActionOutcomeEnvelope(
+    lookup: WorkflowGraphWriteAuthorityEnvelopeLookup,
+  ): Promise<WorkflowGraphWriteAuthorityEnvelope | null | undefined>;
+}
+
+export interface StoredWorkflowGraphWriteAuthorityResolverOptions<TPayload> {
+  readonly store: WorkflowGraphWriteAuthorityEnvelopeStore;
+  readonly envelopeId: (
+    ctx: GraphWriteAuthorityContext<TPayload>,
+  ) => string | null | undefined | Promise<string | null | undefined>;
+  readonly expectedActionId?: (
+    ctx: GraphWriteAuthorityContext<TPayload>,
+  ) => string | null | undefined | Promise<string | null | undefined>;
 }
 
 export class GraphWriteAuthorityResolutionError extends Error {
@@ -85,5 +108,46 @@ export const graphWriteAuthorityResolutionFromWorkflowEnvelope = (
         ? { providerCertificateStatusRef: envelope.providerCertificateStatusRef }
         : {}),
     },
+  };
+};
+
+export const graphWriteAuthorityResolverFromWorkflowEnvelopeStore = <TPayload>(
+  options: StoredWorkflowGraphWriteAuthorityResolverOptions<TPayload>,
+): GraphWriteAuthorityResolver<TPayload> => {
+  return async (ctx) => {
+    const envelopeId = await options.envelopeId(ctx);
+    if (envelopeId === null || envelopeId === undefined || envelopeId.trim() === "") {
+      throw new GraphWriteAuthorityResolutionError(
+        "workflow action outcome envelope id is required for graph write authority",
+      );
+    }
+
+    const envelope = await options.store.getWorkflowActionOutcomeEnvelope({
+      tenantId: String(ctx.tenantId),
+      envelopeId,
+    });
+    if (envelope === null || envelope === undefined) {
+      throw new GraphWriteAuthorityResolutionError(
+        `workflow action outcome envelope ${envelopeId} was not found in the authority store`,
+      );
+    }
+    if (envelope.envelopeId !== envelopeId) {
+      throw new GraphWriteAuthorityResolutionError(
+        `workflow action outcome envelope store returned ${envelope.envelopeId} for requested ${envelopeId}`,
+      );
+    }
+
+    const expectedActionId = await options.expectedActionId?.(ctx);
+    if (
+      expectedActionId !== null &&
+      expectedActionId !== undefined &&
+      expectedActionId !== envelope.actionId
+    ) {
+      throw new GraphWriteAuthorityResolutionError(
+        `workflow action outcome envelope ${envelopeId} action ${envelope.actionId} does not match expected action ${expectedActionId}`,
+      );
+    }
+
+    return graphWriteAuthorityResolutionFromWorkflowEnvelope(envelope);
   };
 };

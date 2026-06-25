@@ -7,10 +7,12 @@ import type {
 import type {
   Graph,
   GraphWriteAuthorityPolicy,
-  GraphWriteAuthorityRef,
-  GraphWriteAuthoritySubstrateRecord,
 } from "@pm/graph";
-import { LeadScoringHandler } from "./handler.js";
+import {
+  graphWriteAuthorityResolverFromWorkflowEnvelopeStore,
+  type WorkflowGraphWriteAuthorityEnvelope,
+} from "@pm/capability-kit";
+import { LeadScoringHandler, type LeadScoringEventPayload } from "./handler.js";
 
 const tenantId = "tnt_lead_scoring_authority" as TenantId;
 const leadId = "ent_lead_authority" as EntityId;
@@ -22,28 +24,9 @@ const strictStorePolicy: GraphWriteAuthorityPolicy = {
   requireSubstrateRecord: true,
 };
 
-const authorityRef: GraphWriteAuthorityRef = {
-  authorityKind: "workflow_action_outcome_envelope",
+const workflowEnvelope: WorkflowGraphWriteAuthorityEnvelope = {
   envelopeId: "env_lead_scoring_authority",
   actionId: "act_lead_scoring_authority",
-  terminalOutcome: "accepted",
-  providerCertificateId: "cert_lead_scoring_authority",
-  providerCertificateDigest: "sha256:lead_scoring_authority",
-  providerCertificateStatusRef: {
-    certificateId: "cert_lead_scoring_authority",
-    certificateDigest: "sha256:lead_scoring_authority",
-    status: "valid",
-    statusSequence: 1,
-    statusEventHash: "sha256:status_event",
-    statusUpdatedAt: "2026-06-25T00:00:00.000Z",
-    checkedAt: "2026-06-25T00:00:01.000Z",
-  },
-};
-
-const substrateRecord: GraphWriteAuthoritySubstrateRecord = {
-  authorityKind: "workflow_action_outcome_envelope",
-  envelopeId: authorityRef.envelopeId,
-  actionId: authorityRef.actionId,
   terminalOutcome: "accepted",
   providerCertificateId: "cert_lead_scoring_authority",
   providerCertificateDigest: "sha256:lead_scoring_authority",
@@ -127,17 +110,32 @@ const graph = {
 describe("LeadScoringHandler graph write authority", () => {
   it("accepts a workflow-injected store-backed authority resolution", async () => {
     const client = makeClient();
-    let resolverCalled = false;
+    let storeLookupCalled = false;
     const handler = new LeadScoringHandler({
       pool: { connect: async () => client } as never,
       graph,
       events: { publishWith: async () => undefined } as never,
       graphWriteAuthorityPolicy: strictStorePolicy,
-      graphWriteAuthority: async ({ targetId: resolvedTargetId }) => {
-        resolverCalled = true;
-        expect(resolvedTargetId).toBe(targetId);
-        return { authorityRef, substrateRecord };
-      },
+      graphWriteAuthority:
+        graphWriteAuthorityResolverFromWorkflowEnvelopeStore<LeadScoringEventPayload>(
+          {
+            store: {
+              async getWorkflowActionOutcomeEnvelope(lookup) {
+                storeLookupCalled = true;
+                expect(lookup).toEqual({
+                  tenantId,
+                  envelopeId: workflowEnvelope.envelopeId,
+                });
+                return workflowEnvelope;
+              },
+            },
+            envelopeId: ({ targetId: resolvedTargetId }) => {
+              expect(resolvedTargetId).toBe(targetId);
+              return workflowEnvelope.envelopeId;
+            },
+            expectedActionId: () => workflowEnvelope.actionId,
+          },
+        ),
     });
 
     await handler.handle(tenantId, {
@@ -147,7 +145,7 @@ describe("LeadScoringHandler graph write authority", () => {
       scoringEventId: "score_authority_1",
     });
 
-    expect(resolverCalled).toBe(true);
+    expect(storeLookupCalled).toBe(true);
     expect(client.calls).toEqual([
       "BEGIN",
       "INSERT_IDEMPOTENCY",
