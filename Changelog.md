@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - ArrowHedge finance source bundle
+
+- Added `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md`, answering RQ54 and replacing it with RQ55: terminal packets for remaining ArrowHedge finance failure classes.
+- Added `buildArrowHedgeWriteBindingProofSourceBundle()` to `@pm/evals`.
+- Exported the finance proof source bundle input type.
+- Added a strict recovery test over the committed ArrowHedge write-binding replay packets, then fed the recovery suite into the all-axis assembler.
+- Verified the packet-backed finance terminal-outcome partition cell becomes verified while the finance axis remains incomplete for missing packet-backed failure classes.
+- Claim boundary: Axis A now has a real partial source bundle, but finance still needs terminal packets for the remaining failure classes and Axis B remains blocked.
+
 ## 2026-06-25 - All-axis proof-packet assembler
 
 - Added `research/daily-arrowsmith-agent-state/v52-all-axis-proof-packet-assembler-2026-06-25.md`, answering RQ53 and replacing it with RQ54: real ArrowHedge finance source bundles with persisted packets and recoveries.

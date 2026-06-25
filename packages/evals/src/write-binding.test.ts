@@ -5,16 +5,27 @@ import {
   verifyInvocationEvidenceBindingAgainstCatalog,
   type EvidenceBindingReferenceCatalog,
 } from "@pm/workflow";
-import { verifyActionOutcomeEnvelopeHash } from "@pm/agent-state";
+import {
+  verifyActionOutcomeEnvelopeHash,
+  type ActionOutcomeEnvelope,
+} from "@pm/agent-state";
+import { graphWriteAuthorityResolutionFromWorkflowEnvelope } from "@pm/capability-kit";
 import type { Capability } from "@pm/registry";
 import type { CapabilityId } from "@pm/types";
 import { tenantId, timestamp } from "@pm/types";
 
 import {
+  auditEvalEventsGraphWriteAuthority,
+  type EvalGraphWriteAuthorityEnvelope,
+  type EvalGraphWriteAuthorityEnvelopeStore,
+  type EvalGraphWriteAuthorityResolver,
+} from "./authority-recovery.js";
+import {
   analyzeEvalEventActionOutcomeReplay,
   analyzeWriteBindingReplayRecords,
   analyzeWriteTransportBindingCoverage,
   buildActionOutcomeEnvelopeReplayIndex,
+  buildArrowHedgeWriteBindingProofSourceBundle,
   buildArrowHedgeWriteBindingReplayCorpus,
   buildEvidenceBindingReferenceCatalogFromReplayCorpora,
   buildFixtureWriteTransportBindingCoverageSamples,
@@ -24,6 +35,7 @@ import {
   type WriteBindingReplayRecord,
 } from "./write-binding.js";
 import { buildArrowHedgeStateEvalSuite } from "./arrowhedge.js";
+import { buildStrictThreeAxisProofPacketAssembly } from "./three-axis-proof-packet.js";
 
 describe("write-binding replay corpus", () => {
   it("generates an ArrowHedge corpus that covers allowed, unverified, missing, incomplete, and policy-blocked write attempts", () => {
@@ -218,6 +230,64 @@ describe("write-binding replay corpus", () => {
       terminalOutcome: "blocked",
       recordId: "wb_arrowhedge_stale_artifact_policy_blocked_001",
     });
+  });
+
+  it("builds a finance proof source bundle from replay packets and store-derived recoveries", async () => {
+    const corpus = buildArrowHedgeWriteBindingReplayCorpus();
+    const packetStore = authorityHarness(
+      corpus.records.map((record) => record.actionOutcomeEnvelope),
+    );
+    const bundleWithoutRecovery = buildArrowHedgeWriteBindingProofSourceBundle();
+
+    const recoverySuite = await auditEvalEventsGraphWriteAuthority({
+      events: bundleWithoutRecovery.events,
+      store: packetStore.store,
+      resolveAcceptedAuthority: packetStore.resolveAcceptedAuthority,
+      policy: strictGraphAuthorityPolicy,
+    });
+    const bundle = buildArrowHedgeWriteBindingProofSourceBundle({
+      authorityRecoverySuite: recoverySuite,
+    });
+    const assembly = buildStrictThreeAxisProofPacketAssembly({
+      packetId: "three_axis_proof_arrowhedge_write_binding_source",
+      generatedAt: "2026-06-11T16:05:00.000Z",
+      sourceBundles: [bundle],
+    });
+
+    expect(recoverySuite.summary).toMatchObject({
+      totalEvents: 14,
+      auditedEvents: 2,
+      validRecoveries: 2,
+      invalidRecoveries: 0,
+      byStatus: {
+        accepted_authority_recovered: 1,
+        terminal_outcome_refused_authority: 1,
+      },
+    });
+    expect(assembly.sourceRecoveries).toEqual([
+      expect.objectContaining({
+        sourceId: "axis-a-arrowhedge-write-binding-replay",
+        axis: "finance",
+        eventCount: 14,
+        obligationCount: 2,
+        recoveryStatus: "provided",
+        recoveryCount: 2,
+        validRecoveries: 2,
+        invalidRecoveries: 0,
+      }),
+    ]);
+    expect(
+      assembly.packet.report.byCell.finance.parallel_write_conflict.verified,
+    ).toBe(true);
+    expect(assembly.packet.report.byAxis.finance.verified).toBe(false);
+    expect(assembly.packet.report.byAxis.finance.missingFailureClasses).toEqual(
+      expect.arrayContaining([
+        "partial_observation",
+        "memory_drift",
+        "feedback_disconnection",
+        "continuity_break",
+      ]),
+    );
   });
 
   it("matches the committed golden write-binding replay JSONL", () => {
@@ -476,6 +546,84 @@ describe("write-binding replay corpus", () => {
     ]);
   });
 });
+
+const strictGraphAuthorityPolicy = {
+  requireAuthorityRef: true,
+  requireProviderCertificateStatusRef: true,
+  requireSubstrateRecord: true,
+} as const;
+
+type ArrowHedgeAuthorityEnvelope = EvalGraphWriteAuthorityEnvelope &
+  Pick<
+    ActionOutcomeEnvelope,
+    | "providerCertificateId"
+    | "providerCertificateDigest"
+    | "providerCertificateStatusRef"
+  >;
+
+function authorityHarness(packets: readonly ActionOutcomeEnvelope[]): {
+  readonly store: EvalGraphWriteAuthorityEnvelopeStore;
+  readonly resolveAcceptedAuthority: EvalGraphWriteAuthorityResolver;
+} {
+  const envelopesByRef = new Map<string, ArrowHedgeAuthorityEnvelope>();
+  for (const packet of packets) {
+    for (const ref of packet.substrateRefs) {
+      if (ref.kind !== "action_outcome_envelope") continue;
+      envelopesByRef.set(
+        `${packet.tenantId}:${ref.id}`,
+        authorityEnvelopeFromPacket(packet, ref.id),
+      );
+    }
+  }
+
+  const findEnvelope = (tenantId: string, envelopeId: string) =>
+    envelopesByRef.get(`${tenantId}:${envelopeId}`);
+  const store: EvalGraphWriteAuthorityEnvelopeStore = {
+    getWorkflowActionOutcomeEnvelope: async ({ tenantId, envelopeId }) =>
+      findEnvelope(tenantId, envelopeId),
+  };
+  const resolveAcceptedAuthority: EvalGraphWriteAuthorityResolver = async ({
+    tenantId,
+    envelopeId,
+    expectedActionId,
+  }) => {
+    const envelope = findEnvelope(String(tenantId), envelopeId);
+    if (envelope === undefined) {
+      throw new Error(`missing ArrowHedge authority envelope ${envelopeId}`);
+    }
+    if (
+      expectedActionId !== undefined &&
+      envelope.actionId !== expectedActionId
+    ) {
+      throw new Error(
+        `ArrowHedge envelope ${envelopeId} action ${envelope.actionId} does not match ${expectedActionId}`,
+      );
+    }
+    return graphWriteAuthorityResolutionFromWorkflowEnvelope(envelope);
+  };
+
+  return { store, resolveAcceptedAuthority };
+}
+
+function authorityEnvelopeFromPacket(
+  packet: ActionOutcomeEnvelope,
+  envelopeId: string,
+): ArrowHedgeAuthorityEnvelope {
+  return {
+    envelopeId,
+    actionId: packet.actionId,
+    terminalOutcome: packet.terminalOutcome,
+    ...(packet.providerCertificateId !== undefined
+      ? { providerCertificateId: packet.providerCertificateId }
+      : {}),
+    ...(packet.providerCertificateDigest !== undefined
+      ? { providerCertificateDigest: packet.providerCertificateDigest }
+      : {}),
+    ...(packet.providerCertificateStatusRef !== undefined
+      ? { providerCertificateStatusRef: packet.providerCertificateStatusRef }
+      : {}),
+  };
+}
 
 function capabilityFixture(
   name: string,

@@ -33,6 +33,8 @@ v51 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacket()`, and loc
 
 v52 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacketAssembly()`, which accepts source bundles, validates declared event counts, builds one strict proof packet, and returns per-source recovery provenance (`provided`, `missing_required`, or `not_required`). Axis B blocker sources remain blocked without synthetic recovery obligations. The remaining proof boundary is producing real Axis A ArrowHedge finance source bundles with persisted packets and recovery suites.
 
+v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundle()`, which builds a finance source bundle from the committed ArrowHedge write-binding replay corpus and can consume strict authority recoveries from replay packets. The terminal-outcome partition cell is now recovery-backed, while finance remains incomplete for failure classes that still lack packet-backed pairs.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -91,6 +93,7 @@ v52 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacketAssembly()`,
 | v50 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v50-local-lab-provider-authority-metadata-2026-06-25.md` | Local-lab provider authority metadata | Answered RQ51, added RQ52, and made accepted Axis C packets carry provider-status authority metadata that strict recovery can validate. |
 | v51 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v51-strict-runner-proof-packet-consumption-2026-06-25.md` | Strict runner proof-packet consumption | Answered RQ52, added RQ53, and made runner proof summaries consume authority recovery suites or expose missing recovery obligations. |
 | v52 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v52-all-axis-proof-packet-assembler-2026-06-25.md` | All-axis proof-packet assembler | Answered RQ53, added RQ54, and added per-source recovery provenance for strict all-axis proof-packet assembly. |
+| v53 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md` | ArrowHedge finance source bundle | Answered RQ54, added RQ55, and made the current ArrowHedge write-binding replay corpus available as a strict finance proof source bundle. |
 
 ## Top Findings
 

@@ -45,6 +45,9 @@ import {
   importEvidenceAdmissionReviewsJsonl,
 } from "./evidence-admission.js";
 import type { EvalEvent, EvalEvidenceRef } from "./schema.js";
+import { buildArrowHedgeStateEvalSuite } from "./arrowhedge.js";
+import type { EvalGraphWriteAuthorityRecoverySuite } from "./authority-recovery.js";
+import type { StrictThreeAxisProofPacketSourceBundle } from "./three-axis-proof-packet.js";
 
 export type WriteBindingReplayDecision =
   | "allowed"
@@ -105,6 +108,10 @@ export interface WriteBindingReplayCorpus {
   readonly records: readonly WriteBindingReplayRecord[];
   readonly jsonl: string;
   readonly metrics: WriteBindingReplayMetrics;
+}
+
+export interface ArrowHedgeWriteBindingProofSourceBundleInput {
+  readonly authorityRecoverySuite?: EvalGraphWriteAuthorityRecoverySuite;
 }
 
 export interface WriteBindingReplayMetrics {
@@ -888,6 +895,63 @@ export function buildArrowHedgeWriteBindingReplayCorpus(): WriteBindingReplayCor
   };
 }
 
+export function buildArrowHedgeWriteBindingProofSourceBundle(
+  input: ArrowHedgeWriteBindingProofSourceBundleInput = {},
+): StrictThreeAxisProofPacketSourceBundle {
+  const corpus = buildArrowHedgeWriteBindingReplayCorpus();
+  const acceptedRef = requiredActionOutcomeRef(
+    corpus.records,
+    "wb_arrowhedge_clean_refresh_allowed_001",
+  );
+  const blockedRef = requiredActionOutcomeRef(
+    corpus.records,
+    "wb_arrowhedge_stale_artifact_policy_blocked_001",
+  );
+  const suite = buildArrowHedgeStateEvalSuite({
+    tenantId: ARROWHEDGE_TENANT,
+    observedAt: "2026-06-11T16:05:00.000Z" as Timestamp,
+    source: "packages/evals/fixtures/write-binding-replay.v1.jsonl",
+    sourceRecordIds: ["ticker:AAPL"],
+    substrateRefs: {
+      graphNodeIds: [],
+      eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+      projectionIds: ["arrowhedge_cop"],
+    },
+    readSetValidation: {
+      currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+      mode: "warn",
+      issueCodes: ["stale_read_ref"],
+    },
+    actionOutcomeEnvelopes: [
+      {
+        scenarioId: "arrowhedge-terminal-outcome-partition",
+        envelopeId: acceptedRef.id,
+        runArm: "baseline",
+        terminalOutcome: "accepted",
+      },
+      {
+        scenarioId: "arrowhedge-terminal-outcome-partition",
+        envelopeId: blockedRef.id,
+        runArm: "substrate",
+        terminalOutcome: "blocked",
+      },
+    ],
+    operationalSamples: [],
+  });
+
+  return {
+    source: {
+      sourceId: "axis-a-arrowhedge-write-binding-replay",
+      axis: "finance",
+      eventCount: suite.events.length,
+    },
+    events: suite.events,
+    ...(input.authorityRecoverySuite !== undefined
+      ? { authorityRecoverySuite: input.authorityRecoverySuite }
+      : {}),
+  };
+}
+
 export function analyzeWriteBindingReplayRecords(
   records: readonly WriteBindingReplayRecord[],
 ): WriteBindingReplayMetrics {
@@ -962,6 +1026,20 @@ function requiredAdmission(
     throw new Error(`missing evidence admission review ${reviewId}`);
   }
   return review;
+}
+
+function requiredActionOutcomeRef(
+  records: readonly WriteBindingReplayRecord[],
+  recordId: string,
+): StateRef {
+  const record = records.find((candidate) => candidate.recordId === recordId);
+  const ref = record?.actionOutcomeEnvelope.substrateRefs.find(
+    (candidate) => candidate.kind === "action_outcome_envelope",
+  );
+  if (ref === undefined) {
+    throw new Error(`write-binding replay record ${recordId} has no ActionOutcomeEnvelope ref`);
+  }
+  return ref;
 }
 
 function buildRecord(input: {
