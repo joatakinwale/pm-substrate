@@ -3,24 +3,33 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   admittedStateEvidenceToObservedReadSetEntry,
+  admitActionOutcomeEnvelope,
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
+  buildActionOutcomeEnvelope,
   buildStateReviewArtifact,
   compareObservedReadSetToDeclared,
   computeObservationContractIntegrityHash,
   evaluateStateReviewInvariantPolicy,
+  evaluateLocalStateSections,
   importStateReviewArtifact,
+  projectActionOutcomeEnvelopeForRole,
+  promoteWorkflowInvocationOutcomeEnvelope,
   reviewExternalStateEvidence,
   reviewProposedActionAgainstCurrentState,
+  recoverActionOutcomeBySubstrateRef,
   serializeStateReviewArtifact,
   stateRef,
   toAdmittedStateEvidence,
+  validateActionOutcomeRoleProjection,
   validateObservationContractBinding,
   validateProposedActionReadSet,
+  verifyActionOutcomeEnvelopeHash,
   verifyObservationContractIntegrity,
   type CurrentStateView,
   type EvidenceAdmissionContext,
   type ExternalStateEvidence,
+  type WorkflowInvocationActionOutcomeEnvelopeSource,
   type ProposedAction,
 } from "./index.js";
 
@@ -746,5 +755,326 @@ describe("artifact round-trip with evidence admissions", () => {
         issue.path.startsWith("/metadata/evidenceAdmissions/0"),
       ),
     ).toBe(true);
+  });
+});
+
+describe("ActionOutcomeEnvelope terminal normal form", () => {
+  const stateReviewRef = stateRef(
+    "state_review_artifact",
+    "artifact_msft_outcome",
+    "MSFT outcome artifact",
+  );
+
+  it("rejects a second terminal outcome for the same stable action id", () => {
+    const accepted = buildActionOutcomeEnvelope({
+      tenantId: t,
+      actionId: "action_msft_decision_001",
+      subject: subjectRef,
+      proposalReviewId: "review_msft_001",
+      stateReviewArtifactHash: "hash_msft_artifact_001",
+      requestedTerminalOutcome: "accepted",
+      decidedAt: evaluatedAt,
+      decidedBy: "workflow:admission",
+      substrateRefs: [stateReviewRef],
+    });
+    const blocked = buildActionOutcomeEnvelope({
+      tenantId: t,
+      actionId: "action_msft_decision_001",
+      subject: subjectRef,
+      proposalReviewId: "review_msft_001",
+      stateReviewArtifactHash: "hash_msft_artifact_001",
+      requestedTerminalOutcome: "blocked",
+      decidedAt: evaluatedAt,
+      decidedBy: "workflow:admission",
+      blockingCauses: [
+        {
+          source: "policy",
+          code: "stale_basis",
+          message: "Read basis was superseded before write admission.",
+          refs: [riskRef],
+          invariantClasses: ["freshness_window"],
+        },
+      ],
+      substrateRefs: [stateReviewRef],
+    });
+
+    expect(admitActionOutcomeEnvelope([], accepted).accepted).toBe(true);
+    const conflict = admitActionOutcomeEnvelope([accepted], blocked);
+    expect(conflict.accepted).toBe(false);
+    expect(conflict.reason).toBe("terminal_outcome_conflict");
+    expect(conflict.message).toContain("accepted");
+    expect(conflict.message).toContain("blocked");
+  });
+
+  it("blocks a requested accepted write when stale evidence would block at high consequence", () => {
+    const staleAdmission = reviewExternalStateEvidence(
+      baseEvidence({
+        evidenceId: "ev_stale_price",
+        validUntil: timestamp("2026-06-10T14:59:00.000Z"),
+      }),
+      baseContext(),
+    );
+
+    const outcome = buildActionOutcomeEnvelope({
+      tenantId: t,
+      actionId: "action_msft_decision_002",
+      subject: subjectRef,
+      proposalReviewId: "review_msft_002",
+      stateReviewArtifactHash: "hash_msft_artifact_002",
+      requestedTerminalOutcome: "accepted",
+      decidedAt: evaluatedAt,
+      decidedBy: "workflow:admission",
+      evidenceAdmissions: [staleAdmission],
+      actionConsequence: "high",
+      substrateRefs: [stateReviewRef],
+    });
+
+    expect(outcome.terminalOutcome).toBe("blocked");
+    expect(outcome.evidenceAdmissionReviewIds).toContain(
+      "ev_stale_price:admission_review",
+    );
+    expect(outcome.blockingCauses.map((cause) => cause.code)).toContain(
+      "stale_evidence",
+    );
+    expect(outcome.blockingCauses[0]?.invariantClasses).toContain(
+      "freshness_window",
+    );
+  });
+
+  it("returns a local-view obstruction instead of summarizing conflicting sections", () => {
+    const legalRef = stateRef("document", "legal_pause_email");
+    const schedulerRef = stateRef("source_record", "scheduler_live_row");
+    const evaluation = evaluateLocalStateSections(
+      [
+        {
+          tenantId: t,
+          sectionId: "legal_view",
+          role: "legal",
+          subject: subjectRef,
+          fields: {
+            approvalState: {
+              value: "revoked",
+              refs: [legalRef],
+              authority: "legal",
+              observedAt: evaluatedAt,
+            },
+          },
+        },
+        {
+          tenantId: t,
+          sectionId: "scheduler_view",
+          role: "scheduler",
+          subject: subjectRef,
+          fields: {
+            approvalState: {
+              value: "approved",
+              refs: [schedulerRef],
+              authority: "scheduler",
+              observedAt: evaluatedAt,
+            },
+          },
+        },
+      ],
+      {
+        generatedAt: evaluatedAt,
+        requiredFields: ["approvalState"],
+      },
+    );
+
+    expect(evaluation.kind).toBe("obstruction");
+    if (evaluation.kind !== "obstruction") throw new Error("expected obstruction");
+    expect(evaluation.obstruction.conflicts).toHaveLength(1);
+    expect(evaluation.obstruction.conflicts[0]?.field).toBe("approvalState");
+    expect(evaluation.obstruction.allowedAction).toBe("request_resolution");
+  });
+
+  it("keeps blocking conflicts visible in role projections", () => {
+    const outcome = buildActionOutcomeEnvelope({
+      tenantId: t,
+      actionId: "action_msft_decision_003",
+      subject: subjectRef,
+      proposalReviewId: "review_msft_003",
+      stateReviewArtifactHash: "hash_msft_artifact_003",
+      requestedTerminalOutcome: "blocked",
+      decidedAt: evaluatedAt,
+      decidedBy: "workflow:admission",
+      blockingCauses: [
+        {
+          source: "local_view",
+          code: "local_view_obstruction",
+          message: "Legal and scheduler views disagree on approval state.",
+          refs: [subjectRef],
+          invariantClasses: ["state_conflict"],
+        },
+      ],
+      substrateRefs: [stateReviewRef],
+    });
+
+    const projection = projectActionOutcomeEnvelopeForRole(
+      outcome,
+      "project_manager",
+    );
+    expect(projection.core.terminalOutcome).toBe("blocked");
+    expect(projection.core.blockingCauseCodes).toContain("local_view_obstruction");
+    expect(projection.visibleBlockingCauses).toHaveLength(1);
+    expect(validateActionOutcomeRoleProjection(outcome, projection).valid).toBe(true);
+
+    const hidden = { ...projection, visibleBlockingCauses: [] };
+    const validation = validateActionOutcomeRoleProjection(outcome, hidden);
+    expect(validation.valid).toBe(false);
+    expect(validation.issues).toContain("blocked projection hides blocking causes");
+  });
+
+  it("lets an amnesiac agent recover the terminal outcome from substrate refs", () => {
+    const outcome = buildActionOutcomeEnvelope({
+      tenantId: t,
+      actionId: "action_msft_decision_004",
+      subject: subjectRef,
+      proposalReviewId: "review_msft_004",
+      stateReviewArtifactHash: "hash_msft_artifact_004",
+      requestedTerminalOutcome: "blocked",
+      decidedAt: evaluatedAt,
+      decidedBy: "workflow:admission",
+      blockingCauses: [
+        {
+          source: "proposal_review",
+          code: "proposal_review_blocking_policy",
+          message: "Proposal failed blocking review.",
+          refs: [riskRef],
+          invariantClasses: ["freshness_window"],
+        },
+      ],
+      substrateRefs: [stateReviewRef],
+    });
+
+    const recovered = recoverActionOutcomeBySubstrateRef([outcome], stateReviewRef);
+    expect(recovered?.actionId).toBe("action_msft_decision_004");
+    expect(recovered?.terminalOutcome).toBe("blocked");
+    expect(recovered?.blockingCauses.map((cause) => cause.code)).toContain(
+      "proposal_review_blocking_policy",
+    );
+  });
+
+  it("promotes an accepted workflow runtime envelope into the canonical action outcome proof", () => {
+    const workflowEnvelope: WorkflowInvocationActionOutcomeEnvelopeSource = {
+      schemaVersion: "pm.workflow.action_outcome_envelope.v1",
+      envelopeId: "outcome_workflow_accept_001",
+      actionId: "tnt_evidence:wf_arrowhedge:1:accept-decision:evt_ready",
+      terminalOutcome: "accepted",
+      generatedAt: evaluatedAt,
+      tenantId: t,
+      workflowId: "wf_arrowhedge",
+      workflowName: "arrowhedge-runtime",
+      workflowVersion: 1,
+      nodeId: "accept-decision",
+      capability: "portfolio/accept",
+      triggerEventId: "evt_ready",
+      stateReviewArtifactId: "artifact_msft_outcome",
+      stateReviewArtifactHash: "hash_msft_artifact_runtime",
+      evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+      evidenceDecision: { valid: true },
+    };
+
+    const outcome = promoteWorkflowInvocationOutcomeEnvelope({
+      workflowEnvelope,
+      subject: subjectRef,
+      proposalReviewId: "review_msft_runtime_accept",
+    });
+
+    expect(outcome.terminalOutcome).toBe("accepted");
+    expect(outcome.actionId).toBe(workflowEnvelope.actionId);
+    expect(outcome.proposalReviewId).toBe("review_msft_runtime_accept");
+    expect(outcome.evidenceAdmissionReviewIds).toEqual([
+      "ev_security:admission_review",
+    ]);
+    expect(outcome.substrateRefs).toContainEqual({
+      kind: "action_outcome_envelope",
+      id: "outcome_workflow_accept_001",
+      label: "Workflow action outcome envelope",
+    });
+    expect(outcome.substrateRefs).toContainEqual({
+      kind: "workflow_run",
+      id: "wf_arrowhedge",
+      label: "arrowhedge-runtime",
+    });
+    expect(outcome.substrateRefs).toContainEqual({
+      kind: "state_review_artifact",
+      id: "artifact_msft_outcome",
+    });
+    expect(verifyActionOutcomeEnvelopeHash(outcome).valid).toBe(true);
+  });
+
+  it("promotes a blocked workflow runtime envelope without inventing a second terminal claim", () => {
+    const workflowEnvelope: WorkflowInvocationActionOutcomeEnvelopeSource = {
+      schemaVersion: "pm.workflow.action_outcome_envelope.v1",
+      envelopeId: "outcome_workflow_blocked_001",
+      actionId: "tnt_evidence:wf_arrowhedge:1:accept-decision:evt_ready_blocked",
+      terminalOutcome: "blocked",
+      generatedAt: evaluatedAt,
+      tenantId: t,
+      workflowId: "wf_arrowhedge",
+      workflowName: "arrowhedge-runtime",
+      workflowVersion: 1,
+      nodeId: "accept-decision",
+      capability: "portfolio/accept",
+      triggerEventId: "evt_ready_blocked",
+      evidenceAdmissionReviewIds: [],
+      evidenceDecision: {
+        valid: false,
+        reason: "evidence_binding_missing",
+      },
+    };
+
+    const outcome = promoteWorkflowInvocationOutcomeEnvelope({
+      workflowEnvelope,
+      subject: subjectRef,
+      proposalReviewId: "review_msft_runtime_blocked",
+      stateReviewArtifactHash: "hash_missing_binding_context",
+    });
+
+    expect(outcome.terminalOutcome).toBe("blocked");
+    expect(outcome.blockingCauses).toContainEqual(
+      expect.objectContaining({
+        source: "policy",
+        code: "evidence_binding_missing",
+      }),
+    );
+    expect(outcome.substrateRefs).toContainEqual({
+      kind: "action_outcome_envelope",
+      id: "outcome_workflow_blocked_001",
+      label: "Workflow action outcome envelope",
+    });
+    expect(verifyActionOutcomeEnvelopeHash(outcome).valid).toBe(true);
+  });
+
+  it("rejects promotion when workflow evidence says blocked but terminal outcome says accepted", () => {
+    const workflowEnvelope: WorkflowInvocationActionOutcomeEnvelopeSource = {
+      schemaVersion: "pm.workflow.action_outcome_envelope.v1",
+      envelopeId: "outcome_workflow_invalid_001",
+      actionId: "tnt_evidence:wf_arrowhedge:1:accept-decision:evt_invalid",
+      terminalOutcome: "accepted",
+      generatedAt: evaluatedAt,
+      tenantId: t,
+      workflowId: "wf_arrowhedge",
+      workflowName: "arrowhedge-runtime",
+      workflowVersion: 1,
+      nodeId: "accept-decision",
+      capability: "portfolio/accept",
+      triggerEventId: "evt_invalid",
+      stateReviewArtifactHash: "hash_msft_artifact_runtime",
+      evidenceAdmissionReviewIds: [],
+      evidenceDecision: {
+        valid: false,
+        reason: "evidence_policy_blocked",
+      },
+    };
+
+    expect(() =>
+      promoteWorkflowInvocationOutcomeEnvelope({
+        workflowEnvelope,
+        subject: subjectRef,
+        proposalReviewId: "review_msft_runtime_invalid",
+      }),
+    ).toThrow(/cannot turn an invalid evidence decision into an accepted terminal outcome/);
   });
 });

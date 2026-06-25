@@ -1,5 +1,194 @@
 # Changelog
 
+## 2026-06-25 - Provider certificate status store
+
+- Added `research/daily-arrowsmith-agent-state/v38-provider-certificate-status-store-2026-06-25.md`, answering RQ39 and replacing it with RQ40: how provider certificate status transitions should become append-only and replayable.
+- Added registry status-store contracts for terminal-admission provider certificates, including immutable certificate records, mutable current status, lookup/update inputs, and status-record validation.
+- Added `verifyTerminalAdmissionProviderCertificateIntegrity()` and `verifyTerminalAdmissionProviderCertificateStatusRecord()` so revocation/supersession can block digest-valid certificates without mutating certificate JSON.
+- Added `PostgresTerminalAdmissionProviderCertificateStore` and migration `0021_registry_terminal_provider_certificates.sql` for tenant-partitioned certificate status persistence.
+- Updated `InvocationActionOutcomeProviderCertificateProvider.getCertificate()` to receive `checkedAt`, and added `PostgresWorkflowRuntime.actionOutcomeProviderCertificateStore` so workflow dispatch can consume the registry status store directly.
+- Claim boundary: the store makes certificate status restart-safe, but append-only status-transition replay remains open; Axis A remains incomplete and Axis B remains blocked until PluggedInSocial is restored or an authoritative fixture run is accepted.
+
+## 2026-06-25 - Terminal provider certificates
+
+- Added `research/daily-arrowsmith-agent-state/v37-terminal-provider-certificates-2026-06-25.md`, answering RQ38 and replacing it with RQ39: how provider certificates should be persisted/refreshed through a substrate-owned status store.
+- Added `TerminalAdmissionProviderCertificate`, subject, status, manifest digest, and certificate digest types to `@pm/types`.
+- Added provider certificate issuance, manifest digesting, certificate digesting, and dispatch-time validation helpers to `@pm/registry`.
+- Extended workflow action outcome envelopes with provider certificate ids/digests, and added `InvocationActionOutcomeProviderCertificateProvider`.
+- Added an opt-in `PostgresWorkflowRuntime` gate that can require a valid provider certificate before write-capable dispatch; missing or invalid certificates dead-letter with blocked terminal outcome envelopes.
+- Added write-binding metric buckets for provider-certificate missing/invalid outcomes so certificate failures are not hidden as generic blocked cases.
+- Claim boundary: certificates are now runtime-checkable evidence, but the certificate status store/revocation refresh path is still open, Axis A remains incomplete, and Axis B remains blocked until PluggedInSocial is restored or an authoritative fixture run is accepted.
+
+## 2026-06-25 - Terminal provider manifest verification
+
+- Added `research/daily-arrowsmith-agent-state/v36-terminal-provider-manifest-verification-2026-06-25.md`, answering RQ37 and replacing it with RQ38: how verified terminal-admission provider manifests should become durable install/runtime certificates.
+- Added `TerminalAdmissionProviderManifest`, `TerminalAdmissionProviderAvailability`, and `contractVersion` to `@pm/types` terminal-admission provider contracts.
+- Added `verifyTerminalAdmissionProviderRef()` and `verifyTerminalAdmissionProviderBindings()` to `@pm/registry`, with explicit issue codes for missing, unavailable, deprecated, version-incompatible, package/export-drifted, and narrower action/profile/ref-kind coverage.
+- Added live provider manifests for the ArrowHedge finance terminal provider and agency publication terminal provider.
+- Added manifest-gated capability-derived provider coverage in `@pm/evals`, so stale provider metadata can be reported as missing coverage instead of counted as proof.
+- Claim boundary: provider manifests are checked in-process for this slice; durable install/runtime certificates remain open, and Axis B remains blocked until PluggedInSocial is restored or an authoritative fixture run is accepted.
+
+## 2026-06-25 - Terminal admission provider metadata
+
+- Added `research/daily-arrowsmith-agent-state/v35-terminal-admission-provider-metadata-2026-06-25.md`, answering RQ36 and replacing it with RQ37: how terminal-admission provider refs should be checked for live availability, version compatibility, and action-type coverage.
+- Added `TerminalAdmissionProviderRef` and optional `WriteContract.terminalAdmissionProviders` to `@pm/types`.
+- Added `listTerminalAdmissionProviderBindings()` to `@pm/registry` so provider coverage can be discovered from normalized capability write contracts.
+- Added `FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER` and attached it to the finance ingest Event write contract that backs the ArrowHedge proposal-review boundary.
+- Added `AGENCY_PUBLICATION_TERMINAL_ADMISSION_PROVIDER` beside the agency publication terminal adapter without claiming unrelated agency write paths are covered.
+- Added `buildWriteTransportBindingCoverageSamplesFromCapabilities()` so `@pm/evals` can derive action-outcome provider coverage from capability descriptors rather than hand-maintained transport inventories.
+- Updated root `vitest.config.ts` to exclude macOS AppleDouble `._*` sidecar files from test discovery; the root suite was otherwise failing before reaching real tests in copied sidecar files.
+- Claim boundary: provider metadata is discovery evidence only; runtime terminal admission, status checks, and three-axis verification remain required. Axis B remains blocked until PluggedInSocial is restored or an authoritative fixture run is accepted.
+
+## 2026-06-25 - Agency publication terminal adapter
+
+- Added `research/daily-arrowsmith-agent-state/v34-agency-publication-terminal-adapter-2026-06-25.md`, answering RQ35 and replacing it with RQ36: how registry/capability metadata should advertise terminal-admission providers without hand-edited eval transport inventories.
+- Added `packages/profile-agency/src/publication-terminal.ts`, defining an authoritative agency publication snapshot contract over subject refs, approval status refs, content hashes, freshness, lifecycle state, and source refs.
+- Added `buildAgencyPublicationActionOutcomeEnvelope()` so agency publication fixtures can become canonical `ActionOutcomeEnvelope`s through `@pm/agent-state`.
+- Added `buildAgencyPublicationActionOutcomeTerminalIndex()` so approved/revoked same-action publish attempts are indexed through the core terminal outcome conflict primitive.
+- Added pure tests proving approved matching content is accepted, revoked approval blocks publish, exact replay is idempotent, and same-action accepted/blocked publication attempts produce a terminal conflict.
+- Claim boundary: this makes Axis B authoritative fixtures executable once accepted; it does not restore PluggedInSocial or make Axis B verified.
+
+## 2026-06-25 - Workflow terminal admission port
+
+- Added `research/daily-arrowsmith-agent-state/v33-workflow-terminal-admission-port-2026-06-25.md`, answering RQ34 and replacing it with RQ35: the minimum agency/marketing adapter contract needed to consume terminal admission without substrate-package edits.
+- Added dependency-light workflow terminal admission types: `InvocationActionOutcomeAdmissionPort`, request, decision, and rejection reasons.
+- Updated `PostgresWorkflowRuntime` with optional `actionOutcomeAdmission`; accepted write-capable dispatch is stopped when terminal admission rejects, blocked evidence-gate envelopes are offered to admission before dead-lettering, and adapter failure fails closed as `action_outcome_admission_rejected`.
+- Added workflow integration tests for accepted admission, terminal-conflict rejection, and blocked-envelope admission before dead-lettering.
+- Claim boundary: this improves the workflow runtime code boundary without adding an `@pm/agent-state` dependency; it does not unblock Axis B or verify the full three-axis matrix.
+
+## 2026-06-25 - ArrowHedge terminal index adoption
+
+- Added `research/daily-arrowsmith-agent-state/v32-arrowhedge-terminal-index-adoption-2026-06-25.md`, answering RQ33 and replacing it with RQ34: how workflow should consume canonical terminal admission without duplicating terminal claims.
+- Added `buildArrowHedgeActionOutcomeEnvelope()` to `@pm/capability-finance-research-ingest`, converting ArrowHedge proposal-review artifacts into canonical `ActionOutcomeEnvelope`s.
+- Added `buildArrowHedgeActionOutcomeTerminalIndex()` so ArrowHedge candidates are admitted through the core `@pm/agent-state` terminal index.
+- Added ArrowHedge tests proving a fresh candidate is accepted, a stale same-action candidate is blocked, exact replay is idempotent, and same-action accepted/blocked candidates produce a terminal conflict.
+- Claim boundary: this improves the Axis A code boundary; it does not complete all ten Axis A classes, unblock Axis B, or verify the full three-axis matrix.
+
+## 2026-06-25 - Terminal outcome index codebase correction
+
+- Added `research/daily-arrowsmith-agent-state/v31-terminal-index-codebase-correction-2026-06-25.md`, answering RQ32 and replacing it with RQ33: which operational write boundaries should consume the terminal index first.
+- Hardened `@pm/agent-state` `admitActionOutcomeEnvelope()` so hash-invalid candidate envelopes are rejected before terminal admission.
+- Added `actionOutcomeTerminalKey()` and `buildActionOutcomeTerminalIndex()` to create a replay/resume index over hash-valid terminal envelopes, with idempotent duplicate counts and conflict issues for same-action different envelopes.
+- Added core tests proving idempotent replay, terminal conflict rejection, invalid-hash rejection, terminal-index issue reporting, and stale blocking reviews demoting requested accepted writes to blocked.
+- Corrected the research ledger boundary: three-axis proof packets are verifier artifacts, not the implementation primitive.
+
+## 2026-06-25 - Three-axis proof packet
+
+- Added `research/daily-arrowsmith-agent-state/v30-three-axis-proof-packet-2026-06-25.md`, answering RQ31 and replacing it with RQ32: how proof packets should validate `action_outcome_envelope` refs against live or replay packet stores.
+- Added `buildThreeAxisProofPacket()` to `@pm/evals`. It wraps the three-axis coverage report with packet status, source groups, verified axes, blocked axes, unverified axes, missing cells, blocked cells, unverified cells, and terminal-proof-backed scenario-pass cells.
+- Updated ArrowHedge Axis A EvalEvents so `actionOutcomeEnvelopes` can be scoped per `baseline` / `substrate` arm and can carry `operationalTerminalOutcome`.
+- Updated the Axis B marketing blocker to emit `scenarioResult: "blocked"` explicitly.
+- Added tests proving the current assembled packet remains `blocked`: Axis C can be verified, Axis A remains incomplete, and Axis B remains blocked. A fully populated synthetic matrix is required for a verified packet.
+- Updated eval schema docs and research ledgers with v30, claim C080, and L040. Claim boundary: this is a traceable proof packet and current blocker report, not full three-axis verification.
+
+## 2026-06-25 - Eval verdict and terminal outcome split
+
+- Added `research/daily-arrowsmith-agent-state/v29-eval-verdict-terminal-outcome-split-2026-06-25.md`, answering RQ30 and replacing it with RQ31: how Axis A/C should emit terminal-proof-backed scenario pass pairs while Axis B remains explicitly blocked until PluggedInSocial or authoritative fixtures exist.
+- Added optional `scenarioResult` and `operationalTerminalOutcome` fields to `EvalEvent`, plus `EVAL_OPERATIONAL_TERMINAL_OUTCOMES`.
+- Schema validation now requires pass/fail scenario verdict refs, requires `operationalTerminalOutcome` to cite an `action_outcome_envelope`, and requires terminal outcome metadata when a legacy `result: "blocked"` is also a scenario pass.
+- Dynamic Axis C protective refusals now emit `result: "blocked"`, `scenarioResult: "pass"`, and `operationalTerminalOutcome: "blocked"`.
+- Updated `analyzeThreeAxisCoverage()` to use `scenarioResult ?? result`, report `scenarioPassPairs`, and verify terminally blocked protective refusals when outcome proof refs exist.
+- Updated eval/local-lab docs and research ledgers with v29, claim C079, and L039. Claim boundary: the full three-axis solution is still unverified because Axis A is incomplete and Axis B remains blocked.
+
+## 2026-06-25 - Three-axis coverage gate
+
+- Added `research/daily-arrowsmith-agent-state/v28-three-axis-coverage-gate-2026-06-25.md`, answering RQ29 and replacing it with RQ30: whether EvalEvent scenario verdicts need to split from operational terminal outcomes so protective substrate refusals are not confused with blocked evaluations.
+- Added `analyzeThreeAxisCoverage()` to `@pm/evals`, producing the required 30-cell matrix across three axes and ten failure classes.
+- The new report separates protective coverage from stricter verification: coverage requires paired baseline/substrate protection with refs; verification requires non-blocked substrate `pass` plus `action_outcome_envelope` terminal proof refs by default.
+- Added tests proving complete Axis C coverage does not hide blocked/missing Axis B cells, and that non-blocked pass pairs without terminal proof refs remain unverified.
+- Updated eval schema docs and research ledgers with v28, claim C078, and L038. Claim boundary: this is the matrix verifier surface, not proof that all 30 cells are satisfied.
+
+## 2026-06-25 - Axis C ten-class live coverage
+
+- Added `research/daily-arrowsmith-agent-state/v27-axis-c-ten-class-live-coverage-2026-06-25.md`, answering RQ28 and replacing it with RQ29: how to lift the explicit coverage gate from Axis C to the full 10 failure classes x 3 axes matrix without hiding Axis B's blocked status.
+- Added `liveCoverage` reporting for dynamic local-agent-lab eval suites. Coverage is complete only when every taxonomy class has a protective packet-backed live pair (`baseline=fail`, `substrate!=fail`) with generated `action_outcome_envelope` refs on both arms.
+- Added nine more dynamic `@pm/local-agent-lab` scenarios so the registry now covers all ten state-failure classes, with a registry test that fails if a class is silently dropped.
+- Updated `pnpm evals:local-agent-lab:live` to print coverage completeness, rate, covered classes, and missing classes.
+- Verified the all-ten Axis C live run against local Postgres/Ollama: 10 scenarios, 20 EvalEvents, 20 packets, 10 baseline failures, 0 substrate failures, and `liveCoverage.complete=true`. A SQL recovery query resolved 20/20 latest packet refs across 10 failure classes.
+- Updated local-lab docs and research ledgers with v27, claim C077, and L037. Claim boundary: Axis C dynamic live coverage is complete for one protective family per class, but the full solution remains unverified until Axis A has the same gate and Axis B is non-blocked.
+
+## 2026-06-25 - Dynamic Axis C live EvalEvents
+
+- Added `research/daily-arrowsmith-agent-state/v26-dynamic-axis-c-evalevents-2026-06-25.md`, answering RQ27 and replacing it with RQ28: how to expand dynamic Axis C `live_run` coverage from stale-observation to all ten failure classes.
+- Added `evidenceStage: "live_run"` to `@pm/evals`, including schema validation, metrics support, and documentation. Live runs now count toward the mature failure-reduction metric while scaffolded scenarios remain excluded.
+- Added dynamic local-agent-lab EvalEvent conversion in `@pm/evals`: `buildDynamicLocalAgentLabEvalSuite()` maps dynamic `ScenarioRun` arms to paired EvalEvents, requires generated `ActionOutcomeEnvelope` packets, and rejects events that cite missing packet refs.
+- Added `recordDynamicLocalAgentLabEvalSuite()` so DB-backed live eval persistence writes outcome packets before EvalEvents.
+- Added `retainWorlds: true` support to `@pm/local-agent-lab` and `pnpm evals:local-agent-lab:live` so live Postgres/Ollama runs preserve event-log substrate refs for replay.
+- Fixed `scripts/migrate.ts` to ignore macOS `._*.sql` AppleDouble sidecar files. The local live run then applied migration `0020`, persisted two live stale-observation EvalEvents plus two packets, and a SQL recovery join resolved both packet refs.
+- Updated local-lab docs and research ledgers with v26, claim C076, and L036. Claim boundary: Axis C is now live for stale-observation only; full Axis C ten-class coverage and Axis B remain unverified.
+
+## 2026-06-25 - Axis C outcome packet generation
+
+- Added `research/daily-arrowsmith-agent-state/v25-axis-c-outcome-packet-generation-2026-06-25.md`, answering RQ26 and replacing it with RQ27: how dynamic `@pm/local-agent-lab` `ScenarioRun` records should become packet-backed EvalEvents in live Postgres/Ollama runs.
+- Updated deterministic Axis C evals so `runLocalLabPairedScenario()` and `runLocalLabPairedEvals()` return hash-valid canonical `ActionOutcomeEnvelope` packets aligned with local-lab substrate EvalEvent refs.
+- Updated `pnpm evals:local-lab` so DB-backed persistence writes action outcome packets before recording EvalEvents.
+- Added canonical packet generation to the dynamic `@pm/local-agent-lab` engine: admitted/refused arm runs now expose `ActionOutcomeEnvelope` packets through `ArmRun`, `ScenarioRun`, and `SuiteResult`.
+- Updated local-lab docs and research ledgers with v25, claim C075, and L035. Claim boundary: full dynamic run-to-EvalEvent persistence across all Axis C failure classes remains open, and Axis B remains blocked.
+
+## 2026-06-25 - Live outcome-envelope packet store
+
+- Added `research/daily-arrowsmith-agent-state/v24-live-outcome-envelope-store-2026-06-25.md`, answering RQ25 and replacing it with RQ26: how Axis C dynamic local-lab and workflow runtime runs should generate and persist promoted outcome-envelope packets before emitting EvalEvents.
+- Added `evals.action_outcome_envelope_packets` in both root and package-local eval migrations so terminal packets can be stored by `(tenant_id, envelope_ref_id)`.
+- Extended `PostgresEvalEventStore` with hash-gated `recordActionOutcomeEnvelope()`, batch packet recording, `getActionOutcomeEnvelopeByRef()`, and `resolveActionOutcomeRefs()`.
+- Packet persistence now rejects hash-invalid envelopes before DB writes and rejects same-ref/different-hash conflicts instead of overwriting terminal proof.
+- Updated the eval event schema docs and research ledgers with v24, claim C074, and L034. Claim boundary: this is the live persistence boundary, not Axis C runtime packet generation, non-blocked Axis B, or full three-axis verification.
+
+## 2026-06-25 - Outcome-envelope replay index for EvalEvents
+
+- Added `research/daily-arrowsmith-agent-state/v23-outcome-envelope-replay-index-2026-06-25.md`, answering RQ24 and replacing it with RQ25: how to move promoted outcome-envelope packets from committed JSONL replay into a live substrate-owned store for Axis C dynamic local-lab and Postgres eval recovery.
+- Added `ActionOutcomeEnvelopeReplayIndex` support in `@pm/evals`, plus `buildActionOutcomeEnvelopeReplayIndex()`, `recoverActionOutcomeEnvelopeFromReplayIndex()`, and `analyzeEvalEventActionOutcomeReplay()`.
+- Added replay metrics for EvalEvent action-outcome refs: resolved/unresolved refs, invalid hashes, and recovered accepted/blocked terminal outcomes.
+- Updated ArrowHedge write-binding tests so the terminal-partition Axis A EvalEvent derives its `action_outcome_envelope` ref from the write-binding replay corpus and recovers a hash-valid blocked terminal envelope.
+- Updated the daily Arrowsmith index and shared research ledger with v23, claim C073, and L033. Claim boundary: this is fixture-backed Axis A replay recovery, not a live store, Axis C runtime recovery, non-blocked Axis B, or full three-axis verification.
+
+## 2026-06-25 - Workflow envelope promotion proof packets
+
+- Added `research/daily-arrowsmith-agent-state/v22-workflow-envelope-promotion-2026-06-25.md`, answering RQ23 and replacing it with RQ24: how to persist and replay promoted runtime outcome envelopes through substrate refs, EvalEvents, and amnesiac resume.
+- Added `promoteWorkflowInvocationOutcomeEnvelope()` in `@pm/agent-state` so workflow runtime envelopes can become canonical `ActionOutcomeEnvelope` proof packets without recomputing or contradicting the workflow terminal claim.
+- Added `action_outcome_envelope` as a `StateRefKind` and validated promotion failure cases for invalid-evidence accepted outcomes, accepted outcomes with blockers, and blocked outcomes without causes.
+- Updated ArrowHedge write-binding replay rows to include promoted action outcome envelopes, regenerated `packages/evals/fixtures/write-binding-replay.v1.jsonl`, and added replay metrics for total, accepted, and blocked action outcome envelopes.
+- Updated the daily Arrowsmith index and shared research ledger with v22, claim C072, and L032. Claim boundary: this is replay/proof-packet promotion, not durable live persistence, non-blocked Axis B, or full three-axis verification.
+
+## 2026-06-25 - Workflow runtime outcome-envelope boundary
+
+- Added `research/daily-arrowsmith-agent-state/v21-workflow-outcome-envelope-boundary-2026-06-25.md`, answering RQ22 and replacing it with RQ23: how to promote runtime workflow envelopes into full `@pm/agent-state` envelopes and EvalEvents without duplicating terminal claims.
+- Added dependency-light `InvocationActionOutcomeEnvelope` support in `@pm/workflow`, plus `buildInvocationActionOutcomeEnvelope()`.
+- Updated `PostgresWorkflowRuntime` so `evidenceBindingMode: "require_for_writes"` generates blocked envelopes for failed evidence-binding validation/verification before dead-lettering and accepted envelopes before write-capable dispatch.
+- Added `actionOutcomeEnvelope` to `InvocationContext` so dispatchers receive the accepted terminal outcome alongside the evidence binding.
+- Updated `@pm/evals` write-transport coverage to mark workflow-routed fixture transports as outcome-envelope-covered: outcome-envelope provider coverage is now 4/4 in the fixture inventory, while evidence-binding provider/verifier coverage remains a separate metric.
+- Updated the daily Arrowsmith index and shared research ledger with v21, claim C071, and L031. Claim boundary: workflow-routed write dispatch now has a runtime envelope boundary, but full agent-state proof packets, live ArrowHedge replay linkage, Axis B, and three-axis verification remain open.
+
+## 2026-06-25 - Write-transport outcome-envelope coverage
+
+- Added `research/daily-arrowsmith-agent-state/v20-write-transport-outcome-envelope-coverage-2026-06-25.md`, answering RQ21 and replacing it with RQ22: where to create outcome envelopes and verify evidence binding atomically before dispatch without requiring profile/capability edits.
+- Extended `@pm/evals` write-transport coverage samples and metrics with outcome-envelope provider coverage: required, covered, missing, coverage rate, and missing transport ids.
+- Made the current runtime gap explicit in the fixture inventory: four write-capable transports require pre-side-effect `ActionOutcomeEnvelope` providers and zero currently have one.
+- Reconciled stale ArrowHedge artifact hashes in `packages/evals/fixtures/write-binding-replay.v1.jsonl` against the committed state-review artifact corpus so replay-catalog verification is consistent again.
+- Updated the daily Arrowsmith index and shared research ledger with v20, claim C070, and L030. Claim boundary: this is an executable coverage metric and replay-fixture correction, not runtime envelope generation.
+
+## 2026-06-25 - ActionOutcomeEnvelope eval wiring and Axis B blocker
+
+- Added `research/daily-arrowsmith-agent-state/v19-action-outcome-eval-wiring-2026-06-25.md`, answering RQ11 with enforcement-boundary papers and replacing it with RQ21: which write-capable transports still lack required `ActionOutcomeEnvelope` generation before side effects.
+- Added `action_outcome_envelope` as a first-class `@pm/evals` evidence/substrate ref kind and documented it in `docs/state-validation/eval-event-schema.md`.
+- Wired outcome-envelope refs into Axis A ArrowHedge and Axis C local-lab substrate eval events, including an ArrowHedge terminal-outcome partition scenario that fails the substrate arm when no matching outcome envelope is supplied.
+- Added `buildMarketingAxisBBlockedEval()` so the missing PluggedInSocial clone or accepted authoritative agency fixtures appear as a machine-checkable blocked Axis B event instead of an informal note.
+- Updated the daily Arrowsmith index and shared research ledger with v19, claim C069, and L029. Claim boundary: this is eval evidence wiring, not runtime write governance. The full three-axis solution remains unverified while Axis B is blocked and write-capable transports are not yet required to emit outcome envelopes before mutation.
+
+## 2026-06-25 - ActionOutcomeEnvelope pure terminal-normal-form slice
+
+- Added `research/daily-arrowsmith-agent-state/v18-action-outcome-loop-2026-06-25.md` as the first closed-loop research ledger: ten unanswered agent-state questions, peer-reviewed-paper-backed answers, replacement questions RQ11-RQ20, bridge hypothesis, falsification criteria, and axis status.
+- Added pure `ActionOutcomeEnvelope` support in `@pm/agent-state`: terminal outcome hashing, same-action terminal partition validation, high-consequence stale-evidence blocking for requested accepted writes, substrate-ref recovery, local-view obstruction artifacts, and role projection validation that preserves blocking conflicts.
+- Added focused tests proving the first candidate slice: the same `actionId` cannot be both accepted and blocked, stale evidence cannot support an accepted high-consequence write, conflicting local views produce obstruction rather than summary, role projections cannot hide blockers, and an amnesiac agent can recover terminal outcome from substrate refs.
+- Updated the daily Arrowsmith index and shared research ledger with v18, claims C067-C068, and L028. Claim boundary: this is pure tested code, not workflow/runtime mutation governance and not full three-axis verification. Axis B remains blocked until PluggedInSocial is restored/cloned or authoritative agency fixtures are accepted.
+- Verification: `pnpm vitest run packages/agent-state/src/external-evidence.test.ts --reporter=basic`; `pnpm --filter @pm/agent-state typecheck`.
+
+## 2026-06-24 - Agent-state Arrowsmith v17 reality-quality cross-paper review
+
+- Fetched `origin/main` and confirmed local `HEAD` and `FETCH_HEAD` at `75a8f589730118dd19a5b42c0855f72b26fd125b` before writing. Did not pull because the worktree already contained unrelated local changes.
+- Added `research/daily-arrowsmith-agent-state/v17-reality-quality-arrowsmith-2026-06-24.md` with a cross-paper review of the strongest reality-quality analogues: quotienting/gauge equivalence, sheaf gluing, Petri nets/event structures, rewriting/normal forms, state-machine replication, Lamport/Paxos/Raft/PBFT ordering, transactional admission, content identity, CRDT/version conflict handling, feedback control, boundary objects, transactive memory, and provenance.
+- Updated `research/daily-arrowsmith-agent-state/index.md` and `research/index.md` with v17, claims C061-C066, and the revised frontier: operational equivalence classes, local-view obstruction artifacts, terminal action normal forms, all-write admission kernels, evidence leases, conflict algebra, receding-horizon execution, and projection-drift checks.
+- Claim boundary: this is a research-only continuation. No runtime code changed; terminal outcome partitioning, local-view obstruction fixtures, durable status stores, and all-transport mutation governance remain implementation work.
+
 ## 2026-06-19 - Agent-state Arrowsmith v16 terminal enforcement correction
 
 - Fetched `origin/main`, ran `git pull --ff-only origin main`, and verified local `HEAD`, `origin/main`, and `FETCH_HEAD` at `bf7d021bcadf93ad536f161d440d62fb2f7ff6bc` before writing.

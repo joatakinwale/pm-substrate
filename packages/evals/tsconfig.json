@@ -9,6 +9,7 @@
   "exclude": ["**/*.test.ts", "dist"],
   "references": [
     { "path": "../agent-state" },
+    { "path": "../registry" },
     { "path": "../types" },
     { "path": "../workflow" }
   ]

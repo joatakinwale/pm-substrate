@@ -31,5 +31,10 @@ export {
   withEdgeStaleness,
   withEdgeListStaleness,
   isStale,
+  freshnessGate,
+  requireFresh,
+  StaleReadError,
   type ReadStaleness,
+  type FreshnessDecision,
+  type StaleReadErrorDetail,
 } from "./staleness.js";

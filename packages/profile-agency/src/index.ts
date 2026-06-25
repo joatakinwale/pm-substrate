@@ -23,4 +23,5 @@
 export * from "./entities.js";
 export * from "./edges.js";
 export * from "./lifecycles.js";
+export * from "./publication-terminal.js";
 export { AGENCY_PROFILE } from "./profile.js";

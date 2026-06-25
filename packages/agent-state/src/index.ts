@@ -6,6 +6,8 @@ export * from "./external-evidence.js";
 
 export const STATE_REVIEW_ARTIFACT_SCHEMA_VERSION =
   "state-review-artifact.v1" as const;
+export const ACTION_OUTCOME_ENVELOPE_SCHEMA_VERSION =
+  "action-outcome-envelope.v1" as const;
 export const STATE_REVIEW_EVENT_TYPE =
   "pm.agent_state.action_proposal_reviewed.v1" as const;
 export const STATE_REVIEW_EVENT_SPEC_VERSION = "1.0" as const;
@@ -18,6 +20,8 @@ export type StateRefKind =
   | "workflow_run"
   | "continuity_checkpoint"
   | "capability_invocation"
+  | "state_review_artifact"
+  | "action_outcome_envelope"
   | "source_record"
   | "document";
 
@@ -394,6 +398,247 @@ export const DEFAULT_STATE_REVIEW_INVARIANT_POLICY_MATRIX = {
   },
 } as const satisfies CompleteStateReviewInvariantPolicyMatrix;
 
+export type ActionTerminalOutcome =
+  | "accepted"
+  | "blocked"
+  | "rejected"
+  | "held"
+  | "superseded"
+  | "escalated";
+
+export type ActionOutcomeBlockingCauseSource =
+  | "proposal_review"
+  | "evidence_admission"
+  | "policy"
+  | "status_check"
+  | "local_view";
+
+export interface ActionOutcomeBlockingCause {
+  readonly source: ActionOutcomeBlockingCauseSource;
+  readonly code: string;
+  readonly message: string;
+  readonly refs: readonly StateRef[];
+  readonly invariantClasses?: readonly StateReviewInvariantClass[];
+}
+
+export interface ActionOutcomeEnvelope {
+  readonly schemaVersion: typeof ACTION_OUTCOME_ENVELOPE_SCHEMA_VERSION;
+  readonly tenantId: TenantId;
+  readonly actionId: string;
+  readonly subject: StateRef;
+  readonly proposalReviewId: string;
+  readonly stateReviewArtifactHash: string;
+  readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly statusCheckRefs: readonly StateRef[];
+  readonly policyTransitionRef?: StateRef;
+  readonly terminalOutcome: ActionTerminalOutcome;
+  readonly decidedAt: Timestamp;
+  readonly decidedBy: string;
+  readonly blockingCauses: readonly ActionOutcomeBlockingCause[];
+  readonly evidenceRefs: readonly StateRef[];
+  readonly substrateRefs: readonly StateRef[];
+  readonly outcomeHash: string;
+}
+
+export type ActionOutcomeEnvelopeHashPayload = Omit<
+  ActionOutcomeEnvelope,
+  "outcomeHash"
+>;
+
+export interface ActionOutcomeEnvelopeInput {
+  readonly tenantId: TenantId;
+  readonly actionId: string;
+  readonly subject: StateRef;
+  readonly proposalReviewId: string;
+  readonly stateReviewArtifactHash: string;
+  readonly evidenceAdmissionReviewIds?: readonly string[];
+  readonly statusCheckRefs?: readonly StateRef[];
+  readonly policyTransitionRef?: StateRef;
+  readonly requestedTerminalOutcome: ActionTerminalOutcome;
+  readonly decidedAt: Timestamp;
+  readonly decidedBy: string;
+  readonly evidenceRefs?: readonly StateRef[];
+  readonly substrateRefs?: readonly StateRef[];
+  readonly blockingCauses?: readonly ActionOutcomeBlockingCause[];
+  readonly proposalReview?: ActionProposalReview;
+  readonly evidenceAdmissions?: readonly EvidenceAdmissionReview[];
+  readonly actionConsequence?: StateReviewActionConsequence;
+}
+
+export interface WorkflowInvocationActionOutcomeEnvelopeSource {
+  readonly schemaVersion: "pm.workflow.action_outcome_envelope.v1";
+  readonly envelopeId: string;
+  readonly actionId: string;
+  readonly terminalOutcome: "accepted" | "blocked";
+  readonly generatedAt: Timestamp | string;
+  readonly tenantId: TenantId | string;
+  readonly workflowId: string;
+  readonly workflowName: string;
+  readonly workflowVersion: number;
+  readonly nodeId: string;
+  readonly capability: string;
+  readonly triggerEventId: string;
+  readonly stateReviewArtifactId?: string;
+  readonly stateReviewArtifactHash?: string;
+  readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly evidenceDecision: {
+    readonly valid: boolean;
+    readonly reason?: string;
+  };
+}
+
+export interface WorkflowActionOutcomePromotionInput {
+  readonly workflowEnvelope: WorkflowInvocationActionOutcomeEnvelopeSource;
+  readonly subject: StateRef;
+  readonly proposalReviewId: string;
+  readonly stateReviewArtifactHash?: string;
+  readonly decidedBy?: string;
+  readonly statusCheckRefs?: readonly StateRef[];
+  readonly policyTransitionRef?: StateRef;
+  readonly evidenceRefs?: readonly StateRef[];
+  readonly substrateRefs?: readonly StateRef[];
+  readonly blockingCauses?: readonly ActionOutcomeBlockingCause[];
+}
+
+export type ActionOutcomePartitionReason =
+  | "first_terminal_outcome"
+  | "idempotent_duplicate"
+  | "candidate_hash_invalid"
+  | "incumbent_hash_invalid"
+  | "terminal_outcome_conflict";
+
+export interface ActionOutcomePartitionDecision {
+  readonly accepted: boolean;
+  readonly reason: ActionOutcomePartitionReason;
+  readonly candidate: ActionOutcomeEnvelope;
+  readonly incumbent?: ActionOutcomeEnvelope;
+  readonly candidateHashValidation: StateReviewArtifactHashValidation;
+  readonly incumbentHashValidation?: StateReviewArtifactHashValidation;
+  readonly message: string;
+}
+
+export type ActionOutcomeTerminalIndexIssueCode = Exclude<
+  ActionOutcomePartitionReason,
+  "first_terminal_outcome" | "idempotent_duplicate"
+>;
+
+export interface ActionOutcomeTerminalIndexIssue {
+  readonly code: ActionOutcomeTerminalIndexIssueCode;
+  readonly key: string;
+  readonly tenantId: TenantId;
+  readonly actionId: string;
+  readonly candidate: ActionOutcomeEnvelope;
+  readonly incumbent?: ActionOutcomeEnvelope;
+  readonly candidateHashValidation: StateReviewArtifactHashValidation;
+  readonly incumbentHashValidation?: StateReviewArtifactHashValidation;
+  readonly message: string;
+}
+
+export interface ActionOutcomeTerminalIndexEntry {
+  readonly key: string;
+  readonly tenantId: TenantId;
+  readonly actionId: string;
+  readonly envelope: ActionOutcomeEnvelope;
+  readonly replayCount: number;
+  readonly substrateRefs: readonly StateRef[];
+}
+
+export interface ActionOutcomeTerminalIndex {
+  readonly valid: boolean;
+  readonly entries: readonly ActionOutcomeTerminalIndexEntry[];
+  readonly issues: readonly ActionOutcomeTerminalIndexIssue[];
+}
+
+export interface LocalStateField {
+  readonly value: unknown;
+  readonly refs: readonly StateRef[];
+  readonly authority?: string;
+  readonly observedAt?: Timestamp;
+  readonly validUntil?: Timestamp;
+}
+
+export interface LocalStateSection {
+  readonly tenantId: TenantId;
+  readonly sectionId: string;
+  readonly role: string;
+  readonly subject: StateRef;
+  readonly fields: Readonly<Record<string, LocalStateField>>;
+}
+
+export interface LocalViewOverlapConflict {
+  readonly field: string;
+  readonly sectionIds: readonly string[];
+  readonly refs: readonly StateRef[];
+  readonly values: readonly unknown[];
+  readonly message: string;
+}
+
+export interface LocalViewObstructionArtifact {
+  readonly artifactId: string;
+  readonly tenantId: TenantId;
+  readonly subject: StateRef;
+  readonly generatedAt: Timestamp;
+  readonly sectionIds: readonly string[];
+  readonly conflicts: readonly LocalViewOverlapConflict[];
+  readonly allowedAction: "request_resolution";
+}
+
+export interface LocalViewGlobalProjection {
+  readonly tenantId: TenantId;
+  readonly subject: StateRef;
+  readonly generatedAt: Timestamp;
+  readonly sectionIds: readonly string[];
+  readonly fields: Readonly<Record<string, LocalStateField>>;
+}
+
+export type LocalViewEvaluation =
+  | {
+      readonly kind: "global_projection";
+      readonly projection: LocalViewGlobalProjection;
+    }
+  | {
+      readonly kind: "obstruction";
+      readonly obstruction: LocalViewObstructionArtifact;
+    };
+
+export interface LocalViewEvaluationOptions {
+  readonly artifactId?: string;
+  readonly generatedAt: Timestamp;
+  readonly requiredFields?: readonly string[];
+}
+
+export type ActionOutcomeProjectionRole =
+  | "risk_officer"
+  | "project_manager"
+  | "auditor"
+  | "operator";
+
+export interface ActionOutcomeInvariantCore {
+  readonly tenantId: TenantId;
+  readonly actionId: string;
+  readonly subject: StateRef;
+  readonly terminalOutcome: ActionTerminalOutcome;
+  readonly proposalReviewId: string;
+  readonly stateReviewArtifactHash: string;
+  readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly statusCheckRefs: readonly StateRef[];
+  readonly blockingCauseCodes: readonly string[];
+  readonly evidenceRefs: readonly StateRef[];
+  readonly substrateRefs: readonly StateRef[];
+  readonly outcomeHash: string;
+}
+
+export interface ActionOutcomeRoleProjection {
+  readonly role: ActionOutcomeProjectionRole;
+  readonly core: ActionOutcomeInvariantCore;
+  readonly visibleBlockingCauses: readonly ActionOutcomeBlockingCause[];
+}
+
+export interface ActionOutcomeProjectionValidation {
+  readonly valid: boolean;
+  readonly issues: readonly string[];
+}
+
 export interface StateReviewArtifactMetadataInput {
   readonly temporalMisalignmentPhase?: StateReviewTemporalMisalignmentPhase;
   readonly invariantClasses?: readonly StateReviewInvariantClass[];
@@ -525,6 +770,497 @@ export function evaluateStateReviewInvariantPolicy(
     advisoryInvariantClasses,
     decisions,
   };
+}
+
+export function buildActionOutcomeEnvelope(
+  input: ActionOutcomeEnvelopeInput,
+): ActionOutcomeEnvelope {
+  const actionConsequence = input.actionConsequence ?? "high";
+  const evidenceAdmissions = input.evidenceAdmissions ?? [];
+  const evidenceAdmissionReviewIds = uniqueStrings([
+    ...(input.evidenceAdmissionReviewIds ?? []),
+    ...evidenceAdmissions.map((review) => review.reviewId),
+  ]);
+  const blockingCauses = dedupeBlockingCauses([
+    ...(input.blockingCauses ?? []),
+    ...blockingCausesFromProposalReview(input.proposalReview),
+    ...blockingCausesFromEvidenceAdmissions(evidenceAdmissions, actionConsequence),
+  ]);
+  const terminalOutcome =
+    input.requestedTerminalOutcome === "accepted" && blockingCauses.length > 0
+      ? "blocked"
+      : input.requestedTerminalOutcome;
+  const payload: ActionOutcomeEnvelopeHashPayload = {
+    schemaVersion: ACTION_OUTCOME_ENVELOPE_SCHEMA_VERSION,
+    tenantId: input.tenantId,
+    actionId: input.actionId,
+    subject: input.subject,
+    proposalReviewId: input.proposalReviewId,
+    stateReviewArtifactHash: input.stateReviewArtifactHash,
+    evidenceAdmissionReviewIds,
+    statusCheckRefs: uniqueStateRefs(input.statusCheckRefs ?? []),
+    ...(input.policyTransitionRef !== undefined
+      ? { policyTransitionRef: input.policyTransitionRef }
+      : {}),
+    terminalOutcome,
+    decidedAt: input.decidedAt,
+    decidedBy: input.decidedBy,
+    blockingCauses,
+    evidenceRefs: uniqueStateRefs([
+      ...(input.evidenceRefs ?? []),
+      ...evidenceAdmissions.flatMap((review) => [
+        ...(review.evidence.subject !== undefined ? [review.evidence.subject] : []),
+        ...review.evidence.refs,
+      ]),
+    ]),
+    substrateRefs: uniqueStateRefs(input.substrateRefs ?? []),
+  };
+
+  return {
+    ...payload,
+    outcomeHash: computeActionOutcomeEnvelopeHash(payload),
+  };
+}
+
+export function promoteWorkflowInvocationOutcomeEnvelope(
+  input: WorkflowActionOutcomePromotionInput,
+): ActionOutcomeEnvelope {
+  const workflowEnvelope = input.workflowEnvelope;
+  const stateReviewArtifactHash =
+    input.stateReviewArtifactHash ?? workflowEnvelope.stateReviewArtifactHash;
+
+  if (stateReviewArtifactHash === undefined || stateReviewArtifactHash.trim() === "") {
+    throw new Error(
+      "workflow outcome promotion requires a stateReviewArtifactHash from the workflow envelope or promotion context",
+    );
+  }
+  if (input.proposalReviewId.trim() === "") {
+    throw new Error("workflow outcome promotion requires a proposalReviewId");
+  }
+  if (
+    workflowEnvelope.terminalOutcome === "accepted" &&
+    workflowEnvelope.evidenceDecision.valid === false
+  ) {
+    throw new Error(
+      "workflow outcome promotion cannot turn an invalid evidence decision into an accepted terminal outcome",
+    );
+  }
+  if (
+    workflowEnvelope.terminalOutcome === "accepted" &&
+    (input.blockingCauses ?? []).length > 0
+  ) {
+    throw new Error(
+      "workflow outcome promotion cannot attach blocking causes to an accepted terminal outcome",
+    );
+  }
+  if (
+    workflowEnvelope.terminalOutcome === "blocked" &&
+    workflowEnvelope.evidenceDecision.valid === true &&
+    (input.blockingCauses ?? []).length === 0
+  ) {
+    throw new Error(
+      "workflow outcome promotion requires a blocking cause for a blocked terminal outcome with a valid evidence decision",
+    );
+  }
+
+  const blockingCauses = dedupeBlockingCauses([
+    ...(input.blockingCauses ?? []),
+    ...workflowBlockingCauses(workflowEnvelope),
+  ]);
+  const workflowEnvelopeRef = stateRef(
+    "action_outcome_envelope",
+    workflowEnvelope.envelopeId,
+    "Workflow action outcome envelope",
+  );
+  const workflowRunRef = stateRef(
+    "workflow_run",
+    workflowEnvelope.workflowId,
+    workflowEnvelope.workflowName,
+  );
+  const capabilityInvocationRef = stateRef(
+    "capability_invocation",
+    `${workflowEnvelope.workflowId}:${workflowEnvelope.workflowVersion}:${workflowEnvelope.nodeId}:${workflowEnvelope.triggerEventId}`,
+    workflowEnvelope.capability,
+  );
+  const stateReviewArtifactRef =
+    workflowEnvelope.stateReviewArtifactId === undefined
+      ? undefined
+      : stateRef("state_review_artifact", workflowEnvelope.stateReviewArtifactId);
+
+  return buildActionOutcomeEnvelope({
+    tenantId: workflowEnvelope.tenantId as TenantId,
+    actionId: workflowEnvelope.actionId,
+    subject: input.subject,
+    proposalReviewId: input.proposalReviewId,
+    stateReviewArtifactHash,
+    evidenceAdmissionReviewIds: workflowEnvelope.evidenceAdmissionReviewIds,
+    ...(input.statusCheckRefs !== undefined
+      ? { statusCheckRefs: input.statusCheckRefs }
+      : {}),
+    ...(input.policyTransitionRef !== undefined
+      ? { policyTransitionRef: input.policyTransitionRef }
+      : {}),
+    requestedTerminalOutcome: workflowEnvelope.terminalOutcome,
+    decidedAt: workflowEnvelope.generatedAt as Timestamp,
+    decidedBy: input.decidedBy ?? "workflow:evidence-binding-gate",
+    ...(input.evidenceRefs !== undefined
+      ? { evidenceRefs: input.evidenceRefs }
+      : {}),
+    substrateRefs: uniqueStateRefs([
+      ...(input.substrateRefs ?? []),
+      workflowEnvelopeRef,
+      workflowRunRef,
+      capabilityInvocationRef,
+      ...(stateReviewArtifactRef === undefined ? [] : [stateReviewArtifactRef]),
+    ]),
+    blockingCauses,
+  });
+}
+
+export function computeActionOutcomeEnvelopeHash(
+  envelope: ActionOutcomeEnvelopeHashPayload,
+): string {
+  return fingerprint64(canonicalStringify(envelope));
+}
+
+export function verifyActionOutcomeEnvelopeHash(
+  envelope: ActionOutcomeEnvelope,
+): StateReviewArtifactHashValidation {
+  const { outcomeHash, ...payload } = envelope;
+  const expectedHash = computeActionOutcomeEnvelopeHash(payload);
+
+  return {
+    valid: outcomeHash === expectedHash,
+    expectedHash,
+    actualHash: outcomeHash,
+  };
+}
+
+export function actionOutcomeTerminalKey(
+  tenantId: TenantId,
+  actionId: string,
+): string {
+  return `${tenantId}:${actionId}`;
+}
+
+export function admitActionOutcomeEnvelope(
+  existing: readonly ActionOutcomeEnvelope[],
+  candidate: ActionOutcomeEnvelope,
+): ActionOutcomePartitionDecision {
+  const candidateHashValidation = verifyActionOutcomeEnvelopeHash(candidate);
+  if (!candidateHashValidation.valid) {
+    return {
+      accepted: false,
+      reason: "candidate_hash_invalid",
+      candidate,
+      candidateHashValidation,
+      message: `Action ${candidate.actionId} terminal outcome envelope hash ${candidateHashValidation.actualHash} does not match recomputed hash ${candidateHashValidation.expectedHash}.`,
+    };
+  }
+
+  const incumbent = existing.find(
+    (item) =>
+      item.tenantId === candidate.tenantId && item.actionId === candidate.actionId,
+  );
+
+  if (incumbent === undefined) {
+    return {
+      accepted: true,
+      reason: "first_terminal_outcome",
+      candidate,
+      candidateHashValidation,
+      message: `Action ${candidate.actionId} has no prior terminal outcome.`,
+    };
+  }
+
+  const incumbentHashValidation = verifyActionOutcomeEnvelopeHash(incumbent);
+  if (!incumbentHashValidation.valid) {
+    return {
+      accepted: false,
+      reason: "incumbent_hash_invalid",
+      candidate,
+      incumbent,
+      candidateHashValidation,
+      incumbentHashValidation,
+      message: `Action ${candidate.actionId} already has an invalid incumbent terminal outcome envelope hash ${incumbentHashValidation.actualHash}.`,
+    };
+  }
+
+  if (incumbent.outcomeHash === candidate.outcomeHash) {
+    return {
+      accepted: true,
+      reason: "idempotent_duplicate",
+      candidate,
+      incumbent,
+      candidateHashValidation,
+      incumbentHashValidation,
+      message: `Action ${candidate.actionId} already has the same terminal outcome envelope.`,
+    };
+  }
+
+  return {
+    accepted: false,
+    reason: "terminal_outcome_conflict",
+    candidate,
+    incumbent,
+    candidateHashValidation,
+    incumbentHashValidation,
+    message: `Action ${candidate.actionId} already ended as ${incumbent.terminalOutcome}; cannot also end as ${candidate.terminalOutcome}.`,
+  };
+}
+
+export function buildActionOutcomeTerminalIndex(
+  envelopes: readonly ActionOutcomeEnvelope[],
+): ActionOutcomeTerminalIndex {
+  const admitted: ActionOutcomeEnvelope[] = [];
+  const replayCounts = new Map<string, number>();
+  const issues: ActionOutcomeTerminalIndexIssue[] = [];
+
+  for (const candidate of envelopes) {
+    const decision = admitActionOutcomeEnvelope(admitted, candidate);
+    const key = actionOutcomeTerminalKey(candidate.tenantId, candidate.actionId);
+
+    if (decision.accepted) {
+      if (decision.reason === "first_terminal_outcome") {
+        admitted.push(candidate);
+        replayCounts.set(key, 1);
+      } else {
+        replayCounts.set(key, (replayCounts.get(key) ?? 1) + 1);
+      }
+      continue;
+    }
+    if (
+      decision.reason === "first_terminal_outcome" ||
+      decision.reason === "idempotent_duplicate"
+    ) {
+      continue;
+    }
+
+    issues.push({
+      code: decision.reason,
+      key,
+      tenantId: candidate.tenantId,
+      actionId: candidate.actionId,
+      candidate,
+      ...(decision.incumbent !== undefined ? { incumbent: decision.incumbent } : {}),
+      candidateHashValidation: decision.candidateHashValidation,
+      ...(decision.incumbentHashValidation !== undefined
+        ? { incumbentHashValidation: decision.incumbentHashValidation }
+        : {}),
+      message: decision.message,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    entries: admitted.map((envelope) => {
+      const key = actionOutcomeTerminalKey(envelope.tenantId, envelope.actionId);
+      return {
+        key,
+        tenantId: envelope.tenantId,
+        actionId: envelope.actionId,
+        envelope,
+        replayCount: replayCounts.get(key) ?? 1,
+        substrateRefs: envelope.substrateRefs,
+      };
+    }),
+    issues,
+  };
+}
+
+export function recoverActionOutcomeBySubstrateRef(
+  envelopes: readonly ActionOutcomeEnvelope[],
+  ref: StateRef,
+): ActionOutcomeEnvelope | undefined {
+  return envelopes.find((envelope) =>
+    envelope.substrateRefs.some((candidate) => sameStateRef(candidate, ref)),
+  );
+}
+
+export function evaluateLocalStateSections(
+  sections: readonly LocalStateSection[],
+  options: LocalViewEvaluationOptions,
+): LocalViewEvaluation {
+  const first = sections[0];
+  if (first === undefined) {
+    const tenantId = "" as TenantId;
+    return {
+      kind: "obstruction",
+      obstruction: {
+        artifactId: options.artifactId ?? "local_view_obstruction:empty",
+        tenantId,
+        subject: stateRef("document", "unknown"),
+        generatedAt: options.generatedAt,
+        sectionIds: [],
+        conflicts: [
+          {
+            field: "$sections",
+            sectionIds: [],
+            refs: [],
+            values: [],
+            message: "No local sections were supplied; a global projection cannot be formed.",
+          },
+        ],
+        allowedAction: "request_resolution",
+      },
+    };
+  }
+
+  const conflicts: LocalViewOverlapConflict[] = [];
+  for (const section of sections) {
+    if (section.tenantId !== first.tenantId) {
+      conflicts.push({
+        field: "$tenantId",
+        sectionIds: [first.sectionId, section.sectionId],
+        refs: [first.subject, section.subject],
+        values: [first.tenantId, section.tenantId],
+        message: `Local section ${section.sectionId} has tenant ${section.tenantId}; expected ${first.tenantId}.`,
+      });
+    }
+    if (!sameStateRef(section.subject, first.subject)) {
+      conflicts.push({
+        field: "$subject",
+        sectionIds: [first.sectionId, section.sectionId],
+        refs: [first.subject, section.subject],
+        values: [formatStateRef(first.subject), formatStateRef(section.subject)],
+        message: `Local section ${section.sectionId} describes ${formatStateRef(section.subject)}; expected ${formatStateRef(first.subject)}.`,
+      });
+    }
+  }
+
+  const fields = uniqueStrings([
+    ...(options.requiredFields ?? []),
+    ...sections.flatMap((section) => Object.keys(section.fields)),
+  ]);
+  const projectionFields: Record<string, LocalStateField> = {};
+
+  for (const field of fields) {
+    const present = sections
+      .map((section) => ({ section, value: section.fields[field] }))
+      .filter(
+        (entry): entry is { section: LocalStateSection; value: LocalStateField } =>
+          entry.value !== undefined,
+      );
+    if (present.length === 0) continue;
+
+    const valuesByKey = new Map<string, typeof present>();
+    for (const entry of present) {
+      const key = canonicalStringify(entry.value.value);
+      const bucket = valuesByKey.get(key) ?? [];
+      bucket.push(entry);
+      valuesByKey.set(key, bucket);
+    }
+
+    if (valuesByKey.size > 1) {
+      conflicts.push({
+        field,
+        sectionIds: present.map((entry) => entry.section.sectionId),
+        refs: uniqueStateRefs(present.flatMap((entry) => entry.value.refs)),
+        values: present.map((entry) => entry.value.value),
+        message: `Local sections disagree on ${field}; no global projection is admissible until the overlap is resolved.`,
+      });
+      continue;
+    }
+
+    projectionFields[field] = present[0]!.value;
+  }
+
+  if (conflicts.length > 0) {
+    return {
+      kind: "obstruction",
+      obstruction: {
+        artifactId:
+          options.artifactId ??
+          `local_view_obstruction:${first.subject.kind}:${first.subject.id}`,
+        tenantId: first.tenantId,
+        subject: first.subject,
+        generatedAt: options.generatedAt,
+        sectionIds: sections.map((section) => section.sectionId),
+        conflicts,
+        allowedAction: "request_resolution",
+      },
+    };
+  }
+
+  return {
+    kind: "global_projection",
+    projection: {
+      tenantId: first.tenantId,
+      subject: first.subject,
+      generatedAt: options.generatedAt,
+      sectionIds: sections.map((section) => section.sectionId),
+      fields: projectionFields,
+    },
+  };
+}
+
+export function projectActionOutcomeEnvelopeForRole(
+  envelope: ActionOutcomeEnvelope,
+  role: ActionOutcomeProjectionRole,
+): ActionOutcomeRoleProjection {
+  return {
+    role,
+    core: {
+      tenantId: envelope.tenantId,
+      actionId: envelope.actionId,
+      subject: envelope.subject,
+      terminalOutcome: envelope.terminalOutcome,
+      proposalReviewId: envelope.proposalReviewId,
+      stateReviewArtifactHash: envelope.stateReviewArtifactHash,
+      evidenceAdmissionReviewIds: envelope.evidenceAdmissionReviewIds,
+      statusCheckRefs: envelope.statusCheckRefs,
+      blockingCauseCodes: envelope.blockingCauses.map((cause) => cause.code),
+      evidenceRefs: envelope.evidenceRefs,
+      substrateRefs: envelope.substrateRefs,
+      outcomeHash: envelope.outcomeHash,
+    },
+    visibleBlockingCauses: envelope.blockingCauses,
+  };
+}
+
+export function validateActionOutcomeRoleProjection(
+  envelope: ActionOutcomeEnvelope,
+  projection: ActionOutcomeRoleProjection,
+): ActionOutcomeProjectionValidation {
+  const issues: string[] = [];
+  const core = projection.core;
+
+  if (core.tenantId !== envelope.tenantId) issues.push("tenantId changed");
+  if (core.actionId !== envelope.actionId) issues.push("actionId changed");
+  if (!sameStateRef(core.subject, envelope.subject)) issues.push("subject changed");
+  if (core.terminalOutcome !== envelope.terminalOutcome) {
+    issues.push("terminalOutcome changed");
+  }
+  if (core.proposalReviewId !== envelope.proposalReviewId) {
+    issues.push("proposalReviewId changed");
+  }
+  if (core.stateReviewArtifactHash !== envelope.stateReviewArtifactHash) {
+    issues.push("stateReviewArtifactHash changed");
+  }
+  if (!sameStringSet(core.evidenceAdmissionReviewIds, envelope.evidenceAdmissionReviewIds)) {
+    issues.push("evidenceAdmissionReviewIds changed");
+  }
+  if (!sameStateRefSet(core.statusCheckRefs, envelope.statusCheckRefs)) {
+    issues.push("statusCheckRefs changed");
+  }
+  if (!sameStringSet(core.blockingCauseCodes, envelope.blockingCauses.map((cause) => cause.code))) {
+    issues.push("blockingCauseCodes changed");
+  }
+  if (!sameStateRefSet(core.evidenceRefs, envelope.evidenceRefs)) {
+    issues.push("evidenceRefs changed");
+  }
+  if (!sameStateRefSet(core.substrateRefs, envelope.substrateRefs)) {
+    issues.push("substrateRefs changed");
+  }
+  if (core.outcomeHash !== envelope.outcomeHash) issues.push("outcomeHash changed");
+  if (
+    envelope.terminalOutcome === "blocked" &&
+    projection.visibleBlockingCauses.length === 0
+  ) {
+    issues.push("blocked projection hides blocking causes");
+  }
+
+  return { valid: issues.length === 0, issues };
 }
 
 export function buildReadSetFromCurrentStateView(
@@ -1327,6 +2063,123 @@ function dedupeRelatedObjects(
   return out;
 }
 
+function blockingCausesFromProposalReview(
+  review: ActionProposalReview | undefined,
+): readonly ActionOutcomeBlockingCause[] {
+  if (review === undefined || !review.execution.blocking) return [];
+  return [
+    {
+      source: "proposal_review",
+      code: "proposal_review_blocking_policy",
+      message: `Action proposal review ${review.reviewId} was evaluated in blocking mode and did not pass.`,
+      refs: uniqueStateRefs([
+        review.currentStateView.subject,
+        ...review.warnings.flatMap((warning) => warning.refs),
+      ]),
+      invariantClasses: inferStateReviewInvariantClasses(review),
+    },
+  ];
+}
+
+function blockingCausesFromEvidenceAdmissions(
+  reviews: readonly EvidenceAdmissionReview[],
+  consequence: StateReviewActionConsequence,
+): readonly ActionOutcomeBlockingCause[] {
+  const causes: ActionOutcomeBlockingCause[] = [];
+  for (const review of reviews) {
+    if (review.decision === "rejected") {
+      causes.push({
+        source: "evidence_admission",
+        code: "evidence_admission_rejected",
+        message: `Evidence admission review ${review.reviewId} rejected evidence ${review.evidence.evidenceId}.`,
+        refs: uniqueStateRefs([
+          ...(review.evidence.subject !== undefined ? [review.evidence.subject] : []),
+          ...review.evidence.refs,
+        ]),
+        invariantClasses: review.invariantClasses,
+      });
+      continue;
+    }
+
+    const policy = evaluateStateReviewInvariantPolicy(
+      review.invariantClasses,
+      consequence,
+    );
+    if (!policy.wouldBlock) continue;
+
+    const blockingClasses = new Set(policy.wouldBlockInvariantClasses);
+    for (const issue of review.issues) {
+      const issueClasses = review.invariantClasses.filter((item) =>
+        blockingClasses.has(item),
+      );
+      causes.push({
+        source: "evidence_admission",
+        code: issue.code,
+        message: issue.message,
+        refs: uniqueStateRefs([
+          ...(issue.ref !== undefined ? [issue.ref] : []),
+          ...(review.evidence.subject !== undefined ? [review.evidence.subject] : []),
+          ...review.evidence.refs,
+        ]),
+        invariantClasses: issueClasses,
+      });
+    }
+  }
+  return causes;
+}
+
+function workflowBlockingCauses(
+  workflowEnvelope: WorkflowInvocationActionOutcomeEnvelopeSource,
+): readonly ActionOutcomeBlockingCause[] {
+  if (workflowEnvelope.evidenceDecision.valid) return [];
+  const reason =
+    workflowEnvelope.evidenceDecision.reason ?? "workflow_evidence_gate_blocked";
+  return [
+    {
+      source: "policy",
+      code: reason,
+      message: `Workflow evidence-binding gate produced blocked terminal outcome ${workflowEnvelope.envelopeId} for ${workflowEnvelope.capability}.`,
+      refs: uniqueStateRefs([
+        stateRef(
+          "action_outcome_envelope",
+          workflowEnvelope.envelopeId,
+          "Workflow action outcome envelope",
+        ),
+        stateRef(
+          "workflow_run",
+          workflowEnvelope.workflowId,
+          workflowEnvelope.workflowName,
+        ),
+        stateRef(
+          "capability_invocation",
+          `${workflowEnvelope.workflowId}:${workflowEnvelope.workflowVersion}:${workflowEnvelope.nodeId}:${workflowEnvelope.triggerEventId}`,
+          workflowEnvelope.capability,
+        ),
+      ]),
+    },
+  ];
+}
+
+function dedupeBlockingCauses(
+  causes: readonly ActionOutcomeBlockingCause[],
+): readonly ActionOutcomeBlockingCause[] {
+  const seen = new Set<string>();
+  const out: ActionOutcomeBlockingCause[] = [];
+  for (const cause of causes) {
+    const key = `${cause.source}:${cause.code}:${cause.message}:${cause.refs.map(formatStateRef).join(",")}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      ...cause,
+      refs: uniqueStateRefs(cause.refs),
+      ...(cause.invariantClasses !== undefined
+        ? { invariantClasses: uniqueStrings(cause.invariantClasses) }
+        : {}),
+    });
+  }
+  return out;
+}
+
 function buildStateReviewArtifactMetadata(
   review: ActionProposalReview,
   input: StateReviewArtifactMetadataInput | undefined,
@@ -1894,10 +2747,14 @@ function validateActionProposalWarningArray(
       issues.push({ path: itemPath, message: "expected object" });
       continue;
     }
-    if (warning["source"] !== "read_set" && warning["source"] !== "observation_contract") {
+    if (
+      warning["source"] !== "read_set" &&
+      warning["source"] !== "observation_contract" &&
+      warning["source"] !== "contract_binding"
+    ) {
       issues.push({
         path: `${itemPath}/source`,
-        message: "expected read_set|observation_contract",
+        message: "expected read_set|observation_contract|contract_binding",
       });
     }
     validateNonEmptyStringField(warning, "code", `${itemPath}/code`, issues);
@@ -2045,6 +2902,12 @@ function sameStringSet(left: readonly string[], right: readonly string[]): boole
   if (left.length !== right.length) return false;
   const rightSet = new Set(right);
   return left.every((item) => rightSet.has(item));
+}
+
+function sameStateRefSet(left: readonly StateRef[], right: readonly StateRef[]): boolean {
+  if (left.length !== right.length) return false;
+  const rightSet = new Set(right.map(formatStateRef));
+  return left.every((item) => rightSet.has(formatStateRef(item)));
 }
 
 function assertion(input: StateAssertion): StateAssertion {

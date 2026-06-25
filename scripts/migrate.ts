@@ -51,7 +51,7 @@ const main = async () => {
   for (const row of r.rows) applied.set(row.filename, row.checksum_sha256);
 
   const files = readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
+    .filter((f) => f.endsWith(".sql") && !f.startsWith("._"))
     .sort();
 
   let applied_count = 0;

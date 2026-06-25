@@ -1,6 +1,20 @@
+import { createHash } from "node:crypto";
+import type {
+  TerminalAdmissionProviderCertificate,
+  Timestamp,
+} from "@pm/types";
+
 export type EvidenceBindingMode = "off" | "require_for_writes";
 
 export type InvocationEvidenceConsequence = "low" | "medium" | "high";
+export type InvocationActionTerminalOutcome = "accepted" | "blocked";
+export type EvidenceBindingFailureReason =
+  | "evidence_binding_missing"
+  | "evidence_binding_incomplete"
+  | "evidence_policy_blocked"
+  | "evidence_binding_unverified"
+  | "provider_certificate_missing"
+  | "provider_certificate_invalid";
 
 export interface InvocationEvidencePolicyDisposition {
   readonly evaluatedAt: string;
@@ -30,10 +44,72 @@ export interface EvidenceBindingRequest {
   readonly triggerEventId: string;
 }
 
+export interface InvocationActionOutcomeEnvelope {
+  readonly schemaVersion: "pm.workflow.action_outcome_envelope.v1";
+  readonly envelopeId: string;
+  readonly actionId: string;
+  readonly terminalOutcome: InvocationActionTerminalOutcome;
+  readonly generatedAt: string;
+  readonly tenantId: string;
+  readonly workflowId: string;
+  readonly workflowName: string;
+  readonly workflowVersion: number;
+  readonly nodeId: string;
+  readonly capability: string;
+  readonly triggerEventId: string;
+  readonly stateReviewArtifactId?: string;
+  readonly stateReviewArtifactHash?: string;
+  readonly evidenceAdmissionReviewIds: readonly string[];
+  readonly providerCertificateId?: string;
+  readonly providerCertificateDigest?: string;
+  readonly evidenceDecision: {
+    readonly valid: boolean;
+    readonly reason?: EvidenceBindingFailureReason;
+  };
+}
+
+export type InvocationActionOutcomeAdmissionRejectionReason =
+  | "terminal_outcome_conflict"
+  | "invalid_action_outcome_envelope"
+  | "admission_unavailable";
+
+export type InvocationActionOutcomeAdmissionDecision =
+  | {
+      readonly admitted: true;
+      readonly reason: "admitted" | "idempotent_replay";
+      readonly message?: string;
+    }
+  | {
+      readonly admitted: false;
+      readonly reason: InvocationActionOutcomeAdmissionRejectionReason;
+      readonly message: string;
+      readonly incumbentEnvelopeId?: string;
+      readonly incumbentTerminalOutcome?: InvocationActionTerminalOutcome;
+    };
+
+export interface InvocationActionOutcomeAdmissionRequest {
+  readonly request: EvidenceBindingRequest;
+  readonly envelope: InvocationActionOutcomeEnvelope;
+  readonly providerCertificate?: TerminalAdmissionProviderCertificate;
+}
+
+export interface InvocationActionOutcomeAdmissionPort {
+  admit(
+    request: InvocationActionOutcomeAdmissionRequest,
+  ): Promise<InvocationActionOutcomeAdmissionDecision>;
+}
+
 export interface EvidenceBindingProvider {
   bind(
     ctx: EvidenceBindingRequest,
   ): Promise<InvocationEvidenceBinding | null | undefined>;
+}
+
+export interface InvocationActionOutcomeProviderCertificateProvider {
+  getCertificate(
+    request: EvidenceBindingRequest,
+    checkedAt?: Timestamp,
+  ): Promise<TerminalAdmissionProviderCertificate | null | undefined>;
 }
 
 export interface EvidenceBindingVerifier {
@@ -53,14 +129,16 @@ export interface EvidenceBindingIssue {
   readonly message: string;
 }
 
+export type EvidenceBindingValidationFailureReason =
+  | "evidence_binding_missing"
+  | "evidence_binding_incomplete"
+  | "evidence_policy_blocked";
+
 export type EvidenceBindingValidationDecision =
   | { readonly valid: true }
   | {
       readonly valid: false;
-      readonly reason:
-        | "evidence_binding_missing"
-        | "evidence_binding_incomplete"
-        | "evidence_policy_blocked";
+      readonly reason: EvidenceBindingValidationFailureReason;
       readonly issues: readonly EvidenceBindingIssue[];
     };
 
@@ -68,7 +146,10 @@ export type EvidenceBindingVerificationDecision =
   | EvidenceBindingValidationDecision
   | {
       readonly valid: false;
-      readonly reason: "evidence_binding_unverified";
+      readonly reason: Exclude<
+        EvidenceBindingFailureReason,
+        EvidenceBindingValidationFailureReason
+      >;
       readonly issues: readonly EvidenceBindingIssue[];
     };
 
@@ -119,6 +200,75 @@ export interface EvidenceBindingRuntimeVerificationRequest {
 export interface EvidenceBindingVerificationRequest
   extends EvidenceBindingRuntimeVerificationRequest {
   readonly catalog: EvidenceBindingReferenceCatalog;
+}
+
+export function buildInvocationActionOutcomeEnvelope(input: {
+  readonly request: EvidenceBindingRequest;
+  readonly evidenceBinding?: InvocationEvidenceBinding | null;
+  readonly evidenceDecision: EvidenceBindingVerificationDecision;
+  readonly generatedAt: string;
+  readonly providerCertificate?: TerminalAdmissionProviderCertificate;
+}): InvocationActionOutcomeEnvelope {
+  const actionId = [
+    input.request.tenantId,
+    input.request.workflowId,
+    input.request.workflowVersion,
+    input.request.nodeId,
+    input.request.triggerEventId,
+  ].join(":");
+  const terminalOutcome = input.evidenceDecision.valid ? "accepted" : "blocked";
+  const binding = input.evidenceBinding ?? undefined;
+  const evidenceAdmissionReviewIds = [
+    ...(binding?.evidenceAdmissionReviewIds ?? []),
+  ];
+  const envelopeSeed = {
+    actionId,
+    terminalOutcome,
+    stateReviewArtifactId: binding?.stateReviewArtifactId,
+    stateReviewArtifactHash: binding?.stateReviewArtifactHash,
+    evidenceAdmissionReviewIds,
+    providerCertificateId: input.providerCertificate?.certificateId,
+    providerCertificateDigest: input.providerCertificate?.certificateDigest,
+    evidenceDecision: input.evidenceDecision,
+  };
+  const envelopeId = `outcome_${createHash("sha256")
+    .update(JSON.stringify(envelopeSeed))
+    .digest("hex")
+    .slice(0, 32)}`;
+
+  return {
+    schemaVersion: "pm.workflow.action_outcome_envelope.v1",
+    envelopeId,
+    actionId,
+    terminalOutcome,
+    generatedAt: input.generatedAt,
+    tenantId: input.request.tenantId,
+    workflowId: input.request.workflowId,
+    workflowName: input.request.workflowName,
+    workflowVersion: input.request.workflowVersion,
+    nodeId: input.request.nodeId,
+    capability: input.request.capability,
+    triggerEventId: input.request.triggerEventId,
+    ...(binding?.stateReviewArtifactId !== undefined
+      ? { stateReviewArtifactId: binding.stateReviewArtifactId }
+      : {}),
+    ...(binding?.stateReviewArtifactHash !== undefined
+      ? { stateReviewArtifactHash: binding.stateReviewArtifactHash }
+      : {}),
+    evidenceAdmissionReviewIds,
+    ...(input.providerCertificate !== undefined
+      ? {
+          providerCertificateId: input.providerCertificate.certificateId,
+          providerCertificateDigest: input.providerCertificate.certificateDigest,
+        }
+      : {}),
+    evidenceDecision: input.evidenceDecision.valid
+      ? { valid: true }
+      : {
+          valid: false,
+          reason: input.evidenceDecision.reason,
+        },
+  };
 }
 
 export function validateInvocationEvidenceBinding(

@@ -26,12 +26,21 @@ import { randomUUID } from "node:crypto";
 import type {
   EventId,
   PMEvent,
+  TerminalAdmissionProviderCertificate,
   TenantId,
+  Timestamp,
   WorkflowId,
 } from "@pm/types";
 import type { EventReader } from "@pm/events";
-import type { Capability, Registry } from "@pm/registry";
-import { matchesPattern } from "@pm/registry";
+import type {
+  Capability,
+  Registry,
+  TerminalAdmissionProviderCertificateStatusStore,
+} from "@pm/registry";
+import {
+  matchesPattern,
+  verifyTerminalAdmissionProviderCertificate,
+} from "@pm/registry";
 import pg from "pg";
 import { WorkflowValidationError } from "./errors.js";
 import { assertWorkflowAcyclic } from "./cycle-detection.js";
@@ -43,10 +52,17 @@ import {
   type InputValidator,
 } from "./input-validation.js";
 import {
+  buildInvocationActionOutcomeEnvelope,
   validateInvocationEvidenceBinding,
   type EvidenceBindingMode,
   type EvidenceBindingProvider,
+  type EvidenceBindingRequest,
   type EvidenceBindingVerifier,
+  type EvidenceBindingVerificationDecision,
+  type InvocationActionOutcomeAdmissionDecision,
+  type InvocationActionOutcomeAdmissionPort,
+  type InvocationActionOutcomeEnvelope,
+  type InvocationActionOutcomeProviderCertificateProvider,
   type InvocationEvidenceBinding,
 } from "./evidence-binding.js";
 import type {
@@ -57,6 +73,28 @@ import type {
   WorkflowNode,
   WorkflowRuntime,
 } from "./interfaces.js";
+
+type InvocationActionOutcomeAdmissionRejectionDecision = Extract<
+  InvocationActionOutcomeAdmissionDecision,
+  { readonly admitted: false }
+>;
+
+type EvidenceBindingRejectionDecision = Extract<
+  EvidenceBindingVerificationDecision,
+  { readonly valid: false }
+>;
+
+type ActionOutcomeProviderCertificateDecision =
+  | {
+      readonly valid: true;
+      readonly certificate?: TerminalAdmissionProviderCertificate;
+    }
+  | {
+      readonly valid: false;
+      readonly reason: "provider_certificate_missing" | "provider_certificate_invalid";
+      readonly certificate?: TerminalAdmissionProviderCertificate;
+      readonly evidenceDecision: EvidenceBindingRejectionDecision;
+    };
 
 /** G8.3: backoff delay for attempt N (1-based). Caps at 5 minutes. */
 function backoffDelay(policy: RetryPolicy, attempt: number): number {
@@ -138,6 +176,16 @@ export interface RuntimeDeps {
   readonly evidenceBindingMode?: EvidenceBindingMode;
   readonly evidenceBindingProvider?: EvidenceBindingProvider;
   readonly evidenceBindingVerifier?: EvidenceBindingVerifier;
+  readonly actionOutcomeProviderCertificateStore?: TerminalAdmissionProviderCertificateStatusStore;
+  readonly actionOutcomeProviderCertificateProvider?: InvocationActionOutcomeProviderCertificateProvider;
+  readonly requireActionOutcomeProviderCertificate?: boolean;
+  /**
+   * Optional terminal-outcome admission boundary for workflow-generated
+   * action envelopes. Keep the runtime dependency-light: callers can adapt
+   * this port to @pm/agent-state's canonical admission/indexing without
+   * making workflow depend on agent-state.
+   */
+  readonly actionOutcomeAdmission?: InvocationActionOutcomeAdmissionPort;
 }
 
 export class PostgresWorkflowRuntime implements WorkflowRuntime {
@@ -151,6 +199,13 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
   readonly #evidenceBindingMode: EvidenceBindingMode;
   readonly #evidenceBindingProvider: EvidenceBindingProvider | undefined;
   readonly #evidenceBindingVerifier: EvidenceBindingVerifier | undefined;
+  readonly #actionOutcomeProviderCertificateProvider:
+    | InvocationActionOutcomeProviderCertificateProvider
+    | undefined;
+  readonly #requireActionOutcomeProviderCertificate: boolean;
+  readonly #actionOutcomeAdmission:
+    | InvocationActionOutcomeAdmissionPort
+    | undefined;
 
   constructor(deps: RuntimeDeps) {
     this.#pool = deps.pool;
@@ -163,6 +218,24 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     this.#evidenceBindingMode = deps.evidenceBindingMode ?? "off";
     this.#evidenceBindingProvider = deps.evidenceBindingProvider;
     this.#evidenceBindingVerifier = deps.evidenceBindingVerifier;
+    this.#actionOutcomeProviderCertificateProvider =
+      deps.actionOutcomeProviderCertificateProvider ??
+      (deps.actionOutcomeProviderCertificateStore
+        ? {
+            getCertificate: async (request, checkedAt) => {
+              const record =
+                await deps.actionOutcomeProviderCertificateStore!.findCurrentCertificate({
+                  tenantId: request.tenantId as TenantId,
+                  capabilityName: request.capability,
+                  ...(checkedAt !== undefined ? { checkedAt } : {}),
+                });
+              return record?.certificate ?? null;
+            },
+          }
+        : undefined);
+    this.#requireActionOutcomeProviderCertificate =
+      deps.requireActionOutcomeProviderCertificate ?? false;
+    this.#actionOutcomeAdmission = deps.actionOutcomeAdmission;
   }
 
   // -------------------------------------------------------------------------
@@ -442,8 +515,12 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         const evidenceBindingRequired =
           this.#evidenceBindingMode === "require_for_writes" && capabilityWrites;
         let evidenceBinding: InvocationEvidenceBinding | undefined;
+        let actionOutcomeEnvelope: InvocationActionOutcomeEnvelope | undefined;
+        let actionOutcomeProviderCertificate:
+          | TerminalAdmissionProviderCertificate
+          | undefined;
         if (evidenceBindingRequired) {
-          const bindingRequest = {
+          const bindingRequest: EvidenceBindingRequest = {
             tenantId: doc.tenantId,
             workflowId: doc.id,
             workflowName: doc.name,
@@ -455,15 +532,45 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
             triggerEventId: event.id,
           };
           const providedBinding = await this.#evidenceBindingProvider?.bind(bindingRequest);
-          const evidenceDecision = validateInvocationEvidenceBinding({
-            capabilityWrites,
-            evidenceBindingRequired,
-            evidenceBinding: providedBinding ?? null,
-          });
+          let evidenceDecision: EvidenceBindingVerificationDecision =
+            validateInvocationEvidenceBinding({
+              capabilityWrites,
+              evidenceBindingRequired,
+              evidenceBinding: providedBinding ?? null,
+            });
           if (!evidenceDecision.valid) {
+            actionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
+              request: bindingRequest,
+              evidenceBinding: providedBinding ?? null,
+              evidenceDecision,
+              generatedAt: event.recordedAt,
+              ...(actionOutcomeProviderCertificate !== undefined
+                ? { providerCertificate: actionOutcomeProviderCertificate }
+                : {}),
+            });
+            const admissionRejection = await this.#admitActionOutcomeEnvelope(
+              bindingRequest,
+              actionOutcomeEnvelope,
+              actionOutcomeProviderCertificate,
+            );
+            if (admissionRejection) {
+              const errPayload = this.#actionOutcomeAdmissionErrorPayload(
+                admissionRejection,
+                actionOutcomeEnvelope,
+              );
+              await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+              await this.#writeDeadLetter({
+                tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+                nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+                inputs, attempts: 1, error: errPayload, reason: "action_outcome_admission_rejected",
+              });
+              runStatus = "failed";
+              return;
+            }
             const errPayload = {
               error: evidenceDecision.reason,
               issues: evidenceDecision.issues,
+              actionOutcomeEnvelope,
             };
             await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
             await this.#writeDeadLetter({
@@ -479,10 +586,40 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
               request: bindingRequest,
               evidenceBinding: providedBinding,
             });
+            evidenceDecision = verificationDecision;
             if (!verificationDecision.valid) {
+              actionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
+                request: bindingRequest,
+                evidenceBinding: providedBinding,
+                evidenceDecision: verificationDecision,
+                generatedAt: event.recordedAt,
+                ...(actionOutcomeProviderCertificate !== undefined
+                  ? { providerCertificate: actionOutcomeProviderCertificate }
+                  : {}),
+              });
+              const admissionRejection = await this.#admitActionOutcomeEnvelope(
+                bindingRequest,
+                actionOutcomeEnvelope,
+                actionOutcomeProviderCertificate,
+              );
+              if (admissionRejection) {
+                const errPayload = this.#actionOutcomeAdmissionErrorPayload(
+                  admissionRejection,
+                  actionOutcomeEnvelope,
+                );
+                await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+                await this.#writeDeadLetter({
+                  tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+                  nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+                  inputs, attempts: 1, error: errPayload, reason: "action_outcome_admission_rejected",
+                });
+                runStatus = "failed";
+                return;
+              }
               const errPayload = {
                 error: verificationDecision.reason,
                 issues: verificationDecision.issues,
+                actionOutcomeEnvelope,
               };
               await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
               await this.#writeDeadLetter({
@@ -493,6 +630,86 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
               runStatus = "failed";
               return;
             }
+          }
+          const providerCertificateDecision =
+            await this.#verifyActionOutcomeProviderCertificate(
+              bindingRequest,
+              event.recordedAt,
+            );
+          if (!providerCertificateDecision.valid) {
+            actionOutcomeProviderCertificate =
+              providerCertificateDecision.certificate;
+            actionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
+              request: bindingRequest,
+              evidenceBinding: providedBinding ?? null,
+              evidenceDecision: providerCertificateDecision.evidenceDecision,
+              generatedAt: event.recordedAt,
+              ...(actionOutcomeProviderCertificate !== undefined
+                ? { providerCertificate: actionOutcomeProviderCertificate }
+                : {}),
+            });
+            const admissionRejection = await this.#admitActionOutcomeEnvelope(
+              bindingRequest,
+              actionOutcomeEnvelope,
+              actionOutcomeProviderCertificate,
+            );
+            if (admissionRejection) {
+              const errPayload = this.#actionOutcomeAdmissionErrorPayload(
+                admissionRejection,
+                actionOutcomeEnvelope,
+              );
+              await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+              await this.#writeDeadLetter({
+                tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+                nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+                inputs, attempts: 1, error: errPayload, reason: "action_outcome_admission_rejected",
+              });
+              runStatus = "failed";
+              return;
+            }
+            const errPayload = {
+              error: providerCertificateDecision.reason,
+              issues: providerCertificateDecision.evidenceDecision.issues,
+              actionOutcomeEnvelope,
+            };
+            await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+            await this.#writeDeadLetter({
+              tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+              nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+              inputs, attempts: 1, error: errPayload, reason: providerCertificateDecision.reason,
+            });
+            runStatus = "failed";
+            return;
+          }
+          actionOutcomeProviderCertificate =
+            providerCertificateDecision.certificate;
+          actionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
+            request: bindingRequest,
+            evidenceBinding: providedBinding ?? null,
+            evidenceDecision,
+            generatedAt: event.recordedAt,
+            ...(actionOutcomeProviderCertificate !== undefined
+              ? { providerCertificate: actionOutcomeProviderCertificate }
+              : {}),
+          });
+          const admissionRejection = await this.#admitActionOutcomeEnvelope(
+            bindingRequest,
+            actionOutcomeEnvelope,
+            actionOutcomeProviderCertificate,
+          );
+          if (admissionRejection) {
+            const errPayload = this.#actionOutcomeAdmissionErrorPayload(
+              admissionRejection,
+              actionOutcomeEnvelope,
+            );
+            await this.#recordStep(runId, node.nodeId, node.capability, "failed", errPayload, 1);
+            await this.#writeDeadLetter({
+              tenantId: doc.tenantId, runId, workflowId: doc.id, workflowVersion: doc.version,
+              nodeId: node.nodeId, capability: node.capability, triggeredBy: event.id,
+              inputs, attempts: 1, error: errPayload, reason: "action_outcome_admission_rejected",
+            });
+            runStatus = "failed";
+            return;
           }
           evidenceBinding = providedBinding ?? undefined;
         }
@@ -512,6 +729,12 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
             workflowId: doc.id,
             nodeId: node.nodeId,
             ...(evidenceBinding !== undefined ? { evidenceBinding } : {}),
+            ...(actionOutcomeEnvelope !== undefined
+              ? { actionOutcomeEnvelope }
+              : {}),
+            ...(actionOutcomeProviderCertificate !== undefined
+              ? { actionOutcomeProviderCertificate }
+              : {}),
           });
           if (inv.success) break;
           if (attempt < maxAttempts && policy) {
@@ -555,6 +778,148 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         WHERE id = $1`,
       [runId, runStatus],
     );
+  }
+
+  async #admitActionOutcomeEnvelope(
+    request: EvidenceBindingRequest,
+    envelope: InvocationActionOutcomeEnvelope,
+    providerCertificate?: TerminalAdmissionProviderCertificate,
+  ): Promise<InvocationActionOutcomeAdmissionRejectionDecision | null> {
+    if (!this.#actionOutcomeAdmission) return null;
+    try {
+      const decision = await this.#actionOutcomeAdmission.admit({
+        request,
+        envelope,
+        ...(providerCertificate !== undefined
+          ? { providerCertificate }
+          : {}),
+      });
+      return decision.admitted ? null : decision;
+    } catch (error) {
+      return {
+        admitted: false,
+        reason: "admission_unavailable",
+        message:
+          error instanceof Error
+            ? error.message
+            : "action outcome admission failed before terminal claim could be recorded",
+      };
+    }
+  }
+
+  async #verifyActionOutcomeProviderCertificate(
+    request: EvidenceBindingRequest,
+    checkedAt: Timestamp,
+  ): Promise<ActionOutcomeProviderCertificateDecision> {
+    const provider = this.#actionOutcomeProviderCertificateProvider;
+    if (!provider) {
+      if (!this.#requireActionOutcomeProviderCertificate) {
+        return { valid: true };
+      }
+      return {
+        valid: false,
+        reason: "provider_certificate_missing",
+        evidenceDecision: {
+          valid: false,
+          reason: "provider_certificate_missing",
+          issues: [
+            {
+              path: "/providerCertificate",
+              message:
+                "write-capable invocation requires a terminal-admission provider certificate before dispatch",
+            },
+          ],
+        },
+      };
+    }
+
+    let certificate: TerminalAdmissionProviderCertificate | null | undefined;
+    try {
+      certificate = await provider.getCertificate(request, checkedAt);
+    } catch (error) {
+      return {
+        valid: false,
+        reason: "provider_certificate_invalid",
+        evidenceDecision: {
+          valid: false,
+          reason: "provider_certificate_invalid",
+          issues: [
+            {
+              path: "/providerCertificate",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "terminal-admission provider certificate lookup failed",
+            },
+          ],
+        },
+      };
+    }
+
+    if (certificate === null || certificate === undefined) {
+      if (!this.#requireActionOutcomeProviderCertificate) {
+        return { valid: true };
+      }
+      return {
+        valid: false,
+        reason: "provider_certificate_missing",
+        evidenceDecision: {
+          valid: false,
+          reason: "provider_certificate_missing",
+          issues: [
+            {
+              path: "/providerCertificate",
+              message:
+                "terminal-admission provider certificate provider returned no certificate",
+            },
+          ],
+        },
+      };
+    }
+
+    const certificateDecision = verifyTerminalAdmissionProviderCertificate({
+      certificate,
+      checkedAt,
+      capabilityName: request.capability,
+    });
+    if (!certificateDecision.valid) {
+      return {
+        valid: false,
+        reason: "provider_certificate_invalid",
+        certificate,
+        evidenceDecision: {
+          valid: false,
+          reason: "provider_certificate_invalid",
+          issues: certificateDecision.issues.map((issue) => ({
+            path: `/providerCertificate/${issue.code}`,
+            message: issue.message,
+          })),
+        },
+      };
+    }
+
+    return { valid: true, certificate };
+  }
+
+  #actionOutcomeAdmissionErrorPayload(
+    decision: InvocationActionOutcomeAdmissionRejectionDecision,
+    envelope: InvocationActionOutcomeEnvelope,
+  ): Record<string, unknown> {
+    return {
+      error: "action_outcome_admission_rejected",
+      actionOutcomeAdmission: {
+        admitted: false,
+        reason: decision.reason,
+        message: decision.message,
+        ...(decision.incumbentEnvelopeId !== undefined
+          ? { incumbentEnvelopeId: decision.incumbentEnvelopeId }
+          : {}),
+        ...(decision.incumbentTerminalOutcome !== undefined
+          ? { incumbentTerminalOutcome: decision.incumbentTerminalOutcome }
+          : {}),
+      },
+      actionOutcomeEnvelope: envelope,
+    };
   }
 
   async #recordStep(
@@ -603,7 +968,10 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       | "evidence_binding_missing"
       | "evidence_binding_incomplete"
       | "evidence_policy_blocked"
-      | "evidence_binding_unverified";
+      | "evidence_binding_unverified"
+      | "provider_certificate_missing"
+      | "provider_certificate_invalid"
+      | "action_outcome_admission_rejected";
   }): Promise<void> {
     const id = `dl_${randomUUID()}`;
     await this.#pool.query(

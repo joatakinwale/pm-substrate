@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { verifyActionOutcomeEnvelopeHash } from "@pm/agent-state";
 
 import {
   LOCAL_LAB_SCENARIOS,
@@ -27,6 +28,22 @@ describe("local-lab paired evals", () => {
     expect(pair.events.every((e) => e.coordinationClass === "derived_projection")).toBe(true);
     expect(pair.events.every((e) => e.evidenceStage === "scaffolded_scenario")).toBe(true);
     expect(pair.events.every((e) => !e.notes.includes("state_bench_category="))).toBe(true);
+    expect(pair.events[0]!.substrateRefs.some((ref) => ref.kind === "action_outcome_envelope")).toBe(false);
+    expect(pair.events[1]!.substrateRefs).toContainEqual({
+      kind: "action_outcome_envelope",
+      id: "outcome_local_lab_stale_memory_rebased",
+      label: "Local lab ActionOutcomeEnvelope",
+    });
+    expect(pair.actionOutcomeEnvelopes).toHaveLength(1);
+    expect(verifyActionOutcomeEnvelopeHash(pair.actionOutcomeEnvelopes[0]!).valid).toBe(true);
+    expect(pair.actionOutcomeEnvelopes[0]!.terminalOutcome).toBe("accepted");
+    expect(
+      pair.actionOutcomeEnvelopes[0]!.substrateRefs.some(
+        (ref) =>
+          ref.kind === "action_outcome_envelope" &&
+          ref.id === "outcome_local_lab_stale_memory_rebased",
+      ),
+    ).toBe(true);
     expect(pair.summary).toMatchObject({
       scenarioId: "stale-memory-after-source-update",
       failureClass: "memory_drift",
@@ -45,6 +62,26 @@ describe("local-lab paired evals", () => {
 
     expect(suite.events).toHaveLength(LOCAL_LAB_SCENARIOS.length * 2);
     expect(suite.summaries).toHaveLength(LOCAL_LAB_SCENARIOS.length);
+    expect(suite.actionOutcomeEnvelopes).toHaveLength(LOCAL_LAB_SCENARIOS.length);
+    expect(
+      suite.actionOutcomeEnvelopes.every(
+        (envelope) => verifyActionOutcomeEnvelopeHash(envelope).valid,
+      ),
+    ).toBe(true);
+    expect(
+      suite.actionOutcomeEnvelopes.map((envelope) => envelope.terminalOutcome),
+    ).toEqual(["accepted", "blocked", "blocked"]);
+    const eventOutcomeRefIds = suite.events.flatMap((event) =>
+      event.substrateRefs
+        .filter((ref) => ref.kind === "action_outcome_envelope")
+        .map((ref) => ref.id),
+    );
+    const packetOutcomeRefIds = suite.actionOutcomeEnvelopes.flatMap((envelope) =>
+      envelope.substrateRefs
+        .filter((ref) => ref.kind === "action_outcome_envelope")
+        .map((ref) => ref.id),
+    );
+    expect(eventOutcomeRefIds).toEqual(packetOutcomeRefIds);
     expect(suite.baselineFailures).toBe(LOCAL_LAB_SCENARIOS.length);
     expect(suite.substrateFailures).toBe(0);
     expect(suite.failureReduction).toBe(0);

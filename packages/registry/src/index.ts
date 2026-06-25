@@ -11,7 +11,41 @@ export type {
   Capability,
   NormalizedCapability,
   Registry,
+  TerminalAdmissionProviderBinding,
+  TerminalAdmissionProviderBindingVerification,
+  TerminalAdmissionProviderCertificateIssuanceInput,
+  TerminalAdmissionProviderCertificateIssuanceReport,
+  TerminalAdmissionProviderCertificateRejection,
+  TerminalAdmissionProviderCertificateFindCurrentInput,
+  TerminalAdmissionProviderCertificateLookupInput,
+  TerminalAdmissionProviderCertificateRecordInput,
+  TerminalAdmissionProviderCertificateStatusRecord,
+  TerminalAdmissionProviderCertificateStatusRecordValidationInput,
+  TerminalAdmissionProviderCertificateStatusStore,
+  TerminalAdmissionProviderCertificateStatusUpdateInput,
+  TerminalAdmissionProviderCertificateValidationDecision,
+  TerminalAdmissionProviderCertificateValidationInput,
+  TerminalAdmissionProviderCertificateValidationIssue,
+  TerminalAdmissionProviderCertificateValidationIssueCode,
+  TerminalAdmissionProviderRefVerification,
+  TerminalAdmissionProviderVerificationIssue,
+  TerminalAdmissionProviderVerificationIssueCode,
+  TerminalAdmissionProviderVerificationReport,
 } from "./interfaces.js";
-export { normalizeCapability } from "./interfaces.js";
-export { PostgresRegistry } from "./postgres.js";
+export {
+  listTerminalAdmissionProviderBindings,
+  normalizeCapability,
+  issueTerminalAdmissionProviderCertificates,
+  terminalAdmissionProviderCertificateDigest,
+  terminalAdmissionProviderManifestDigest,
+  verifyTerminalAdmissionProviderCertificate,
+  verifyTerminalAdmissionProviderCertificateIntegrity,
+  verifyTerminalAdmissionProviderCertificateStatusRecord,
+  verifyTerminalAdmissionProviderBindings,
+  verifyTerminalAdmissionProviderRef,
+} from "./interfaces.js";
+export {
+  PostgresRegistry,
+  PostgresTerminalAdmissionProviderCertificateStore,
+} from "./postgres.js";
 export { matchesPattern } from "./pattern.js";

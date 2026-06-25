@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type {
   CapabilityId,
   EmitDecl,
@@ -7,6 +9,11 @@ import type {
   SubscribeDecl,
   SubscribeContract,
   TenantId,
+  TerminalAdmissionProviderCertificate,
+  TerminalAdmissionProviderCertificateStatus,
+  TerminalAdmissionProviderManifest,
+  TerminalAdmissionProviderRef,
+  Timestamp,
   WriteDecl,
   WriteContract,
 } from "@pm/types";
@@ -109,6 +116,171 @@ export interface NormalizedCapability {
   readonly untyped: boolean;
 }
 
+export interface TerminalAdmissionProviderBinding {
+  readonly capabilityId: CapabilityId;
+  readonly capabilityName: string;
+  readonly capabilityVersion: number;
+  readonly writeInterface: string;
+  readonly writeFields: readonly string[];
+  readonly writeOwnership: WriteContract["ownership"];
+  readonly provider: TerminalAdmissionProviderRef;
+}
+
+export type TerminalAdmissionProviderVerificationIssueCode =
+  | "provider_missing"
+  | "provider_unavailable"
+  | "provider_deprecated"
+  | "provider_kind_mismatch"
+  | "provider_package_mismatch"
+  | "provider_export_mismatch"
+  | "provider_version_incompatible"
+  | "provider_action_types_empty"
+  | "provider_action_type_missing"
+  | "provider_profile_missing"
+  | "provider_evidence_ref_kind_missing"
+  | "provider_substrate_ref_kind_missing";
+
+export interface TerminalAdmissionProviderVerificationIssue {
+  readonly code: TerminalAdmissionProviderVerificationIssueCode;
+  readonly providerId: string;
+  readonly message: string;
+  readonly expected?: string;
+  readonly actual?: string;
+}
+
+export interface TerminalAdmissionProviderRefVerification {
+  readonly provider: TerminalAdmissionProviderRef;
+  readonly manifest?: TerminalAdmissionProviderManifest;
+  readonly verified: boolean;
+  readonly issues: readonly TerminalAdmissionProviderVerificationIssue[];
+}
+
+export interface TerminalAdmissionProviderBindingVerification
+  extends TerminalAdmissionProviderRefVerification {
+  readonly binding: TerminalAdmissionProviderBinding;
+}
+
+export interface TerminalAdmissionProviderVerificationReport {
+  readonly totalBindings: number;
+  readonly verifiedBindings: number;
+  readonly failedBindings: number;
+  readonly missingProviderIds: readonly string[];
+  readonly issues: readonly TerminalAdmissionProviderVerificationIssue[];
+  readonly bindings: readonly TerminalAdmissionProviderBindingVerification[];
+}
+
+export interface TerminalAdmissionProviderCertificateIssuanceInput {
+  readonly issuer: string;
+  readonly issuedAt: Timestamp;
+  readonly validUntil: Timestamp;
+}
+
+export interface TerminalAdmissionProviderCertificateRejection {
+  readonly binding: TerminalAdmissionProviderBinding;
+  readonly provider: TerminalAdmissionProviderRef;
+  readonly issues: readonly TerminalAdmissionProviderVerificationIssue[];
+}
+
+export interface TerminalAdmissionProviderCertificateIssuanceReport {
+  readonly issuedCertificates: readonly TerminalAdmissionProviderCertificate[];
+  readonly rejectedBindings: readonly TerminalAdmissionProviderCertificateRejection[];
+}
+
+export type TerminalAdmissionProviderCertificateValidationIssueCode =
+  | "certificate_digest_invalid"
+  | "certificate_manifest_digest_invalid"
+  | "certificate_not_yet_valid"
+  | "certificate_expired"
+  | "certificate_revoked"
+  | "certificate_superseded"
+  | "certificate_capability_mismatch"
+  | "certificate_provider_mismatch";
+
+export interface TerminalAdmissionProviderCertificateValidationIssue {
+  readonly code: TerminalAdmissionProviderCertificateValidationIssueCode;
+  readonly certificateId: string;
+  readonly message: string;
+  readonly expected?: string;
+  readonly actual?: string;
+}
+
+export interface TerminalAdmissionProviderCertificateValidationInput {
+  readonly certificate: TerminalAdmissionProviderCertificate;
+  readonly checkedAt: Timestamp;
+  readonly capabilityName?: string;
+  readonly providerId?: string;
+}
+
+export interface TerminalAdmissionProviderCertificateValidationDecision {
+  readonly valid: boolean;
+  readonly issues: readonly TerminalAdmissionProviderCertificateValidationIssue[];
+}
+
+export interface TerminalAdmissionProviderCertificateStatusRecord {
+  readonly tenantId: TenantId;
+  readonly certificate: TerminalAdmissionProviderCertificate;
+  readonly currentStatus: TerminalAdmissionProviderCertificateStatus;
+  readonly statusUpdatedAt: Timestamp;
+  readonly recordedAt?: Timestamp;
+  readonly statusReason?: string;
+  readonly supersededByCertificateId?: string;
+}
+
+export interface TerminalAdmissionProviderCertificateRecordInput {
+  readonly tenantId: TenantId;
+  readonly certificate: TerminalAdmissionProviderCertificate;
+  readonly currentStatus?: TerminalAdmissionProviderCertificateStatus;
+  readonly statusUpdatedAt: Timestamp;
+  readonly statusReason?: string;
+  readonly supersededByCertificateId?: string;
+}
+
+export interface TerminalAdmissionProviderCertificateStatusUpdateInput {
+  readonly tenantId: TenantId;
+  readonly certificateId: string;
+  readonly status: TerminalAdmissionProviderCertificateStatus;
+  readonly statusUpdatedAt: Timestamp;
+  readonly statusReason?: string;
+  readonly supersededByCertificateId?: string;
+}
+
+export interface TerminalAdmissionProviderCertificateLookupInput {
+  readonly tenantId: TenantId;
+  readonly certificateId: string;
+}
+
+export interface TerminalAdmissionProviderCertificateFindCurrentInput {
+  readonly tenantId: TenantId;
+  readonly capabilityName: string;
+  readonly providerId?: string;
+  readonly checkedAt?: Timestamp;
+}
+
+export interface TerminalAdmissionProviderCertificateStatusRecordValidationInput {
+  readonly record: TerminalAdmissionProviderCertificateStatusRecord;
+  readonly checkedAt: Timestamp;
+  readonly capabilityName?: string;
+  readonly providerId?: string;
+}
+
+export interface TerminalAdmissionProviderCertificateStatusStore {
+  recordCertificate(
+    input: TerminalAdmissionProviderCertificateRecordInput,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord>;
+
+  getCertificateRecord(
+    input: TerminalAdmissionProviderCertificateLookupInput,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null>;
+
+  setCertificateStatus(
+    input: TerminalAdmissionProviderCertificateStatusUpdateInput,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null>;
+
+  findCurrentCertificate(
+    input: TerminalAdmissionProviderCertificateFindCurrentInput,
+  ): Promise<TerminalAdmissionProviderCertificateStatusRecord | null>;
+}
+
 const normalizeEmit = (d: EmitDecl): { contract: EmitContract; untyped: boolean } => {
   if (isEmitContract(d)) return { contract: d, untyped: false };
   return {
@@ -194,6 +366,483 @@ export const normalizeCapability = (cap: Capability): NormalizedCapability => {
     untyped,
   };
 };
+
+/**
+ * Discover terminal-admission providers declared on a capability's write
+ * contracts. The result is registry metadata only; write runtimes must still
+ * call the provider and validate its terminal proof before mutating state.
+ */
+export const listTerminalAdmissionProviderBindings = (
+  cap: Capability,
+): readonly TerminalAdmissionProviderBinding[] => {
+  const normalized = normalizeCapability(cap);
+  return normalized.writes.flatMap((write) =>
+    (write.terminalAdmissionProviders ?? []).map((provider) => ({
+      capabilityId: normalized.id,
+      capabilityName: normalized.name,
+      capabilityVersion: normalized.version,
+      writeInterface: write.interface,
+      writeFields: write.fields,
+      writeOwnership: write.ownership,
+      provider,
+    })),
+  );
+};
+
+export const verifyTerminalAdmissionProviderRef = (
+  provider: TerminalAdmissionProviderRef,
+  manifests: readonly TerminalAdmissionProviderManifest[],
+): TerminalAdmissionProviderRefVerification => {
+  const manifest = manifests.find((candidate) =>
+    candidate.providerId === provider.providerId
+  );
+  const issues: TerminalAdmissionProviderVerificationIssue[] = [];
+
+  if (manifest === undefined) {
+    issues.push({
+      code: "provider_missing",
+      providerId: provider.providerId,
+      message: `No terminal-admission provider manifest is available for ${provider.providerId}.`,
+      expected: provider.providerId,
+    });
+    return { provider, verified: false, issues };
+  }
+
+  if (manifest.availability === "unavailable") {
+    issues.push({
+      code: "provider_unavailable",
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} is unavailable.`,
+      actual: manifest.availability,
+    });
+  } else if (manifest.availability === "deprecated") {
+    issues.push({
+      code: "provider_deprecated",
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} is deprecated and cannot prove fresh coverage.`,
+      actual: manifest.availability,
+    });
+  }
+
+  if (manifest.kind !== provider.kind) {
+    issues.push({
+      code: "provider_kind_mismatch",
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} kind does not match the declared ref.`,
+      expected: provider.kind,
+      actual: manifest.kind,
+    });
+  }
+  if (manifest.packageName !== provider.packageName) {
+    issues.push({
+      code: "provider_package_mismatch",
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} package does not match the declared ref.`,
+      expected: provider.packageName,
+      actual: manifest.packageName,
+    });
+  }
+  if (manifest.exportName !== provider.exportName) {
+    issues.push({
+      code: "provider_export_mismatch",
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} export does not match the declared ref.`,
+      expected: provider.exportName,
+      actual: manifest.exportName,
+    });
+  }
+  if (!providerVersionCompatible(provider, manifest)) {
+    issues.push({
+      code: "provider_version_incompatible",
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} contract version is not compatible with the declared ref.`,
+      expected: versionLabel(provider.contractVersion),
+      actual: versionLabel(manifest.contractVersion),
+    });
+  }
+  if (provider.actionTypes.length === 0) {
+    issues.push({
+      code: "provider_action_types_empty",
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} declares no covered action types.`,
+    });
+  }
+  for (const actionType of provider.actionTypes) {
+    if (!manifest.actionTypes.includes(actionType)) {
+      issues.push({
+        code: "provider_action_type_missing",
+        providerId: provider.providerId,
+        message: `Terminal-admission provider ${provider.providerId} manifest does not cover action type ${actionType}.`,
+        expected: actionType,
+      });
+    }
+  }
+  addMissingRefKindIssues(
+    issues,
+    provider,
+    manifest,
+    "profiles",
+    "provider_profile_missing",
+  );
+  addMissingRefKindIssues(
+    issues,
+    provider,
+    manifest,
+    "evidenceRefKinds",
+    "provider_evidence_ref_kind_missing",
+  );
+  addMissingRefKindIssues(
+    issues,
+    provider,
+    manifest,
+    "substrateRefKinds",
+    "provider_substrate_ref_kind_missing",
+  );
+
+  return {
+    provider,
+    manifest,
+    verified: issues.length === 0,
+    issues,
+  };
+};
+
+export const verifyTerminalAdmissionProviderBindings = (
+  capabilities: readonly Capability[],
+  manifests: readonly TerminalAdmissionProviderManifest[],
+): TerminalAdmissionProviderVerificationReport => {
+  const bindings = capabilities.flatMap((cap) =>
+    listTerminalAdmissionProviderBindings(cap)
+  );
+  const verifiedBindings = bindings.map((binding) => {
+    const verification = verifyTerminalAdmissionProviderRef(
+      binding.provider,
+      manifests,
+    );
+    return {
+      binding,
+      provider: verification.provider,
+      ...(verification.manifest ? { manifest: verification.manifest } : {}),
+      verified: verification.verified,
+      issues: verification.issues,
+    };
+  });
+  const issues = verifiedBindings.flatMap((binding) => binding.issues);
+
+  return {
+    totalBindings: verifiedBindings.length,
+    verifiedBindings: verifiedBindings.filter((binding) => binding.verified)
+      .length,
+    failedBindings: verifiedBindings.filter((binding) => !binding.verified)
+      .length,
+    missingProviderIds: uniqueStrings(
+      issues
+        .filter((issue) => issue.code === "provider_missing")
+        .map((issue) => issue.providerId),
+    ),
+    issues,
+    bindings: verifiedBindings,
+  };
+};
+
+export const terminalAdmissionProviderManifestDigest = (
+  manifest: TerminalAdmissionProviderManifest,
+): string => sha256(stableJson(manifest));
+
+export const terminalAdmissionProviderCertificateDigest = (
+  certificate: TerminalAdmissionProviderCertificate,
+): string => {
+  const { certificateDigest: _certificateDigest, ...digestible } = certificate;
+  return sha256(stableJson(digestible));
+};
+
+export const issueTerminalAdmissionProviderCertificates = (
+  capabilities: readonly Capability[],
+  manifests: readonly TerminalAdmissionProviderManifest[],
+  input: TerminalAdmissionProviderCertificateIssuanceInput,
+): TerminalAdmissionProviderCertificateIssuanceReport => {
+  const verification = verifyTerminalAdmissionProviderBindings(
+    capabilities,
+    manifests,
+  );
+  const issuedCertificates: TerminalAdmissionProviderCertificate[] = [];
+  const rejectedBindings: TerminalAdmissionProviderCertificateRejection[] = [];
+
+  for (const bindingVerification of verification.bindings) {
+    if (!bindingVerification.verified || bindingVerification.manifest === undefined) {
+      rejectedBindings.push({
+        binding: bindingVerification.binding,
+        provider: bindingVerification.provider,
+        issues: bindingVerification.issues,
+      });
+      continue;
+    }
+
+    const manifestDigest = terminalAdmissionProviderManifestDigest(
+      bindingVerification.manifest,
+    );
+    const subject = {
+      capabilityId: bindingVerification.binding.capabilityId,
+      capabilityName: bindingVerification.binding.capabilityName,
+      capabilityVersion: bindingVerification.binding.capabilityVersion,
+      writeInterface: bindingVerification.binding.writeInterface,
+      writeFields: bindingVerification.binding.writeFields,
+      writeOwnership: bindingVerification.binding.writeOwnership,
+      providerId: bindingVerification.provider.providerId,
+    };
+    const certificateId = `tapc_${sha256(
+      stableJson({
+        issuer: input.issuer,
+        issuedAt: input.issuedAt,
+        validUntil: input.validUntil,
+        subject,
+        manifestDigest,
+      }),
+    ).slice(0, 32)}`;
+    const unsigned = {
+      schemaVersion: "pm.terminal_admission_provider_certificate.v1",
+      certificateId,
+      certificateDigest: "",
+      issuer: input.issuer,
+      issuedAt: input.issuedAt,
+      validUntil: input.validUntil,
+      status: "valid",
+      subject,
+      provider: bindingVerification.provider,
+      manifest: bindingVerification.manifest,
+      manifestDigest,
+    } as const satisfies TerminalAdmissionProviderCertificate;
+
+    issuedCertificates.push({
+      ...unsigned,
+      certificateDigest: terminalAdmissionProviderCertificateDigest(unsigned),
+    });
+  }
+
+  return {
+    issuedCertificates,
+    rejectedBindings,
+  };
+};
+
+export const verifyTerminalAdmissionProviderCertificateIntegrity = (
+  certificate: TerminalAdmissionProviderCertificate,
+): TerminalAdmissionProviderCertificateValidationDecision => {
+  const issues: TerminalAdmissionProviderCertificateValidationIssue[] = [];
+  const actualManifestDigest = terminalAdmissionProviderManifestDigest(
+    certificate.manifest,
+  );
+  if (actualManifestDigest !== certificate.manifestDigest) {
+    issues.push({
+      code: "certificate_manifest_digest_invalid",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} has an invalid manifest digest.`,
+      expected: certificate.manifestDigest,
+      actual: actualManifestDigest,
+    });
+  }
+
+  const actualCertificateDigest =
+    terminalAdmissionProviderCertificateDigest(certificate);
+  if (actualCertificateDigest !== certificate.certificateDigest) {
+    issues.push({
+      code: "certificate_digest_invalid",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} has an invalid certificate digest.`,
+      expected: certificate.certificateDigest,
+      actual: actualCertificateDigest,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+  };
+};
+
+export const verifyTerminalAdmissionProviderCertificate = (
+  input: TerminalAdmissionProviderCertificateValidationInput,
+): TerminalAdmissionProviderCertificateValidationDecision => {
+  const { certificate } = input;
+  const issues = [
+    ...verifyTerminalAdmissionProviderCertificateIntegrity(certificate).issues,
+  ];
+
+  const checkedAt = Date.parse(input.checkedAt);
+  if (checkedAt < Date.parse(certificate.issuedAt)) {
+    issues.push({
+      code: "certificate_not_yet_valid",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} is not valid until ${certificate.issuedAt}.`,
+      expected: certificate.issuedAt,
+      actual: input.checkedAt,
+    });
+  }
+  if (Date.parse(certificate.validUntil) < checkedAt) {
+    issues.push({
+      code: "certificate_expired",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} expired at ${certificate.validUntil}.`,
+      expected: certificate.validUntil,
+      actual: input.checkedAt,
+    });
+  }
+
+  if (certificate.status === "revoked") {
+    issues.push({
+      code: "certificate_revoked",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} is revoked.`,
+      actual: certificate.status,
+    });
+  } else if (certificate.status === "superseded") {
+    issues.push({
+      code: "certificate_superseded",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} has been superseded.`,
+      actual: certificate.status,
+    });
+  }
+
+  if (
+    input.capabilityName !== undefined &&
+    certificate.subject.capabilityName !== input.capabilityName
+  ) {
+    issues.push({
+      code: "certificate_capability_mismatch",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} is bound to capability ${certificate.subject.capabilityName}, not ${input.capabilityName}.`,
+      expected: input.capabilityName,
+      actual: certificate.subject.capabilityName,
+    });
+  }
+  if (
+    input.providerId !== undefined &&
+    certificate.subject.providerId !== input.providerId
+  ) {
+    issues.push({
+      code: "certificate_provider_mismatch",
+      certificateId: certificate.certificateId,
+      message: `Terminal-admission provider certificate ${certificate.certificateId} is bound to provider ${certificate.subject.providerId}, not ${input.providerId}.`,
+      expected: input.providerId,
+      actual: certificate.subject.providerId,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+  };
+};
+
+export const verifyTerminalAdmissionProviderCertificateStatusRecord = (
+  input: TerminalAdmissionProviderCertificateStatusRecordValidationInput,
+): TerminalAdmissionProviderCertificateValidationDecision => {
+  const issues = [
+    ...verifyTerminalAdmissionProviderCertificate({
+      certificate: input.record.certificate,
+      checkedAt: input.checkedAt,
+      ...(input.capabilityName !== undefined
+        ? { capabilityName: input.capabilityName }
+        : {}),
+      ...(input.providerId !== undefined ? { providerId: input.providerId } : {}),
+    }).issues,
+  ];
+
+  if (
+    input.record.currentStatus === "revoked" &&
+    !issues.some((issue) => issue.code === "certificate_revoked")
+  ) {
+    issues.push({
+      code: "certificate_revoked",
+      certificateId: input.record.certificate.certificateId,
+      message: `Terminal-admission provider certificate ${input.record.certificate.certificateId} is revoked by the status store.`,
+      actual: input.record.currentStatus,
+    });
+  } else if (
+    input.record.currentStatus === "superseded" &&
+    !issues.some((issue) => issue.code === "certificate_superseded")
+  ) {
+    issues.push({
+      code: "certificate_superseded",
+      certificateId: input.record.certificate.certificateId,
+      message: `Terminal-admission provider certificate ${input.record.certificate.certificateId} has been superseded by the status store.`,
+      ...(input.record.supersededByCertificateId !== undefined
+        ? { expected: input.record.supersededByCertificateId }
+        : {}),
+      actual: input.record.currentStatus,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+  };
+};
+
+function providerVersionCompatible(
+  provider: TerminalAdmissionProviderRef,
+  manifest: TerminalAdmissionProviderManifest,
+): boolean {
+  const required = provider.contractVersion;
+  const actual = manifest.contractVersion;
+  if (required.major !== actual.major) return false;
+  if (actual.minor > required.minor) return true;
+  if (actual.minor < required.minor) return false;
+  return actual.patch >= required.patch;
+}
+
+function versionLabel(version: {
+  readonly major: number;
+  readonly minor: number;
+  readonly patch: number;
+}): string {
+  return `${version.major}.${version.minor}.${version.patch}`;
+}
+
+function addMissingRefKindIssues(
+  issues: TerminalAdmissionProviderVerificationIssue[],
+  provider: TerminalAdmissionProviderRef,
+  manifest: TerminalAdmissionProviderManifest,
+  field: "profiles" | "evidenceRefKinds" | "substrateRefKinds",
+  code: TerminalAdmissionProviderVerificationIssueCode,
+): void {
+  const expected = provider[field] ?? [];
+  const actual = manifest[field] ?? [];
+  for (const value of expected) {
+    if (actual.includes(value)) continue;
+    issues.push({
+      code,
+      providerId: provider.providerId,
+      message: `Terminal-admission provider ${provider.providerId} manifest does not cover ${field} value ${value}.`,
+      expected: value,
+    });
+  }
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return [...new Set(values)];
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function sortJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJsonValue);
+  if (value === null || typeof value !== "object") return value;
+  const record = value as Record<string, unknown>;
+  return Object.keys(record)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = sortJsonValue(record[key]);
+      return acc;
+    }, {});
+}
 
 export interface Registry {
   /**

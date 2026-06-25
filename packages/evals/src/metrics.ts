@@ -820,7 +820,8 @@ function countsTowardFailureReduction(event: EvalEvent): boolean {
   const stage = evidenceStageFor(event);
   return (
     stage === "blocked_mutation" ||
-    stage === "paired_behavioral_improvement"
+    stage === "paired_behavioral_improvement" ||
+    stage === "live_run"
   );
 }
 

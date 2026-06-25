@@ -4,10 +4,13 @@ import { tenantId, timestamp } from "@pm/types";
 import {
   buildObservationContractFromCurrentStateView,
   buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
+  buildActionOutcomeEnvelope,
+  buildActionOutcomeTerminalIndex,
   buildReadSetFromCurrentStateView,
   buildStateReviewArtifact,
   compareObservedReadSetToDeclared,
   computeStateReviewArtifactHash,
+  admitActionOutcomeEnvelope,
   evaluateStateReviewInvariantPolicy,
   evaluateObservationContract,
   importStateReviewArtifact,
@@ -17,7 +20,9 @@ import {
   serializeStateReviewArtifactsJsonl,
   stateRef,
   validateProposedActionReadSet,
+  verifyActionOutcomeEnvelopeHash,
   verifyStateReviewArtifactHash,
+  type ActionOutcomeEnvelopeInput,
   type CurrentStateView,
   type ProposedAction,
 } from "./index.js";
@@ -63,6 +68,30 @@ const actionFrom = (
   proposedAt: timestamp("2026-06-03T14:05:00.000Z"),
   ...overrides,
 });
+
+const actionOutcomeEnvelope = (
+  overrides: Partial<ActionOutcomeEnvelopeInput> = {},
+) =>
+  buildActionOutcomeEnvelope({
+    tenantId: t,
+    actionId: "action:dec_aapl_buy_120:accept",
+    subject: stateRef("projection", "arrowhedge_cop:AAPL", "AAPL COP"),
+    proposalReviewId: "review:dec_aapl_buy_120",
+    stateReviewArtifactHash: "a".repeat(64),
+    evidenceAdmissionReviewIds: ["ev:price_window:admission_review"],
+    requestedTerminalOutcome: "accepted",
+    decidedAt: timestamp("2026-06-03T14:06:00.000Z"),
+    decidedBy: "agent:portfolio-manager",
+    evidenceRefs: [signalRef, riskRef],
+    substrateRefs: [
+      stateRef(
+        "action_outcome_envelope",
+        "outcome:dec_aapl_buy_120",
+        "AAPL terminal outcome",
+      ),
+    ],
+    ...overrides,
+  });
 
 describe("@pm/agent-state read-set validation", () => {
   it("builds read-set entries from every current-state source ref", () => {
@@ -921,5 +950,133 @@ describe("@pm/agent-state read-set validation", () => {
       valid: false,
       actualHash: artifact.artifactHash,
     });
+  });
+
+  it("admits exactly one hash-valid terminal outcome per stable action id", () => {
+    const accepted = actionOutcomeEnvelope();
+    const duplicate = { ...accepted };
+    const blocked = actionOutcomeEnvelope({
+      requestedTerminalOutcome: "blocked",
+      blockingCauses: [
+        {
+          source: "status_check",
+          code: "risk_snapshot_stale",
+          message: "Risk snapshot changed before acceptance.",
+          refs: [riskRef],
+          invariantClasses: ["freshness_window"],
+        },
+      ],
+    });
+
+    expect(admitActionOutcomeEnvelope([], accepted)).toMatchObject({
+      accepted: true,
+      reason: "first_terminal_outcome",
+      candidateHashValidation: { valid: true },
+    });
+    expect(admitActionOutcomeEnvelope([accepted], duplicate)).toMatchObject({
+      accepted: true,
+      reason: "idempotent_duplicate",
+      candidateHashValidation: { valid: true },
+      incumbentHashValidation: { valid: true },
+    });
+    expect(admitActionOutcomeEnvelope([accepted], blocked)).toMatchObject({
+      accepted: false,
+      reason: "terminal_outcome_conflict",
+      candidate: { terminalOutcome: "blocked" },
+      incumbent: { terminalOutcome: "accepted" },
+      candidateHashValidation: { valid: true },
+      incumbentHashValidation: { valid: true },
+    });
+  });
+
+  it("rejects tampered terminal outcome envelopes before admission", () => {
+    const envelope = actionOutcomeEnvelope();
+    const tampered = {
+      ...envelope,
+      terminalOutcome: "blocked" as const,
+    };
+
+    expect(verifyActionOutcomeEnvelopeHash(tampered)).toMatchObject({
+      valid: false,
+      actualHash: envelope.outcomeHash,
+    });
+    expect(admitActionOutcomeEnvelope([], tampered)).toMatchObject({
+      accepted: false,
+      reason: "candidate_hash_invalid",
+      candidateHashValidation: { valid: false },
+    });
+  });
+
+  it("builds a terminal outcome index with replay counts and conflict issues", () => {
+    const accepted = actionOutcomeEnvelope();
+    const duplicate = { ...accepted };
+    const conflict = actionOutcomeEnvelope({
+      requestedTerminalOutcome: "blocked",
+      blockingCauses: [
+        {
+          source: "policy",
+          code: "approval_revoked",
+          message: "The approving authority revoked the action.",
+          refs: [decisionRef],
+          invariantClasses: ["workflow_position"],
+        },
+      ],
+    });
+    const invalid = {
+      ...actionOutcomeEnvelope({ actionId: "action:invalid_hash" }),
+      outcomeHash: "bad_hash",
+    };
+
+    const index = buildActionOutcomeTerminalIndex([
+      accepted,
+      duplicate,
+      conflict,
+      invalid,
+    ]);
+
+    expect(index.valid).toBe(false);
+    expect(index.entries).toHaveLength(1);
+    expect(index.entries[0]).toMatchObject({
+      key: "tnt_agent_state:action:dec_aapl_buy_120:accept",
+      replayCount: 2,
+      envelope: {
+        terminalOutcome: "accepted",
+      },
+    });
+    expect(index.issues.map((issue) => issue.code)).toEqual([
+      "terminal_outcome_conflict",
+      "candidate_hash_invalid",
+    ]);
+  });
+
+  it("keeps stale blocking reviews from becoming accepted terminal outcomes", () => {
+    const view = baseView();
+    const review = reviewProposedActionAgainstCurrentState(
+      actionFrom(view, {
+        proposedAt: timestamp("2026-06-03T14:11:00.000Z"),
+      }),
+      view,
+      {
+        evaluatedAt: timestamp("2026-06-03T14:11:00.000Z"),
+        enforcementMode: "blocking",
+      },
+    );
+
+    const envelope = actionOutcomeEnvelope({
+      proposalReviewId: review.reviewId,
+      proposalReview: review,
+      requestedTerminalOutcome: "accepted",
+    });
+
+    expect(envelope).toMatchObject({
+      terminalOutcome: "blocked",
+      blockingCauses: [
+        {
+          source: "proposal_review",
+          code: "proposal_review_blocking_policy",
+        },
+      ],
+    });
+    expect(verifyActionOutcomeEnvelopeHash(envelope).valid).toBe(true);
   });
 });

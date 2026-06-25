@@ -19,14 +19,19 @@ console.log(JSON.stringify({
   authorityGatePassRate: suite.metrics.authorityGatePassRate,
   convergentUpdateAutoResolutionRate: suite.metrics.convergentUpdateAutoResolutionRate,
   byCoordinationClass: suite.metrics.byCoordinationClass,
+  actionOutcomeEnvelopePackets: suite.actionOutcomeEnvelopes.length,
 }, null, 2));
 
 const databaseUrl = env["PM_DATABASE_URL"];
 if (databaseUrl) {
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
-    await new PostgresEvalEventStore(pool).recordMany(suite.events);
-    console.log(`persisted ${suite.events.length} eval events`);
+    const store = new PostgresEvalEventStore(pool);
+    await store.recordActionOutcomeEnvelopes(suite.actionOutcomeEnvelopes);
+    await store.recordMany(suite.events);
+    console.log(
+      `persisted ${suite.actionOutcomeEnvelopes.length} action outcome packets and ${suite.events.length} eval events`,
+    );
   } finally {
     await pool.end();
   }

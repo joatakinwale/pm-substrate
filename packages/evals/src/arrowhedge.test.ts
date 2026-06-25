@@ -8,7 +8,7 @@ import {
 } from "./metrics.js";
 
 describe("ArrowHedge state eval suite", () => {
-  it("emits paired evals for the six ArrowHedge adapter and agent-state scenarios", () => {
+  it("emits paired evals for the ArrowHedge adapter and agent-state scenarios", () => {
     const suite = buildArrowHedgeStateEvalSuite({
       tenantId: tenantId("tnt_arrowhedge_eval"),
       observedAt: timestamp("2026-06-03T16:30:00.000Z"),
@@ -38,6 +38,12 @@ describe("ArrowHedge state eval suite", () => {
           artifactId: "artifact_arrowhedge_stale_read_001",
         },
       ],
+      actionOutcomeEnvelopes: [
+        {
+          scenarioId: "arrowhedge-terminal-outcome-partition",
+          envelopeId: "outcome_arrowhedge_terminal_partition_001",
+        },
+      ],
       operationalSamples: [
         {
           adapterStartedAt: timestamp("2026-06-03T16:29:58.000Z"),
@@ -57,11 +63,12 @@ describe("ArrowHedge state eval suite", () => {
       "stale_observation",
       "workflow_invalidation",
       "capability_contract_violation",
+      "parallel_write_conflict",
     ]);
     expect(suite.summaries.map((summary) => summary.scenarioId)).toContain(
       "arrowhedge-distribution-currentness-mismatch",
     );
-    expect(suite.events).toHaveLength(12);
+    expect(suite.events).toHaveLength(14);
     const artifactLinkedEvents = suite.events
       .filter((event) =>
         event.substrateRefs.some((ref) => ref.kind === "state_review_artifact"),
@@ -84,21 +91,50 @@ describe("ArrowHedge state eval suite", () => {
         ],
       },
     ]);
+    const outcomeLinkedEvents = suite.events
+      .filter((event) =>
+        event.substrateRefs.some((ref) => ref.kind === "action_outcome_envelope"),
+      )
+      .map((event) => ({
+        scenarioId: event.scenarioId,
+        refs: event.substrateRefs.filter(
+          (ref) => ref.kind === "action_outcome_envelope",
+        ),
+      }));
+    expect(outcomeLinkedEvents).toEqual([
+      {
+        scenarioId: "arrowhedge-terminal-outcome-partition",
+        refs: [
+          {
+            kind: "action_outcome_envelope",
+            id: "outcome_arrowhedge_terminal_partition_001",
+            label: "ArrowHedge ActionOutcomeEnvelope",
+          },
+        ],
+      },
+    ]);
 
     const metrics = analyzeEvalEvents(suite.events);
     expect(metrics).toMatchObject({
-      pairedGroups: 6,
-      completePairedGroups: 6,
-      baselineFailures: 6,
+      pairedGroups: 7,
+      completePairedGroups: 7,
+      baselineFailures: 7,
       substrateFailures: 0,
-      failureReduction: 0,
-      allStageFailureReduction: 6,
+      failureReduction: 1,
+      allStageFailureReduction: 7,
       authorityGatePassRate: 1,
     });
     expect(metrics.evidenceStages).toEqual([
       "scaffolded_scenario",
       "detected_warning",
+      "blocked_mutation",
     ]);
+    expect(metrics.byEvidenceStage.blocked_mutation).toMatchObject({
+      events: 2,
+      pairedGroups: 1,
+      failureReduction: 1,
+      substratePasses: 1,
+    });
     expect(metrics.byEvidenceStage.detected_warning).toMatchObject({
       events: 2,
       pairedGroups: 1,
@@ -124,6 +160,11 @@ describe("ArrowHedge state eval suite", () => {
       allStageFailureReduction: 1,
       substratePasses: 1,
     });
+    expect(metrics.byFailureClass["parallel_write_conflict"]).toMatchObject({
+      failureReduction: 1,
+      allStageFailureReduction: 1,
+      substratePasses: 1,
+    });
 
     const operational = analyzeAdapterOperationalMetrics(
       suite.events,
@@ -134,7 +175,7 @@ describe("ArrowHedge state eval suite", () => {
       mappingRejectionRate: 1 / 9,
       stateDisagreementRate: 1 / 3,
       authorityGatePassRate: 1,
-      authorityGatePasses: 5,
+      authorityGatePasses: 6,
       authorityGateFailures: 0,
     });
   });

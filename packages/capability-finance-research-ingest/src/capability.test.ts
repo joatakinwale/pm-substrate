@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCapability } from "@pm/registry";
+import {
+  listTerminalAdmissionProviderBindings,
+  normalizeCapability,
+  verifyTerminalAdmissionProviderBindings,
+} from "@pm/registry";
 
 import {
   FINANCE_RESEARCH_INGEST_CAPABILITY,
   FINANCE_RESEARCH_EVENT_TYPES,
+  FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER,
+  FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER_MANIFEST,
 } from "./capability.js";
 
 describe("FINANCE_RESEARCH_INGEST_CAPABILITY", () => {
@@ -48,5 +54,43 @@ describe("FINANCE_RESEARCH_INGEST_CAPABILITY", () => {
     expect(FINANCE_RESEARCH_INGEST_CAPABILITY.requiredPermissions).toEqual([
       "finance-research.ingest.write",
     ]);
+  });
+
+  it("advertises the ArrowHedge terminal-admission provider on the event write boundary", () => {
+    const [binding] = listTerminalAdmissionProviderBindings(
+      FINANCE_RESEARCH_INGEST_CAPABILITY,
+    );
+
+    expect(binding).toMatchObject({
+      capabilityName: "finance-research.ingest",
+      writeInterface: "Event",
+      writeFields: ["kind", "occurredAt"],
+      provider: FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER,
+    });
+    expect(
+      FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER.actionTypes,
+    ).toEqual([
+      "portfolio.decision.accept",
+      "workflow.block",
+      "risk.refresh",
+    ]);
+  });
+
+  it("verifies the advertised ArrowHedge provider against its live manifest", () => {
+    const report = verifyTerminalAdmissionProviderBindings(
+      [FINANCE_RESEARCH_INGEST_CAPABILITY],
+      [FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER_MANIFEST],
+    );
+
+    expect(report).toMatchObject({
+      totalBindings: 1,
+      verifiedBindings: 1,
+      failedBindings: 0,
+      issues: [],
+    });
+    expect(report.bindings[0]?.manifest).toMatchObject({
+      providerId: "finance-research.arrowhedge.action-outcome-envelope.v1",
+      availability: "available",
+    });
   });
 });

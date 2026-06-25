@@ -5,16 +5,25 @@ import {
   verifyInvocationEvidenceBindingAgainstCatalog,
   type EvidenceBindingReferenceCatalog,
 } from "@pm/workflow";
+import { verifyActionOutcomeEnvelopeHash } from "@pm/agent-state";
+import type { Capability } from "@pm/registry";
+import type { CapabilityId } from "@pm/types";
+import { tenantId, timestamp } from "@pm/types";
 
 import {
+  analyzeEvalEventActionOutcomeReplay,
   analyzeWriteBindingReplayRecords,
   analyzeWriteTransportBindingCoverage,
+  buildActionOutcomeEnvelopeReplayIndex,
   buildArrowHedgeWriteBindingReplayCorpus,
   buildEvidenceBindingReferenceCatalogFromReplayCorpora,
   buildFixtureWriteTransportBindingCoverageSamples,
+  buildWriteTransportBindingCoverageSamplesFromCapabilities,
   importWriteBindingReplayRecordsJsonl,
+  recoverActionOutcomeEnvelopeFromReplayIndex,
   type WriteBindingReplayRecord,
 } from "./write-binding.js";
+import { buildArrowHedgeStateEvalSuite } from "./arrowhedge.js";
 
 describe("write-binding replay corpus", () => {
   it("generates an ArrowHedge corpus that covers allowed, unverified, missing, incomplete, and policy-blocked write attempts", () => {
@@ -47,6 +56,28 @@ describe("write-binding replay corpus", () => {
         ),
       ),
     ).toBe(true);
+    expect(
+      corpus.records.every(
+        (record) => verifyActionOutcomeEnvelopeHash(record.actionOutcomeEnvelope).valid,
+      ),
+    ).toBe(true);
+    expect(
+      corpus.records.map((record) => record.actionOutcomeEnvelope.terminalOutcome),
+    ).toEqual([
+      "accepted",
+      "blocked",
+      "blocked",
+      "blocked",
+      "blocked",
+      "blocked",
+    ]);
+    expect(
+      corpus.records.every((record) =>
+        record.actionOutcomeEnvelope.substrateRefs.some(
+          (ref) => ref.kind === "action_outcome_envelope",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("derives metrics from observed replay decisions instead of scenario labels", () => {
@@ -63,7 +94,12 @@ describe("write-binding replay corpus", () => {
       incompleteBindings: 1,
       policyBlocked: 2,
       unverifiedBindings: 1,
+      providerCertificateMissing: 0,
+      providerCertificateInvalid: 0,
       rejectedEvidenceReferences: 1,
+      actionOutcomeEnvelopeCount: 6,
+      acceptedActionOutcomeEnvelopes: 1,
+      blockedActionOutcomeEnvelopes: 5,
       replayHashCoverage: 1,
       highConsequenceRecords: 6,
     });
@@ -73,6 +109,95 @@ describe("write-binding replay corpus", () => {
       blocked_incomplete_binding: 1,
       blocked_policy: 2,
       blocked_unverified_binding: 1,
+      blocked_provider_certificate_missing: 0,
+      blocked_provider_certificate_invalid: 0,
+    });
+  });
+
+  it("indexes promoted action outcome envelopes for amnesiac replay recovery", () => {
+    const records = buildArrowHedgeWriteBindingReplayCorpus().records;
+    const index = buildActionOutcomeEnvelopeReplayIndex(records);
+    const staleBlockedRecord = records.find(
+      (record) =>
+        record.recordId === "wb_arrowhedge_stale_artifact_policy_blocked_001",
+    );
+    const replayRef = staleBlockedRecord?.actionOutcomeEnvelope.substrateRefs.find(
+      (ref) => ref.kind === "action_outcome_envelope",
+    );
+
+    expect(replayRef).toBeDefined();
+    expect(index).toMatchObject({
+      envelopeCount: 6,
+      indexedRefCount: 6,
+      acceptedTerminalOutcomes: 1,
+      blockedTerminalOutcomes: 5,
+      invalidEnvelopeHashes: [],
+    });
+
+    const recovered = recoverActionOutcomeEnvelopeFromReplayIndex(index, {
+      kind: "action_outcome_envelope",
+      id: replayRef!.id,
+    });
+
+    expect(recovered).toBeDefined();
+    expect(recovered!.terminalOutcome).toBe("blocked");
+    expect(recovered!.actionId).toContain("evt_arrowhedge_accept_ready_stale_artifact");
+    expect(verifyActionOutcomeEnvelopeHash(recovered!).valid).toBe(true);
+  });
+
+  it("resolves Axis A eval action-outcome refs against committed replay proof packets", () => {
+    const records = buildArrowHedgeWriteBindingReplayCorpus().records;
+    const terminalPartitionRef = records
+      .find(
+        (record) =>
+          record.recordId === "wb_arrowhedge_stale_artifact_policy_blocked_001",
+      )
+      ?.actionOutcomeEnvelope.substrateRefs.find(
+        (ref) => ref.kind === "action_outcome_envelope",
+      );
+
+    expect(terminalPartitionRef).toBeDefined();
+
+    const suite = buildArrowHedgeStateEvalSuite({
+      tenantId: tenantId("tnt_arrowhedge_state_review_corpus"),
+      observedAt: timestamp("2026-06-11T16:05:00.000Z"),
+      source: "packages/evals/fixtures/write-binding-replay.v1.jsonl",
+      sourceRecordIds: ["ticker:AAPL"],
+      substrateRefs: {
+        graphNodeIds: [],
+        eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+        projectionIds: ["arrowhedge_cop"],
+      },
+      readSetValidation: {
+        currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+        mode: "warn",
+        issueCodes: ["stale_read_ref"],
+      },
+      actionOutcomeEnvelopes: [
+        {
+          scenarioId: "arrowhedge-terminal-outcome-partition",
+          envelopeId: terminalPartitionRef!.id,
+        },
+      ],
+      operationalSamples: [],
+    });
+    const replay = analyzeEvalEventActionOutcomeReplay(suite.events, records);
+
+    expect(replay).toMatchObject({
+      eventCount: 14,
+      eventsWithActionOutcomeRefs: 1,
+      actionOutcomeRefCount: 1,
+      resolvedActionOutcomeRefs: 1,
+      unresolvedActionOutcomeRefs: 0,
+      invalidResolvedActionOutcomeRefs: 0,
+      acceptedTerminalOutcomes: 0,
+      blockedTerminalOutcomes: 1,
+    });
+    expect(replay.recoveries[0]).toMatchObject({
+      scenarioId: "arrowhedge-terminal-outcome-partition",
+      resolved: true,
+      terminalOutcome: "blocked",
+      recordId: "wb_arrowhedge_stale_artifact_policy_blocked_001",
     });
   });
 
@@ -183,6 +308,11 @@ describe("write-binding replay corpus", () => {
     expect(report.advisoryOnlyTransports).toBe(1);
     expect(report.missingProviderTransports).toBe(1);
     expect(report.coverageRate).toBe(0.5);
+    expect(report.outcomeEnvelopeRequiredTransports).toBe(4);
+    expect(report.outcomeEnvelopeCoveredTransports).toBe(4);
+    expect(report.outcomeEnvelopeMissingTransports).toBe(0);
+    expect(report.outcomeEnvelopeCoverageRate).toBe(1);
+    expect(report.missingActionOutcomeEnvelopeTransportIds).toEqual([]);
     expect(report.byDisposition).toEqual({
       advisory_only: 1,
       missing_provider: 1,
@@ -192,7 +322,160 @@ describe("write-binding replay corpus", () => {
       "agency.lead.promote",
     );
   });
+
+  it("derives action-outcome provider coverage from capability write contracts", () => {
+    const coveredCapability = capabilityFixture("finance-research.ingest", [
+      {
+        interface: "Event",
+        fields: ["kind", "occurredAt"],
+        ownership: "contributor",
+        terminalAdmissionProviders: [
+          {
+            providerId: "finance-research.arrowhedge.action-outcome-envelope.v1",
+            kind: "action_outcome_envelope",
+            contractVersion: { major: 1, minor: 0, patch: 0 },
+            packageName: "@pm/capability-finance-research-ingest",
+            exportName: "buildArrowHedgeActionOutcomeEnvelope",
+            actionTypes: ["portfolio.decision.accept"],
+          },
+        ],
+      },
+      {
+        interface: "Resource",
+        fields: ["name", "kind"],
+        ownership: "contributor",
+      },
+    ]);
+    const uncoveredCapability = capabilityFixture("agency.lead-scoring", [
+      {
+        interface: "Resource",
+        fields: ["currentTotalLeadsScored"],
+        ownership: "owner",
+      },
+    ]);
+
+    const report = analyzeWriteTransportBindingCoverage(
+      buildWriteTransportBindingCoverageSamplesFromCapabilities(
+        [
+          {
+            capability: coveredCapability,
+            profile: "finance-research",
+            workflowName: "arrowhedge-write-binding-replay",
+            bindingMode: "require_for_writes",
+            hasBindingProvider: true,
+            hasBindingVerifier: true,
+          },
+          {
+            capability: uncoveredCapability,
+            profile: "agency",
+            workflowName: "agency-lead-scoring",
+            bindingMode: "require_for_writes",
+            hasBindingProvider: true,
+            hasBindingVerifier: true,
+          },
+        ],
+        {
+          requireVerifiedTerminalAdmissionProviders: true,
+          terminalAdmissionProviderManifests: [
+            {
+              providerId:
+                "finance-research.arrowhedge.action-outcome-envelope.v1",
+              kind: "action_outcome_envelope",
+              contractVersion: { major: 1, minor: 0, patch: 1 },
+              packageName: "@pm/capability-finance-research-ingest",
+              exportName: "buildArrowHedgeActionOutcomeEnvelope",
+              actionTypes: ["portfolio.decision.accept", "workflow.block"],
+              availability: "available",
+            },
+          ],
+        },
+      ),
+    );
+
+    const byTransportId = new Map(
+      report.samples.map((sample) => [sample.transportId, sample]),
+    );
+
+    expect(
+      byTransportId.get("finance-research.ingest:Event:kind,occurredAt"),
+    ).toMatchObject({
+      hasActionOutcomeEnvelopeProvider: true,
+      terminalAdmissionProviderIds: [
+        "finance-research.arrowhedge.action-outcome-envelope.v1",
+      ],
+    });
+    expect(
+      byTransportId.get(
+        "agency.lead-scoring:Resource:currentTotalLeadsScored",
+      ),
+    ).toMatchObject({
+      hasActionOutcomeEnvelopeProvider: false,
+      terminalAdmissionProviderIds: [],
+    });
+    expect(report.outcomeEnvelopeRequiredTransports).toBe(3);
+    expect(report.outcomeEnvelopeCoveredTransports).toBe(1);
+    expect(report.outcomeEnvelopeMissingTransports).toBe(2);
+    expect(report.missingActionOutcomeEnvelopeTransportIds).toEqual([
+      "finance-research.ingest:Resource:name,kind",
+      "agency.lead-scoring:Resource:currentTotalLeadsScored",
+    ]);
+
+    const staleProviderReport = analyzeWriteTransportBindingCoverage(
+      buildWriteTransportBindingCoverageSamplesFromCapabilities(
+        [
+          {
+            capability: coveredCapability,
+            profile: "finance-research",
+            workflowName: "arrowhedge-write-binding-replay",
+            bindingMode: "require_for_writes",
+            hasBindingProvider: true,
+            hasBindingVerifier: true,
+          },
+        ],
+        {
+          requireVerifiedTerminalAdmissionProviders: true,
+          terminalAdmissionProviderManifests: [
+            {
+              providerId:
+                "finance-research.arrowhedge.action-outcome-envelope.v1",
+              kind: "action_outcome_envelope",
+              contractVersion: { major: 1, minor: 0, patch: 1 },
+              packageName: "@pm/capability-finance-research-ingest",
+              exportName: "buildArrowHedgeActionOutcomeEnvelope",
+              actionTypes: ["workflow.block"],
+              availability: "available",
+            },
+          ],
+        },
+      ),
+    );
+
+    expect(staleProviderReport.outcomeEnvelopeCoveredTransports).toBe(0);
+    expect(staleProviderReport.missingActionOutcomeEnvelopeTransportIds).toEqual([
+      "finance-research.ingest:Event:kind,occurredAt",
+      "finance-research.ingest:Resource:name,kind",
+    ]);
+  });
 });
+
+function capabilityFixture(
+  name: string,
+  writesInterfaces: Capability["writesInterfaces"],
+): Capability {
+  return {
+    id: `cap_${name.replace(/[^a-z0-9]+/gi, "_")}` as CapabilityId,
+    name,
+    version: 1,
+    readsInterfaces: [],
+    writesInterfaces,
+    readsEdges: [],
+    writesEdges: [],
+    emits: [],
+    subscribesTo: [],
+    requiredPermissions: [],
+    description: "test fixture",
+  };
+}
 
 function replayBindingRecord(
   record: WriteBindingReplayRecord,

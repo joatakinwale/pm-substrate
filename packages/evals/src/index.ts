@@ -1,5 +1,6 @@
 export {
   EVAL_AXES,
+  EVAL_OPERATIONAL_TERMINAL_OUTCOMES,
   EVAL_REF_KINDS,
   EVAL_RESULTS,
   FAILURE_CLASSES,
@@ -21,6 +22,7 @@ export {
   type EvalAxis,
   type EvalEvent,
   type EvalEvidenceRef,
+  type EvalOperationalTerminalOutcome,
   type EvalRefKind,
   type EvalResult,
   type FailureClass,
@@ -33,6 +35,7 @@ export {
 } from "./schema.js";
 export {
   PostgresEvalEventStore,
+  type ActionOutcomeEnvelopeStoreRecovery,
   type EvalEventDbClient,
   type EvalEventQueryResult,
 } from "./persistence/index.js";
@@ -77,6 +80,23 @@ export {
   type LocalLabPairSummary,
 } from "./local-lab.js";
 export {
+  assertEventsHaveGeneratedActionOutcomePackets,
+  analyzeDynamicLocalAgentLabLiveCoverage,
+  buildDynamicLocalAgentLabEvalEvents,
+  buildDynamicLocalAgentLabEvalSuite,
+  recordDynamicLocalAgentLabEvalSuite,
+  type DynamicLocalAgentLabArm,
+  type DynamicLocalAgentLabArmRunForEval,
+  type DynamicLocalAgentLabEvalOptions,
+  type DynamicLocalAgentLabEvalStore,
+  type DynamicLocalAgentLabEvalSuite,
+  type DynamicLocalAgentLabFailureClassCoverage,
+  type DynamicLocalAgentLabLiveCoverageReport,
+  type DynamicLocalAgentLabScenarioRunForEval,
+  type DynamicLocalAgentLabSuiteForEval,
+  type DynamicLocalAgentLabTaxonomy,
+} from "./local-agent-lab.js";
+export {
   buildAdapterStateProofEvalPair,
   type AdapterStateProofEvalInput,
   type AdapterStateProofPairedResult,
@@ -85,11 +105,16 @@ export {
 } from "./adapter-proof.js";
 export {
   buildArrowHedgeStateEvalSuite,
+  type ArrowHedgeActionOutcomeEnvelopeEvalRef,
   type ArrowHedgeScenarioSummary,
   type ArrowHedgeStateReviewArtifactEvalRef,
   type ArrowHedgeStateEvalInput,
   type ArrowHedgeStateEvalSuite,
 } from "./arrowhedge.js";
+export {
+  buildMarketingAxisBBlockedEval,
+  type MarketingAxisBBlockedInput,
+} from "./marketing.js";
 export {
   analyzeEvidenceAdmissionFixtureResults,
   buildEvidenceAdmissionFixtureCorpus,
@@ -110,13 +135,36 @@ export {
   type StateReviewArtifactRunGroup,
 } from "./evidence-admission.js";
 export {
+  analyzeThreeAxisCoverage,
+  type ThreeAxisAxisCoverage,
+  type ThreeAxisCoverageCell,
+  type ThreeAxisCoverageOptions,
+  type ThreeAxisCoverageReason,
+  type ThreeAxisCoverageReport,
+} from "./three-axis-coverage.js";
+export {
+  buildThreeAxisProofPacket,
+  type ThreeAxisProofPacket,
+  type ThreeAxisProofPacketCellRef,
+  type ThreeAxisProofPacketInput,
+  type ThreeAxisProofPacketSource,
+  type ThreeAxisProofPacketStatus,
+} from "./three-axis-proof-packet.js";
+export {
+  analyzeEvalEventActionOutcomeReplay,
   analyzeWriteBindingReplayRecords,
   analyzeWriteTransportBindingCoverage,
+  buildActionOutcomeEnvelopeReplayIndex,
   buildArrowHedgeWriteBindingReplayCorpus,
   buildEvidenceBindingReferenceCatalogFromReplayCorpora,
   buildFixtureWriteTransportBindingCoverageSamples,
   importWriteBindingReplayRecordsJsonl,
+  recoverActionOutcomeEnvelopeFromReplayIndex,
   serializeWriteBindingReplayRecordsJsonl,
+  type ActionOutcomeEnvelopeReplayIndex,
+  type ActionOutcomeEnvelopeReplayIndexedRef,
+  type EvalEventActionOutcomeReplayMetrics,
+  type EvalEventActionOutcomeReplayRecovery,
   type EvidenceBindingReferenceCatalogBuildResult,
   type EvidenceBindingReferenceCatalogMetrics,
   type WriteTransportBindingCoverageDisposition,
