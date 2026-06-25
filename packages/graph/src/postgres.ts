@@ -48,6 +48,11 @@ import type {
   Graph,
   UpdateNodeInput,
 } from "./interfaces.js";
+import {
+  assertGraphWriteAuthority,
+  type GraphWriteAuthorityPolicy,
+  type GraphWriteAuthorityRef,
+} from "./write-authority.js";
 
 /**
  * UUID regex: covers v1–v5 and nil UUID (all-zeros). Case-insensitive.
@@ -57,6 +62,14 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const isValidUUID = (s: string): boolean => UUID_RE.test(s);
+
+const isGraphWriteAuthorityRef = (
+  value: unknown,
+): value is GraphWriteAuthorityRef =>
+  typeof value === "object" &&
+  value !== null &&
+  (value as { readonly authorityKind?: unknown }).authorityKind ===
+    "workflow_action_outcome_envelope";
 
 /**
  * Optional dependency on a profile validator. When supplied, every node
@@ -76,6 +89,12 @@ export interface PostgresGraphOptions {
    * (substrate-only validation — Tier-1 type CHECK constraint still applies).
    */
   readonly validatorFactory?: ValidatorFactory;
+
+  /**
+   * If set, every graph write must carry the configured workflow authority
+   * reference before SQL execution.
+   */
+  readonly writeAuthorityPolicy?: GraphWriteAuthorityPolicy;
 }
 
 interface NodeRow {
@@ -138,10 +157,12 @@ type Querier = Pick<pg.ClientBase, "query"> | pg.Pool;
 export class PostgresGraph implements Graph {
   readonly #pool: pg.Pool;
   readonly #validatorFactory: ValidatorFactory | null;
+  readonly #writeAuthorityPolicy: GraphWriteAuthorityPolicy | undefined;
 
   constructor(pool: pg.Pool, options: PostgresGraphOptions = {}) {
     this.#pool = pool;
     this.#validatorFactory = options.validatorFactory ?? null;
+    this.#writeAuthorityPolicy = options.writeAuthorityPolicy;
   }
 
   // -------------------------------------------------------------------------
@@ -220,6 +241,8 @@ export class PostgresGraph implements Graph {
     input: CreateNodeInput,
     tx?: pg.ClientBase,
   ): Promise<CreateNodeResult> {
+    this.#assertWriteAuthority(input.writeAuthorityRef);
+
     // -----------------------------------------------------------------------
     // 1. Validate caller-supplied ID if present.
     // -----------------------------------------------------------------------
@@ -312,6 +335,8 @@ export class PostgresGraph implements Graph {
     input: UpdateNodeInput,
     tx?: pg.ClientBase,
   ): Promise<NodeBase> {
+    this.#assertWriteAuthority(input.writeAuthorityRef);
+
     // Validate the proposed identity against the tenant's installed
     // profiles. We need the existing node to know the profile binding
     // (caller supplies only the tenantId+id+identity), so we read first.
@@ -361,6 +386,8 @@ export class PostgresGraph implements Graph {
     input: CreateEdgeInput,
     tx?: pg.ClientBase,
   ): Promise<Edge> {
+    this.#assertWriteAuthority(input.writeAuthorityRef);
+
     if (this.#validatorFactory) {
       // Look up the concrete types of the from/to nodes + count existing
       // edges of this type from/to each side. The validator does the
@@ -420,9 +447,19 @@ export class PostgresGraph implements Graph {
   async deleteEdge(
     tenantId: TenantId,
     id: EdgeId,
+    writeAuthorityRefOrTx?: GraphWriteAuthorityRef | pg.ClientBase,
     tx?: pg.ClientBase,
   ): Promise<void> {
-    const q = this.#q(tx);
+    const writeAuthorityRef = isGraphWriteAuthorityRef(writeAuthorityRefOrTx)
+      ? writeAuthorityRefOrTx
+      : undefined;
+    const queryClient = isGraphWriteAuthorityRef(writeAuthorityRefOrTx)
+      ? tx
+      : writeAuthorityRefOrTx;
+
+    this.#assertWriteAuthority(writeAuthorityRef);
+
+    const q = this.#q(queryClient);
     const r = await q.query(
       `UPDATE graph.edges
           SET deleted_at = now(),
@@ -438,6 +475,15 @@ export class PostgresGraph implements Graph {
   // -------------------------------------------------------------------------
   // Internal
   // -------------------------------------------------------------------------
+
+  #assertWriteAuthority(authorityRef?: GraphWriteAuthorityRef): void {
+    assertGraphWriteAuthority({
+      ...(authorityRef !== undefined ? { authorityRef } : {}),
+      ...(this.#writeAuthorityPolicy !== undefined
+        ? { policy: this.#writeAuthorityPolicy }
+        : {}),
+    });
+  }
 
   /**
    * Resolve a `Querier`. If a transactional client is passed, use it; else

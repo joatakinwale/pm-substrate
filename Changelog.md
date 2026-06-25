@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - Graph write authority refs
+
+- Added `research/daily-arrowsmith-agent-state/v41-graph-write-authority-ref-2026-06-25.md`, answering RQ42 and replacing it with RQ43: how capability-kit raw graph writes should propagate graph write-authority refs.
+- Added `GraphWriteAuthorityRef`, `GraphWriteProviderCertificateStatusRef`, `GraphWriteAuthorityPolicy`, `validateGraphWriteAuthority()`, `assertGraphWriteAuthority()`, and `GraphWriteAuthorityError` to `@pm/graph`.
+- Added optional write-authority refs to graph create/update/edge mutation inputs and optional `PostgresGraph.writeAuthorityPolicy`.
+- Updated `PostgresGraph` so strict graph instances reject create/update/tombstone mutations before SQL when accepted workflow authority or provider-certificate status refs are missing, revoked, or mismatched.
+- Added pure/adapter tests proving authority validation and pre-SQL rejection.
+- Claim boundary: graph writes can now enforce the workflow authority/status-ref boundary when policy is enabled, but capability-kit raw SQL still needs propagation before broad mutation-governance claims.
+
 ## 2026-06-25 - Workflow status ref binding
 
 - Added `research/daily-arrowsmith-agent-state/v40-workflow-status-ref-binding-2026-06-25.md`, answering RQ41 and replacing it with RQ42: how non-workflow graph/capability writes should consume provider-certificate status refs.

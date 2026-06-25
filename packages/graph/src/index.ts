@@ -38,3 +38,14 @@ export {
   type FreshnessDecision,
   type StaleReadErrorDetail,
 } from "./staleness.js";
+
+export {
+  assertGraphWriteAuthority,
+  GraphWriteAuthorityError,
+  validateGraphWriteAuthority,
+  type GraphWriteAuthorityIssue,
+  type GraphWriteAuthorityIssueCode,
+  type GraphWriteAuthorityPolicy,
+  type GraphWriteAuthorityRef,
+  type GraphWriteProviderCertificateStatusRef,
+} from "./write-authority.js";
