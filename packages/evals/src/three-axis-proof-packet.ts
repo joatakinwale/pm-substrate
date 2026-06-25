@@ -8,6 +8,10 @@ import {
   type EvalEvent,
   type FailureClass,
 } from "./schema.js";
+import type {
+  EvalGraphWriteAuthorityRecovery,
+  EvalGraphWriteAuthorityRecoveryStatus,
+} from "./authority-recovery.js";
 import {
   analyzeThreeAxisCoverage,
   type ThreeAxisCoverageOptions,
@@ -35,6 +39,26 @@ export interface ThreeAxisProofPacketInput {
   readonly events: readonly EvalEvent[];
   readonly sources: readonly ThreeAxisProofPacketSource[];
   readonly coverageOptions?: ThreeAxisCoverageOptions;
+  readonly authorityRecoveries?: readonly EvalGraphWriteAuthorityRecovery[];
+  readonly requireAuthorityRecovery?: boolean;
+}
+
+export interface ThreeAxisAuthorityRecoveryObligation {
+  readonly runId: string;
+  readonly axis: EvalAxis;
+  readonly scenarioId: string;
+  readonly failureClass: FailureClass;
+  readonly expectedStatus: EvalGraphWriteAuthorityRecoveryStatus;
+  readonly recoveryStatus?: EvalGraphWriteAuthorityRecoveryStatus;
+  readonly reason?: string;
+}
+
+export interface ThreeAxisAuthorityRecoveryGate {
+  readonly required: boolean;
+  readonly passed: boolean;
+  readonly obligationCount: number;
+  readonly validObligations: number;
+  readonly invalidObligations: readonly ThreeAxisAuthorityRecoveryObligation[];
 }
 
 export interface ThreeAxisProofPacket {
@@ -49,6 +73,7 @@ export interface ThreeAxisProofPacket {
   readonly unverifiedAxes: readonly EvalAxis[];
   readonly verifiedCells: readonly ThreeAxisProofPacketCellRef[];
   readonly terminalProofBackedScenarioPassCells: readonly ThreeAxisProofPacketCellRef[];
+  readonly authorityRecoveryGate: ThreeAxisAuthorityRecoveryGate;
   readonly blockedCells: readonly ThreeAxisProofPacketCellRef[];
   readonly missingCells: readonly ThreeAxisProofPacketCellRef[];
   readonly unverifiedCells: readonly ThreeAxisProofPacketCellRef[];
@@ -67,12 +92,13 @@ export function buildThreeAxisProofPacket(
     (cell) =>
       cell.scenarioPassPairs > 0 && cell.terminalProofBackedPairs > 0,
   );
+  const authorityRecoveryGate = analyzeAuthorityRecoveryGate(input);
   const verifiedAxes = EVAL_AXES.filter((axis) => report.byAxis[axis].verified);
   const blockedAxes = EVAL_AXES.filter(
     (axis) => report.byAxis[axis].blockedFailureClasses.length > 0,
   );
   const unverifiedAxes = EVAL_AXES.filter((axis) => !report.byAxis[axis].verified);
-  const status = report.verified
+  const status = report.verified && authorityRecoveryGate.passed
     ? "verified"
     : blockedCells.length > 0
       ? "blocked"
@@ -105,6 +131,7 @@ export function buildThreeAxisProofPacket(
     terminalProofBackedScenarioPassCells: cellRefs(
       terminalProofBackedScenarioPassCells,
     ),
+    authorityRecoveryGate,
     blockedCells: cellRefs(blockedCells),
     missingCells: cellRefs(missingCells),
     unverifiedCells: cellRefs(unverifiedCells),
@@ -134,4 +161,83 @@ function stablePacketId(payload: unknown): string {
     .update(JSON.stringify(payload))
     .digest("hex")
     .slice(0, 16)}`;
+}
+
+function analyzeAuthorityRecoveryGate(
+  input: ThreeAxisProofPacketInput,
+): ThreeAxisAuthorityRecoveryGate {
+  const required = input.requireAuthorityRecovery === true;
+  const obligations = authorityRecoveryObligations(input.events);
+  const recoveries = new Map(
+    (input.authorityRecoveries ?? []).map((recovery) => [
+      recovery.runId,
+      recovery,
+    ]),
+  );
+  const invalidObligations = obligations.flatMap((obligation) => {
+    const recovery = recoveries.get(obligation.runId);
+    if (recovery === undefined) {
+      return [
+        {
+          ...obligation,
+          reason: "missing_authority_recovery",
+        },
+      ];
+    }
+    if (!recovery.valid) {
+      return [
+        {
+          ...obligation,
+          recoveryStatus: recovery.status,
+          reason: "invalid_authority_recovery",
+        },
+      ];
+    }
+    if (recovery.status !== obligation.expectedStatus) {
+      return [
+        {
+          ...obligation,
+          recoveryStatus: recovery.status,
+          reason: "unexpected_authority_recovery_status",
+        },
+      ];
+    }
+    return [];
+  });
+
+  return {
+    required,
+    passed: !required || invalidObligations.length === 0,
+    obligationCount: obligations.length,
+    validObligations: obligations.length - invalidObligations.length,
+    invalidObligations,
+  };
+}
+
+function authorityRecoveryObligations(
+  events: readonly EvalEvent[],
+): readonly ThreeAxisAuthorityRecoveryObligation[] {
+  return events.flatMap((event) => {
+    if (event.operationalTerminalOutcome === undefined) return [];
+    if (
+      !event.substrateRefs.some((ref) => ref.kind === "action_outcome_envelope")
+    ) {
+      return [];
+    }
+    const scenarioResult = event.scenarioResult ?? event.result;
+    if (scenarioResult === "blocked") return [];
+
+    return [
+      {
+        runId: event.runId,
+        axis: event.axis,
+        scenarioId: event.scenarioId,
+        failureClass: event.failureClass,
+        expectedStatus:
+          event.operationalTerminalOutcome === "accepted"
+            ? "accepted_authority_recovered"
+            : "terminal_outcome_refused_authority",
+      },
+    ];
+  });
 }

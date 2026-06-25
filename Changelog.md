@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-25 - Proof packet authority gate
+
+- Added `research/daily-arrowsmith-agent-state/v48-proof-packet-authority-gate-2026-06-25.md`, answering RQ49 and replacing it with RQ50: generating authority recoveries from real Axis A/C runner store/resolver calls.
+- Added `authorityRecoveries` and `requireAuthorityRecovery` to `buildThreeAxisProofPacket()`.
+- Added `ThreeAxisAuthorityRecoveryGate` and recovery obligations so strict proof packets cannot remain `verified` when terminal-proof-backed events lack valid expected-status authority recoveries.
+- Added tests proving missing recoveries downgrade an otherwise verified packet, valid recoveries restore verified status, and blocked terminal outcomes cannot masquerade as accepted authority.
+- Claim boundary: proof packets can now require strict authority recovery inputs, but Axis A/C runner scripts still need to generate those recoveries from real packet stores and store-backed resolvers; Axis B remains blocked.
+
 ## 2026-06-25 - Strict authority recovery audit
 
 - Added `research/daily-arrowsmith-agent-state/v47-strict-authority-recovery-audit-2026-06-25.md`, answering RQ48 and replacing it with RQ49: how strict authority recovery becomes a required Axis A/C runner/proof-packet gate.

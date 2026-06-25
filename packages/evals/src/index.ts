@@ -158,6 +158,8 @@ export {
 } from "./three-axis-coverage.js";
 export {
   buildThreeAxisProofPacket,
+  type ThreeAxisAuthorityRecoveryGate,
+  type ThreeAxisAuthorityRecoveryObligation,
   type ThreeAxisProofPacket,
   type ThreeAxisProofPacketCellRef,
   type ThreeAxisProofPacketInput,

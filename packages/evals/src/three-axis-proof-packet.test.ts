@@ -14,6 +14,7 @@ import {
   type FailureClass,
   type RunArm,
 } from "./schema.js";
+import type { EvalGraphWriteAuthorityRecovery } from "./authority-recovery.js";
 import { buildThreeAxisProofPacket } from "./three-axis-proof-packet.js";
 
 const tenantId = "tnt_three_axis_packet" as TenantId;
@@ -168,6 +169,103 @@ describe("three-axis proof packet", () => {
     expect(packet.unverifiedCells).toEqual([]);
     expect(packet.terminalProofBackedScenarioPassCells).toHaveLength(30);
   });
+
+  it("requires authority recovery when the stricter proof-packet gate is enabled", () => {
+    const events = (["finance", "marketing", "local_lab"] as const).flatMap((axis) =>
+      FAILURE_CLASSES.flatMap((failureClass) =>
+        pairedEvents({
+          axis,
+          failureClass,
+          scenarioId: `${axis}-${failureClass}`,
+          substrateResult: "pass",
+          evidenceStage:
+            axis === "local_lab" ? "live_run" : "paired_behavioral_improvement",
+        }),
+      ),
+    );
+
+    const missingRecoveryPacket = buildThreeAxisProofPacket({
+      packetId: "three_axis_proof_requires_authority_missing",
+      generatedAt: observedAt,
+      events,
+      sources: [{ sourceId: "all-axes-fixture", eventCount: events.length }],
+      requireAuthorityRecovery: true,
+    });
+
+    expect(missingRecoveryPacket.report.verified).toBe(true);
+    expect(missingRecoveryPacket.status).toBe("unverified");
+    expect(missingRecoveryPacket.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: false,
+      obligationCount: 60,
+      validObligations: 0,
+    });
+    expect(
+      missingRecoveryPacket.authorityRecoveryGate.invalidObligations[0],
+    ).toMatchObject({
+      reason: "missing_authority_recovery",
+      expectedStatus: "accepted_authority_recovered",
+    });
+
+    const recoveredPacket = buildThreeAxisProofPacket({
+      packetId: "three_axis_proof_requires_authority_recovered",
+      generatedAt: observedAt,
+      events,
+      sources: [{ sourceId: "all-axes-fixture", eventCount: events.length }],
+      authorityRecoveries: events.map(authorityRecoveryForEvent),
+      requireAuthorityRecovery: true,
+    });
+
+    expect(recoveredPacket.status).toBe("verified");
+    expect(recoveredPacket.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: true,
+      obligationCount: 60,
+      validObligations: 60,
+      invalidObligations: [],
+    });
+  });
+
+  it("does not let blocked terminal outcomes masquerade as accepted authority", () => {
+    const events = pairedEvents({
+      axis: "local_lab",
+      failureClass: "stale_observation",
+      scenarioId: "local-blocked-refusal",
+      substrateResult: "blocked",
+      substrateScenarioResult: "pass",
+      substrateOperationalTerminalOutcome: "blocked",
+      evidenceStage: "live_run",
+    });
+    const recoveries = events.map(authorityRecoveryForEvent);
+    const wrongSubstrateRecovery = {
+      ...recoveries[1]!,
+      status: "accepted_authority_recovered" as const,
+    };
+
+    const packet = buildThreeAxisProofPacket({
+      packetId: "three_axis_proof_blocked_wrong_authority",
+      generatedAt: observedAt,
+      events,
+      sources: [{ sourceId: "axis-c-blocked-fixture", eventCount: events.length }],
+      authorityRecoveries: [recoveries[0]!, wrongSubstrateRecovery],
+      requireAuthorityRecovery: true,
+    });
+
+    expect(packet.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: false,
+      obligationCount: 2,
+      validObligations: 1,
+    });
+    expect(packet.authorityRecoveryGate.invalidObligations).toEqual([
+      expect.objectContaining({
+        runId: "run_local-blocked-refusal_substrate",
+        expectedStatus: "terminal_outcome_refused_authority",
+        recoveryStatus: "accepted_authority_recovered",
+        reason: "unexpected_authority_recovery_status",
+      }),
+    ]);
+  });
 });
 
 function pairedEvents(input: {
@@ -239,4 +337,31 @@ function event(input: {
     result: input.result,
     notes: "three-axis proof-packet fixture",
   });
+}
+
+function authorityRecoveryForEvent(
+  event: EvalEvent,
+): EvalGraphWriteAuthorityRecovery {
+  const terminalOutcome = event.operationalTerminalOutcome!;
+  return {
+    runId: event.runId,
+    scenarioId: event.scenarioId,
+    axis: event.axis,
+    tenantId: event.tenantId,
+    envelopeId: event.substrateRefs.find(
+      (ref) => ref.kind === "action_outcome_envelope",
+    )!.id,
+    actionId: `action_${event.runId}`,
+    terminalOutcome:
+      terminalOutcome === "accepted" ? "accepted" : "blocked",
+    valid: true,
+    status:
+      terminalOutcome === "accepted"
+        ? "accepted_authority_recovered"
+        : "terminal_outcome_refused_authority",
+    evidenceRefs: event.evidenceRefs,
+    substrateRefs: event.substrateRefs,
+    issueCodes: [],
+    issues: [],
+  };
 }
