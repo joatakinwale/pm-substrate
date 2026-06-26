@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-25 - ArrowHedge packet-store source bundle
+
+- Added `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md`, answering RQ59 and replacing it with RQ60: packet-backed Axis A scenario families for `memory_drift`, `continuity_break`, and the remaining finance gaps.
+- Added `buildArrowHedgeTerminalPacketProofSourceBundle()` and `ArrowHedgeTerminalPacketProofSourceBundleInput` to `@pm/evals`.
+- Updated the ArrowHedge paired temporal packet proof to persist packets through `PostgresEvalEventStore.recordActionOutcomeEnvelopes()` before strict authority recovery.
+- Replaced hand-built packet lookup in the paired temporal test with the shared eval packet-store path.
+- Claim boundary: Axis A now has a reusable store-backed proof path for the canonical temporal packet families, but the finance axis still lacks packet-backed coverage for all ten failure classes and Axis B remains blocked.
+
 ## 2026-06-25 - ArrowHedge paired temporal packet corpus
 
 - Added `research/daily-arrowsmith-agent-state/v57-arrowhedge-paired-temporal-packet-corpus-2026-06-25.md`, answering RQ58 for canonical paired packet generation and replacing it with RQ59: durable packet-store persistence plus a reusable strict Axis A source bundle.

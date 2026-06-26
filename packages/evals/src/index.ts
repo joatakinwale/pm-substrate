@@ -123,12 +123,14 @@ export {
 export {
   ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
   buildArrowHedgeStateEvalSuite,
+  buildArrowHedgeTerminalPacketProofSourceBundle,
   type ArrowHedgeActionOutcomeEnvelopeEvalRef,
   type ArrowHedgeScenarioSummary,
   type ArrowHedgeScenarioSpec,
   type ArrowHedgeStateReviewArtifactEvalRef,
   type ArrowHedgeStateEvalInput,
   type ArrowHedgeStateEvalSuite,
+  type ArrowHedgeTerminalPacketProofSourceBundleInput,
 } from "./arrowhedge.js";
 export {
   buildMarketingAxisBBlockedEval,

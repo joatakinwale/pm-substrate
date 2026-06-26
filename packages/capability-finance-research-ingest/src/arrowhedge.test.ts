@@ -2,11 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+  PostgresEvalEventStore,
   analyzeThreeAxisCoverage,
   auditEvalEventsGraphWriteAuthority,
   buildStrictThreeAxisProofPacketAssembly,
   buildArrowHedgeStateEvalSuite,
-  type EvalGraphWriteAuthorityEnvelopeStore,
+  buildArrowHedgeTerminalPacketProofSourceBundle,
   type EvalGraphWriteAuthorityResolver,
 } from "@pm/evals";
 import {
@@ -16,6 +17,7 @@ import {
   validateProposedActionReadSet,
   verifyActionOutcomeEnvelopeHash,
   verifyStateReviewArtifactHash,
+  type ActionOutcomeEnvelope,
 } from "@pm/agent-state";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { tenantId, timestamp } from "@pm/types";
@@ -39,7 +41,6 @@ import {
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
   validateArrowHedgeTypedEventPayload,
-  type ArrowHedgeActionOutcomeEnvelopeCorpusPacket,
   type ArrowHedgeCommonOperatingPictureState,
 } from "./arrowhedge.js";
 
@@ -1256,7 +1257,8 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       runArm: packet.runArm,
       terminalOutcome: packet.terminalOutcome,
     }));
-    const suite = buildArrowHedgeStateEvalSuite({
+    const sourceBundleInput = {
+      sourceId: "axis-a-arrowhedge-paired-temporal-packets",
       tenantId: tenant,
       observedAt: timestamp("2026-06-03T14:13:00.000Z"),
       runIdPrefix: "run_arrowhedge_paired_packets",
@@ -1274,8 +1276,10 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       scenarioSpecs: ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
       actionOutcomeEnvelopes: mappedActionOutcomeRefs,
       operationalSamples: [],
-    });
-    const report = analyzeThreeAxisCoverage(suite.events);
+    } as const;
+    const sourceBundleWithoutRecovery =
+      buildArrowHedgeTerminalPacketProofSourceBundle(sourceBundleInput);
+    const report = analyzeThreeAxisCoverage(sourceBundleWithoutRecovery.events);
 
     expect(report.byCell.finance.stale_observation.verified).toBe(true);
     expect(report.byCell.finance.feedback_disconnection).toMatchObject({
@@ -1291,33 +1295,31 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       expect.arrayContaining(["memory_drift", "continuity_break"]),
     );
 
-    const substrateMappedEvents = suite.events.filter(
+    const substrateMappedEvents = sourceBundleWithoutRecovery.events.filter(
       (event) =>
         event.runArm === "substrate" &&
         ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS.some(
           (scenario) => scenario.scenarioId === event.scenarioId,
         ),
     );
+    const packetStore = new PostgresEvalEventStore(inMemoryEvalPacketDb());
+    await packetStore.recordActionOutcomeEnvelopes(
+      corpus.packets.map((packet) => packet.envelope),
+    );
     const recoverySuite = await auditEvalEventsGraphWriteAuthority({
       events: substrateMappedEvents,
-      store: pairedPacketStore(corpus.packets),
+      store: packetStore,
       resolveAcceptedAuthority: refusedAuthorityResolver,
       policy: strictGraphAuthorityPolicy,
+    });
+    const sourceBundle = buildArrowHedgeTerminalPacketProofSourceBundle({
+      ...sourceBundleInput,
+      authorityRecoverySuite: recoverySuite,
     });
     const assembly = buildStrictThreeAxisProofPacketAssembly({
       packetId: "three_axis_proof_arrowhedge_paired_temporal_packets",
       generatedAt: timestamp("2026-06-03T14:13:30.000Z"),
-      sourceBundles: [
-        {
-          source: {
-            sourceId: "axis-a-arrowhedge-paired-temporal-packets",
-            axis: "finance",
-            eventCount: suite.events.length,
-          },
-          events: suite.events,
-          authorityRecoverySuite: recoverySuite,
-        },
-      ],
+      sourceBundles: [sourceBundle],
     });
 
     expect(recoverySuite.summary).toMatchObject({
@@ -1742,19 +1744,33 @@ async function foldPlanIntoCop(
   return state;
 }
 
-function pairedPacketStore(
-  packets: readonly ArrowHedgeActionOutcomeEnvelopeCorpusPacket[],
-): EvalGraphWriteAuthorityEnvelopeStore {
-  const packetsByRef = new Map(packets.map((packet) => [packet.ref.id, packet]));
+function inMemoryEvalPacketDb() {
+  const envelopes = new Map<string, ActionOutcomeEnvelope>();
   return {
-    getWorkflowActionOutcomeEnvelope: async ({ envelopeId }) => {
-      const packet = packetsByRef.get(envelopeId);
-      if (packet === undefined) return undefined;
-      return {
-        envelopeId,
-        actionId: packet.actionId,
-        terminalOutcome: packet.terminalOutcome,
-      };
+    query: async (sql: string, values?: readonly unknown[]) => {
+      if (sql.includes("INSERT INTO evals.action_outcome_envelope_packets")) {
+        const tenantId = String(values?.[0]);
+        const envelopeRefId = String(values?.[1]);
+        const outcomeHash = String(values?.[4]);
+        const envelope = values?.[5] as ActionOutcomeEnvelope;
+        const key = `${tenantId}:${envelopeRefId}`;
+        const existing = envelopes.get(key);
+        if (existing !== undefined && existing.outcomeHash !== outcomeHash) {
+          return { rows: [] };
+        }
+        envelopes.set(key, envelope);
+        return { rows: [{ envelope_ref_id: envelopeRefId }] };
+      }
+
+      if (sql.includes("SELECT envelope")) {
+        const key = `${String(values?.[0])}:${String(values?.[1])}`;
+        const envelope = envelopes.get(key);
+        return {
+          rows: envelope === undefined ? [] : [{ envelope }],
+        };
+      }
+
+      throw new Error(`unexpected in-memory eval packet query: ${sql}`);
     },
   };
 }

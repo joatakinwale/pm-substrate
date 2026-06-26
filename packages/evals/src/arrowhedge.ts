@@ -11,6 +11,8 @@ import {
   type RunArm,
 } from "./schema.js";
 import type { AdapterOperationalSample } from "./metrics.js";
+import type { EvalGraphWriteAuthorityRecoverySuite } from "./authority-recovery.js";
+import type { StrictThreeAxisProofPacketSourceBundle } from "./three-axis-proof-packet.js";
 
 export interface ArrowHedgeStateEvalInput {
   readonly tenantId: TenantId;
@@ -62,6 +64,12 @@ export interface ArrowHedgeStateEvalSuite {
   readonly events: readonly EvalEvent[];
   readonly summaries: readonly ArrowHedgeScenarioSummary[];
   readonly operationalSamples: readonly AdapterOperationalSample[];
+}
+
+export interface ArrowHedgeTerminalPacketProofSourceBundleInput
+  extends ArrowHedgeStateEvalInput {
+  readonly sourceId: string;
+  readonly authorityRecoverySuite?: EvalGraphWriteAuthorityRecoverySuite;
 }
 
 export interface ArrowHedgeScenarioSpec {
@@ -333,6 +341,29 @@ export function buildArrowHedgeStateEvalSuite(
     events: pairs.flatMap((pair) => pair.events),
     summaries: pairs.map((pair) => pair.summary),
     operationalSamples: input.operationalSamples,
+  };
+}
+
+export function buildArrowHedgeTerminalPacketProofSourceBundle(
+  input: ArrowHedgeTerminalPacketProofSourceBundleInput,
+): StrictThreeAxisProofPacketSourceBundle {
+  const {
+    sourceId,
+    authorityRecoverySuite,
+    ...suiteInput
+  } = input;
+  const suite = buildArrowHedgeStateEvalSuite(suiteInput);
+
+  return {
+    source: {
+      sourceId,
+      axis: "finance",
+      eventCount: suite.events.length,
+    },
+    events: suite.events,
+    ...(authorityRecoverySuite !== undefined
+      ? { authorityRecoverySuite }
+      : {}),
   };
 }
 

@@ -43,6 +43,8 @@ v56 update: `@pm/evals` now distinguishes failed baseline terminal observations 
 
 v57 update: `@pm/capability-finance-research-ingest` now exposes `buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus()`. The paired corpus emits baseline advisory comparator packets with no provider authority and substrate protective packets for the canonical temporal ArrowHedge scenarios, allowing Axis A to verify those three temporal cells with substrate-only recovery while keeping the finance axis incomplete for missing packet-backed failure classes.
 
+v58 update: `@pm/evals` now exposes `buildArrowHedgeTerminalPacketProofSourceBundle()`, and the finance paired-packet test persists paired packets through `PostgresEvalEventStore` before recovering substrate terminal refusals. The current Axis A temporal proof path is now reusable and store-backed, but still incomplete until additional packet-backed failure families cover `memory_drift`, `continuity_break`, and the remaining finance gaps.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -106,6 +108,7 @@ v57 update: `@pm/capability-finance-research-ingest` now exposes `buildArrowHedg
 | v55 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v55-arrowhedge-packet-eval-mapping-2026-06-25.md` | ArrowHedge packet eval mapping | Answered RQ56, added RQ57, and mapped real finance-domain temporal packets into Axis A EvalEvents while keeping cells unverified until paired terminal proof/recovery exists. |
 | v56 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v56-axis-a-baseline-recovery-obligations-2026-06-25.md` | Axis A baseline recovery obligations | Answered RQ57 for strict proof semantics, added RQ58, and made baseline failed terminal observations replay evidence rather than accepted authority-recovery obligations. |
 | v57 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v57-arrowhedge-paired-temporal-packet-corpus-2026-06-25.md` | ArrowHedge paired temporal packet corpus | Answered RQ58 for canonical paired packet generation, added RQ59, and generated baseline/substrate temporal packet pairs with substrate-only strict recovery. |
+| v58 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md` | ArrowHedge packet-store source bundle | Answered RQ59, added RQ60, and moved paired temporal packet recovery through `PostgresEvalEventStore` plus a reusable strict Axis A source-bundle helper. |
 
 ## Top Findings
 
