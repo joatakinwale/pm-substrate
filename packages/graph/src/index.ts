@@ -31,5 +31,22 @@ export {
   withEdgeStaleness,
   withEdgeListStaleness,
   isStale,
+  freshnessGate,
+  requireFresh,
+  StaleReadError,
   type ReadStaleness,
+  type FreshnessDecision,
+  type StaleReadErrorDetail,
 } from "./staleness.js";
+
+export {
+  assertGraphWriteAuthority,
+  GraphWriteAuthorityError,
+  validateGraphWriteAuthority,
+  type GraphWriteAuthorityIssue,
+  type GraphWriteAuthorityIssueCode,
+  type GraphWriteAuthorityPolicy,
+  type GraphWriteAuthorityRef,
+  type GraphWriteAuthoritySubstrateRecord,
+  type GraphWriteProviderCertificateStatusRef,
+} from "./write-authority.js";

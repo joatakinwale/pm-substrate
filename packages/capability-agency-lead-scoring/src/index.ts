@@ -12,7 +12,7 @@
  * The architectural point: `scoring_config_id` does NOT appear on lead-event
  * payloads. The rollup target is derived from the graph, not from a field
  * that can be left null at creation time. Same anti-pattern repair the
- * wedding budget capability applied to the original WeddingWebApp bug.
+ * retired wedding-era budget capability (G4 anti-fixation proof).
  *
  * Idempotency: each scoring event is recorded in
  * `lead_scoring.applied_scoring_events` before the rollup write.
@@ -23,7 +23,7 @@
  *
  * G4 anti-fixation status: this package is the second proof point that the
  * substrate's capability shape is profile-agnostic. It was implemented
- * without a single edit to substrate packages or to capability-wedding-budget.
+ * without a single edit to substrate packages or to any other capability.
  * See research/discovery-engine/pm-substrate-research-gap-audit-2026-05-05.md.
  */
 

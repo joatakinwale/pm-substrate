@@ -1,3 +1,5 @@
+import type { CapabilityId, Timestamp } from "./common.js";
+
 /**
  * Typed, versioned capability contracts (G6 / ADR-0013).
  *
@@ -25,7 +27,7 @@ export interface SchemaVersion {
 /**
  * A reference to a JSON Schema file shipped alongside the capability's source.
  *
- * - `type` is the stable event-type string (e.g. "wedding.contract.payment_recorded").
+ * - `type` is the stable event-type string (e.g. "agency.lead.qualified").
  *   It must match the topic pattern subscribers use.
  * - `version` is the schema's semver. Field-additive changes are minor/patch;
  *   field-removal or required-narrowing is major.
@@ -54,7 +56,7 @@ export interface EmitContract {
 export interface SubscribeContract {
   /**
    * Pattern matches `PayloadSchemaRef.type`. Wildcards allowed (e.g.
-   * "wedding.contract.*"). Wildcard semantics match `@pm/registry`'s
+   * "agency.lead.*"). Wildcard semantics match `@pm/registry`'s
    * `matchesPattern`.
    */
   readonly pattern: string;
@@ -96,6 +98,80 @@ export interface ReadContract {
 }
 
 /**
+ * A discoverable terminal-admission provider for a write contract.
+ *
+ * The provider ref is declarative metadata, not an admission decision. Runtime
+ * write paths still have to call the provider and verify the resulting
+ * terminal proof before accepting a mutation.
+ */
+export interface TerminalAdmissionProviderRef {
+  /** Stable provider identifier. Convention: "<profile>.<boundary>.<kind>.vN". */
+  readonly providerId: string;
+  readonly kind: "action_outcome_envelope";
+  /** Contract version consumed by the declaring write surface. */
+  readonly contractVersion: SchemaVersion;
+  /** Package and export that supply the provider implementation. */
+  readonly packageName: string;
+  readonly exportName: string;
+  /** Action types this provider can partition into terminal outcomes. */
+  readonly actionTypes: readonly string[];
+  /** Optional profiles where this provider is intended to apply. */
+  readonly profiles?: readonly string[];
+  /** Evidence ref kinds the provider may require before accepting a write. */
+  readonly evidenceRefKinds?: readonly string[];
+  /** Substrate ref kinds the provider emits for replay/resume. */
+  readonly substrateRefKinds?: readonly string[];
+}
+
+export type TerminalAdmissionProviderAvailability =
+  | "available"
+  | "unavailable"
+  | "deprecated";
+
+/**
+ * Runtime/provider-side manifest used to check that a declarative provider ref
+ * still points at an available and compatible implementation.
+ */
+export interface TerminalAdmissionProviderManifest
+  extends TerminalAdmissionProviderRef {
+  readonly availability: TerminalAdmissionProviderAvailability;
+}
+
+export type TerminalAdmissionProviderCertificateStatus =
+  | "valid"
+  | "revoked"
+  | "superseded";
+
+export interface TerminalAdmissionProviderCertificateSubject {
+  readonly capabilityId: CapabilityId;
+  readonly capabilityName: string;
+  readonly capabilityVersion: number;
+  readonly writeInterface: string;
+  readonly writeFields: readonly string[];
+  readonly writeOwnership: "owner" | "contributor" | "delegated";
+  readonly providerId: string;
+}
+
+/**
+ * Durable proof that a capability write surface was checked against a provider
+ * manifest at install/runtime handoff. Certificates are still status-bearing:
+ * runtimes must check status and validity windows before dispatch.
+ */
+export interface TerminalAdmissionProviderCertificate {
+  readonly schemaVersion: "pm.terminal_admission_provider_certificate.v1";
+  readonly certificateId: string;
+  readonly certificateDigest: string;
+  readonly issuer: string;
+  readonly issuedAt: Timestamp;
+  readonly validUntil: Timestamp;
+  readonly status: TerminalAdmissionProviderCertificateStatus;
+  readonly subject: TerminalAdmissionProviderCertificateSubject;
+  readonly provider: TerminalAdmissionProviderRef;
+  readonly manifest: TerminalAdmissionProviderManifest;
+  readonly manifestDigest: string;
+}
+
+/**
  * A capability declares what graph state it writes, with ownership semantics.
  *
  * Ownership rules enforced by the workflow installer:
@@ -110,6 +186,12 @@ export interface WriteContract {
   readonly interface: string;
   readonly fields: readonly string[];
   readonly ownership: "owner" | "contributor" | "delegated";
+  /**
+   * Optional terminal-admission providers for this write surface. When present,
+   * registry and verifier tooling can discover coverage from capability
+   * metadata instead of relying on hand-maintained transport inventories.
+   */
+  readonly terminalAdmissionProviders?: readonly TerminalAdmissionProviderRef[];
 }
 
 /**

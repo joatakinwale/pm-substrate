@@ -30,6 +30,14 @@ export interface SubstrateAppDeps {
   readonly events: EventPublisher & EventReader;
   readonly projections: ProjectionRunner;
   readonly domainEventHandlers?: Readonly<Record<string, DomainEventHandler>>;
+  /**
+   * Optional profile-specific sub-routers, mounted under
+   * /tenants/:tenantId/<basePath>. The substrate core stays profile-agnostic:
+   * profile-bound ingest surfaces (e.g. the ArrowHedgeLab finance bridge) are
+   * built in a profile/demo package and injected here, never imported by the
+   * substrate library itself.
+   */
+  readonly extraRoutes?: ReadonlyArray<{ readonly basePath: string; readonly router: Hono }>;
 }
 
 export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
@@ -43,6 +51,9 @@ export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
   app.route("/tenants/:tenantId", graphRoutes(deps.graph));
   app.route("/tenants/:tenantId/events", eventRoutes(deps.events, deps.domainEventHandlers));
   app.route("/tenants/:tenantId/projections", projectionRoutes(deps.projections));
+  for (const extra of deps.extraRoutes ?? []) {
+    app.route(`/tenants/:tenantId/${extra.basePath}`, extra.router);
+  }
 
   app.onError((err, c) => {
     const httpErr = toHTTPException(err);

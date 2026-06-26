@@ -1,9 +1,37 @@
 import type {
   EventId,
   PMEvent,
+  TerminalAdmissionProviderCertificate,
   TenantId,
   WorkflowId,
 } from "@pm/types";
+import type {
+  InvocationActionOutcomeEnvelope,
+  InvocationActionOutcomeProviderCertificateStatusRef,
+  InvocationEvidenceBinding,
+} from "./evidence-binding.js";
+
+export type {
+  EvidenceBindingMode,
+  EvidenceBindingProvider,
+  EvidenceBindingVerifier,
+  EvidenceBindingRequest,
+  EvidenceBindingVerificationDecision,
+  EvidenceBindingRuntimeVerificationRequest,
+  InvocationActionOutcomeAdmissionDecision,
+  InvocationActionOutcomeAdmissionPort,
+  InvocationActionOutcomeAdmissionRejectionReason,
+  InvocationActionOutcomeAdmissionRequest,
+  InvocationActionOutcomeEnvelope,
+  InvocationActionOutcomeProviderCertificateLookup,
+  InvocationActionOutcomeProviderCertificateLookupResult,
+  InvocationActionOutcomeProviderCertificateProvider,
+  InvocationActionOutcomeProviderCertificateStatusRef,
+  InvocationActionTerminalOutcome,
+  InvocationEvidenceBinding,
+  InvocationEvidenceConsequence,
+  InvocationEvidencePolicyDisposition,
+} from "./evidence-binding.js";
 
 export interface WorkflowDoc {
   readonly id: WorkflowId;
@@ -83,6 +111,20 @@ export interface InvocationContext {
   readonly tenantId: TenantId;
   readonly capability: string;
   readonly inputs: Readonly<Record<string, unknown>>;
+  /**
+   * Optional evidence-action binding for write-capable invocations. When the
+   * runtime is configured with `evidenceBindingMode: "require_for_writes"`,
+   * dispatch is denied unless this binding is present and complete.
+   */
+  readonly evidenceBinding?: InvocationEvidenceBinding;
+  /**
+   * Runtime-generated terminal outcome for a write-capable invocation. Present
+   * before dispatch when `evidenceBindingMode: "require_for_writes"` admits the
+   * write, and mirrored in dead-letter errors when the gate blocks it.
+   */
+  readonly actionOutcomeEnvelope?: InvocationActionOutcomeEnvelope;
+  readonly actionOutcomeProviderCertificate?: TerminalAdmissionProviderCertificate;
+  readonly actionOutcomeProviderCertificateStatusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
   /** Event that triggered the run, for tracing/audit. */
   readonly triggerEvent: PMEvent;
   /** Workflow + node identification, for logs. */

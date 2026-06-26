@@ -27,6 +27,19 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/agent-state:
+    dependencies:
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/capability-agency-lead-scoring:
     dependencies:
       '@pm/capability-kit':
@@ -79,12 +92,12 @@ importers:
       '@pm/events':
         specifier: workspace:*
         version: link:../events
+      '@pm/profile-finance-research':
+        specifier: workspace:*
+        version: link:../profile-finance-research
       '@pm/profile-registry':
         specifier: workspace:*
         version: link:../profile-registry
-      '@pm/profile-wedding':
-        specifier: workspace:*
-        version: link:../profile-wedding
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
@@ -100,6 +113,12 @@ importers:
 
   packages/capability-finance-research-ingest:
     dependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
+      '@pm/continuity':
+        specifier: workspace:*
+        version: link:../continuity
       '@pm/entity-mapping':
         specifier: workspace:*
         version: link:../entity-mapping
@@ -166,154 +185,6 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
-  packages/capability-wedding-budget:
-    dependencies:
-      '@pm/capability-kit':
-        specifier: workspace:*
-        version: link:../capability-kit
-      '@pm/events':
-        specifier: workspace:*
-        version: link:../events
-      '@pm/graph':
-        specifier: workspace:*
-        version: link:../graph
-      '@pm/profile-registry':
-        specifier: workspace:*
-        version: link:../profile-registry
-      '@pm/profile-wedding':
-        specifier: workspace:*
-        version: link:../profile-wedding
-      '@pm/registry':
-        specifier: workspace:*
-        version: link:../registry
-      '@pm/types':
-        specifier: workspace:*
-        version: link:../types
-    devDependencies:
-      '@pm/capability-wedding-contracts':
-        specifier: workspace:*
-        version: link:../capability-wedding-contracts
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.20.0
-      pg:
-        specifier: ^8.13.0
-        version: 8.20.0
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.17)
-
-  packages/capability-wedding-calendar:
-    dependencies:
-      '@pm/events':
-        specifier: workspace:*
-        version: link:../events
-      '@pm/graph':
-        specifier: workspace:*
-        version: link:../graph
-      '@pm/profile-registry':
-        specifier: workspace:*
-        version: link:../profile-registry
-      '@pm/profile-wedding':
-        specifier: workspace:*
-        version: link:../profile-wedding
-      '@pm/registry':
-        specifier: workspace:*
-        version: link:../registry
-      '@pm/types':
-        specifier: workspace:*
-        version: link:../types
-    devDependencies:
-      '@pm/capability-wedding-contracts':
-        specifier: workspace:*
-        version: link:../capability-wedding-contracts
-      '@pm/capability-wedding-tasks':
-        specifier: workspace:*
-        version: link:../capability-wedding-tasks
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.20.0
-      pg:
-        specifier: ^8.13.0
-        version: 8.20.0
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.17)
-
-  packages/capability-wedding-contracts:
-    dependencies:
-      '@pm/events':
-        specifier: workspace:*
-        version: link:../events
-      '@pm/graph':
-        specifier: workspace:*
-        version: link:../graph
-      '@pm/profile-registry':
-        specifier: workspace:*
-        version: link:../profile-registry
-      '@pm/profile-wedding':
-        specifier: workspace:*
-        version: link:../profile-wedding
-      '@pm/registry':
-        specifier: workspace:*
-        version: link:../registry
-      '@pm/types':
-        specifier: workspace:*
-        version: link:../types
-    devDependencies:
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.20.0
-      pg:
-        specifier: ^8.13.0
-        version: 8.20.0
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.17)
-
-  packages/capability-wedding-tasks:
-    dependencies:
-      '@pm/events':
-        specifier: workspace:*
-        version: link:../events
-      '@pm/graph':
-        specifier: workspace:*
-        version: link:../graph
-      '@pm/profile-registry':
-        specifier: workspace:*
-        version: link:../profile-registry
-      '@pm/profile-wedding':
-        specifier: workspace:*
-        version: link:../profile-wedding
-      '@pm/registry':
-        specifier: workspace:*
-        version: link:../registry
-      '@pm/types':
-        specifier: workspace:*
-        version: link:../types
-    devDependencies:
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.20.0
-      pg:
-        specifier: ^8.13.0
-        version: 8.20.0
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.17)
-
   packages/continuity:
     dependencies:
       '@pm/types':
@@ -323,6 +194,9 @@ importers:
         specifier: ^8.13.0
         version: 8.20.0
     devDependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
@@ -342,9 +216,9 @@ importers:
       '@pm/profile-agency':
         specifier: workspace:*
         version: link:../profile-agency
-      '@pm/profile-wedding':
+      '@pm/profile-finance-research':
         specifier: workspace:*
-        version: link:../profile-wedding
+        version: link:../profile-finance-research
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -354,10 +228,25 @@ importers:
 
   packages/evals:
     dependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
       '@pm/types':
         specifier: workspace:*
         version: link:../types
+      '@pm/workflow':
+        specifier: workspace:*
+        version: link:../workflow
     devDependencies:
+      '@pm/capability-kit':
+        specifier: workspace:*
+        version: link:../capability-kit
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -399,9 +288,9 @@ importers:
       '@pm/events':
         specifier: workspace:*
         version: link:../events
-      '@pm/profile-wedding':
+      '@pm/profile-finance-research':
         specifier: workspace:*
-        version: link:../profile-wedding
+        version: link:../profile-finance-research
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
@@ -412,8 +301,36 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/local-agent-lab:
+    dependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/profile-agency:
     dependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
       '@pm/types':
         specifier: workspace:*
         version: link:../types
@@ -433,12 +350,12 @@ importers:
       '@pm/graph':
         specifier: workspace:*
         version: link:../graph
+      '@pm/profile-finance-research':
+        specifier: workspace:*
+        version: link:../profile-finance-research
       '@pm/profile-registry':
         specifier: workspace:*
         version: link:../profile-registry
-      '@pm/profile-wedding':
-        specifier: workspace:*
-        version: link:../profile-wedding
       '@pm/projections':
         specifier: workspace:*
         version: link:../projections
@@ -480,25 +397,12 @@ importers:
         specifier: ^8.13.0
         version: 8.20.0
     devDependencies:
-      '@pm/profile-wedding':
+      '@pm/profile-finance-research':
         specifier: workspace:*
-        version: link:../profile-wedding
+        version: link:../profile-finance-research
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.3
-      vitest:
-        specifier: ^2.1.0
-        version: 2.1.9(@types/node@22.19.17)
-
-  packages/profile-wedding:
-    dependencies:
-      '@pm/types':
-        specifier: workspace:*
-        version: link:../types
-    devDependencies:
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -547,6 +451,18 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/substrate-dashboard:
+    devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.4.21
+        version: 5.4.21(@types/node@22.19.17)
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/substrate-http:
     dependencies:
       '@pm/events':
@@ -580,9 +496,9 @@ importers:
       '@pm/capability-audit':
         specifier: workspace:*
         version: link:../capability-audit
-      '@pm/profile-wedding':
+      '@pm/profile-finance-research':
         specifier: workspace:*
-        version: link:../profile-wedding
+        version: link:../profile-finance-research
       '@types/pg':
         specifier: ^8.11.10
         version: 8.20.0
@@ -595,21 +511,21 @@ importers:
 
   packages/substrate-http-demo:
     dependencies:
-      '@pm/capability-wedding-budget':
+      '@pm/capability-finance-research-ingest':
         specifier: workspace:*
-        version: link:../capability-wedding-budget
+        version: link:../capability-finance-research-ingest
       '@pm/events':
         specifier: workspace:*
         version: link:../events
       '@pm/graph':
         specifier: workspace:*
         version: link:../graph
+      '@pm/profile-finance-research':
+        specifier: workspace:*
+        version: link:../profile-finance-research
       '@pm/profile-registry':
         specifier: workspace:*
         version: link:../profile-registry
-      '@pm/profile-wedding':
-        specifier: workspace:*
-        version: link:../profile-wedding
       '@pm/projections':
         specifier: workspace:*
         version: link:../projections

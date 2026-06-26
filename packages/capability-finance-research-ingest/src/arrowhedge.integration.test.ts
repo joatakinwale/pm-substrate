@@ -3,6 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
 import {
+  buildObservationContractFromCurrentStateView,
+  buildReadSetFromCurrentStateView,
+  validateProposedActionReadSet,
+} from "@pm/agent-state";
+import {
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
   buildArrowHedgeStateEvalSuite,
@@ -12,10 +17,12 @@ import { PostgresGraph } from "@pm/graph";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { PostgresProfileRegistry } from "@pm/profile-registry";
 import { PostgresProjectionRunner } from "@pm/projections";
-import { timestamp, type TenantId } from "@pm/types";
+import { timestamp, type PMEvent, type TenantId } from "@pm/types";
 
 import {
+  buildArrowHedgeCurrentStateView,
   buildArrowHedgeIngestionPlan,
+  compareArrowHedgeStateReviewArtifactCorpusEquivalence,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
   type ArrowHedgeCommonOperatingPictureState,
@@ -223,6 +230,103 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
       authorityGatePassRate: 1,
       stateDisagreementRate: 0,
     });
+    const fixtureCop = await foldEventsIntoCop(projection, result.eventsPublished);
+    const originalFixtureView = buildArrowHedgeCurrentStateView({
+      tenantId,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state: fixtureCop,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const artifactInput = {
+      tenantId,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      scenarioId: "arrowhedge-db-fixture-state-review-equivalence",
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId: "dec_aapl_buy_120" },
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: timestamp("2026-06-03T16:30:00.000Z"),
+      readSet: buildReadSetFromCurrentStateView(
+        originalFixtureView,
+        originalFixtureView.authorityRule,
+      ),
+      observationContract:
+        buildObservationContractFromCurrentStateView(originalFixtureView),
+      artifact: {
+        artifactId: "artifact_arrowhedge_db_equivalence_stale_001",
+        metadata: {
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/aapl-db-equivalence.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-session-db-equivalence-001",
+        },
+      },
+    } as const;
+    const equivalence = compareArrowHedgeStateReviewArtifactCorpusEquivalence({
+      fixture: {
+        label: "fixture-cop",
+        inputs: [{ ...artifactInput, state: fixtureCop }],
+      },
+      projected: {
+        label: "db-projected-cop",
+        inputs: [{ ...artifactInput, state: cop! }],
+      },
+    });
+
+    expect(equivalence.valid).toBe(true);
+    expect(equivalence.mismatches).toEqual([]);
+    expect(equivalence.fixture).toMatchObject({
+      canonicalArtifactJsonl: equivalence.projected.canonicalArtifactJsonl,
+      replayHashValid: [true],
+      artifactHashes: equivalence.projected.artifactHashes,
+      continuityArtifactIds: ["artifact_arrowhedge_db_equivalence_stale_001"],
+      continuityArtifactHashes: equivalence.projected.continuityArtifactHashes,
+      continuityWarningCodes: [
+        expect.arrayContaining([
+          "stale_read_ref",
+          "freshness_window_current",
+          "workflow_position_mismatch",
+        ]),
+      ],
+      temporalPhases: ["observation_to_action"],
+      invariantClasses: [
+        expect.arrayContaining([
+          "freshness_window",
+          "workflow_position",
+          "state_conflict",
+        ]),
+      ],
+    });
+    const currentStateView = buildArrowHedgeCurrentStateView({
+      tenantId,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state: cop!,
+    })!;
+    const readSetValidation = validateProposedActionReadSet(
+      {
+        tenantId,
+        actionType: "portfolio.decision.accept",
+        subject: currentStateView.subject,
+        payload: { decisionId: "dec_aapl_buy_120" },
+        readSet: buildReadSetFromCurrentStateView(
+          currentStateView,
+          currentStateView.authorityRule,
+        ),
+        proposedBy: "agent:portfolio-manager",
+        proposedAt: timestamp("2026-06-03T16:30:00.000Z"),
+      },
+      currentStateView,
+    );
+    expect(readSetValidation.mode).toBe("warn");
+    expect(readSetValidation.issues.map((issue) => issue.code)).toContain(
+      "stale_read_ref",
+    );
 
     const emittedEventIds = result.eventsPublished.map((event) => event.id);
     const evalSuite = buildArrowHedgeStateEvalSuite({
@@ -235,16 +339,23 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
         eventIds: emittedEventIds,
         projectionIds: [projection.name],
       },
+      readSetValidation: {
+        currentStateViewId: currentStateView.viewId,
+        mode: readSetValidation.mode,
+        issueCodes: readSetValidation.issues.map((issue) => issue.code),
+      },
       operationalSamples: [plan.operationalSample],
     });
     const metrics = analyzeEvalEvents(evalSuite.events);
     expect(metrics.byFailureClass["representation_loss"]).toMatchObject({
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
     expect(metrics.byFailureClass["capability_contract_violation"]).toMatchObject({
-      substrateFailures: 1,
+      substrateFailures: 0,
       failureReduction: 0,
+      allStageFailureReduction: 1,
     });
 
     const operational = analyzeAdapterOperationalMetrics(
@@ -255,9 +366,22 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
       adapterTimeToFirstValidEventMs: 1500,
       mappingRejectionRate: 0,
       stateDisagreementRate: 0,
-      authorityGatePassRate: 0.75,
-      authorityGatePasses: 3,
-      authorityGateFailures: 1,
+      authorityGatePassRate: 1,
+      authorityGatePasses: 5,
+      authorityGateFailures: 0,
     });
   });
 });
+
+async function foldEventsIntoCop(
+  projection: ReturnType<typeof createArrowHedgeCommonOperatingPictureProjection>,
+  events: readonly PMEvent[],
+): Promise<ArrowHedgeCommonOperatingPictureState> {
+  let state = projection.initial();
+
+  for (const event of events) {
+    state = await projection.apply(state, event);
+  }
+
+  return state;
+}

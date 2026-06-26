@@ -1,14 +1,32 @@
 import { describe, expect, it } from "vitest";
+import {
+  buildReadSetFromCurrentStateView,
+  buildStateReviewArtifact,
+  reviewProposedActionAgainstCurrentState,
+  stateRef,
+  type CurrentStateView,
+} from "@pm/agent-state";
 import type { TenantId, Timestamp } from "@pm/types";
 
 import { evalEvidenceRef, type EvalEvent } from "./schema.js";
 import {
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
+  analyzeActionProposalReviews,
+  analyzeStateAssertions,
+  analyzeStateReviewArtifacts,
+  analyzeStateReviewArtifactEvidence,
+  actionProposalReviewsFromStateReviewArtifacts,
+  stateAssertionsFromStateReviewArtifacts,
+  stateReviewArtifactSamplesFromArtifacts,
+  type StateReviewArtifactSample,
 } from "./metrics.js";
 
 const tenantId = "tnt_metrics" as TenantId;
 const observedAt = "2026-06-03T15:00:00.000Z" as Timestamp;
+const signalRef = stateRef("event", "evt_signal", "analyst.signal.created");
+const riskRef = stateRef("event", "evt_risk", "risk.state.validated");
+const decisionRef = stateRef("event", "evt_decision", "portfolio.decision.proposed");
 
 function event(input: {
   readonly scenarioId: string;
@@ -19,6 +37,7 @@ function event(input: {
   readonly memoryBenchmarkBridge?: EvalEvent["memoryBenchmarkBridge"];
   readonly mastCategory?: EvalEvent["mastCategory"];
   readonly coordinationClass?: EvalEvent["coordinationClass"];
+  readonly evidenceStage?: EvalEvent["evidenceStage"];
 }): EvalEvent {
   return {
     tenantId,
@@ -37,9 +56,63 @@ function event(input: {
     memoryBenchmarkBridge: input.memoryBenchmarkBridge,
     mastCategory: input.mastCategory,
     coordinationClass: input.coordinationClass,
+    evidenceStage: input.evidenceStage ?? "paired_behavioral_improvement",
     result: input.result,
     notes: "metrics fixture",
   };
+}
+
+function currentStateView(): CurrentStateView {
+  return {
+    tenantId,
+    viewId: "arrowhedge_cop:AAPL:current_state_view",
+    subject: stateRef("projection", "arrowhedge_cop:AAPL", "AAPL COP"),
+    observedAt: "2026-06-03T14:00:00.000Z" as Timestamp,
+    validUntil: "2026-06-03T14:10:00.000Z" as Timestamp,
+    authorityRule: "arrowhedge:backtest:bt_aapl_breakout",
+    projectionVersion: 1,
+    workflowPosition: "decision_pending",
+    sourceRefs: [signalRef, riskRef, decisionRef],
+    missingSources: [],
+    conflicts: [],
+    allowedActions: [
+      {
+        actionType: "portfolio.decision.accept",
+        label: "Accept portfolio decision",
+        requiredRefs: [signalRef, riskRef, decisionRef],
+        requiredWorkflowPosition: "decision_pending",
+      },
+    ],
+  };
+}
+
+function persistedArtifactFixture() {
+  const view = currentStateView();
+  const review = reviewProposedActionAgainstCurrentState(
+    {
+      tenantId,
+      actionType: "portfolio.decision.accept",
+      subject: view.subject,
+      payload: { decisionId: "dec_aapl_buy_120" },
+      readSet: buildReadSetFromCurrentStateView(view, view.authorityRule),
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: "2026-06-03T14:11:00.000Z" as Timestamp,
+    },
+    view,
+  );
+
+  return buildStateReviewArtifact(review, {
+    artifactId: "artifact_arrowhedge_metrics_001",
+    source: "arrowhedge/arrowhedge_cop",
+    traceContext: {
+      traceparent:
+        "00-11111111111111111111111111111111-2222222222222222-01",
+    },
+    metadata: {
+      scenarioId: "arrowhedge-distribution-currentness-mismatch",
+      fixtureId: "fixtures/arrowhedge/state-review-artifacts/aapl-stale.json",
+    },
+  });
 }
 
 describe("eval event metrics", () => {
@@ -116,6 +189,7 @@ describe("eval event metrics", () => {
       baselineFailures: 3,
       substrateFailures: 0,
       failureReduction: 3,
+      allStageFailureReduction: 3,
       authorityGatePassRate: 1,
       convergentUpdateAutoResolutionRate: 1,
     });
@@ -136,6 +210,7 @@ describe("eval event metrics", () => {
       "authority_gated_transition",
       "derived_projection",
     ]);
+    expect(metrics.evidenceStages).toEqual(["paired_behavioral_improvement"]);
     expect(metrics.byCoordinationClass["authority_gated_transition"]).toMatchObject({
       events: 2,
       pairedGroups: 1,
@@ -167,6 +242,79 @@ describe("eval event metrics", () => {
       substrateFailures: 0,
       failureReduction: 0,
       substratePasses: 0,
+    });
+  });
+
+  it("keeps scaffolded pairs out of the evidence-adjusted failure-reduction metric", () => {
+    const metrics = analyzeEvalEvents([
+      event({
+        scenarioId: "scaffolded",
+        runArm: "baseline",
+        pairedRunGroup: "pair_scaffolded",
+        result: "fail",
+        evidenceStage: "scaffolded_scenario",
+      }),
+      event({
+        scenarioId: "scaffolded",
+        runArm: "substrate",
+        pairedRunGroup: "pair_scaffolded",
+        result: "pass",
+        evidenceStage: "scaffolded_scenario",
+      }),
+    ]);
+
+    expect(metrics).toMatchObject({
+      baselineFailures: 1,
+      substrateFailures: 0,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
+      evidenceStages: ["scaffolded_scenario"],
+    });
+    expect(metrics.byEvidenceStage.scaffolded_scenario).toMatchObject({
+      events: 2,
+      failureReduction: 1,
+      substratePasses: 1,
+    });
+    expect(metrics.byFailureClass.parallel_write_conflict).toMatchObject({
+      failureReduction: 0,
+      allStageFailureReduction: 1,
+    });
+  });
+
+  it("counts live-run pairs toward the evidence-adjusted failure-reduction metric", () => {
+    const metrics = analyzeEvalEvents([
+      event({
+        scenarioId: "live-run",
+        runArm: "baseline",
+        pairedRunGroup: "pair_live_run",
+        result: "fail",
+        evidenceStage: "live_run",
+      }),
+      event({
+        scenarioId: "live-run",
+        runArm: "substrate",
+        pairedRunGroup: "pair_live_run",
+        result: "blocked",
+        evidenceStage: "live_run",
+      }),
+    ]);
+
+    expect(metrics).toMatchObject({
+      baselineFailures: 1,
+      substrateFailures: 0,
+      failureReduction: 1,
+      allStageFailureReduction: 1,
+      evidenceStages: ["live_run"],
+    });
+    expect(metrics.byEvidenceStage.live_run).toMatchObject({
+      events: 2,
+      failureReduction: 1,
+      substrateBlocked: 1,
+    });
+    expect(metrics.byFailureClass.parallel_write_conflict).toMatchObject({
+      failureReduction: 1,
+      allStageFailureReduction: 1,
+      substrateBlocked: 1,
     });
   });
 
@@ -242,6 +390,505 @@ describe("eval event metrics", () => {
       authorityGatePassRate: 0.5,
       authorityGatePasses: 1,
       authorityGateFailures: 1,
+    });
+  });
+
+  it("summarizes state assertion pass/fail metrics by code and severity", () => {
+    expect(
+      analyzeStateAssertions([
+        {
+          code: "required_source_refs_present",
+          passed: true,
+          severity: "fail",
+        },
+        {
+          code: "freshness_window_current",
+          passed: false,
+          severity: "warn",
+        },
+        {
+          code: "workflow_position_matches",
+          passed: false,
+          severity: "warn",
+        },
+        {
+          code: "authority_rule_matches",
+          passed: true,
+          severity: "fail",
+        },
+      ]),
+    ).toEqual({
+      totalAssertions: 4,
+      passedAssertions: 2,
+      failedAssertions: 2,
+      passRate: 0.5,
+      failedByCode: {
+        freshness_window_current: 1,
+        workflow_position_matches: 1,
+      },
+      failedBySeverity: {
+        warn: 2,
+      },
+    });
+  });
+
+  it("summarizes action proposal review warnings and warn-first disposition", () => {
+    expect(
+      analyzeActionProposalReviews([
+        {
+          valid: true,
+          mode: "warn",
+          execution: { allowed: true, blocking: false, enforcementMode: "advisory" },
+          warnings: [],
+        },
+        {
+          valid: false,
+          mode: "warn",
+          execution: { allowed: true, blocking: false, enforcementMode: "advisory" },
+          warnings: [
+            { source: "read_set", code: "stale_read_ref", severity: "warn" },
+            {
+              source: "observation_contract",
+              code: "freshness_window_current",
+              severity: "warn",
+            },
+            { source: "read_set", code: "workflow_position_mismatch", severity: "warn" },
+          ],
+        },
+      ]),
+    ).toEqual({
+      totalReviews: 2,
+      validReviews: 1,
+      invalidReviews: 1,
+      allowedReviews: 2,
+      blockedReviews: 0,
+      warnModeReviews: 2,
+      advisoryReviews: 2,
+      blockingModeReviews: 0,
+      totalWarnings: 3,
+      warningsBySource: {
+        observation_contract: 1,
+        read_set: 2,
+      },
+      warningsByCode: {
+        freshness_window_current: 1,
+        stale_read_ref: 1,
+        workflow_position_mismatch: 1,
+      },
+      warningsBySeverity: {
+        warn: 3,
+      },
+    });
+  });
+
+  it("summarizes replayable state-review artifact coverage", () => {
+    expect(
+      analyzeStateReviewArtifacts([
+        {
+          artifactHash: "a".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          traceContext: {
+            traceparent:
+              "00-11111111111111111111111111111111-2222222222222222-01",
+          },
+          relatedObjects: [
+            { role: "primary_subject" },
+            { role: "source_ref" },
+            { role: "ticker_symbol" },
+          ],
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              { source: "read_set", code: "stale_read_ref", severity: "warn" },
+            ],
+          },
+        },
+        {
+          artifactHash: "b".repeat(64),
+          hashValid: false,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [],
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: false,
+              blocking: true,
+              enforcementMode: "blocking",
+            },
+            warnings: [
+              {
+                source: "observation_contract",
+                code: "freshness_window_current",
+                severity: "warn",
+              },
+            ],
+          },
+        },
+      ]),
+    ).toEqual({
+      totalArtifacts: 2,
+      hashVerifiedArtifacts: 1,
+      hashMismatchArtifacts: 1,
+      hashVerificationRate: 0.5,
+      traceLinkedArtifacts: 1,
+      traceJoinCoverage: 0.5,
+      artifactsWithRelatedObjects: 1,
+      objectRoleCoverage: 0.5,
+      relatedObjectCount: 3,
+      relatedObjectsByRole: {
+        primary_subject: 1,
+        source_ref: 1,
+        ticker_symbol: 1,
+      },
+      warningCount: 2,
+      warningsBySource: {
+        observation_contract: 1,
+        read_set: 1,
+      },
+      warningsByCode: {
+        freshness_window_current: 1,
+        stale_read_ref: 1,
+      },
+      advisoryArtifacts: 1,
+      blockingModeArtifacts: 1,
+      blockedArtifacts: 1,
+      policyActionConsequence: "high",
+      policyWouldBlockArtifacts: 0,
+      wouldBlockByInvariantClass: {},
+      artifactsBySource: {
+        "arrowhedge/arrowhedge_cop": 2,
+      },
+      artifactsByType: {
+        "pm.agent_state.action_proposal_reviewed.v1": 2,
+      },
+      artifactsByTemporalMisalignmentPhase: {},
+      temporalMisalignmentPhaseCoverage: {
+        requiredPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        coveredPhases: [],
+        missingPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        coverageRate: 0,
+      },
+      artifactsByInvariantClass: {},
+    });
+  });
+
+  it("reports policy would-block artifact metrics without claiming actual mutation blocking", () => {
+    const samples: readonly StateReviewArtifactSample[] = [
+      {
+        artifactHash: "a".repeat(64),
+        hashValid: true,
+        eventEnvelope: {
+          source: "arrowhedge/arrowhedge_cop",
+          type: "pm.agent_state.action_proposal_reviewed.v1",
+        },
+        relatedObjects: [],
+        metadata: {
+          temporalMisalignmentPhase: "observation_to_action",
+          invariantClasses: ["freshness_window"],
+        },
+        review: {
+          valid: false,
+          mode: "warn",
+          execution: {
+            allowed: true,
+            blocking: false,
+            enforcementMode: "advisory",
+          },
+          warnings: [
+            { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          ],
+        },
+      },
+      {
+        artifactHash: "b".repeat(64),
+        hashValid: true,
+        eventEnvelope: {
+          source: "arrowhedge/arrowhedge_cop",
+          type: "pm.agent_state.action_proposal_reviewed.v1",
+        },
+        relatedObjects: [],
+        metadata: {
+          temporalMisalignmentPhase: "action_to_feedback",
+          invariantClasses: ["source_authority", "projection_version"],
+        },
+        review: {
+          valid: false,
+          mode: "warn",
+          execution: {
+            allowed: true,
+            blocking: false,
+            enforcementMode: "advisory",
+          },
+          warnings: [
+            { source: "read_set", code: "authority_mismatch", severity: "warn" },
+            {
+              source: "read_set",
+              code: "projection_version_mismatch",
+              severity: "warn",
+            },
+          ],
+        },
+      },
+    ];
+
+    expect(analyzeStateReviewArtifacts(samples)).toMatchObject({
+      blockedArtifacts: 0,
+      policyActionConsequence: "high",
+      policyWouldBlockArtifacts: 2,
+      wouldBlockByInvariantClass: {
+        freshness_window: 1,
+        source_authority: 1,
+        projection_version: 1,
+      },
+    });
+    expect(
+      analyzeStateReviewArtifacts(samples, { actionConsequence: "medium" }),
+    ).toMatchObject({
+      blockedArtifacts: 0,
+      policyActionConsequence: "medium",
+      policyWouldBlockArtifacts: 1,
+      wouldBlockByInvariantClass: {
+        source_authority: 1,
+      },
+    });
+    expect(
+      analyzeStateReviewArtifacts(samples, {
+        actionConsequence: "high",
+        policyMatrix: {
+          freshness_window: {
+            high: "advisory",
+          },
+        },
+      }),
+    ).toMatchObject({
+      blockedArtifacts: 0,
+      policyActionConsequence: "high",
+      policyWouldBlockArtifacts: 1,
+      wouldBlockByInvariantClass: {
+        source_authority: 1,
+        projection_version: 1,
+      },
+    });
+  });
+
+  it("reports complete temporal-misalignment phase coverage across artifact samples", () => {
+    expect(
+      analyzeStateReviewArtifacts([
+        {
+          artifactHash: "a".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [{ role: "ticker_symbol" }],
+          metadata: {
+            temporalMisalignmentPhase: "observation_to_action",
+            invariantClasses: ["freshness_window"],
+          },
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              { source: "read_set", code: "stale_read_ref", severity: "warn" },
+            ],
+          },
+        },
+        {
+          artifactHash: "b".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [{ role: "execution_feedback" }],
+          metadata: {
+            temporalMisalignmentPhase: "action_to_feedback",
+            invariantClasses: ["source_authority", "projection_version"],
+          },
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              { source: "read_set", code: "authority_mismatch", severity: "warn" },
+              {
+                source: "read_set",
+                code: "projection_version_mismatch",
+                severity: "warn",
+              },
+            ],
+          },
+        },
+        {
+          artifactHash: "c".repeat(64),
+          hashValid: true,
+          eventEnvelope: {
+            source: "arrowhedge/arrowhedge_cop",
+            type: "pm.agent_state.action_proposal_reviewed.v1",
+          },
+          relatedObjects: [{ role: "feedback_observation_gap" }],
+          metadata: {
+            temporalMisalignmentPhase: "feedback_to_observation",
+            invariantClasses: ["required_evidence"],
+          },
+          review: {
+            valid: false,
+            mode: "warn",
+            execution: {
+              allowed: true,
+              blocking: false,
+              enforcementMode: "advisory",
+            },
+            warnings: [
+              {
+                source: "observation_contract",
+                code: "required_source_refs_present",
+                severity: "fail",
+              },
+            ],
+          },
+        },
+      ]),
+    ).toMatchObject({
+      artifactsByTemporalMisalignmentPhase: {
+        observation_to_action: 1,
+        action_to_feedback: 1,
+        feedback_to_observation: 1,
+      },
+      artifactsByInvariantClass: {
+        freshness_window: 1,
+        source_authority: 1,
+        projection_version: 1,
+        required_evidence: 1,
+      },
+      temporalMisalignmentPhaseCoverage: {
+        requiredPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        coveredPhases: [
+          "observation_to_action",
+          "action_to_feedback",
+          "feedback_to_observation",
+        ],
+        missingPhases: [],
+        coverageRate: 1,
+      },
+    });
+  });
+
+  it("derives assertion, proposal-review, and artifact metrics from real state-review artifacts", () => {
+    const artifact = persistedArtifactFixture();
+    const assertionSamples = stateAssertionsFromStateReviewArtifacts([artifact]);
+    const reviewSamples = actionProposalReviewsFromStateReviewArtifacts([artifact]);
+    const artifactSamples = stateReviewArtifactSamplesFromArtifacts([artifact]);
+
+    expect(assertionSamples.map((sample) => sample.code)).toEqual([
+      "required_source_refs_present",
+      "authority_rule_matches",
+      "freshness_window_current",
+      "projection_version_matches",
+      "workflow_position_matches",
+      "conflicts_declared",
+      "missing_sources_declared",
+    ]);
+    expect(reviewSamples).toEqual([
+      {
+        valid: false,
+        mode: "warn",
+        execution: {
+          allowed: true,
+          blocking: false,
+          enforcementMode: "advisory",
+        },
+        warnings: [
+          { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          { source: "read_set", code: "stale_read_ref", severity: "warn" },
+          {
+            source: "observation_contract",
+            code: "freshness_window_current",
+            severity: "warn",
+          },
+        ],
+      },
+    ]);
+    expect(artifactSamples).toMatchObject([
+      {
+        artifactHash: artifact.artifactHash,
+        hashValid: true,
+        metadata: {
+          temporalMisalignmentPhase: "observation_to_action",
+          invariantClasses: ["freshness_window"],
+        },
+      },
+    ]);
+
+    expect(analyzeStateReviewArtifactEvidence([artifact])).toMatchObject({
+      stateAssertions: {
+        totalAssertions: 7,
+        failedAssertions: 1,
+        failedByCode: {
+          freshness_window_current: 1,
+        },
+      },
+      actionProposalReviews: {
+        totalReviews: 1,
+        invalidReviews: 1,
+        totalWarnings: 4,
+        warningsByCode: {
+          stale_read_ref: 3,
+          freshness_window_current: 1,
+        },
+      },
+      stateReviewArtifacts: {
+        totalArtifacts: 1,
+        hashVerifiedArtifacts: 1,
+        artifactsByTemporalMisalignmentPhase: {
+          observation_to_action: 1,
+        },
+        temporalMisalignmentPhaseCoverage: {
+          coveredPhases: ["observation_to_action"],
+          missingPhases: ["action_to_feedback", "feedback_to_observation"],
+          coverageRate: 1 / 3,
+        },
+        artifactsByInvariantClass: {
+          freshness_window: 1,
+        },
+      },
     });
   });
 });

@@ -38,10 +38,10 @@
       "path": "../substrate-http"
     },
     {
-      "path": "../capability-wedding-budget"
+      "path": "../capability-finance-research-ingest"
     },
     {
-      "path": "../profile-wedding"
+      "path": "../profile-finance-research"
     }
   ]
 }

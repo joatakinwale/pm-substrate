@@ -66,5 +66,5 @@ export const AGENCY_LEAD_SCORING_CAPABILITY = {
     "Subscribes to lead-progression events and infers the rollup target by walking " +
     "the graph topology (lead -> lead_scored_by OR lead -> assigned_user -> user_default_scoring). " +
     "No scoring_config_id on the payload — topology is the contract. " +
-    "Mirrors @pm/capability-wedding-budget's design as G4 anti-fixation proof.",
+    "G4 anti-fixation proof: mirrors the original rollup-capability design (wedding-era package since retired).",
 } as const satisfies Capability;

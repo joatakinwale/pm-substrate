@@ -105,7 +105,7 @@ class SnapshotValidator implements ProfileValidator {
   readonly #tenantId: TenantId;
   /** Concrete entity type → (profileName, EntityTypeDef). */
   readonly #entityTypes = new Map<string, { profile: string; def: EntityTypeDef }>();
-  /** Profile-prefixed edge name ("wedding/has_principal") → EdgeTypeDef. */
+  /** Profile-prefixed edge name ("agency/client_has_project") → EdgeTypeDef. */
   readonly #edgeTypes = new Map<string, EdgeTypeDef>();
   /** (profileName, concreteType) → LifecycleDef. */
   readonly #lifecycles = new Map<string, LifecycleDef>();
@@ -297,5 +297,5 @@ const enforceCardinality = (
   // "at-least" is a floor, not a ceiling — we can't enforce it on a single
   // write (a node may legitimately have 0 of a type during construction).
   // Floor enforcement belongs in a tenant-config validation step that runs
-  // after the wedding doc is "finalized". Logged for P2.
+  // after the engagement doc is "finalized". Logged for P2.
 };

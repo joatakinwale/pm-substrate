@@ -85,6 +85,7 @@ export function buildAdapterStateProofEvalPair(
     memoryBenchmarkBridge: "knowledge_update",
     mastCategory: "task_verification",
     coordinationClass: COORDINATION_CLASS,
+    evidenceStage: "scaffolded_scenario",
     result: "fail",
     notes:
       "Baseline source-only onboarding cannot prove equivalent graph, event, and projection state.",
@@ -109,6 +110,7 @@ export function buildAdapterStateProofEvalPair(
     memoryBenchmarkBridge: "knowledge_update",
     mastCategory: "task_verification",
     coordinationClass: COORDINATION_CLASS,
+    evidenceStage: "scaffolded_scenario",
     result: "pass",
     notes: `Substrate adapter represented ${input.sourceRecords.length} source records as graph nodes, adapter events, and projection state.`,
   });

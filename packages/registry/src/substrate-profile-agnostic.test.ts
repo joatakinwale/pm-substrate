@@ -15,11 +15,11 @@
  *
  *   1. Runtime parity: when the agency capability test runs, it instantiates
  *      the SAME substrate classes (PostgresGraph, PostgresEventStore,
- *      PostgresRegistry, PostgresProfileRegistry) that the wedding capability
- *      test uses. There is no `AgencyAwareGraph`, no profile-specific
- *      subclass, no agency-only feature flag. We assert this by importing
- *      the substrate classes and checking that profile-bound capability
- *      packages do NOT export any substrate type / class / function.
+ *      PostgresRegistry, PostgresProfileRegistry) that the finance-research
+ *      capability test uses. There is no `AgencyAwareGraph`, no
+ *      profile-specific subclass, no agency-only feature flag. We assert this
+ *      by importing the substrate classes and checking that profile-bound
+ *      capability packages do NOT export any substrate type / class / function.
  *
  *   2. Source invariant: no substrate package contains identifiers, string
  *      literals, or imports referencing a specific profile by name (the
@@ -29,9 +29,9 @@
  *      are documentation, not behavior), but flagged so a future contributor
  *      can see the boundary.
  *
- * If a future change wires "wedding" or "agency" into the substrate as a
- * concrete identifier, this test fails and points at the file:line so the
- * regression is caught immediately. The right fix in that case is to
+ * If a future change wires "agency" or "finance-research" into the substrate
+ * as a concrete identifier, this test fails and points at the file:line so
+ * the regression is caught immediately. The right fix in that case is to
  * generalize the substrate API \u2014 not to delete the test.
  */
 
@@ -243,9 +243,9 @@ function scanSubstratePackage(
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
       for (const profile of profileNames) {
-        // Word-boundary match: catches "wedding", "weddingFoo",
-        // "Wedding", "WEDDING", but not random substrings in URLs/etc.
-        // Case-insensitive on purpose \u2014 a `WeddingProfile` identifier in
+        // Word-boundary match: catches "agency", "agencyFoo",
+        // "Agency", "AGENCY", but not random substrings in URLs/etc.
+        // Case-insensitive on purpose \u2014 an `AgencyProfile` identifier in
         // the substrate would be exactly the leak we're catching.
         const re = new RegExp(
           `(?<![a-zA-Z0-9])${profile}(?![a-zA-Z0-9])`,

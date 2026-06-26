@@ -18,7 +18,7 @@ import type { ProfileEntity } from "@pm/types";
  *
  * G4 anti-fixation rule: building this package must not require any change
  * to packages/types, graph, events, registry, workflow, projections,
- * profile-wedding, profile-registry, capability-audit, or substrate-http.
+ * profile-finance-research, profile-registry, capability-audit, or substrate-http.
  * If any of those need to change, the substrate has a fixation problem
  * and the change is a finding, not a feature.
  */
@@ -261,7 +261,7 @@ export type AgencyUserRole =
 /**
  * LeadScoringConfig — a named ruleset for evaluating Leads. Specializes Resource.
  *
- * Mirrors the same architectural pattern as BudgetCategory in profile-wedding:
+ * Mirrors the rollup-target architectural pattern (proven by the retired wedding-era BudgetCategory):
  * a Resource node that aggregates state owned exclusively by one capability.
  *
  * The agency-lead-scoring capability (Tier-2) listens to lead-related events,

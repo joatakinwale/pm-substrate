@@ -2,7 +2,7 @@
  * Equivalence + behavior tests for defineCapability.
  *
  * Strategy: build a synthetic capability with the kit and run it through
- * the same Postgres dev DB the wedding.budget capability uses. Asserts:
+ * the same Postgres dev DB the domain capabilities use. Asserts:
  *
  *   1. Idempotency: same key applied twice → only one rollup happens,
  *      only one event emitted.

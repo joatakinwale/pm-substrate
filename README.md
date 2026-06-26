@@ -1,107 +1,62 @@
 # pm-substrate
 
-**The PM-layer Tier-1 substrate.** Universal entity graph + event log + capability registry + per-tenant workflow runtime.
+**The project-manager layer for agentic workspaces: a tenant-scoped, governed operational state plane.**
 
-A JOATLABS.dev primitive. The shared base every business platform built on top of it inherits.
+A JOATLABS.dev primitive. Canonical thesis: [`artifacts/pm_substrate_rewrite.md`](./artifacts/pm_substrate_rewrite.md) — *State Coherence Under Partial Observation* (2026-05-26).
 
 ---
 
-## What this is
+## The problem
 
-A workspace's project-manager layer — the missing layer that arbitrates *interactions between tools* the way a human PM arbitrates between specialists. Components are mature; **interoperability is the bottleneck**. This is the substrate that makes the toolset coherent.
+Work moves through many specialized tools, teams, and AI agents that each hold a partial model of the same changing reality. The hard problem is **state coherence**: bounded actors must act safely when every actor sees only part of the system, every observation can be stale, and every action may change state other actors depend on. LLM agents make this failure visible because they act quickly across many systems without owning institutional memory — but humans, departments, and SaaS tools fail the same way.
 
-This is the **Tier-1 substrate**: the universal primitives, identical across tenants and industries. Tier-2 industry profiles (wedding, legal, healthcare, agency) ship as **separate packages** that consume this substrate.
+pm-substrate does not solve reality. It solves **governed operational state**: what the workspace accepts as actionable, where that claim came from, how fresh it is, which actor may change it, which workflow it belongs to, and how agents resume from it after context loss.
 
-## Architecture (4 layers)
+## Two coupled claims
 
-1. **Entity graph** — identity + stable attrs only on nodes; everything contextual on typed edges. Per-tenant declared. (`packages/graph`)
-2. **Event log** — append-only, topic-scoped (tenant + entity type), declarative subscriptions. Decoupling + time-travel queries free. (`packages/events`)
-3. **Capability registry** — tools register as capability providers (reads, writes, emits, requires_perms). "Integration" stops existing as a concept. (`packages/registry`)
-4. **Workflow runtime** — per-tenant graph of capability invocations conditioned on events. Processes expressed, not coded. (`packages/workflow`)
+1. **Plug-in claim** — a platform onboards through new mapping/profile/capability files with **zero substrate-package edits and zero changes to existing providers**. AI proposes the semantic mapping; deterministic validators, profiles, write gates, and provenance decide admissibility. *AI is the semantic mapper. The substrate is the type system, compiler, runtime, event ledger, and audit trail.*
+2. **Agent-state claim** — agents behave better resuming from substrate state than from chat history: current-state review before action, source authority, evidence-backed proposals, replay, amnesiac continuity.
 
-## The seven Tier-1 entity primitives (`packages/types`)
+Validation surface: the **ArrowHedgeLabs sandbox** (a multi-agent financial-research project used strictly as a research/education testbed — the *agents* are the subject, not finance). See [`docs/validation.md`](./docs/validation.md) for tests T1–T8 and the 12 behavior metrics.
 
-Cover ~90% of B2B operations. Defined once, identical across all tenants.
+## Architecture (layers)
 
-- `Counterparty` — customer / client / patient / guest / vendor / partner
-- `Engagement` — project / case / deal / event / matter / job / ticket
-- `Transaction` — invoice / payment / contract / order / claim
-- `Resource` — person / asset / room / equipment
-- `Communication` — email / call / message / note
-- `Document` — any file produced or referenced
-- `Event` — something happened at a time, immutable
+1. **Entity graph** — identity-only nodes, typed edges, profile-validated writes. (`packages/graph`)
+2. **Event log** — append-only, tenant-partitioned, hash-chained provenance, `LISTEN/NOTIFY` bus. (`packages/events`)
+3. **Capability registry** — tools declare reads/emits/permissions; isolation enforced by test. (`packages/registry`, `packages/capability-kit`)
+4. **Workflow runtime** — per-tenant processes conditioned on events. (`packages/workflow`)
+5. **Agent operational state** — `CurrentStateView`, `ObservationContract` (v2: integrity hash, holder binding, allowed use), `ActionProposalReview` (warn-first), durable `StateReviewArtifact` with hash replay, observed read-set comparison, invariant-class policy, **external evidence admission** (MCP handles, memory, approvals, provider policy, traces, PM handoffs — evidence, never authority). (`packages/agent-state`)
+6. **Evals** — paired baseline/substrate scenarios, ArrowHedge fixture corpus, artifact-derived metrics, admission fixtures, run groups, role projections. (`packages/evals`)
 
-Industry profiles (Tier 2) specialize these. Tenant customizations (Tier 3) extend the profile.
+Supporting: `entity-mapping` (declarative source→substrate mappings + profile-aware semantic validation), `continuity` (agent checkpoints), `tenants`, `projections`, `profile-registry`, `substrate-http` (+ demo).
+
+## Layered ontology
+
+- **Tier 1 — universal primitives** (`packages/types`): `Counterparty`, `Engagement`, `Transaction`, `Resource`, `Communication`, `Document`, `Event`.
+- **Tier 2 — profiles** as libraries: `profile-finance-research` (ArrowHedge validation artifact), `profile-agency` (second-profile proof that the substrate is profile-agnostic — enforced by `substrate-profile-agnostic.test.ts`).
+- **Tier 3 — tenant customizations.**
+
+The substrate names no profile in its own code; profiles install per tenant at runtime.
 
 ## Day-1 stack (deliberate)
 
-- **Postgres-only.** Five schemas: `graph`, `events`, `projections`, `registry`, `workflow`.
-- **`LISTEN/NOTIFY` as event bus.** No Kafka, no NATS, no Redis. Yet.
-- **One projection-worker process.** Build the contract, scale it later.
-- **Postgres FTS** for any search needs.
-
-The discipline is in the *interfaces*, not the infrastructure. Each piece swaps under a stable contract when scale demands it. See [`docs/adr/0001-day-1-stack.md`](./docs/adr/0001-day-1-stack.md).
-
-## Repo layout
-
-```
-pm-substrate/
-├── packages/
-│   ├── types/         # Tier-1 entity-interface contracts
-│   ├── graph/         # Entity graph API + Postgres adapter
-│   ├── events/        # Append-only log + LISTEN/NOTIFY publisher/subscriber
-│   ├── registry/      # Capability registry
-│   ├── workflow/      # Per-tenant workflow runtime
-│   └── projections/   # Read-model projection workers
-├── scripts/
-│   ├── migrate.ts     # Apply DB migrations
-│   └── seed.ts        # Seed dev tenant
-├── db/
-│   └── migrations/    # SQL migrations (schema-per-concern)
-├── docs/
-│   ├── architecture.md
-│   └── adr/           # Architecture Decision Records
-├── docker-compose.yml # Postgres + pgweb for local dev
-└── tsconfig.base.json
-```
+Postgres-only: five schemas, `LISTEN/NOTIFY` as the bus, FTS for search, one projection worker. Heartbeats are **reconciliation events** (Kubernetes-controller style), never truth. Each piece swaps under a stable contract when scale demands (see `docs/adr/0001-day-1-stack.md`).
 
 ## Getting started
 
 ```bash
-# Install
 pnpm install
-
-# Bring up Postgres
-pnpm db:up
-
-# Apply migrations + seed dev tenant
+pnpm db:up        # Postgres via docker compose
 pnpm db:migrate
 pnpm db:seed
-
-# Build everything
 pnpm build
-
-# Type-check
 pnpm typecheck
-
-# Test
-pnpm test
-
-# Reset everything (drops pgdata)
-pnpm db:reset
+pnpm test         # full suite incl. DB-gated integration tests (PM_DATABASE_URL)
 ```
 
-## Status
+## Research
 
-**Phase 0 — substrate.** Active. See `docs/roadmap.md` for the full Phase 0–4 plan.
-
-| Phase | Deliverable |
-|---|---|
-| 0 | This repo. Tier-1 substrate skeleton + Postgres + interface contracts. |
-| 1 | Wedding Tier-2 profile package (specializations + identity primacy + lifecycles). |
-| 2 | Refactor 3 WeddingWebApp subsystems as capability providers. |
-| 3 | Add a 4th provider with zero coordination. **The demo moment.** |
-| 4 | Second profile (legal / agency) without touching the substrate. **Architecture proven.** |
+`research/index.md` is the claim ledger (C001+, run protocol, implementation frontier). Daily chains: `research/daily-arrowsmith-agent-state/`, `research/daily-ai-competitive-intelligence/`. Research claims must map to executable substrate checks — *architecture without falsification criteria is theology* ([`docs/validation.md`](./docs/validation.md)).
 
 ## License
 

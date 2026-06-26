@@ -4,6 +4,8 @@ import type { TenantId, Timestamp } from "@pm/types";
 import {
   COORDINATION_CLASSES,
   EVAL_AXES,
+  EVAL_EVIDENCE_STAGES,
+  EVAL_OPERATIONAL_TERMINAL_OUTCOMES,
   FAILURE_CLASSES,
   MAST_CATEGORIES,
   MEMORY_BENCHMARK_BRIDGES,
@@ -62,6 +64,21 @@ describe("eval event schema", () => {
       "authority_gated_transition",
       "derived_projection",
     ]);
+    expect(EVAL_EVIDENCE_STAGES).toEqual([
+      "scaffolded_scenario",
+      "detected_warning",
+      "blocked_mutation",
+      "paired_behavioral_improvement",
+      "live_run",
+    ]);
+    expect(EVAL_OPERATIONAL_TERMINAL_OUTCOMES).toEqual([
+      "accepted",
+      "blocked",
+      "rejected",
+      "held",
+      "superseded",
+      "escalated",
+    ]);
   });
 
   it("accepts a valid state-failure eval event", () => {
@@ -69,6 +86,44 @@ describe("eval event schema", () => {
     expect(result).toEqual({ valid: true, issues: [] });
     expect(isEvalEvent(baseEvent)).toBe(true);
     expect(assertEvalEvent(baseEvent)).toEqual(baseEvent);
+  });
+
+  it("allows eval events to cite durable state-review artifacts and action outcomes", () => {
+    const event = evalEvent({
+      ...baseEvent,
+      evidenceStage: "detected_warning",
+      evidenceRefs: [
+        evalEvidenceRef(
+          "state_review_artifact",
+          "artifact_arrowhedge_stale_read_001",
+          "ArrowHedge stale-read review artifact",
+        ),
+      ],
+      substrateRefs: [
+        ...baseEvent.substrateRefs,
+        evalEvidenceRef(
+          "state_review_artifact",
+          "artifact_arrowhedge_stale_read_001",
+        ),
+        evalEvidenceRef(
+          "action_outcome_envelope",
+          "outcome_arrowhedge_stale_blocked_001",
+        ),
+      ],
+    });
+
+    expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
+  });
+
+  it("accepts live-run evidence from dynamic harnesses", () => {
+    const event = evalEvent({
+      ...baseEvent,
+      axis: "local_lab",
+      runId: "run_local_agent_lab_live_stale_observation_baseline",
+      evidenceStage: "live_run",
+    });
+
+    expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
   });
 
   it("collects shape and enum issues without short-circuiting", () => {
@@ -83,6 +138,7 @@ describe("eval event schema", () => {
       memoryBenchmarkBridge: "memo",
       mastCategory: "coordination_bug",
       coordinationClass: "eventually_consistent_magic",
+      evidenceStage: "claimed_proof",
       evidenceRefs: [{ kind: "event", id: "" }],
       substrateRefs: [{ kind: "bad_ref", id: "x" }],
       notes: "",
@@ -100,6 +156,7 @@ describe("eval event schema", () => {
         "/memoryBenchmarkBridge",
         "/mastCategory",
         "/coordinationClass",
+        "/evidenceStage",
         "/evidenceRefs/0/id",
         "/substrateRefs/0/kind",
         "/notes",
@@ -120,11 +177,69 @@ describe("eval event schema", () => {
       expect.arrayContaining([
         {
           path: "/evidenceRefs",
-          message: "pass/fail eval events require at least one evidence reference",
+          message: "pass/fail scenario results require at least one evidence reference",
         },
         {
           path: "/substrateRefs",
-          message: "pass/fail eval events require at least one substrate reference",
+          message: "pass/fail scenario results require at least one substrate reference",
+        },
+      ]),
+    );
+  });
+
+  it("separates scenario verdict from operational terminal outcome", () => {
+    const event = evalEvent({
+      ...baseEvent,
+      axis: "local_lab",
+      result: "blocked",
+      scenarioResult: "pass",
+      operationalTerminalOutcome: "blocked",
+      substrateRefs: [
+        ...baseEvent.substrateRefs,
+        evalEvidenceRef(
+          "action_outcome_envelope",
+          "outcome_local_lab_stale_blocked_001",
+        ),
+      ],
+    });
+
+    expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
+  });
+
+  it("requires terminal outcome metadata for blocked operational passes", () => {
+    const result = validateEvalEvent({
+      ...baseEvent,
+      axis: "local_lab",
+      result: "blocked",
+      scenarioResult: "pass",
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        {
+          path: "/operationalTerminalOutcome",
+          message: "blocked operational result with scenario pass requires operationalTerminalOutcome",
+        },
+      ]),
+    );
+  });
+
+  it("requires action outcome refs when terminal outcome metadata is present", () => {
+    const result = validateEvalEvent({
+      ...baseEvent,
+      axis: "local_lab",
+      result: "pass",
+      scenarioResult: "pass",
+      operationalTerminalOutcome: "accepted",
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        {
+          path: "/substrateRefs",
+          message: "operationalTerminalOutcome requires an action_outcome_envelope substrate ref",
         },
       ]),
     );

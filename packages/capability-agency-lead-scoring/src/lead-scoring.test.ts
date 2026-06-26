@@ -2,7 +2,7 @@
  * Integration tests for the agency.lead-scoring capability.
  *
  * Built as the second proof point in the G4 anti-fixation falsification test.
- * Mirrors the structure of @pm/capability-wedding-budget's budget.test.ts:
+ * Mirrors the original rollup-capability test structure (wedding-era package since retired):
  *
  *   1. Happy path (lead-bound override): lead-scored event → correct
  *      LeadScoringConfig.currentTotalLeadsScored update + agency.lead.scored

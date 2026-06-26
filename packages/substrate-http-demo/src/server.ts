@@ -2,11 +2,13 @@
 /**
  * @pm/substrate-http-demo — sample server entry point.
  *
- * Demonstrates @pm/substrate-http wired with the wedding profile and the
- * wedding-budget capability. This is the demo bootstrap that docker-compose
- * and `pnpm db:reset` run against. It is NOT part of the substrate library;
- * @pm/substrate-http itself is profile-agnostic and contains no references
- * to any specific profile or capability.
+ * Demonstrates @pm/substrate-http as a profile-agnostic substrate API.
+ * Tenants install profiles (e.g. finance-research, agency) at runtime via
+ * the profile-registry routes; capability handlers register per deployment
+ * through the optional `domainEventHandlers` map. This is the demo bootstrap
+ * that docker-compose and `pnpm db:reset` run against. It is NOT part of the
+ * substrate library; @pm/substrate-http itself is profile-agnostic and
+ * contains no references to any specific profile or capability.
  *
  * Closes ADR-0012 (substrate-http demo wiring extracted from the library).
  *
@@ -24,7 +26,6 @@
  */
 
 import { createServer } from "node:http";
-import type { EntityId } from "@pm/types";
 import { env, exit } from "node:process";
 
 import pg from "pg";
@@ -35,9 +36,9 @@ import { PostgresProfileRegistry } from "@pm/profile-registry";
 import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresRegistry } from "@pm/registry";
 import { PostgresTenantDirectory } from "@pm/tenants";
-import { BudgetRollupHandler } from "@pm/capability-wedding-budget";
 
 import { createSubstrateApp } from "@pm/substrate-http";
+import { arrowhedgeRoutes } from "./arrowhedge-route.js";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -67,12 +68,6 @@ const graph = new PostgresGraph(pool, {
 });
 const capabilityRegistry = new PostgresRegistry(pool);
 const projections = new PostgresProjectionRunner(pool, events);
-const budgetRollup = new BudgetRollupHandler({
-  pool,
-  graph,
-  events,
-  emittedBy: "pm-substrate-http/wedding.budget",
-});
 
 const app = createSubstrateApp({
   tenants,
@@ -81,16 +76,18 @@ const app = createSubstrateApp({
   graph,
   events,
   projections,
-  domainEventHandlers: {
-    "wedding.contract.payment_recorded": async (input) => {
-      await budgetRollup.handle(input.tenantId, {
-        contractId: String(input.payload["contractId"]) as EntityId,
-        amount: Number(input.payload["amount"]),
-        recordedAt: String(input.payload["recordedAt"]),
-        paymentId: String(input.payload["paymentId"]),
-      });
+  // Capability-specific domain event handlers register here per deployment.
+  // The demo ships none: the substrate surface itself is the demonstration.
+  //
+  // Profile-specific ingest surfaces are injected as extra routes (the
+  // substrate library stays profile-agnostic). The ArrowHedgeLab finance
+  // bridge mounts at /tenants/:tenantId/arrowhedge.
+  extraRoutes: [
+    {
+      basePath: "arrowhedge",
+      router: arrowhedgeRoutes({ pool, graph, events, projections }),
     },
-  },
+  ],
 });
 
 // ---------------------------------------------------------------------------

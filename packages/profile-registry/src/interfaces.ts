@@ -82,7 +82,7 @@ export interface LifecycleCheck {
 export interface EdgeWriteCheck {
   readonly tenantId: TenantId;
   /**
-   * Profile-prefixed edge type ("wedding/has_principal") OR a raw type
+   * Profile-prefixed edge type ("agency/client_has_project") OR a raw type
    * for cross-profile edges in the Tier-1 catalog. Validation only
    * applies to profile-prefixed types; substrate stores raw types as-is.
    */

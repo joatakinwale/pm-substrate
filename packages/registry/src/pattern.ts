@@ -1,7 +1,7 @@
 /**
  * Same minimal glob grammar as @pm/events:
  *   "task.created" | "task.*" | "*.created" | "*"
- *   "wedding.contract.payment_recorded" | "wedding.contract.*" | "wedding.*.signed"
+ *   "agency.lead.qualified" | "agency.lead.*" | "agency.*.qualified"
  *
  * Supports arbitrary segment counts (segments separated by ".").
  * A `*` matches any single segment. A bare `*` matches anything.
@@ -11,8 +11,8 @@
  * the change lands in both packages and is enforced by a shared test fixture.
  *
  * History: an earlier 2-segment-only implementation silently mismatched
- * 3-segment topics like "wedding.contract.payment_recorded" against
- * "wedding.contract.*" (returning false). Surfaced by the G6 contract-
+ * 3-segment topics like "agency.lead.qualified" against
+ * "agency.lead.*" (returning false). Surfaced by the G6 contract-
  * validation tests (ADR-0013). Fixed here to handle arbitrary segment counts.
  */
 export const matchesPattern = (pattern: string, type: string): boolean => {

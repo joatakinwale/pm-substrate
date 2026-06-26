@@ -19,9 +19,14 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
-    "@pm/types": "workspace:*"
+    "@pm/agent-state": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*",
+    "@pm/workflow": "workspace:*"
   },
   "devDependencies": {
+    "@pm/capability-kit": "workspace:*",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"
   }

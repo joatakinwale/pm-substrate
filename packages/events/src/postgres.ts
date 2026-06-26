@@ -174,11 +174,14 @@ export class PostgresEventStore
     const occurredAt =
       input.occurredAt ?? (new Date().toISOString() as Timestamp);
 
+    // ORDER BY seq: recorded_at freezes per transaction (now()), so a
+    // multi-event transaction would tie on recorded_at and the random id
+    // tie-break could fork the hash chain. seq is monotonic per insert.
     const prior = await client.query<{ content_hash: string | null }>(
       `SELECT content_hash
          FROM events.events
         WHERE tenant_id = $1
-        ORDER BY recorded_at DESC, id DESC
+        ORDER BY seq DESC
         LIMIT 1`,
       [input.tenantId],
     );
@@ -312,13 +315,15 @@ export class PostgresEventStore
   }
 
   async verifyChain(tenantId: TenantId): Promise<EventChainVerificationReport> {
+    // ORDER BY seq: matches the publish-time prior-event ordering exactly,
+    // including multi-event transactions whose recorded_at values tie.
     const r = await this.#pool.query<RowShape>(
       `SELECT id, tenant_id, type, entity_id, emitted_by, payload_schema,
               payload, occurred_at, recorded_at, caused_by, schema_version,
               authority, content_hash, prior_event_hash
          FROM events.events
         WHERE tenant_id = $1
-        ORDER BY recorded_at ASC, id ASC`,
+        ORDER BY seq ASC`,
       [tenantId],
     );
     return verifyEventChain(tenantId, r.rows.map(rowToEvent));

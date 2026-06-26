@@ -48,6 +48,7 @@ describe("adapter state-proof evals", () => {
       pairedRunGroup: "pair_agency-source-row-onboarding",
       failureClass: "representation_loss",
       result: "fail",
+      evidenceStage: "scaffolded_scenario",
     });
     expect(substrate).toMatchObject({
       axis: "marketing",
@@ -59,6 +60,7 @@ describe("adapter state-proof evals", () => {
       memoryBenchmarkBridge: "knowledge_update",
       mastCategory: "task_verification",
       coordinationClass: "derived_projection",
+      evidenceStage: "scaffolded_scenario",
     });
     expect(substrate.substrateRefs).toEqual([
       { kind: "graph_node", id: "00000000-0000-4000-8000-00000000a001", label: "ClientOrg" },
@@ -74,14 +76,16 @@ describe("adapter state-proof evals", () => {
       completePairedGroups: 1,
       baselineFailures: 1,
       substrateFailures: 0,
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
     });
     expect(metrics.byFailureClass["representation_loss"]).toMatchObject({
       events: 2,
       pairedGroups: 1,
       baselineFailures: 1,
       substrateFailures: 0,
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
     expect(metrics.byCoordinationClass["derived_projection"]).toMatchObject({
@@ -89,7 +93,8 @@ describe("adapter state-proof evals", () => {
       pairedGroups: 1,
       baselineFailures: 1,
       substrateFailures: 0,
-      failureReduction: 1,
+      failureReduction: 0,
+      allStageFailureReduction: 1,
       substratePasses: 1,
     });
   });

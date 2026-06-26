@@ -6,6 +6,9 @@
  *
  * If this test ever needs profile-specific branching to pass, the layered
  * ontology has leaked. See ADR-0009 falsification mode #7.
+ *
+ * Fixtures use the finance-research profile (the ArrowHedge agent-state
+ * validation artifact).
  */
 
 import { randomUUID } from "node:crypto";
@@ -15,7 +18,7 @@ import { PostgresEventStore } from "@pm/events";
 import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresProfileRegistry } from "@pm/profile-registry";
 import { PostgresRegistry } from "@pm/registry";
-import { WEDDING_PROFILE } from "@pm/profile-wedding";
+import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import type { TenantId } from "@pm/types";
 import { AUDIT_CAPABILITY, auditProjection } from "./index.js";
 import type { AuditState } from "./projection.js";
@@ -68,7 +71,7 @@ describeIfDb("common/audit-log capability — Tier-1 tool proof", () => {
   it("registers cleanly against any tenant regardless of installed profile", async () => {
     const a = await makeTenant();
     const b = await makeTenant();
-    await profileRegistry.install(a, WEDDING_PROFILE);
+    await profileRegistry.install(a, FINANCE_RESEARCH_PROFILE);
     // b has no profile installed — raw Tier-1 only.
 
     await capRegistry.register(a, AUDIT_CAPABILITY);
@@ -90,16 +93,16 @@ describeIfDb("common/audit-log capability — Tier-1 tool proof", () => {
     ]);
   });
 
-  it("produces the same audit shape across a wedding tenant and a raw Tier-1 tenant", async () => {
+  it("produces the same audit shape across a finance-research tenant and a raw Tier-1 tenant", async () => {
     // Two tenants. Same number of events with overlapping types.
-    const weddingT = await makeTenant();
+    const financeT = await makeTenant();
     const rawT = await makeTenant();
-    await profileRegistry.install(weddingT, WEDDING_PROFILE);
-    await capRegistry.register(weddingT, AUDIT_CAPABILITY);
+    await profileRegistry.install(financeT, FINANCE_RESEARCH_PROFILE);
+    await capRegistry.register(financeT, AUDIT_CAPABILITY);
     await capRegistry.register(rawT, AUDIT_CAPABILITY);
 
     const eventTypes = ["thing.created", "thing.updated", "thing.deleted"];
-    for (const t of [weddingT, rawT]) {
+    for (const t of [financeT, rawT]) {
       for (const type of eventTypes) {
         await events.publish({
           tenantId: t,
@@ -112,11 +115,11 @@ describeIfDb("common/audit-log capability — Tier-1 tool proof", () => {
       }
     }
 
-    await runner.catchUp(weddingT, "common/audit-log");
+    await runner.catchUp(financeT, "common/audit-log");
     await runner.catchUp(rawT, "common/audit-log");
 
-    const weddingState = await runner.getState<AuditState>(
-      weddingT,
+    const financeState = await runner.getState<AuditState>(
+      financeT,
       "common/audit-log",
     );
     const rawState = await runner.getState<AuditState>(
@@ -124,47 +127,47 @@ describeIfDb("common/audit-log capability — Tier-1 tool proof", () => {
       "common/audit-log",
     );
 
-    expect(weddingState?.count).toBe(3);
+    expect(financeState?.count).toBe(3);
     expect(rawState?.count).toBe(3);
 
     // The byType breakdown is identical: same keys, same counts. The only
     // difference between the two tenants is which profile is installed —
     // and audit doesn't care.
-    expect(weddingState?.byType).toEqual({
+    expect(financeState?.byType).toEqual({
       "thing.created": 1, "thing.updated": 1, "thing.deleted": 1,
     });
-    expect(rawState?.byType).toEqual(weddingState?.byType);
+    expect(rawState?.byType).toEqual(financeState?.byType);
 
     // Entry shapes identical (modulo unique IDs).
     const shape = (s: AuditState) =>
       s.entries.map((e) => ({
         type: e.type, emittedBy: e.emittedBy, hasEntityId: !!e.entityId,
       }));
-    expect(shape(weddingState!)).toEqual(shape(rawState!));
+    expect(shape(financeState!)).toEqual(shape(rawState!));
   });
 
-  it("captures wedding-specific events without any wedding-aware code in the projection", async () => {
-    // Sanity: when wedding-specific event types fire, audit just records them
+  it("captures profile-specific events without any profile-aware code in the projection", async () => {
+    // Sanity: when finance-research event types fire, audit just records them
     // by string. No branch ever inspects the profile binding. If a future
-    // change introduces a `if (event.type.startsWith('wedding/'))` somewhere
+    // change introduces a `if (event.type.startsWith('finance'))` somewhere
     // in this projection module, the architecture is leaking.
     const t = await makeTenant();
-    await profileRegistry.install(t, WEDDING_PROFILE);
+    await profileRegistry.install(t, FINANCE_RESEARCH_PROFILE);
     await capRegistry.register(t, AUDIT_CAPABILITY);
 
     await events.publish({
-      tenantId: t, type: "wedding.contract.signed",
-      entityId: "ent_contract_x",
-      emittedBy: "cap.wedding-contracts",
-      payloadSchema: "wedding.contract.signed/v1",
-      payload: { vendorId: "ent_v" },
+      tenantId: t, type: "analyst.signal.created",
+      entityId: "ent_signal_x",
+      emittedBy: "cap.finance-research-ingest",
+      payloadSchema: "analyst.signal.created/v1",
+      payload: { agentId: "agent:analyst_momentum" },
     });
     await events.publish({
-      tenantId: t, type: "wedding.guest.rsvp_accepted",
-      entityId: "ent_guest_y",
-      emittedBy: "cap.wedding-rsvp",
-      payloadSchema: "wedding.guest.rsvp_accepted/v1",
-      payload: { plusOne: false },
+      tenantId: t, type: "portfolio.decision.accepted",
+      entityId: "ent_decision_y",
+      emittedBy: "cap.finance-research-ingest",
+      payloadSchema: "portfolio.decision.accepted/v1",
+      payload: { accepted: true },
     });
 
     await runner.catchUp(t, "common/audit-log");
@@ -172,8 +175,8 @@ describeIfDb("common/audit-log capability — Tier-1 tool proof", () => {
 
     expect(state?.count).toBe(2);
     expect(state?.byType).toEqual({
-      "wedding.contract.signed": 1,
-      "wedding.guest.rsvp_accepted": 1,
+      "analyst.signal.created": 1,
+      "portfolio.decision.accepted": 1,
     });
   });
 
@@ -181,7 +184,7 @@ describeIfDb("common/audit-log capability — Tier-1 tool proof", () => {
     // Architectural pin: the audit projection's source must not depend on any
     // profile package. Verified at the package.json level — `dependencies`
     // contains @pm/projections, @pm/registry, @pm/types and nothing else.
-    // A future PR that adds @pm/profile-wedding (etc.) to runtime
+    // A future PR that adds a @pm/profile-* package (etc.) to runtime
     // dependencies would be visible in code review and fail this test.
     const fs = await import("node:fs/promises");
     const path = await import("node:path");

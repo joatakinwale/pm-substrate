@@ -317,7 +317,7 @@ describe("Agency profile constraints", () => {
 
   it("Lead.qualificationStatus is in the identity bag, not a substrate lifecycle", () => {
     // Intentional: we keep CRM-style progression in the identity bag rather
-    // than as a substrate-enforced lifecycle, paralleling how profile-wedding
+    // than as a substrate-enforced lifecycle, paralleling how earlier profiles
     // handles Couple/Guest/Vendor states. If you want to lift it later, that's
     // a separate decision — it's not a substrate gap.
     expect(AGENCY_PROFILE.lifecycles["Lead"]).toBeUndefined();

@@ -99,10 +99,10 @@ describe("validateCapabilityContracts — compatible cases", () => {
 
   it("producer + subscriber on same major version passes", () => {
     const producer = cap("producer", {
-      emits: [emit("wedding.contract.signed", 1)],
+      emits: [emit("agency.contract.signed", 1)],
     });
     const subscriber = cap("subscriber", {
-      subscribesTo: [subscribe("wedding.contract.signed", 1, 1)],
+      subscribesTo: [subscribe("agency.contract.signed", 1, 1)],
     });
     expect(() =>
       validateCapabilityContracts(ctx([producer, subscriber])),
@@ -111,10 +111,10 @@ describe("validateCapabilityContracts — compatible cases", () => {
 
   it("subscriber accepting wider major range passes", () => {
     const producer = cap("producer", {
-      emits: [emit("wedding.task.created", 2)],
+      emits: [emit("agency.task.created", 2)],
     });
     const subscriber = cap("subscriber", {
-      subscribesTo: [subscribe("wedding.task.*", 1, 2)],
+      subscribesTo: [subscribe("agency.task.*", 1, 2)],
     });
     expect(() =>
       validateCapabilityContracts(ctx([producer, subscriber])),
@@ -148,10 +148,10 @@ describe("validateCapabilityContracts — compatible cases", () => {
 describe("validateCapabilityContracts — incompatible cases", () => {
   it("producer major version above subscriber accepted range rejects", () => {
     const producer = cap("producer", {
-      emits: [emit("wedding.contract.signed", 2)],
+      emits: [emit("agency.contract.signed", 2)],
     });
     const subscriber = cap("subscriber", {
-      subscribesTo: [subscribe("wedding.contract.signed", 1, 1)],
+      subscribesTo: [subscribe("agency.contract.signed", 1, 1)],
     });
     expect(() =>
       validateCapabilityContracts(ctx([producer, subscriber])),
@@ -163,10 +163,10 @@ describe("validateCapabilityContracts — incompatible cases", () => {
 
   it("producer major version below subscriber accepted range rejects", () => {
     const producer = cap("producer", {
-      emits: [emit("wedding.task.created", 1)],
+      emits: [emit("agency.task.created", 1)],
     });
     const subscriber = cap("subscriber", {
-      subscribesTo: [subscribe("wedding.task.created", 2, 3)],
+      subscribesTo: [subscribe("agency.task.created", 2, 3)],
     });
     expect(() =>
       validateCapabilityContracts(ctx([producer, subscriber])),
@@ -189,8 +189,8 @@ describe("validateCapabilityContracts — incompatible cases", () => {
   });
 
   it("two owners on same interface (field-empty) rejects", () => {
-    const a = cap("a", { writes: [writes("Wedding", [], "owner")] });
-    const b = cap("b", { writes: [writes("Wedding", [], "owner")] });
+    const a = cap("a", { writes: [writes("Project", [], "owner")] });
+    const b = cap("b", { writes: [writes("Project", [], "owner")] });
     expect(() => validateCapabilityContracts(ctx([a, b]))).toThrow(
       WorkflowValidationError,
     );
@@ -247,12 +247,12 @@ describe("validateCapabilityContracts — strict mode", () => {
 
   it("fully-typed capability passes strict mode", () => {
     const producer = cap("producer", {
-      emits: [emit("wedding.task.created", 1)],
-      reads: [reads("Wedding")],
+      emits: [emit("agency.task.created", 1)],
+      reads: [reads("Project")],
       writes: [writes("Task", ["id", "title"], "owner")],
     });
     const subscriber = cap("subscriber", {
-      subscribesTo: [subscribe("wedding.task.*", 1, 1)],
+      subscribesTo: [subscribe("agency.task.*", 1, 1)],
       reads: [reads("Task")],
     });
     expect(() =>
@@ -269,10 +269,10 @@ describe("validateCapabilityContracts — strict mode", () => {
 
 describe("validateCapabilityContracts — pattern matching", () => {
   it("wildcard subscriber matches multiple producer types and validates each", () => {
-    const a = cap("a", { emits: [emit("wedding.task.created", 1)] });
-    const b = cap("b", { emits: [emit("wedding.task.completed", 1)] });
+    const a = cap("a", { emits: [emit("agency.task.created", 1)] });
+    const b = cap("b", { emits: [emit("agency.task.completed", 1)] });
     const subscriber = cap("subscriber", {
-      subscribesTo: [subscribe("wedding.task.*", 1, 1)],
+      subscribesTo: [subscribe("agency.task.*", 1, 1)],
     });
     expect(() =>
       validateCapabilityContracts(ctx([a, b, subscriber])),
@@ -280,16 +280,16 @@ describe("validateCapabilityContracts — pattern matching", () => {
   });
 
   it("wildcard subscriber rejects if any matched producer is out of range", () => {
-    const a = cap("a", { emits: [emit("wedding.task.created", 1)] });
-    const b = cap("b", { emits: [emit("wedding.task.completed", 3)] }); // bumped
+    const a = cap("a", { emits: [emit("agency.task.created", 1)] });
+    const b = cap("b", { emits: [emit("agency.task.completed", 3)] }); // bumped
     const subscriber = cap("subscriber", {
-      subscribesTo: [subscribe("wedding.task.*", 1, 1)],
+      subscribesTo: [subscribe("agency.task.*", 1, 1)],
     });
     expect(() =>
       validateCapabilityContracts(ctx([a, b, subscriber])),
     ).toThrow(WorkflowValidationError);
     expect(() =>
       validateCapabilityContracts(ctx([a, b, subscriber])),
-    ).toThrow(/wedding\.task\.completed.*major version 3/);
+    ).toThrow(/agency\.task\.completed.*major version 3/);
   });
 });

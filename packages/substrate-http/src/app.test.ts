@@ -3,12 +3,12 @@
  *
  * Exercise: profile install → capability register → node create → edge
  * create (cardinality enforced) → event publish → event read → projection
- * catch-up. The same cross-tool flow that drives the wedding scenario,
- * exercised end-to-end through HTTP.
+ * catch-up. The same cross-tool flow that drives the ArrowHedge agent-state
+ * scenario, exercised end-to-end through HTTP.
  *
  * No domain semantics in these tests. Every assertion is about substrate
- * behavior over HTTP, not wedding behavior. (Wedding-specific tests live
- * with the wedding capability packages.)
+ * behavior over HTTP, not finance behavior. (Finance-specific tests live
+ * with @pm/capability-finance-research-ingest.)
  */
 
 import { randomUUID } from "node:crypto";
@@ -21,7 +21,7 @@ import { PostgresProfileRegistry } from "@pm/profile-registry";
 import { PostgresProjectionRunner } from "@pm/projections";
 import { PostgresRegistry } from "@pm/registry";
 import { PostgresTenantDirectory } from "@pm/tenants";
-import { WEDDING_PROFILE } from "@pm/profile-wedding";
+import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { auditProjection, AUDIT_CAPABILITY } from "@pm/capability-audit";
 import type { TenantId } from "@pm/types";
 import { createSubstrateApp } from "./app.js";
@@ -153,22 +153,22 @@ describeIfDb("substrate HTTP", () => {
 
   it("install profile + list + get + delete", async () => {
     const tenantId = await makeTenant();
-    let r = await call("POST", `/tenants/${tenantId}/profiles`, WEDDING_PROFILE);
+    let r = await call("POST", `/tenants/${tenantId}/profiles`, FINANCE_RESEARCH_PROFILE);
     expect(r.status).toBe(200);
 
     r = await call("GET", `/tenants/${tenantId}/profiles`);
     const list = (await r.json()) as { profiles: Array<{ name: string }> };
-    expect(list.profiles.map((p) => p.name)).toContain("wedding");
+    expect(list.profiles.map((p) => p.name)).toContain("finance-research");
 
-    r = await call("GET", `/tenants/${tenantId}/profiles/wedding`);
+    r = await call("GET", `/tenants/${tenantId}/profiles/finance-research`);
     expect(r.status).toBe(200);
     const got = (await r.json()) as { name: string };
-    expect(got.name).toBe("wedding");
+    expect(got.name).toBe("finance-research");
 
-    r = await call("DELETE", `/tenants/${tenantId}/profiles/wedding`);
+    r = await call("DELETE", `/tenants/${tenantId}/profiles/finance-research`);
     expect(r.status).toBe(200);
 
-    r = await call("GET", `/tenants/${tenantId}/profiles/wedding`);
+    r = await call("GET", `/tenants/${tenantId}/profiles/finance-research`);
     expect(r.status).toBe(404);
   });
 
@@ -188,9 +188,9 @@ describeIfDb("substrate HTTP", () => {
 
   it("create node + edge enforces profile cardinality (HTTP-level)", async () => {
     const tenantId = await makeTenant();
-    await call("POST", `/tenants/${tenantId}/profiles`, WEDDING_PROFILE);
+    await call("POST", `/tenants/${tenantId}/profiles`, FINANCE_RESEARCH_PROFILE);
 
-    // Create a Wedding + 3 Couples
+    // Create an AnalystSignal + 2 Tickers
     const mk = async (binding: { tier1: string; profile: string; concrete: string }, identity: Record<string, unknown>) => {
       const r = await call("POST", `/tenants/${tenantId}/nodes`, {
         profile: binding,
@@ -201,40 +201,39 @@ describeIfDb("substrate HTTP", () => {
       const node = (await r.json()) as { id: string };
       return node.id;
     };
-    const wid = await mk(
-      { tier1: "Engagement", profile: "wedding", concrete: "Wedding" },
-      { title: "T", eventDate: "2026-08-01", venue: "X", operationalState: "planning" },
+    const sid = await mk(
+      { tier1: "Event", profile: "finance-research", concrete: "AnalystSignal" },
+      {
+        kind: "analyst_signal",
+        occurredAt: "2026-06-03T14:00:00.000Z",
+        agentId: "agent:analyst_momentum",
+        signal: "bullish",
+        confidence: 0.8,
+      },
     );
-    const c1 = await mk(
-      { tier1: "Counterparty", profile: "wedding", concrete: "Couple" },
-      { name: "P1" },
+    const t1 = await mk(
+      { tier1: "Resource", profile: "finance-research", concrete: "Ticker" },
+      { name: "AAPL ticker", kind: "ticker", symbol: "AAPL", assetClass: "equity", currency: "USD" },
     );
-    const c2 = await mk(
-      { tier1: "Counterparty", profile: "wedding", concrete: "Couple" },
-      { name: "P2" },
-    );
-    const c3 = await mk(
-      { tier1: "Counterparty", profile: "wedding", concrete: "Couple" },
-      { name: "P3" },
+    const t2 = await mk(
+      { tier1: "Resource", profile: "finance-research", concrete: "Ticker" },
+      { name: "MSFT ticker", kind: "ticker", symbol: "MSFT", assetClass: "equity", currency: "USD" },
     );
 
-    // First two has_principal edges succeed.
+    // The first signal_for_ticker edge succeeds.
     let r = await call("POST", `/tenants/${tenantId}/edges`, {
-      type: "wedding/has_principal", fromId: wid, toId: c1, attrs: {},
-    });
-    expect(r.status).toBe(200);
-    r = await call("POST", `/tenants/${tenantId}/edges`, {
-      type: "wedding/has_principal", fromId: wid, toId: c2, attrs: {},
+      type: "finance-research/signal_for_ticker", fromId: sid, toId: t1, attrs: {},
     });
     expect(r.status).toBe(200);
 
-    // Third must be rejected with 422 (ProfileValidationError → 422).
+    // A second must be rejected with 422 (ProfileValidationError → 422):
+    // a signal targets exactly one ticker.
     r = await call("POST", `/tenants/${tenantId}/edges`, {
-      type: "wedding/has_principal", fromId: wid, toId: c3, attrs: {},
+      type: "finance-research/signal_for_ticker", fromId: sid, toId: t2, attrs: {},
     });
     expect(r.status).toBe(422);
     const err = (await r.json()) as { error: string };
-    expect(err.error).toMatch(/exactly:2/);
+    expect(err.error).toMatch(/exactly:1/);
   });
 
   it("publish events + read + getById + verify chain", async () => {
@@ -296,14 +295,14 @@ describeIfDb("substrate HTTP", () => {
 
   it("returns 404 for unknown node + 422 for bad profile write", async () => {
     const tenantId = await makeTenant();
-    await call("POST", `/tenants/${tenantId}/profiles`, WEDDING_PROFILE);
+    await call("POST", `/tenants/${tenantId}/profiles`, FINANCE_RESEARCH_PROFILE);
 
     let r = await call("GET", `/tenants/${tenantId}/nodes/ent_nope`);
     expect(r.status).toBe(404);
 
-    // Missing required fields on a Wedding.
+    // Missing required fields on a ResearchRun.
     r = await call("POST", `/tenants/${tenantId}/nodes`, {
-      profile: { tier1: "Engagement", profile: "wedding", concrete: "Wedding" },
+      profile: { tier1: "Engagement", profile: "finance-research", concrete: "ResearchRun" },
       identity: { title: "Only Title" },
       schemaVersion: 1,
     });

@@ -10,8 +10,48 @@ import {
   type MappingEventInput,
   type SourceEntityRecord,
 } from "@pm/entity-mapping";
+import {
+  buildActionOutcomeEnvelope,
+  buildActionOutcomeProviderAuthority,
+  buildActionOutcomeTerminalIndex,
+  buildObservationContractFromCurrentStateView,
+  buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
+  buildReadSetFromCurrentStateView,
+  buildStateReviewArtifact,
+  evaluateObservationContract,
+  importStateReviewArtifactsJsonl,
+  reviewProposedActionAgainstCurrentState,
+  serializeStateReviewArtifactsJsonl,
+  stateRef,
+  type ActionOutcomeEnvelope,
+  type ActionOutcomeBlockingCause,
+  type ActionOutcomeProviderAuthority,
+  type ActionOutcomeTerminalIndex,
+  type ActionProposalReviewEnforcementMode,
+  type ActionProposalReview,
+  type ActionTerminalOutcome,
+  type AllowedAction,
+  type CurrentStateView,
+  type ObservationContract,
+  type ObservationContractEvaluation,
+  type ReadSetEntry,
+  type StateReviewArtifact,
+  type StateReviewArtifactContinuityPayload,
+  type StateReviewArtifactOptions,
+  type StateConflict,
+  type StateRef,
+  verifyStateReviewArtifactHash,
+  verifyActionOutcomeEnvelopeHash,
+} from "@pm/agent-state";
+import {
+  checkpointHash,
+  findContinuityContradictions,
+  verifyContinuityCheckpointChain,
+  type ContinuityCheckpoint,
+} from "@pm/continuity";
 import type {
   EntityId,
+  EventId,
   PMEvent,
   ProfileDefinition,
   TenantId,
@@ -230,6 +270,15 @@ export interface ArrowHedgePlanContext {
   readonly profile: ProfileDefinition;
   readonly adapterStartedAt: Timestamp;
   readonly emittedBy?: string;
+  /**
+   * When true, deterministic graph node ids are namespaced by tenant. Graph
+   * node ids are globally unique across tenants, but content-addressed ids
+   * like `ticker:AAPL` are identical for every tenant ingesting the same
+   * real-world entity — which collides when more than one tenant shares a
+   * process (e.g. the live HTTP ingest route). Defaults to false to preserve
+   * legacy single-scope ids (and the committed fixture corpus).
+   */
+  readonly scopeNodeIdsByTenant?: boolean;
 }
 
 export interface ArrowHedgeExecutionResult {
@@ -311,7 +360,21 @@ const ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMAS: Readonly<
   ),
 );
 
-export function parseArrowHedgeSnapshot(input: unknown): ArrowHedgeParseResult {
+/**
+ * Parse + map an ArrowHedge snapshot into source entity records.
+ *
+ * `idScope` (optional) namespaces the deterministic node ids. Graph node ids
+ * are globally unique across tenants, but content-addressed ids like
+ * `ticker:AAPL` are identical for every tenant that ingests the same
+ * real-world entity — which collides when more than one tenant uses a shared
+ * process (e.g. the live HTTP ingest route). Passing the tenant id as idScope
+ * keeps node ids deterministic *within* a tenant while avoiding cross-tenant
+ * UUID collisions. Omitting it preserves the legacy single-scope behavior.
+ */
+export function parseArrowHedgeSnapshot(
+  input: unknown,
+  idScope?: string,
+): ArrowHedgeParseResult {
   const issues: ArrowHedgeValidationIssue[] = [];
   if (!isRecord(input)) {
     return {
@@ -363,7 +426,7 @@ export function parseArrowHedgeSnapshot(input: unknown): ArrowHedgeParseResult {
     records.push({
       sourceName,
       sourceRecordId,
-      id: stableEntityId(sourceRecordId),
+      id: stableEntityId(idScope ? `${idScope}:${sourceRecordId}` : sourceRecordId),
       observedAt: observedAt!,
       row,
     });
@@ -488,7 +551,10 @@ export function buildArrowHedgeIngestionPlan(
   input: unknown,
   ctx: ArrowHedgePlanContext,
 ): ArrowHedgeIngestionPlan {
-  const parsed = parseArrowHedgeSnapshot(input);
+  const parsed = parseArrowHedgeSnapshot(
+    input,
+    ctx.scopeNodeIdsByTenant ? ctx.tenantId : undefined,
+  );
   if (!parsed.valid || !parsed.snapshot) {
     return invalidPlan(parsed.issues, ctx, parsed.records.length || 1);
   }
@@ -620,22 +686,35 @@ export async function executeArrowHedgeIngestionPlan<TTx>(
 export interface ArrowHedgeTickerCop {
   readonly symbol: string;
   readonly latestSignal?: {
+    readonly eventId: string;
+    readonly signalId: string;
     readonly signal: string;
     readonly confidence: number;
     readonly sourceSnapshotId: string;
+    readonly evidenceDocumentIds: readonly string[];
+    readonly observedAt: Timestamp;
+    readonly authority: string;
   };
   readonly latestRiskState?: {
+    readonly eventId: string;
+    readonly riskStateId: string;
     readonly currentPrice: number;
     readonly maxShares: number;
     readonly sourceSnapshotId: string;
     readonly freshnessExpiresAt: string | null;
+    readonly observedAt: Timestamp;
+    readonly authority: string;
   };
   readonly latestDecision?: {
+    readonly eventId: string;
+    readonly decisionId: string;
     readonly action: string;
     readonly quantity: number;
     readonly accepted: boolean;
     readonly riskSourceSnapshotId: string | null;
     readonly signalSourceSnapshotId: string | null;
+    readonly observedAt: Timestamp;
+    readonly authority: string;
   };
   readonly authorityGate: {
     readonly passes: number;
@@ -652,6 +731,161 @@ export interface ArrowHedgeCommonOperatingPictureState {
     readonly authorityGatePassRate: number | null;
     readonly stateDisagreementRate: number | null;
   };
+}
+
+export interface ArrowHedgeCurrentStateViewInput {
+  readonly tenantId: TenantId;
+  readonly projectionName: string;
+  readonly projectionVersion?: number;
+  readonly symbol: string;
+  readonly state: ArrowHedgeCommonOperatingPictureState;
+  readonly evaluatedAt?: Timestamp;
+}
+
+export interface ArrowHedgeCurrentStateViewsInput {
+  readonly tenantId: TenantId;
+  readonly projectionName: string;
+  readonly projectionVersion?: number;
+  readonly state: ArrowHedgeCommonOperatingPictureState;
+}
+
+export interface ArrowHedgeObservationReportInput
+  extends ArrowHedgeCurrentStateViewInput {
+  readonly evaluatedAt?: Timestamp;
+}
+
+export interface ArrowHedgeObservationReport {
+  readonly currentStateView: CurrentStateView;
+  readonly observationContract: ObservationContract;
+  readonly evaluation: ObservationContractEvaluation;
+}
+
+export interface ArrowHedgeProposalReviewInput
+  extends ArrowHedgeCurrentStateViewInput {
+  readonly actionType: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly proposedBy: string;
+  readonly proposedAt: Timestamp;
+  readonly readSet?: readonly ReadSetEntry[];
+  readonly observationContract?: ObservationContract;
+  readonly enforcementMode?: ActionProposalReviewEnforcementMode;
+}
+
+export interface ArrowHedgeStateReviewArtifactInput
+  extends ArrowHedgeProposalReviewInput {
+  readonly artifact?: StateReviewArtifactOptions;
+  readonly scenarioId?: string;
+  readonly continuityCheck?: ArrowHedgeContinuityCheck;
+}
+
+export interface ArrowHedgeActionOutcomeEnvelopeInput
+  extends ArrowHedgeStateReviewArtifactInput {
+  readonly actionId?: string;
+  readonly requestedTerminalOutcome?: ActionTerminalOutcome;
+  readonly decidedAt?: Timestamp;
+  readonly decidedBy?: string;
+  readonly providerAuthority?: ActionOutcomeProviderAuthority | null;
+  readonly terminalPacketRunArm?: ArrowHedgeActionOutcomeEnvelopeRunArm;
+  readonly terminalPacketAuthorityRole?: ArrowHedgeActionOutcomeEnvelopeAuthorityRole;
+  readonly statusCheckRefs?: readonly StateRef[];
+  readonly substrateRefs?: readonly StateRef[];
+}
+
+export interface ArrowHedgeContinuityCheck {
+  readonly agentId: string;
+  readonly checkpoints: readonly ContinuityCheckpoint[];
+  readonly requiredDecisionRefs?: readonly string[];
+  readonly requiredEvidenceEventIds?: readonly EventId[];
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusInput
+  extends ArrowHedgeStateReviewArtifactInput {
+  readonly scenarioId: string;
+}
+
+export interface ArrowHedgeTemporalMisalignmentFixtureCasesInput
+  extends ArrowHedgeCurrentStateViewInput {
+  readonly observationCapturedAt: Timestamp;
+  readonly observationToActionProposedAt: Timestamp;
+  readonly actionToFeedbackProposedAt: Timestamp;
+  readonly feedbackToObservationProposedAt: Timestamp;
+  readonly proposedBy?: string;
+}
+
+export interface ArrowHedgeCanonicalStateReviewArtifactCorpusInput
+  extends ArrowHedgeTemporalMisalignmentFixtureCasesInput {}
+
+export type ArrowHedgeActionOutcomeEnvelopeRunArm = "baseline" | "substrate";
+
+export type ArrowHedgeActionOutcomeEnvelopeAuthorityRole =
+  | "comparator_observation"
+  | "substrate_authority";
+
+export interface ArrowHedgeStateReviewArtifactCorpus {
+  readonly artifacts: readonly StateReviewArtifact[];
+  readonly jsonl: string;
+  readonly continuityPayloads: readonly StateReviewArtifactContinuityPayload[];
+}
+
+export interface ArrowHedgeActionOutcomeEnvelopeCorpusPacket {
+  readonly scenarioId: string;
+  readonly runArm: ArrowHedgeActionOutcomeEnvelopeRunArm;
+  readonly authorityRole: ArrowHedgeActionOutcomeEnvelopeAuthorityRole;
+  readonly actionId: string;
+  readonly ref: StateRef;
+  readonly envelope: ActionOutcomeEnvelope;
+  readonly terminalOutcome: ActionTerminalOutcome;
+  readonly outcomeHash: string;
+  readonly hashValid: boolean;
+}
+
+export interface ArrowHedgeActionOutcomeEnvelopeCorpus {
+  readonly packets: readonly ArrowHedgeActionOutcomeEnvelopeCorpusPacket[];
+  readonly terminalIndex: ActionOutcomeTerminalIndex;
+  readonly hashValid: boolean;
+  readonly valid: boolean;
+  readonly terminalOutcomeCounts: Readonly<Record<ActionTerminalOutcome, number>>;
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceSource {
+  readonly label: string;
+  readonly inputs: readonly ArrowHedgeStateReviewArtifactCorpusInput[];
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceInput {
+  readonly fixture: ArrowHedgeStateReviewArtifactCorpusEquivalenceSource;
+  readonly projected: ArrowHedgeStateReviewArtifactCorpusEquivalenceSource;
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot {
+  readonly label: string;
+  readonly inputCount: number;
+  readonly artifactCount: number;
+  readonly canonicalArtifactJsonl: string;
+  readonly importValid: readonly boolean[];
+  readonly replayHashValid: readonly boolean[];
+  readonly artifactIds: readonly string[];
+  readonly artifactHashes: readonly string[];
+  readonly continuityArtifactIds: readonly string[];
+  readonly continuityArtifactHashes: readonly string[];
+  readonly continuityReviewIds: readonly string[];
+  readonly continuityWarningCodes: readonly (readonly string[])[];
+  readonly warningCodes: readonly (readonly string[])[];
+  readonly temporalPhases: readonly string[];
+  readonly invariantClasses: readonly (readonly string[])[];
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch {
+  readonly field: string;
+  readonly fixture: unknown;
+  readonly projected: unknown;
+}
+
+export interface ArrowHedgeStateReviewArtifactCorpusEquivalence {
+  readonly valid: boolean;
+  readonly mismatches: readonly ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch[];
+  readonly fixture: ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot;
+  readonly projected: ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot;
 }
 
 export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
@@ -672,6 +906,897 @@ export function createArrowHedgeCommonOperatingPictureProjection(name: string) {
       event: PMEvent,
     ): ArrowHedgeCommonOperatingPictureState => updateCop(state, event),
   };
+}
+
+export function buildArrowHedgeCurrentStateViews(
+  input: ArrowHedgeCurrentStateViewsInput,
+): readonly CurrentStateView[] {
+  return Object.keys(input.state.tickers).flatMap((symbol) => {
+    const view = buildArrowHedgeCurrentStateView({ ...input, symbol });
+    return view ? [view] : [];
+  });
+}
+
+export function buildArrowHedgeCurrentStateView(
+  input: ArrowHedgeCurrentStateViewInput,
+): CurrentStateView | null {
+  const ticker = input.state.tickers[input.symbol];
+  if (!ticker) return null;
+
+  const observedAt = latestTickerTimestamp(ticker);
+  const authorityRule = latestTickerAuthority(ticker);
+  if (!observedAt || !authorityRule) return null;
+
+  const asOf = input.evaluatedAt ?? observedAt;
+  const sourceRefs = tickerSourceRefs(ticker);
+  const missingSources = tickerMissingSources(ticker);
+  const conflicts = tickerConflicts(ticker, asOf);
+  const workflowPosition = tickerWorkflowPosition(ticker, conflicts, asOf);
+  const allowedActions = tickerAllowedActions(sourceRefs);
+  const validUntil = ticker.latestRiskState?.freshnessExpiresAt;
+
+  return {
+    tenantId: input.tenantId,
+    viewId: `${input.projectionName}:${input.symbol}:current_state_view`,
+    subject: stateRef(
+      "projection",
+      `${input.projectionName}:${input.symbol}`,
+      `ArrowHedge COP ${input.symbol}`,
+    ),
+    observedAt,
+    ...(validUntil !== undefined && validUntil !== null
+      ? { validUntil: validUntil as Timestamp }
+      : {}),
+    authorityRule,
+    ...(input.projectionVersion !== undefined
+      ? { projectionVersion: input.projectionVersion }
+      : {}),
+    workflowPosition,
+    sourceRefs,
+    missingSources,
+    conflicts,
+    allowedActions,
+  };
+}
+
+export function buildArrowHedgeObservationReport(
+  input: ArrowHedgeObservationReportInput,
+): ArrowHedgeObservationReport | null {
+  const currentStateView = buildArrowHedgeCurrentStateView(input);
+  if (!currentStateView) return null;
+
+  const observationContract =
+    buildObservationContractFromCurrentStateView(currentStateView);
+  const evaluation = evaluateObservationContract(
+    observationContract,
+    currentStateView,
+    input.evaluatedAt ?? currentStateView.observedAt,
+  );
+
+  return {
+    currentStateView,
+    observationContract,
+    evaluation,
+  };
+}
+
+export function buildArrowHedgeProposalReview(
+  input: ArrowHedgeProposalReviewInput,
+): ActionProposalReview | null {
+  const currentStateView = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.evaluatedAt ?? input.proposedAt,
+  });
+  if (!currentStateView) return null;
+
+  return reviewProposedActionAgainstCurrentState(
+    {
+      tenantId: input.tenantId,
+      actionType: input.actionType,
+      subject: currentStateView.subject,
+      payload: input.payload,
+      readSet:
+        input.readSet ??
+        buildReadSetFromCurrentStateView(
+          currentStateView,
+          currentStateView.authorityRule,
+        ),
+      ...(input.observationContract !== undefined
+        ? { observationContract: input.observationContract }
+        : {}),
+      proposedBy: input.proposedBy,
+      proposedAt: input.proposedAt,
+    },
+    currentStateView,
+    {
+      evaluatedAt: input.proposedAt,
+      ...(input.observationContract !== undefined
+        ? { observationContract: input.observationContract }
+        : {}),
+      // Enforce by default: a failed read-set or observation-contract check
+      // must block the proposal, not merely warn. Advisory-by-default made the
+      // proposal-review layer non-enforcing (Audit 2026-06-19: the dashboard
+      // "policy" column showed allowed=true even on contract failures). Callers
+      // can still opt into "advisory" explicitly for shadow/observe-only runs.
+      enforcementMode: input.enforcementMode ?? "blocking",
+    },
+  );
+}
+
+export function buildArrowHedgeStateReviewArtifact(
+  input: ArrowHedgeStateReviewArtifactInput,
+): StateReviewArtifact | null {
+  const review = buildArrowHedgeProposalReview(input);
+  if (!review) return null;
+
+  const artifactOptions = input.artifact ?? {};
+  const metadata = {
+    ...(artifactOptions.metadata ?? {}),
+    ...(input.scenarioId !== undefined ? { scenarioId: input.scenarioId } : {}),
+  };
+  return buildStateReviewArtifact(review, {
+    ...artifactOptions,
+    artifactId:
+      artifactOptions.artifactId ?? `${review.reviewId}:state_review_artifact`,
+    source: artifactOptions.source ?? `arrowhedge/${input.projectionName}`,
+    metadata,
+    relatedObjects: [
+      {
+        role: "ticker_symbol",
+        ref: stateRef(
+          "source_record",
+          `ticker:${input.symbol}`,
+          `ArrowHedge ticker ${input.symbol}`,
+        ),
+      },
+      ...(artifactOptions.relatedObjects ?? []),
+    ],
+  });
+}
+
+export function buildArrowHedgeActionOutcomeEnvelope(
+  input: ArrowHedgeActionOutcomeEnvelopeInput,
+): ActionOutcomeEnvelope | null {
+  const artifact = buildArrowHedgeStateReviewArtifact(input);
+  if (!artifact) return null;
+
+  const continuityRefs = arrowHedgeContinuityRefs(input.continuityCheck);
+  const continuityBlockingCauses = buildArrowHedgeContinuityBlockingCauses(
+    input.tenantId,
+    input.continuityCheck,
+  );
+  const actionId = input.actionId ?? arrowHedgeActionId(input, artifact);
+  const outcomeRef = stateRef(
+    "action_outcome_envelope",
+    arrowHedgeActionOutcomeRefId(actionId),
+    "ArrowHedge ActionOutcomeEnvelope",
+  );
+  const requestedTerminalOutcome =
+    input.requestedTerminalOutcome ??
+    (artifact.review.execution.allowed ? "accepted" : "blocked");
+  const providerAuthority =
+    input.providerAuthority === null
+      ? undefined
+      : input.providerAuthority ??
+        (requestedTerminalOutcome === "accepted" && artifact.review.execution.allowed
+          ? buildArrowHedgeActionOutcomeProviderAuthority(
+              input.decidedAt ?? artifact.generatedAt,
+            )
+          : undefined);
+
+  return buildActionOutcomeEnvelope({
+    tenantId: input.tenantId,
+    actionId,
+    subject: artifact.review.currentStateView.subject,
+    proposalReviewId: artifact.review.reviewId,
+    stateReviewArtifactHash: artifact.artifactHash,
+    evidenceAdmissionReviewIds: [],
+    ...(input.statusCheckRefs !== undefined
+      ? { statusCheckRefs: input.statusCheckRefs }
+      : {}),
+    ...(providerAuthority !== undefined
+      ? {
+          providerCertificateId: providerAuthority.providerCertificateId,
+          providerCertificateDigest: providerAuthority.providerCertificateDigest,
+          providerCertificateStatusRef:
+            providerAuthority.providerCertificateStatusRef,
+        }
+      : {}),
+    requestedTerminalOutcome,
+    decidedAt: input.decidedAt ?? artifact.generatedAt,
+    decidedBy: input.decidedBy ?? "arrowhedge:proposal-review-gate",
+    evidenceRefs: uniqueStateRefs([...artifact.provenance.used, ...continuityRefs]),
+    substrateRefs: uniqueStateRefs([
+      outcomeRef,
+      stateRef("state_review_artifact", artifact.artifactId),
+      artifact.review.currentStateView.subject,
+      ...continuityRefs,
+      ...(input.substrateRefs ?? []),
+    ]),
+    blockingCauses: continuityBlockingCauses,
+    proposalReview: artifact.review,
+  });
+}
+
+export function buildArrowHedgeActionOutcomeTerminalIndex(
+  inputs: readonly ArrowHedgeActionOutcomeEnvelopeInput[],
+): ActionOutcomeTerminalIndex {
+  return buildActionOutcomeTerminalIndex(
+    inputs.flatMap((input) => {
+      const envelope = buildArrowHedgeActionOutcomeEnvelope(input);
+      return envelope === null ? [] : [envelope];
+    }),
+  );
+}
+
+export function buildArrowHedgeActionOutcomeEnvelopeCorpus(
+  inputs: readonly ArrowHedgeActionOutcomeEnvelopeInput[],
+): ArrowHedgeActionOutcomeEnvelopeCorpus {
+  const packets = inputs.flatMap((input) => {
+    const envelope = buildArrowHedgeActionOutcomeEnvelope(input);
+    if (envelope === null) return [];
+    const ref = actionOutcomeEnvelopeRef(envelope);
+    const hash = verifyActionOutcomeEnvelopeHash(envelope);
+    return [
+      {
+        scenarioId: input.scenarioId ?? "arrowhedge-unscoped-action",
+        runArm: input.terminalPacketRunArm ?? "substrate",
+        authorityRole:
+          input.terminalPacketAuthorityRole ??
+          defaultTerminalPacketAuthorityRole(input.terminalPacketRunArm),
+        actionId: envelope.actionId,
+        ref,
+        envelope,
+        terminalOutcome: envelope.terminalOutcome,
+        outcomeHash: envelope.outcomeHash,
+        hashValid: hash.valid,
+      } satisfies ArrowHedgeActionOutcomeEnvelopeCorpusPacket,
+    ];
+  });
+  const terminalIndex = buildActionOutcomeTerminalIndex(
+    packets.map((packet) => packet.envelope),
+  );
+  const terminalOutcomeCounts = emptyTerminalOutcomeCounts();
+  for (const packet of packets) {
+    terminalOutcomeCounts[packet.terminalOutcome] += 1;
+  }
+  const hashValid = packets.every((packet) => packet.hashValid);
+
+  return {
+    packets,
+    terminalIndex,
+    hashValid,
+    valid: hashValid && terminalIndex.valid,
+    terminalOutcomeCounts,
+  };
+}
+
+export function buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus(
+  input: ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
+): ArrowHedgeActionOutcomeEnvelopeCorpus {
+  const cleanCase = buildArrowHedgeCleanCurrentFixtureCase(input);
+  const temporalCases = buildArrowHedgeTemporalMisalignmentFixtureCases(input);
+
+  return buildArrowHedgeActionOutcomeEnvelopeCorpus([
+    ...(cleanCase ? [cleanCase] : []),
+    ...temporalCases,
+  ]);
+}
+
+export function buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus(
+  input: ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
+): ArrowHedgeActionOutcomeEnvelopeCorpus {
+  const packetCases = [
+    ...buildArrowHedgeTemporalMisalignmentFixtureCases(input),
+    ...buildArrowHedgeSourceAuthorityConflictFixtureCases(input),
+    ...buildArrowHedgeContinuityFixtureCases(input),
+  ];
+  const pairedInputs = packetCases.flatMap((fixtureCase) => [
+    buildBaselineTerminalObservationCase(fixtureCase),
+    {
+      ...fixtureCase,
+      terminalPacketRunArm: "substrate" as const,
+      terminalPacketAuthorityRole: "substrate_authority" as const,
+    },
+  ]);
+
+  return buildArrowHedgeActionOutcomeEnvelopeCorpus(pairedInputs);
+}
+
+function buildBaselineTerminalObservationCase(
+  input: ArrowHedgeStateReviewArtifactCorpusInput & ArrowHedgeActionOutcomeEnvelopeInput,
+): ArrowHedgeActionOutcomeEnvelopeInput {
+  const { continuityCheck: _continuityCheck, ...baselineInput } = input;
+  const artifact = input.artifact;
+  return {
+    ...baselineInput,
+    actionId: arrowHedgeBaselineObservationActionId(input),
+    requestedTerminalOutcome: "accepted",
+    enforcementMode: "advisory",
+    providerAuthority: null,
+    terminalPacketRunArm: "baseline",
+    terminalPacketAuthorityRole: "comparator_observation",
+    decidedBy: "arrowhedge:baseline-comparator",
+    substrateRefs: [
+      stateRef(
+        "document",
+        `${input.scenarioId}:baseline-comparator`,
+        "ArrowHedge baseline comparator observation",
+      ),
+    ],
+    artifact: {
+      ...artifact,
+      artifactId:
+        artifact?.artifactId === undefined
+          ? `artifact_${input.scenarioId}_baseline_observation`
+          : `${artifact.artifactId}_baseline_observation`,
+      metadata: {
+        ...(artifact?.metadata ?? {}),
+        evalEventIds: [
+          ...(artifact?.metadata?.evalEventIds ?? []),
+          `${input.scenarioId}:baseline`,
+        ],
+      },
+    },
+  };
+}
+
+export function buildArrowHedgeActionOutcomeProviderAuthority(
+  checkedAt: Timestamp,
+): ActionOutcomeProviderAuthority {
+  return buildActionOutcomeProviderAuthority({
+    certificateId: "tapc_arrowhedge_terminal_provider_v1",
+    certificateDigest: "sha256:arrowhedge_terminal_provider_v1",
+    statusEventHash: "sha256:arrowhedge_terminal_provider_status_v1",
+    statusUpdatedAt: "2026-06-03T13:59:30.000Z" as Timestamp,
+    checkedAt,
+  });
+}
+
+export function buildArrowHedgeStateReviewArtifactCorpus(
+  inputs: readonly ArrowHedgeStateReviewArtifactCorpusInput[],
+): ArrowHedgeStateReviewArtifactCorpus {
+  const artifacts = inputs.flatMap((input) => {
+    const artifact = buildArrowHedgeStateReviewArtifact(input);
+    return artifact === null ? [] : [artifact];
+  });
+
+  return {
+    artifacts,
+    jsonl: serializeStateReviewArtifactsJsonl(artifacts),
+    continuityPayloads: artifacts.map((artifact) =>
+      buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact(artifact),
+    ),
+  };
+}
+
+export function buildArrowHedgeCanonicalStateReviewArtifactCorpus(
+  input: ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
+): ArrowHedgeStateReviewArtifactCorpus {
+  const cleanCase = buildArrowHedgeCleanCurrentFixtureCase(input);
+  const temporalCases = buildArrowHedgeTemporalMisalignmentFixtureCases(input);
+
+  return buildArrowHedgeStateReviewArtifactCorpus([
+    ...(cleanCase ? [cleanCase] : []),
+    ...temporalCases,
+  ]);
+}
+
+export function buildArrowHedgeTemporalMisalignmentFixtureCases(
+  input: ArrowHedgeTemporalMisalignmentFixtureCasesInput,
+): readonly ArrowHedgeStateReviewArtifactCorpusInput[] {
+  const originalView = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = input.state.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!originalView || !decisionId) return [];
+
+  const originalObservation =
+    buildObservationContractFromCurrentStateView(originalView);
+  const proposedBy = input.proposedBy ?? "agent:portfolio-manager";
+  const feedbackReadSet = buildReadSetFromCurrentStateView(
+    originalView,
+    `arrowhedge:execution-feedback:${input.symbol}`,
+  ).map((entry) => ({
+    ...entry,
+    ...(input.projectionVersion !== undefined
+      ? { projectionVersion: input.projectionVersion - 1 }
+      : {}),
+  }));
+  const feedbackObservationState = omitLatestRiskState(input.state, input.symbol);
+  const feedbackObservationView = buildArrowHedgeCurrentStateView({
+    ...input,
+    state: feedbackObservationState,
+    evaluatedAt: input.feedbackToObservationProposedAt,
+  });
+  if (!feedbackObservationView) return [];
+
+  return [
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-observation-to-action-stale-risk",
+      actionType: "portfolio.decision.accept",
+      payload: { decisionId },
+      proposedBy,
+      proposedAt: input.observationToActionProposedAt,
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      artifact: {
+        artifactId: "artifact_arrowhedge_observation_to_action_stale_risk_001",
+        metadata: {
+          temporalMisalignmentPhase: "observation_to_action",
+          invariantClasses: [
+            "freshness_window",
+            "workflow_position",
+            "state_conflict",
+          ],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/temporal-observation-to-action-stale-risk.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-temporal-fixture-observation-action",
+          workflowRunId: "arrowhedge-temporal-workflow-observation-action",
+          evalEventIds: ["eval_arrowhedge_observation_to_action"],
+        },
+      },
+    },
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-action-to-feedback-authority-drift",
+      actionType: "risk.refresh",
+      payload: {
+        decisionId,
+        feedbackId: `feedback:${decisionId}:post_action_authority`,
+      },
+      proposedBy,
+      proposedAt: input.actionToFeedbackProposedAt,
+      readSet: feedbackReadSet,
+      observationContract: originalObservation,
+      artifact: {
+        artifactId: "artifact_arrowhedge_action_to_feedback_authority_001",
+        metadata: {
+          temporalMisalignmentPhase: "action_to_feedback",
+          invariantClasses: ["source_authority", "projection_version"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/temporal-action-to-feedback-authority.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-temporal-fixture-action-feedback",
+          workflowRunId: "arrowhedge-temporal-workflow-action-feedback",
+          evalEventIds: ["eval_arrowhedge_action_to_feedback"],
+        },
+      },
+    },
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: feedbackObservationState,
+      scenarioId: "arrowhedge-feedback-to-observation-missing-risk",
+      actionType: "risk.refresh",
+      payload: {
+        decisionId,
+        missingObservation: "risk_state",
+      },
+      proposedBy,
+      proposedAt: input.feedbackToObservationProposedAt,
+      readSet: buildReadSetFromCurrentStateView(
+        feedbackObservationView,
+        feedbackObservationView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      artifact: {
+        artifactId:
+          "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
+        metadata: {
+          temporalMisalignmentPhase: "feedback_to_observation",
+          invariantClasses: ["required_evidence"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/temporal-feedback-to-observation-missing-risk.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-temporal-fixture-feedback-observation",
+          workflowRunId: "arrowhedge-temporal-workflow-feedback-observation",
+          evalEventIds: ["eval_arrowhedge_feedback_to_observation"],
+        },
+      },
+    },
+  ];
+}
+
+export function buildArrowHedgeSourceAuthorityConflictFixtureCases(
+  input: ArrowHedgeTemporalMisalignmentFixtureCasesInput,
+): readonly ArrowHedgeStateReviewArtifactCorpusInput[] {
+  const conflictState = arrowHedgeSourceAuthorityConflictState(
+    input.state,
+    input.symbol,
+  );
+  const view = buildArrowHedgeCurrentStateView({
+    ...input,
+    state: conflictState,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = conflictState.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!view || !ticker?.latestRiskState || !decisionId) return [];
+
+  return [
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: conflictState,
+      scenarioId: "arrowhedge-source-authority-risk-snapshot-conflict",
+      actionType: "portfolio.decision.accept",
+      payload: {
+        decisionId,
+        authorityConflictId: `risk:${ticker.latestRiskState.sourceSnapshotId}`,
+      },
+      proposedBy: input.proposedBy ?? "agent:portfolio-manager",
+      proposedAt: input.observationCapturedAt,
+      readSet: buildReadSetFromCurrentStateView(view, view.authorityRule),
+      observationContract: buildObservationContractFromCurrentStateView(view),
+      artifact: {
+        artifactId: "artifact_arrowhedge_source_authority_conflict_001",
+        metadata: {
+          temporalMisalignmentPhase: "none",
+          invariantClasses: ["source_authority", "state_conflict"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/source-authority-risk-snapshot-conflict.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-authority-fixture-risk-snapshot",
+          workflowRunId: "arrowhedge-authority-workflow-risk-snapshot",
+          evalEventIds: ["eval_arrowhedge_source_authority_conflict"],
+        },
+      },
+    },
+  ];
+}
+
+export function buildArrowHedgeContinuityFixtureCases(
+  input: ArrowHedgeTemporalMisalignmentFixtureCasesInput,
+): readonly ArrowHedgeStateReviewArtifactCorpusInput[] {
+  const view = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = input.state.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!view || !decisionId) return [];
+
+  const proposedBy = input.proposedBy ?? "agent:portfolio-manager";
+  const readSet = buildReadSetFromCurrentStateView(view, view.authorityRule);
+  const observationContract = buildObservationContractFromCurrentStateView(view);
+  const continuityAgentId = "arrowhedge-axis-a-continuity";
+
+  return [
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-memory-drift-conflicting-position",
+      actionType: "portfolio.decision.accept",
+      payload: {
+        decisionId,
+        memoryCheckpointId: "chk_arrowhedge_memory_drift_new_001",
+      },
+      proposedBy,
+      proposedAt: input.observationCapturedAt,
+      readSet,
+      observationContract,
+      continuityCheck: {
+        agentId: continuityAgentId,
+        checkpoints: buildArrowHedgeMemoryDriftCheckpoints(
+          input.tenantId,
+          continuityAgentId,
+          decisionId,
+        ),
+      },
+      artifact: {
+        artifactId: "artifact_arrowhedge_memory_drift_conflict_001",
+        metadata: {
+          temporalMisalignmentPhase: "none",
+          invariantClasses: ["state_conflict", "required_evidence"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/continuity-memory-drift-conflict.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-continuity-fixture-memory-drift",
+          workflowRunId: "arrowhedge-continuity-workflow-memory-drift",
+          evalEventIds: ["eval_arrowhedge_memory_drift_conflict"],
+        },
+      },
+    },
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-continuity-break-missing-terminal-history",
+      actionType: "risk.refresh",
+      payload: {
+        decisionId,
+        refreshId: `refresh:${decisionId}:amnesiac_resume`,
+      },
+      proposedBy,
+      proposedAt: input.observationCapturedAt,
+      readSet,
+      observationContract,
+      continuityCheck: {
+        agentId: continuityAgentId,
+        checkpoints: buildArrowHedgeContinuityBreakCheckpoints(
+          input.tenantId,
+          continuityAgentId,
+          decisionId,
+        ),
+        requiredDecisionRefs: [`arrowhedge:terminal:${decisionId}`],
+      },
+      artifact: {
+        artifactId:
+          "artifact_arrowhedge_continuity_break_missing_terminal_001",
+        metadata: {
+          temporalMisalignmentPhase: "none",
+          invariantClasses: ["required_evidence", "workflow_position"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/continuity-break-missing-terminal-history.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-continuity-fixture-break",
+          workflowRunId: "arrowhedge-continuity-workflow-break",
+          evalEventIds: ["eval_arrowhedge_continuity_break_missing_terminal"],
+        },
+      },
+    },
+  ];
+}
+
+export interface ArrowHedgeCleanCurrentFixtureCaseInput
+  extends ArrowHedgeCurrentStateViewInput {
+  /** Time the (fresh) observation was captured; also used as the proposal time. */
+  readonly observationCapturedAt: Timestamp;
+  readonly proposedBy?: string;
+}
+
+/**
+ * Clean accepted/current ArrowHedge artifact fixture (research frontier item
+ * 4): a positive metrics baseline where the observation is fresh, the read
+ * set matches the current state view, the contract evaluates clean, and the
+ * review is valid with zero warnings and temporal phase `none`.
+ */
+export function buildArrowHedgeCleanCurrentFixtureCase(
+  input: ArrowHedgeCleanCurrentFixtureCaseInput,
+): ArrowHedgeStateReviewArtifactCorpusInput | null {
+  const view = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = input.state.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!view || !decisionId) return null;
+
+  return {
+    tenantId: input.tenantId,
+    projectionName: input.projectionName,
+    ...(input.projectionVersion !== undefined
+      ? { projectionVersion: input.projectionVersion }
+      : {}),
+    symbol: input.symbol,
+    state: input.state,
+    scenarioId: "arrowhedge-clean-current-accepted",
+    actionType: "risk.refresh",
+    payload: { decisionId, refreshId: `refresh:${decisionId}:clean_current` },
+    proposedBy: input.proposedBy ?? "agent:portfolio-manager",
+    proposedAt: input.observationCapturedAt,
+    readSet: buildReadSetFromCurrentStateView(view, view.authorityRule),
+    observationContract: buildObservationContractFromCurrentStateView(view),
+    artifact: {
+      artifactId: "artifact_arrowhedge_clean_current_accepted_001",
+      metadata: {
+        temporalMisalignmentPhase: "none",
+        invariantClasses: [],
+        fixtureId:
+          "fixtures/arrowhedge/state-review-artifacts/clean-current-accepted.json",
+        clientSurface: "codex",
+        provider: "openai",
+        sessionId: "arrowhedge-clean-current-fixture",
+        workflowRunId: "arrowhedge-clean-current-workflow",
+        evalEventIds: ["eval_arrowhedge_clean_current_accepted"],
+      },
+    },
+  };
+}
+
+function omitLatestRiskState(
+  state: ArrowHedgeCommonOperatingPictureState,
+  symbol: string,
+): ArrowHedgeCommonOperatingPictureState {
+  const ticker = state.tickers[symbol];
+  if (!ticker) return state;
+
+  const tickerWithoutRiskState: ArrowHedgeTickerCop = {
+    symbol: ticker.symbol,
+    ...(ticker.latestSignal !== undefined
+      ? { latestSignal: ticker.latestSignal }
+      : {}),
+    ...(ticker.latestDecision !== undefined
+      ? { latestDecision: ticker.latestDecision }
+      : {}),
+    authorityGate: ticker.authorityGate,
+    stateDisagreements: ticker.stateDisagreements,
+    staleBlocks: ticker.staleBlocks,
+  };
+  return {
+    ...state,
+    tickers: {
+      ...state.tickers,
+      [symbol]: tickerWithoutRiskState,
+    },
+  };
+}
+
+export function compareArrowHedgeStateReviewArtifactCorpusEquivalence(
+  input: ArrowHedgeStateReviewArtifactCorpusEquivalenceInput,
+): ArrowHedgeStateReviewArtifactCorpusEquivalence {
+  const fixture = summarizeStateReviewArtifactCorpusEquivalenceSource(
+    input.fixture,
+  );
+  const projected = summarizeStateReviewArtifactCorpusEquivalenceSource(
+    input.projected,
+  );
+  const comparedFields: readonly (keyof Omit<
+    ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot,
+    "label"
+  >)[] = [
+    "inputCount",
+    "artifactCount",
+    "canonicalArtifactJsonl",
+    "importValid",
+    "replayHashValid",
+    "artifactIds",
+    "artifactHashes",
+    "continuityArtifactIds",
+    "continuityArtifactHashes",
+    "continuityReviewIds",
+    "continuityWarningCodes",
+    "warningCodes",
+    "temporalPhases",
+    "invariantClasses",
+  ];
+  const mismatches: ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch[] = [];
+
+  for (const field of comparedFields) {
+    if (!sameEquivalenceValue(fixture[field], projected[field])) {
+      mismatches.push({
+        field,
+        fixture: fixture[field],
+        projected: projected[field],
+      });
+    }
+  }
+
+  appendValidityFailures(input.fixture.label, fixture, mismatches);
+  appendValidityFailures(input.projected.label, projected, mismatches);
+
+  return {
+    valid: mismatches.length === 0,
+    mismatches,
+    fixture,
+    projected,
+  };
+}
+
+function summarizeStateReviewArtifactCorpusEquivalenceSource(
+  source: ArrowHedgeStateReviewArtifactCorpusEquivalenceSource,
+): ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot {
+  const corpus = buildArrowHedgeStateReviewArtifactCorpus(source.inputs);
+  const imported = importStateReviewArtifactsJsonl(corpus.jsonl);
+
+  return {
+    label: source.label,
+    inputCount: source.inputs.length,
+    artifactCount: corpus.artifacts.length,
+    canonicalArtifactJsonl: corpus.jsonl,
+    importValid: imported.map((result) => result.valid),
+    replayHashValid: corpus.artifacts.map(
+      (artifact) => verifyStateReviewArtifactHash(artifact).valid,
+    ),
+    artifactIds: corpus.artifacts.map((artifact) => artifact.artifactId),
+    artifactHashes: corpus.artifacts.map((artifact) => artifact.artifactHash),
+    continuityArtifactIds: corpus.continuityPayloads.map(
+      (payload) => payload.stateReviewArtifactId,
+    ),
+    continuityArtifactHashes: corpus.continuityPayloads.map(
+      (payload) => payload.stateReviewArtifactHash,
+    ),
+    continuityReviewIds: corpus.continuityPayloads.map(
+      (payload) => payload.reviewId,
+    ),
+    continuityWarningCodes: corpus.continuityPayloads.map((payload) =>
+      sortedStrings(payload.warningCodes),
+    ),
+    warningCodes: corpus.artifacts.map((artifact) =>
+      sortedStrings(artifact.review.warnings.map((warning) => warning.code)),
+    ),
+    temporalPhases: corpus.artifacts.map(
+      (artifact) => artifact.metadata.temporalMisalignmentPhase,
+    ),
+    invariantClasses: corpus.artifacts.map((artifact) =>
+      sortedStrings(artifact.metadata.invariantClasses),
+    ),
+  };
+}
+
+function appendValidityFailures(
+  label: string,
+  snapshot: ArrowHedgeStateReviewArtifactCorpusEquivalenceSnapshot,
+  mismatches: ArrowHedgeStateReviewArtifactCorpusEquivalenceMismatch[],
+): void {
+  if (snapshot.inputCount === 0) {
+    mismatches.push({
+      field: `${label}.inputCount`,
+      fixture: "at least 1",
+      projected: snapshot.inputCount,
+    });
+  } else if (snapshot.artifactCount !== snapshot.inputCount) {
+    mismatches.push({
+      field: `${label}.artifactCount`,
+      fixture: snapshot.inputCount,
+      projected: snapshot.artifactCount,
+    });
+  }
+  if (snapshot.importValid.some((valid) => !valid)) {
+    mismatches.push({
+      field: `${label}.importValid`,
+      fixture: snapshot.importValid.map(() => true),
+      projected: snapshot.importValid,
+    });
+  }
+  if (snapshot.replayHashValid.some((valid) => !valid)) {
+    mismatches.push({
+      field: `${label}.replayHashValid`,
+      fixture: snapshot.replayHashValid.map(() => true),
+      projected: snapshot.replayHashValid,
+    });
+  }
+}
+
+function sameEquivalenceValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function sortedStrings(values: readonly string[]): readonly string[] {
+  return [...values].sort((left, right) => left.localeCompare(right));
 }
 
 export function validateArrowHedgeTypedEventPayload(
@@ -839,7 +1964,17 @@ function buildTypedEvents(
     }),
   ];
 
-  if (decision.node.identity["accepted"] === true && !hasStateDisagreement(snapshot)) {
+  // Acceptance is gated by BOTH authority checks: a decision may only be
+  // accepted if there is no state disagreement AND the backing state is not
+  // stale. Previously only disagreement was checked, so a stale-but-agreeing
+  // decision emitted BOTH accepted and blocked.stale_state for the same
+  // decision — the stale protection was advisory, not enforced. (Audit
+  // 2026-06-18: GOOG/NVDA/TSLA were accepted while also stale-blocked.)
+  if (
+    decision.node.identity["accepted"] === true &&
+    !hasStateDisagreement(snapshot) &&
+    !isStale(snapshot)
+  ) {
     events.push(
       typedEvent({
         tenantId,
@@ -897,15 +2032,22 @@ function updateCop(
     next = {
       ...current,
       latestSignal: {
+        eventId: event.id,
+        signalId: event.entityId,
         signal: String(payload["signal"]),
         confidence: Number(payload["confidence"]),
         sourceSnapshotId: String(payload["sourceSnapshotId"]),
+        evidenceDocumentIds: stringArray(payload["evidenceDocumentIds"]),
+        observedAt: event.occurredAt,
+        authority: eventAuthority(event),
       },
     };
   } else if (event.type === "risk.state.validated") {
     next = {
       ...current,
       latestRiskState: {
+        eventId: event.id,
+        riskStateId: String(payload["riskStateId"]),
         currentPrice: Number(payload["currentPrice"]),
         maxShares: Number(payload["maxShares"]),
         sourceSnapshotId: String(payload["sourceSnapshotId"]),
@@ -913,16 +2055,24 @@ function updateCop(
           typeof payload["freshnessExpiresAt"] === "string"
             ? payload["freshnessExpiresAt"]
             : null,
+        observedAt: event.occurredAt,
+        authority: eventAuthority(event),
       },
     };
   } else if (event.type === "portfolio.decision.proposed") {
-    const disagrees =
+    const riskDisagrees =
       current.latestRiskState !== undefined &&
       typeof payload["riskSourceSnapshotId"] === "string" &&
       payload["riskSourceSnapshotId"] !== current.latestRiskState.sourceSnapshotId;
+    const signalDisagrees =
+      current.latestSignal !== undefined &&
+      typeof payload["signalSourceSnapshotId"] === "string" &&
+      payload["signalSourceSnapshotId"] !== current.latestSignal.sourceSnapshotId;
     next = {
       ...current,
       latestDecision: {
+        eventId: event.id,
+        decisionId: String(payload["decisionId"]),
         action: String(payload["action"]),
         quantity: Number(payload["quantity"]),
         accepted: Boolean(payload["accepted"]),
@@ -934,8 +2084,11 @@ function updateCop(
           typeof payload["signalSourceSnapshotId"] === "string"
             ? payload["signalSourceSnapshotId"]
             : null,
+        observedAt: event.occurredAt,
+        authority: eventAuthority(event),
       },
-      stateDisagreements: current.stateDisagreements + (disagrees ? 1 : 0),
+      stateDisagreements:
+        current.stateDisagreements + (riskDisagrees || signalDisagrees ? 1 : 0),
     };
   } else if (event.type === "portfolio.decision.accepted") {
     next = {
@@ -961,6 +2114,498 @@ function updateCop(
     tickers,
     summary: summarizeCop(tickers),
   };
+}
+
+function tickerSourceRefs(ticker: ArrowHedgeTickerCop): readonly StateRef[] {
+  return uniqueStateRefs([
+    ticker.latestSignal
+      ? stateRef("event", ticker.latestSignal.eventId, "analyst.signal.created")
+      : null,
+    ticker.latestRiskState
+      ? stateRef("event", ticker.latestRiskState.eventId, "risk.state.validated")
+      : null,
+    ticker.latestDecision
+      ? stateRef(
+          "event",
+          ticker.latestDecision.eventId,
+          "portfolio.decision.proposed",
+        )
+      : null,
+    ...(ticker.latestSignal?.evidenceDocumentIds.map((id) =>
+      stateRef("document", id, "evidence_document"),
+    ) ?? []),
+  ]);
+}
+
+function tickerMissingSources(ticker: ArrowHedgeTickerCop): readonly string[] {
+  const missing: string[] = [];
+  if (!ticker.latestSignal) missing.push("analyst_signal");
+  if (!ticker.latestRiskState) missing.push("risk_state");
+  if (!ticker.latestDecision) missing.push("portfolio_decision");
+  return missing;
+}
+
+function tickerConflicts(
+  ticker: ArrowHedgeTickerCop,
+  asOf: Timestamp,
+): readonly StateConflict[] {
+  const conflicts: StateConflict[] = [];
+
+  if (
+    ticker.latestDecision?.riskSourceSnapshotId !== null &&
+    ticker.latestDecision?.riskSourceSnapshotId !== undefined &&
+    ticker.latestRiskState !== undefined &&
+    ticker.latestDecision.riskSourceSnapshotId !== ticker.latestRiskState.sourceSnapshotId
+  ) {
+    conflicts.push({
+      conflictType: "source_authority_conflict",
+      refs: presentStateRefs([
+        ticker.latestDecision
+          ? stateRef(
+              "event",
+              ticker.latestDecision.eventId,
+              "portfolio.decision.proposed",
+            )
+          : null,
+        stateRef("event", ticker.latestRiskState.eventId, "risk.state.validated"),
+      ]),
+      message:
+        "Decision risk snapshot does not match the current ArrowHedge risk state.",
+    });
+  }
+
+  if (
+    ticker.latestDecision?.signalSourceSnapshotId !== null &&
+    ticker.latestDecision?.signalSourceSnapshotId !== undefined &&
+    ticker.latestSignal !== undefined &&
+    ticker.latestDecision.signalSourceSnapshotId !== ticker.latestSignal.sourceSnapshotId
+  ) {
+    conflicts.push({
+      conflictType: "source_authority_conflict",
+      refs: presentStateRefs([
+        ticker.latestDecision
+          ? stateRef(
+              "event",
+              ticker.latestDecision.eventId,
+              "portfolio.decision.proposed",
+            )
+          : null,
+        stateRef("event", ticker.latestSignal.eventId, "analyst.signal.created"),
+      ]),
+      message:
+        "Decision signal snapshot does not match the current ArrowHedge analyst signal.",
+    });
+  }
+
+  if (tickerRiskStateIsStale(ticker, asOf)) {
+    conflicts.push({
+      conflictType: "stale_observation",
+      refs: presentStateRefs([
+        ticker.latestRiskState
+          ? stateRef("event", ticker.latestRiskState.eventId, "risk.state.validated")
+          : null,
+      ]),
+      message:
+        "Current ArrowHedge risk state is past its freshness window for this proposal.",
+    });
+  }
+
+  return conflicts;
+}
+
+function tickerWorkflowPosition(
+  ticker: ArrowHedgeTickerCop,
+  conflicts: readonly StateConflict[],
+  asOf: Timestamp,
+): string {
+  if (ticker.staleBlocks > 0 || conflicts.length > 0 || tickerRiskStateIsStale(ticker, asOf)) {
+    return "blocked_stale_state";
+  }
+  if (ticker.latestDecision?.accepted === true && ticker.authorityGate.passes > 0) {
+    return "accepted";
+  }
+  return "decision_pending";
+}
+
+function tickerAllowedActions(sourceRefs: readonly StateRef[]): readonly AllowedAction[] {
+  return [
+    {
+      actionType: "portfolio.decision.accept",
+      label: "Accept portfolio decision",
+      requiredRefs: sourceRefs,
+      requiredWorkflowPosition: "decision_pending",
+    },
+    {
+      actionType: "workflow.block",
+      label: "Block workflow",
+      requiredRefs: sourceRefs,
+      requiredWorkflowPosition: "blocked_stale_state",
+    },
+    {
+      actionType: "risk.refresh",
+      label: "Refresh risk state",
+      requiredRefs: [],
+    },
+  ];
+}
+
+function latestTickerTimestamp(ticker: ArrowHedgeTickerCop): Timestamp | null {
+  return maxTimestamp([
+    ticker.latestSignal?.observedAt,
+    ticker.latestRiskState?.observedAt,
+    ticker.latestDecision?.observedAt,
+  ]);
+}
+
+function latestTickerAuthority(ticker: ArrowHedgeTickerCop): string | null {
+  return (
+    ticker.latestDecision?.authority ??
+    ticker.latestRiskState?.authority ??
+    ticker.latestSignal?.authority ??
+    null
+  );
+}
+
+function tickerRiskStateIsStale(
+  ticker: ArrowHedgeTickerCop,
+  observedAt: Timestamp,
+): boolean {
+  const validUntil = ticker.latestRiskState?.freshnessExpiresAt;
+  return typeof validUntil === "string" && Date.parse(validUntil) < Date.parse(observedAt);
+}
+
+function arrowHedgeActionId(
+  input: ArrowHedgeActionOutcomeEnvelopeInput,
+  artifact: StateReviewArtifact,
+): string {
+  const actionDiscriminator =
+    payloadString(input.payload, "refreshId") ??
+    payloadString(input.payload, "feedbackId") ??
+    payloadString(input.payload, "authorityConflictId") ??
+    payloadString(input.payload, "memoryCheckpointId") ??
+    missingObservationActionDiscriminator(input.payload) ??
+    payloadString(input.payload, "decisionId") ??
+    artifact.review.reviewId;
+  return [
+    input.tenantId,
+    input.projectionName,
+    input.symbol,
+    input.actionType,
+    actionDiscriminator,
+  ].join(":");
+}
+
+function arrowHedgeBaselineObservationActionId(
+  input: ArrowHedgeStateReviewArtifactCorpusInput,
+): string {
+  return [
+    input.tenantId,
+    input.projectionName,
+    input.symbol,
+    input.actionType,
+    "baseline",
+    input.scenarioId,
+  ].join(":");
+}
+
+function arrowHedgeActionOutcomeRefId(actionId: string): string {
+  return `arrowhedge_outcome_${createHash("sha256")
+    .update(actionId)
+    .digest("hex")
+    .slice(0, 32)}`;
+}
+
+function defaultTerminalPacketAuthorityRole(
+  runArm: ArrowHedgeActionOutcomeEnvelopeRunArm | undefined,
+): ArrowHedgeActionOutcomeEnvelopeAuthorityRole {
+  return runArm === "baseline"
+    ? "comparator_observation"
+    : "substrate_authority";
+}
+
+function arrowHedgeContinuityRefs(
+  continuityCheck: ArrowHedgeContinuityCheck | undefined,
+): readonly StateRef[] {
+  return uniqueStateRefs(
+    (continuityCheck?.checkpoints ?? []).map((checkpoint) =>
+      stateRef("continuity_checkpoint", checkpoint.id, checkpoint.title),
+    ),
+  );
+}
+
+function buildArrowHedgeContinuityBlockingCauses(
+  tenantId: TenantId,
+  continuityCheck: ArrowHedgeContinuityCheck | undefined,
+): readonly ActionOutcomeBlockingCause[] {
+  if (continuityCheck === undefined) return [];
+
+  const refs = arrowHedgeContinuityRefs(continuityCheck);
+  const causes: ActionOutcomeBlockingCause[] = [];
+  const report = verifyContinuityCheckpointChain({
+    tenantId,
+    agentId: continuityCheck.agentId,
+    checkpoints: continuityCheck.checkpoints,
+  });
+
+  if (!report.valid) {
+    causes.push({
+      source: "status_check",
+      code: "continuity_checkpoint_chain_invalid",
+      message:
+        "Continuity checkpoint chain failed hash/prior-link verification before terminal action admission.",
+      refs,
+      invariantClasses: ["required_evidence", "source_authority"],
+    });
+  }
+
+  const contradictions = findContinuityContradictions(
+    continuityCheck.checkpoints,
+  );
+  if (contradictions.length > 0) {
+    causes.push({
+      source: "local_view",
+      code: "continuity_memory_drift_conflict",
+      message:
+        "Continuity checkpoints contain conflicting open decision or claim summaries.",
+      refs: uniqueStateRefs(
+        contradictions.flatMap((finding) => [
+          stateRef(
+            "continuity_checkpoint",
+            finding.older.id,
+            finding.older.title,
+          ),
+          stateRef(
+            "continuity_checkpoint",
+            finding.newer.id,
+            finding.newer.title,
+          ),
+        ]),
+      ),
+      invariantClasses: ["state_conflict"],
+    });
+  }
+
+  const presentDecisionRefs = new Set(
+    continuityCheck.checkpoints.flatMap((checkpoint) => checkpoint.decisionRefs),
+  );
+  const missingDecisionRefs = (continuityCheck.requiredDecisionRefs ?? []).filter(
+    (ref) => !presentDecisionRefs.has(ref),
+  );
+  if (missingDecisionRefs.length > 0) {
+    causes.push({
+      source: "policy",
+      code: "continuity_terminal_history_missing",
+      message: `Continuity checkpoints are missing required terminal decision refs: ${missingDecisionRefs.join(", ")}.`,
+      refs,
+      invariantClasses: ["required_evidence", "workflow_position"],
+    });
+  }
+
+  const presentEvidenceEventIds = new Set(
+    continuityCheck.checkpoints.flatMap((checkpoint) =>
+      checkpoint.evidenceEventIds.map(String),
+    ),
+  );
+  const missingEvidenceEventIds = (
+    continuityCheck.requiredEvidenceEventIds ?? []
+  ).filter((eventId) => !presentEvidenceEventIds.has(String(eventId)));
+  if (missingEvidenceEventIds.length > 0) {
+    causes.push({
+      source: "policy",
+      code: "continuity_evidence_history_missing",
+      message: `Continuity checkpoints are missing required evidence event ids: ${missingEvidenceEventIds.join(", ")}.`,
+      refs,
+      invariantClasses: ["required_evidence"],
+    });
+  }
+
+  return causes;
+}
+
+function actionOutcomeEnvelopeRef(envelope: ActionOutcomeEnvelope): StateRef {
+  const ref = envelope.substrateRefs.find(
+    (candidate) => candidate.kind === "action_outcome_envelope",
+  );
+  if (ref === undefined) {
+    throw new Error(
+      `ArrowHedge ActionOutcomeEnvelope ${envelope.actionId} has no action_outcome_envelope substrate ref`,
+    );
+  }
+  return ref;
+}
+
+function emptyTerminalOutcomeCounts(): Record<ActionTerminalOutcome, number> {
+  return {
+    accepted: 0,
+    blocked: 0,
+    rejected: 0,
+    held: 0,
+    superseded: 0,
+    escalated: 0,
+  };
+}
+
+function missingObservationActionDiscriminator(
+  payload: Readonly<Record<string, unknown>>,
+): string | undefined {
+  const decisionId = payloadString(payload, "decisionId");
+  const missingObservation = payloadString(payload, "missingObservation");
+  if (decisionId === undefined || missingObservation === undefined) {
+    return undefined;
+  }
+  return `${decisionId}:missing:${missingObservation}`;
+}
+
+function buildArrowHedgeMemoryDriftCheckpoints(
+  tenantId: TenantId,
+  agentId: string,
+  decisionId: string,
+): readonly ContinuityCheckpoint[] {
+  const first = arrowHedgeContinuityCheckpoint({
+    id: "chk_arrowhedge_memory_drift_old_001",
+    tenantId,
+    agentId,
+    scope: "axis-a/arrowhedge/aapl",
+    kind: "claim",
+    title: `AAPL terminal decision ${decisionId}`,
+    summary:
+      "Terminal decision is blocked until current risk state is refreshed.",
+    evidenceEventIds: ["evt_arrowhedge_risk_1400" as EventId],
+    decisionRefs: [`arrowhedge:terminal:${decisionId}:blocked`],
+    status: "open",
+    payload: {
+      symbol: "AAPL",
+      failureClass: "memory_drift",
+    },
+    createdAt: "2026-06-03T14:01:00.000Z" as Timestamp,
+    priorCheckpointHash: null,
+  });
+  const second = arrowHedgeContinuityCheckpoint({
+    id: "chk_arrowhedge_memory_drift_new_001",
+    tenantId,
+    agentId,
+    scope: "axis-a/arrowhedge/aapl",
+    kind: "claim",
+    title: `AAPL terminal decision ${decisionId}`,
+    summary:
+      "Private resume memory says terminal decision was accepted and can continue.",
+    evidenceEventIds: ["evt_arrowhedge_resume_memory" as EventId],
+    decisionRefs: [`arrowhedge:terminal:${decisionId}:accepted-from-memory`],
+    status: "open",
+    payload: {
+      symbol: "AAPL",
+      failureClass: "memory_drift",
+    },
+    createdAt: "2026-06-03T14:08:00.000Z" as Timestamp,
+    priorCheckpointHash: first.contentHash,
+  });
+  return [first, second];
+}
+
+function buildArrowHedgeContinuityBreakCheckpoints(
+  tenantId: TenantId,
+  agentId: string,
+  decisionId: string,
+): readonly ContinuityCheckpoint[] {
+  const first = arrowHedgeContinuityCheckpoint({
+    id: "chk_arrowhedge_continuity_break_001",
+    tenantId,
+    agentId,
+    scope: "axis-a/arrowhedge/aapl",
+    kind: "handoff",
+    title: `Resume AAPL decision ${decisionId}`,
+    summary:
+      "Resume packet carries source evidence but omits the terminal outcome history.",
+    evidenceEventIds: ["evt_arrowhedge_risk_1400" as EventId],
+    decisionRefs: [`arrowhedge:risk:${decisionId}:observed`],
+    status: "open",
+    payload: {
+      symbol: "AAPL",
+      failureClass: "continuity_break",
+    },
+    createdAt: "2026-06-03T14:09:00.000Z" as Timestamp,
+    priorCheckpointHash: null,
+  });
+  return [first];
+}
+
+function arrowHedgeContinuityCheckpoint(
+  input: Omit<ContinuityCheckpoint, "contentHash">,
+): ContinuityCheckpoint {
+  return {
+    ...input,
+    contentHash: checkpointHash(input),
+  };
+}
+
+function arrowHedgeSourceAuthorityConflictState(
+  state: ArrowHedgeCommonOperatingPictureState,
+  symbol: string,
+): ArrowHedgeCommonOperatingPictureState {
+  const ticker = state.tickers[symbol];
+  if (!ticker?.latestRiskState || !ticker.latestDecision) return state;
+
+  const tickers = {
+    ...state.tickers,
+    [symbol]: {
+      ...ticker,
+      latestRiskState: {
+        ...ticker.latestRiskState,
+        eventId: `${ticker.latestRiskState.eventId}:authority_conflict`,
+        riskStateId: `${ticker.latestRiskState.riskStateId}:authority_conflict`,
+        sourceSnapshotId: `${ticker.latestRiskState.sourceSnapshotId}:revalidated`,
+        authority: `${ticker.latestRiskState.authority}:risk_revalidated`,
+      },
+    },
+  };
+
+  return {
+    tickers,
+    summary: summarizeCop(tickers),
+  };
+}
+
+function payloadString(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+): string | undefined {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+function uniqueStateRefs(refs: readonly (StateRef | null)[]): readonly StateRef[] {
+  const seen = new Set<string>();
+  const out: StateRef[] = [];
+  for (const ref of refs) {
+    if (!ref) continue;
+    const key = `${ref.kind}:${ref.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(ref);
+  }
+  return out;
+}
+
+function presentStateRefs(refs: readonly (StateRef | null)[]): readonly StateRef[] {
+  return refs.filter((ref): ref is StateRef => ref !== null);
+}
+
+function maxTimestamp(values: readonly (Timestamp | undefined)[]): Timestamp | null {
+  const present = values.filter((value): value is Timestamp => value !== undefined);
+  if (present.length === 0) return null;
+  return present.reduce((latest, candidate) =>
+    Date.parse(candidate) > Date.parse(latest) ? candidate : latest,
+  );
+}
+
+function eventAuthority(event: PMEvent): string {
+  return event.authority ?? event.emittedBy;
+}
+
+function stringArray(value: unknown): readonly string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function invalidPlan(

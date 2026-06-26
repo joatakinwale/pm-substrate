@@ -64,7 +64,7 @@ const extractArrayLiteral = (source: string, field: string): string | null => {
 const hasTopLevelStringLiteralEntry = (arrayLiteral: string): boolean => {
   // Detect top-level array entries that begin with a string literal, without
   // flagging strings nested inside typed object entries (e.g.
-  // `{ schema: { type: "wedding.task.created" } }`). This is intentionally a
+  // `{ schema: { type: "analyst.signal.created" } }`). This is intentionally a
   // tiny scanner, not a TypeScript parser.
   let depth = 0;
   let inString: '"' | "'" | "`" | null = null;

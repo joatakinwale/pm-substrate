@@ -3,7 +3,7 @@
  *
  * Discipline rule: every endpoint maps 1:1 onto a method that already exists
  * on a substrate package. No speculative API, no convenience aggregations,
- * no domain-specific endpoints. If the wedding capabilities don't need it,
+ * no domain-specific endpoints. If the domain capabilities don't need it,
  * it doesn't get built.
  *
  * This is the rule that keeps Tier-1 honest: if the second business model

@@ -6,6 +6,10 @@ import type {
   ProfileBinding,
   TenantId,
 } from "@pm/types";
+import type {
+  GraphWriteAuthorityRef,
+  GraphWriteAuthoritySubstrateRecord,
+} from "./write-authority.js";
 
 export interface GraphReader {
   /** Read a node, scoped to its tenant. Null if not found. */
@@ -63,7 +67,12 @@ export interface GraphWriter {
   createEdge(input: CreateEdgeInput): Promise<Edge>;
 
   /** Tombstone (not hard-delete). Audit + time-travel depend on it. */
-  deleteEdge(tenantId: TenantId, id: EdgeId): Promise<void>;
+  deleteEdge(
+    tenantId: TenantId,
+    id: EdgeId,
+    writeAuthorityRef?: GraphWriteAuthorityRef,
+    writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord,
+  ): Promise<void>;
 }
 
 export interface CreateNodeInput {
@@ -77,6 +86,8 @@ export interface CreateNodeInput {
   readonly profile: ProfileBinding;
   readonly identity: Readonly<Record<string, unknown>>;
   readonly schemaVersion: number;
+  readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 export interface UpdateNodeInput {
@@ -84,6 +95,8 @@ export interface UpdateNodeInput {
   readonly id: EntityId;
   readonly identity: Readonly<Record<string, unknown>>;
   readonly expectedSchemaVersion: number;
+  readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 export interface CreateEdgeInput {
@@ -92,6 +105,8 @@ export interface CreateEdgeInput {
   readonly fromId: EntityId;
   readonly toId: EntityId;
   readonly attrs: Readonly<Record<string, unknown>>;
+  readonly writeAuthorityRef?: GraphWriteAuthorityRef;
+  readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;
 }
 
 export interface Graph extends GraphReader, GraphWriter {}

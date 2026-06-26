@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     root: ".",
     include: ["packages/**/src/**/*.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/._*"],
     passWithNoTests: true,
     // Explicit empty css config — prevents Vite from searching parent dirs
     // for a postcss.config.js (the WD_BLACK drive has another project's

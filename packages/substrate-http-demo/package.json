@@ -2,7 +2,7 @@
   "name": "@pm/substrate-http-demo",
   "version": "0.1.0",
   "private": true,
-  "description": "Sample server entry point demonstrating @pm/substrate-http wired with the wedding profile + wedding-budget capability. NOT part of the substrate library; a runnable demo for docker-compose and local development.",
+  "description": "Sample server entry point demonstrating the profile-agnostic @pm/substrate-http API. NOT part of the substrate library; a runnable demo for docker-compose and local development.",
   "type": "module",
   "main": "./dist/server.js",
   "scripts": {
@@ -14,11 +14,11 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
-    "@pm/capability-wedding-budget": "workspace:*",
+    "@pm/capability-finance-research-ingest": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
     "@pm/events": "workspace:*",
     "@pm/graph": "workspace:*",
     "@pm/profile-registry": "workspace:*",
-    "@pm/profile-wedding": "workspace:*",
     "@pm/projections": "workspace:*",
     "@pm/registry": "workspace:*",
     "@pm/substrate-http": "workspace:*",
