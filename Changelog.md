@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-25 - ArrowHedge packet eval mapping
+
+- Added `research/daily-arrowsmith-agent-state/v55-arrowhedge-packet-eval-mapping-2026-06-25.md`, answering RQ56 and replacing it with RQ57: baseline-side terminal failure packets and store-derived recoveries for mapped finance scenario families.
+- Added opt-in `scenarioSpecs` to `buildArrowHedgeStateEvalSuite()`.
+- Exported `ArrowHedgeScenarioSpec` and `ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS` from `@pm/evals`.
+- Added a finance-domain test that builds the real canonical ArrowHedge terminal packet corpus, maps the blocked temporal packets into Axis A EvalEvents, and proves mapped cells are covered but not verified without baseline terminal proof.
+- Claim boundary: Axis A packet mapping improved, but finance still lacks baseline terminal packets, strict recovery suites for these mapped families, `memory_drift` / `continuity_break` packet families, and Axis B remains blocked.
+
 ## 2026-06-25 - ArrowHedge terminal packet corpus
 
 - Added `research/daily-arrowsmith-agent-state/v54-arrowhedge-terminal-packet-corpus-2026-06-25.md`, answering RQ55 and replacing it with RQ56: mapping domain-owned ArrowHedge terminal packets into Axis A source bundles with store-derived recovery.

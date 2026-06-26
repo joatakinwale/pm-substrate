@@ -121,9 +121,11 @@ export {
   type AdapterStateProofSummary,
 } from "./adapter-proof.js";
 export {
+  ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
   buildArrowHedgeStateEvalSuite,
   type ArrowHedgeActionOutcomeEnvelopeEvalRef,
   type ArrowHedgeScenarioSummary,
+  type ArrowHedgeScenarioSpec,
   type ArrowHedgeStateReviewArtifactEvalRef,
   type ArrowHedgeStateEvalInput,
   type ArrowHedgeStateEvalSuite,

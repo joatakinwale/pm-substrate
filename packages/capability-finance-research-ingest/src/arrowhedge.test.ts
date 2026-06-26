@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+  analyzeThreeAxisCoverage,
+  buildArrowHedgeStateEvalSuite,
+} from "@pm/evals";
+import {
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
   importStateReviewArtifactsJsonl,
@@ -1082,6 +1087,105 @@ describe("ArrowHedge Common Operating Picture projection", () => {
         .filter((packet) => packet.terminalOutcome === "blocked")
         .every((packet) => packet.envelope.providerCertificateId === undefined),
     ).toBe(true);
+  });
+
+  it("maps canonical terminal packets into Axis A eval events without verified overclaim", async () => {
+    const tenant = tenantId("tnt_arrowhedge_terminal_packet_eval_mapping");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_packet_eval",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+    const corpus = buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const packetsByScenario = new Map(
+      corpus.packets.map((packet) => [packet.scenarioId, packet]),
+    );
+    const mappedActionOutcomeRefs =
+      ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS.map((scenario) => {
+        const packet = packetsByScenario.get(scenario.scenarioId);
+        if (packet === undefined) {
+          throw new Error(`missing packet for ${scenario.scenarioId}`);
+        }
+        return {
+          scenarioId: scenario.scenarioId,
+          envelopeId: packet.ref.id,
+          runArm: "substrate" as const,
+          terminalOutcome: packet.terminalOutcome,
+        };
+      });
+
+    const suite = buildArrowHedgeStateEvalSuite({
+      tenantId: tenant,
+      observedAt: timestamp("2026-06-03T14:13:00.000Z"),
+      runIdPrefix: "run_arrowhedge_packet_mapping",
+      source: "packages/capability-finance-research-ingest/src/arrowhedge.test.ts",
+      sourceRecordIds: [
+        "ticker:AAPL",
+        "risk:risk_aapl_1400",
+        "decision:dec_aapl_buy_120",
+      ],
+      substrateRefs: {
+        graphNodeIds: [],
+        eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+        projectionIds: [projection.name],
+      },
+      scenarioSpecs: ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+      actionOutcomeEnvelopes: mappedActionOutcomeRefs,
+      operationalSamples: [],
+    });
+    const mappedScenarioIds = new Set(
+      ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS.map(
+        (scenario) => scenario.scenarioId,
+      ),
+    );
+    const mappedEvents = suite.events.filter((event) =>
+      mappedScenarioIds.has(event.scenarioId),
+    );
+    const mappedSubstrateEvents = mappedEvents.filter(
+      (event) => event.runArm === "substrate",
+    );
+    const report = analyzeThreeAxisCoverage(suite.events);
+
+    expect(suite.events).toHaveLength(20);
+    expect(mappedEvents).toHaveLength(6);
+    expect(
+      mappedSubstrateEvents.every(
+        (event) =>
+          event.operationalTerminalOutcome === "blocked" &&
+          event.substrateRefs.some(
+            (ref) => ref.kind === "action_outcome_envelope",
+          ),
+      ),
+    ).toBe(true);
+    expect(report.byCell.finance.partial_observation).toMatchObject({
+      covered: true,
+      verified: false,
+      terminalProofBackedPairs: 0,
+    });
+    expect(report.byCell.finance.partial_observation.reasons).toContain(
+      "missing_terminal_proof_refs",
+    );
+    expect(report.byCell.finance.feedback_disconnection).toMatchObject({
+      covered: true,
+      verified: false,
+      terminalProofBackedPairs: 0,
+    });
+    expect(report.byAxis.finance.verified).toBe(false);
   });
 
   it("emits a clean accepted/current artifact fixture as a positive metrics baseline", async () => {
