@@ -775,7 +775,9 @@ export interface ArrowHedgeActionOutcomeEnvelopeInput
   readonly requestedTerminalOutcome?: ActionTerminalOutcome;
   readonly decidedAt?: Timestamp;
   readonly decidedBy?: string;
-  readonly providerAuthority?: ActionOutcomeProviderAuthority;
+  readonly providerAuthority?: ActionOutcomeProviderAuthority | null;
+  readonly terminalPacketRunArm?: ArrowHedgeActionOutcomeEnvelopeRunArm;
+  readonly terminalPacketAuthorityRole?: ArrowHedgeActionOutcomeEnvelopeAuthorityRole;
   readonly statusCheckRefs?: readonly StateRef[];
   readonly substrateRefs?: readonly StateRef[];
 }
@@ -797,6 +799,12 @@ export interface ArrowHedgeTemporalMisalignmentFixtureCasesInput
 export interface ArrowHedgeCanonicalStateReviewArtifactCorpusInput
   extends ArrowHedgeTemporalMisalignmentFixtureCasesInput {}
 
+export type ArrowHedgeActionOutcomeEnvelopeRunArm = "baseline" | "substrate";
+
+export type ArrowHedgeActionOutcomeEnvelopeAuthorityRole =
+  | "comparator_observation"
+  | "substrate_authority";
+
 export interface ArrowHedgeStateReviewArtifactCorpus {
   readonly artifacts: readonly StateReviewArtifact[];
   readonly jsonl: string;
@@ -805,6 +813,8 @@ export interface ArrowHedgeStateReviewArtifactCorpus {
 
 export interface ArrowHedgeActionOutcomeEnvelopeCorpusPacket {
   readonly scenarioId: string;
+  readonly runArm: ArrowHedgeActionOutcomeEnvelopeRunArm;
+  readonly authorityRole: ArrowHedgeActionOutcomeEnvelopeAuthorityRole;
   readonly actionId: string;
   readonly ref: StateRef;
   readonly envelope: ActionOutcomeEnvelope;
@@ -1044,12 +1054,14 @@ export function buildArrowHedgeActionOutcomeEnvelope(
     input.requestedTerminalOutcome ??
     (artifact.review.execution.allowed ? "accepted" : "blocked");
   const providerAuthority =
-    input.providerAuthority ??
-    (requestedTerminalOutcome === "accepted" && artifact.review.execution.allowed
-      ? buildArrowHedgeActionOutcomeProviderAuthority(
-          input.decidedAt ?? artifact.generatedAt,
-        )
-      : undefined);
+    input.providerAuthority === null
+      ? undefined
+      : input.providerAuthority ??
+        (requestedTerminalOutcome === "accepted" && artifact.review.execution.allowed
+          ? buildArrowHedgeActionOutcomeProviderAuthority(
+              input.decidedAt ?? artifact.generatedAt,
+            )
+          : undefined);
 
   return buildActionOutcomeEnvelope({
     tenantId: input.tenantId,
@@ -1105,6 +1117,10 @@ export function buildArrowHedgeActionOutcomeEnvelopeCorpus(
     return [
       {
         scenarioId: input.scenarioId ?? "arrowhedge-unscoped-action",
+        runArm: input.terminalPacketRunArm ?? "substrate",
+        authorityRole:
+          input.terminalPacketAuthorityRole ??
+          defaultTerminalPacketAuthorityRole(input.terminalPacketRunArm),
         actionId: envelope.actionId,
         ref,
         envelope,
@@ -1142,6 +1158,59 @@ export function buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus(
     ...(cleanCase ? [cleanCase] : []),
     ...temporalCases,
   ]);
+}
+
+export function buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus(
+  input: ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
+): ArrowHedgeActionOutcomeEnvelopeCorpus {
+  const temporalCases = buildArrowHedgeTemporalMisalignmentFixtureCases(input);
+  const pairedInputs = temporalCases.flatMap((fixtureCase) => [
+    buildBaselineTerminalObservationCase(fixtureCase),
+    {
+      ...fixtureCase,
+      terminalPacketRunArm: "substrate" as const,
+      terminalPacketAuthorityRole: "substrate_authority" as const,
+    },
+  ]);
+
+  return buildArrowHedgeActionOutcomeEnvelopeCorpus(pairedInputs);
+}
+
+function buildBaselineTerminalObservationCase(
+  input: ArrowHedgeStateReviewArtifactCorpusInput,
+): ArrowHedgeActionOutcomeEnvelopeInput {
+  const artifact = input.artifact;
+  return {
+    ...input,
+    actionId: arrowHedgeBaselineObservationActionId(input),
+    requestedTerminalOutcome: "accepted",
+    enforcementMode: "advisory",
+    providerAuthority: null,
+    terminalPacketRunArm: "baseline",
+    terminalPacketAuthorityRole: "comparator_observation",
+    decidedBy: "arrowhedge:baseline-comparator",
+    substrateRefs: [
+      stateRef(
+        "document",
+        `${input.scenarioId}:baseline-comparator`,
+        "ArrowHedge baseline comparator observation",
+      ),
+    ],
+    artifact: {
+      ...artifact,
+      artifactId:
+        artifact?.artifactId === undefined
+          ? `artifact_${input.scenarioId}_baseline_observation`
+          : `${artifact.artifactId}_baseline_observation`,
+      metadata: {
+        ...(artifact?.metadata ?? {}),
+        evalEventIds: [
+          ...(artifact?.metadata?.evalEventIds ?? []),
+          `${input.scenarioId}:baseline`,
+        ],
+      },
+    },
+  };
 }
 
 export function buildArrowHedgeActionOutcomeProviderAuthority(
@@ -2039,11 +2108,32 @@ function arrowHedgeActionId(
   ].join(":");
 }
 
+function arrowHedgeBaselineObservationActionId(
+  input: ArrowHedgeStateReviewArtifactCorpusInput,
+): string {
+  return [
+    input.tenantId,
+    input.projectionName,
+    input.symbol,
+    input.actionType,
+    "baseline",
+    input.scenarioId,
+  ].join(":");
+}
+
 function arrowHedgeActionOutcomeRefId(actionId: string): string {
   return `arrowhedge_outcome_${createHash("sha256")
     .update(actionId)
     .digest("hex")
     .slice(0, 32)}`;
+}
+
+function defaultTerminalPacketAuthorityRole(
+  runArm: ArrowHedgeActionOutcomeEnvelopeRunArm | undefined,
+): ArrowHedgeActionOutcomeEnvelopeAuthorityRole {
+  return runArm === "baseline"
+    ? "comparator_observation"
+    : "substrate_authority";
 }
 
 function actionOutcomeEnvelopeRef(envelope: ActionOutcomeEnvelope): StateRef {

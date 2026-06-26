@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - ArrowHedge paired temporal packet corpus
+
+- Added `research/daily-arrowsmith-agent-state/v57-arrowhedge-paired-temporal-packet-corpus-2026-06-25.md`, answering RQ58 for canonical paired packet generation and replacing it with RQ59: durable packet-store persistence plus a reusable strict Axis A source bundle.
+- Added `buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus()` to `@pm/capability-finance-research-ingest`.
+- Added packet-level `runArm` and `authorityRole` metadata so ArrowHedge terminal packets can distinguish baseline comparator observations from substrate authority packets.
+- Added `providerAuthority: null` support for ArrowHedge baseline comparator packets, preventing accepted baseline observations from carrying provider certificate authority.
+- Added a finance test that maps paired temporal packets into Axis A, verifies the three temporal cells, generates a substrate-only recovery suite, and assembles a strict proof packet while keeping finance incomplete for missing classes.
+- Claim boundary: Axis A temporal packet coverage improved, but durable packet-store persistence, a reusable strict source bundle, remaining finance failure classes, and Axis B remain open.
+
 ## 2026-06-25 - Axis A baseline recovery obligations
 
 - Added `research/daily-arrowsmith-agent-state/v56-axis-a-baseline-recovery-obligations-2026-06-25.md`, answering RQ57 for strict proof semantics and replacing it with RQ58: persisted baseline terminal observation packets plus substrate recovery suites for mapped finance families.

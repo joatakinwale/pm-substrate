@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
   analyzeThreeAxisCoverage,
+  auditEvalEventsGraphWriteAuthority,
+  buildStrictThreeAxisProofPacketAssembly,
   buildArrowHedgeStateEvalSuite,
+  type EvalGraphWriteAuthorityEnvelopeStore,
+  type EvalGraphWriteAuthorityResolver,
 } from "@pm/evals";
 import {
   buildObservationContractFromCurrentStateView,
@@ -20,6 +24,7 @@ import {
   buildArrowHedgeIngestionPlan,
   buildArrowHedgeActionOutcomeEnvelope,
   buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus,
+  buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus,
   buildArrowHedgeActionOutcomeTerminalIndex,
   buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCanonicalStateReviewArtifactCorpus,
@@ -34,6 +39,7 @@ import {
   executeArrowHedgeIngestionPlan,
   parseArrowHedgeSnapshot,
   validateArrowHedgeTypedEventPayload,
+  type ArrowHedgeActionOutcomeEnvelopeCorpusPacket,
   type ArrowHedgeCommonOperatingPictureState,
 } from "./arrowhedge.js";
 
@@ -1188,6 +1194,163 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(report.byAxis.finance.verified).toBe(false);
   });
 
+  it("builds paired baseline/substrate temporal packets for strict Axis A source recovery", async () => {
+    const tenant = tenantId("tnt_arrowhedge_paired_terminal_packets");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_paired_packets",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+    const corpus = buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+
+    expect(corpus.valid).toBe(true);
+    expect(corpus.packets).toHaveLength(6);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      accepted: 3,
+      blocked: 3,
+    });
+    expect(
+      corpus.packets.filter((packet) => packet.runArm === "baseline"),
+    ).toHaveLength(3);
+    expect(
+      corpus.packets.filter((packet) => packet.runArm === "substrate"),
+    ).toHaveLength(3);
+    expect(
+      corpus.packets
+        .filter((packet) => packet.runArm === "baseline")
+        .every(
+          (packet) =>
+            packet.authorityRole === "comparator_observation" &&
+            packet.terminalOutcome === "accepted" &&
+            packet.envelope.providerCertificateId === undefined,
+        ),
+    ).toBe(true);
+    expect(
+      corpus.packets
+        .filter((packet) => packet.runArm === "substrate")
+        .every(
+          (packet) =>
+            packet.authorityRole === "substrate_authority" &&
+            packet.terminalOutcome === "blocked",
+        ),
+    ).toBe(true);
+
+    const mappedActionOutcomeRefs = corpus.packets.map((packet) => ({
+      scenarioId: packet.scenarioId,
+      envelopeId: packet.ref.id,
+      runArm: packet.runArm,
+      terminalOutcome: packet.terminalOutcome,
+    }));
+    const suite = buildArrowHedgeStateEvalSuite({
+      tenantId: tenant,
+      observedAt: timestamp("2026-06-03T14:13:00.000Z"),
+      runIdPrefix: "run_arrowhedge_paired_packets",
+      source: "packages/capability-finance-research-ingest/src/arrowhedge.test.ts",
+      sourceRecordIds: [
+        "ticker:AAPL",
+        "risk:risk_aapl_1400",
+        "decision:dec_aapl_buy_120",
+      ],
+      substrateRefs: {
+        graphNodeIds: [],
+        eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+        projectionIds: [projection.name],
+      },
+      scenarioSpecs: ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+      actionOutcomeEnvelopes: mappedActionOutcomeRefs,
+      operationalSamples: [],
+    });
+    const report = analyzeThreeAxisCoverage(suite.events);
+
+    expect(report.byCell.finance.stale_observation.verified).toBe(true);
+    expect(report.byCell.finance.feedback_disconnection).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byCell.finance.partial_observation).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byAxis.finance.verified).toBe(false);
+    expect(report.byAxis.finance.missingFailureClasses).toEqual(
+      expect.arrayContaining(["memory_drift", "continuity_break"]),
+    );
+
+    const substrateMappedEvents = suite.events.filter(
+      (event) =>
+        event.runArm === "substrate" &&
+        ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS.some(
+          (scenario) => scenario.scenarioId === event.scenarioId,
+        ),
+    );
+    const recoverySuite = await auditEvalEventsGraphWriteAuthority({
+      events: substrateMappedEvents,
+      store: pairedPacketStore(corpus.packets),
+      resolveAcceptedAuthority: refusedAuthorityResolver,
+      policy: strictGraphAuthorityPolicy,
+    });
+    const assembly = buildStrictThreeAxisProofPacketAssembly({
+      packetId: "three_axis_proof_arrowhedge_paired_temporal_packets",
+      generatedAt: timestamp("2026-06-03T14:13:30.000Z"),
+      sourceBundles: [
+        {
+          source: {
+            sourceId: "axis-a-arrowhedge-paired-temporal-packets",
+            axis: "finance",
+            eventCount: suite.events.length,
+          },
+          events: suite.events,
+          authorityRecoverySuite: recoverySuite,
+        },
+      ],
+    });
+
+    expect(recoverySuite.summary).toMatchObject({
+      totalEvents: 3,
+      auditedEvents: 3,
+      validRecoveries: 3,
+      invalidRecoveries: 0,
+      byStatus: {
+        terminal_outcome_refused_authority: 3,
+      },
+    });
+    expect(assembly.sourceRecoveries).toEqual([
+      expect.objectContaining({
+        sourceId: "axis-a-arrowhedge-paired-temporal-packets",
+        axis: "finance",
+        eventCount: 20,
+        obligationCount: 3,
+        recoveryStatus: "provided",
+        recoveryCount: 3,
+        validRecoveries: 3,
+        invalidRecoveries: 0,
+      }),
+    ]);
+    expect(assembly.packet.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: true,
+      obligationCount: 3,
+      validObligations: 3,
+      invalidObligations: [],
+    });
+    expect(assembly.packet.report.byAxis.finance.verified).toBe(false);
+  });
+
   it("emits a clean accepted/current artifact fixture as a positive metrics baseline", async () => {
     const tenant = tenantId("tnt_arrowhedge_clean_current");
     const plan = buildArrowHedgeIngestionPlan(snapshot, {
@@ -1578,3 +1741,30 @@ async function foldPlanIntoCop(
 
   return state;
 }
+
+function pairedPacketStore(
+  packets: readonly ArrowHedgeActionOutcomeEnvelopeCorpusPacket[],
+): EvalGraphWriteAuthorityEnvelopeStore {
+  const packetsByRef = new Map(packets.map((packet) => [packet.ref.id, packet]));
+  return {
+    getWorkflowActionOutcomeEnvelope: async ({ envelopeId }) => {
+      const packet = packetsByRef.get(envelopeId);
+      if (packet === undefined) return undefined;
+      return {
+        envelopeId,
+        actionId: packet.actionId,
+        terminalOutcome: packet.terminalOutcome,
+      };
+    },
+  };
+}
+
+const refusedAuthorityResolver: EvalGraphWriteAuthorityResolver = async () => {
+  throw new Error("terminal outcome refused accepted graph authority");
+};
+
+const strictGraphAuthorityPolicy = {
+  requireAuthorityRef: true,
+  requireProviderCertificateStatusRef: true,
+  requireSubstrateRecord: true,
+} as const;
