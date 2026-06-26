@@ -17,8 +17,7 @@ export interface MarketingAxisBBlockedInput {
 export function buildMarketingAxisBBlockedEval(
   input: MarketingAxisBBlockedInput,
 ): EvalEvent {
-  const sourcePath =
-    input.sourcePath ?? "/Volumes/WD_BLACK/JoatLabs/PluggedInSocial";
+  const sourcePath = input.sourcePath ?? "./pluggedinsocial";
   const scenarioId =
     input.scenarioId ?? "publish-after-client-approval-revoked";
   const fixtureNote =

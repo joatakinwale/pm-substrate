@@ -2,6 +2,8 @@ import {
   verifyActionOutcomeEnvelopeHash,
   type ActionOutcomeProviderCertificateStatusRef,
   type ActionOutcomeEnvelope,
+  type ProjectionReplayCertificateRef,
+  type ProjectionReplayCertificateStoreRootWitnessSettlementRef,
 } from "@pm/agent-state";
 import {
   assertEvalEvent,
@@ -51,6 +53,8 @@ export interface WorkflowGraphWriteAuthorityEnvelopePacket {
   readonly providerCertificateId?: string;
   readonly providerCertificateDigest?: string;
   readonly providerCertificateStatusRef?: WorkflowGraphWriteAuthorityProviderCertificateStatusRef;
+  readonly projectionReplayRef?: ProjectionReplayCertificateRef;
+  readonly projectionReplayRootSettlementRef?: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
 }
 
 export class PostgresEvalEventStore {
@@ -241,6 +245,15 @@ export class PostgresEvalEventStore {
             providerCertificateStatusRef: workflowProviderStatusRef(
               envelope.providerCertificateStatusRef,
             ),
+          }
+        : {}),
+      ...(envelope.projectionReplayRef !== undefined
+        ? { projectionReplayRef: envelope.projectionReplayRef }
+        : {}),
+      ...(envelope.projectionReplayRootSettlementRef !== undefined
+        ? {
+            projectionReplayRootSettlementRef:
+              envelope.projectionReplayRootSettlementRef,
           }
         : {}),
     };

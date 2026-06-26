@@ -25,5 +25,5 @@ export {
   type EventChainVerificationReport,
   type EventProvenanceEnvelope,
 } from "./provenance.js";
-export { matchesPattern } from "./pattern.js";
+export { matchesPattern, patternToSqlLike } from "./pattern.js";
 export { ensureMonthPartition, monthRange } from "./partitions.js";

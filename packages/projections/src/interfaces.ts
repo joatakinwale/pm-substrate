@@ -1,4 +1,4 @@
-import type { PMEvent, TenantId } from "@pm/types";
+import type { EntityId, EventId, PMEvent, TenantId, Timestamp } from "@pm/types";
 
 /**
  * A projection is a deterministic, replayable function from the event stream
@@ -29,4 +29,39 @@ export interface ProjectionRunner {
     tenantId: TenantId,
     name: string,
   ): Promise<TState | null>;
+
+  /**
+   * Inspect the durable replay frontier for the current materialized state.
+   * This is not a state view by itself; it is the projection-owned evidence
+   * that a state view can cite when building a replay certificate.
+   */
+  getReplayFrontier(
+    tenantId: TenantId,
+    name: string,
+  ): Promise<ProjectionReplayFrontier | null>;
+}
+
+export interface ProjectionReplayFrontierEvent {
+  readonly eventId: EventId;
+  readonly sequence: number;
+  readonly type: string;
+  readonly entityId: EntityId;
+  readonly recordedAt: Timestamp;
+  readonly contentHash: string | null;
+  readonly authority: string | null;
+}
+
+export interface ProjectionReplayFrontier {
+  readonly tenantId: TenantId;
+  readonly projectionName: string;
+  readonly projectionVersion: number;
+  readonly replayedToEventId: EventId | null;
+  /**
+   * Global event-log sequence of `replayedToEventId`, or 0 when the projection
+   * has not consumed any events.
+   */
+  readonly replayedToPosition: number;
+  readonly replayedToRecordedAt: string | null;
+  readonly consumedEventCount: number;
+  readonly transitionEvents: readonly ProjectionReplayFrontierEvent[];
 }

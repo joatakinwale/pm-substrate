@@ -15,7 +15,7 @@ describe("marketing Axis B blocker eval", () => {
     expect(event.result).toBe("blocked");
     expect(event.evidenceRefs).toHaveLength(0);
     expect(event.substrateRefs).toHaveLength(0);
-    expect(event.notes).toContain("/Volumes/WD_BLACK/JoatLabs/PluggedInSocial");
+    expect(event.notes).toContain("./pluggedinsocial");
     expect(event.notes).toContain("No authoritative agency fixtures");
     expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
   });

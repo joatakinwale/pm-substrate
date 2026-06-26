@@ -7,6 +7,8 @@ import {
   validateGraphWriteAuthority,
   type GraphWriteAuthorityRef,
   type GraphWriteAuthoritySubstrateRecord,
+  type GraphWriteProjectionReplayRef,
+  type GraphWriteProjectionReplayRootSettlementRef,
 } from "./write-authority.js";
 
 const tenantId = "tnt_graph_authority" as TenantId;
@@ -32,6 +34,30 @@ const validAuthority = (): GraphWriteAuthorityRef => ({
   },
 });
 
+const validProjectionReplayRef = (): GraphWriteProjectionReplayRef => ({
+  certificateId: "projection_replay_graph_authority",
+  certificateHash: "sha256:projection_replay_certificate",
+  projectionName: "graph/current-state",
+  projectionVersion: 3,
+  authorityScope: "graph.write.strict",
+  replayedToPosition: 42,
+  transitionHistoryHash: "sha256:projection_transition_history",
+  projectionHash: "sha256:projection_hash",
+  checkedAt,
+});
+
+const validProjectionReplayRootSettlementRef =
+  (): GraphWriteProjectionReplayRootSettlementRef => ({
+    rootSequence: 7,
+    rootHash: "sha256:projection_replay_root",
+    settlementSequence: 3,
+    settlementStatus: "settled",
+    settlementHash: "sha256:projection_replay_root_settlement",
+    settlementRecordHash: "sha256:projection_replay_root_settlement_record",
+    authorityTopologyHash: "sha256:projection_replay_authority_topology",
+    checkedAt,
+  });
+
 const validSubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
   authorityKind: "workflow_action_outcome_envelope",
   envelopeId: "env_graph_authority",
@@ -48,6 +74,33 @@ const validSubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
     statusUpdatedAt: checkedAt,
     checkedAt,
   },
+});
+
+const validReplayAuthority = (): GraphWriteAuthorityRef => ({
+  ...validAuthority(),
+  projectionReplayRef: validProjectionReplayRef(),
+});
+
+const validSettledReplayAuthority = (): GraphWriteAuthorityRef => ({
+  ...validAuthority(),
+  projectionReplayRef: {
+    ...validProjectionReplayRef(),
+    certificateStoreSequence: validProjectionReplayRootSettlementRef().rootSequence,
+    certificateStoreRootHash: validProjectionReplayRootSettlementRef().rootHash,
+  },
+  projectionReplayRootSettlementRef: validProjectionReplayRootSettlementRef(),
+});
+
+const validReplaySubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
+  ...validSubstrateRecord(),
+  projectionReplayRef: validProjectionReplayRef(),
+});
+
+const validSettledReplaySubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
+  ...validSubstrateRecord(),
+  projectionReplayRef: validSettledReplayAuthority().projectionReplayRef,
+  projectionReplayRootSettlementRef:
+    validProjectionReplayRootSettlementRef(),
 });
 
 describe("validateGraphWriteAuthority", () => {
@@ -166,6 +219,170 @@ describe("validateGraphWriteAuthority", () => {
       "graph_write_authority_substrate_record_mismatch",
     );
   });
+
+  it("requires projection replay proof when configured", () => {
+    const issues = validateGraphWriteAuthority({
+      authorityRef: validAuthority(),
+      policy: {
+        requireAuthorityRef: true,
+        requireProjectionReplayRef: true,
+      },
+    });
+
+    expect(issues.map((issue) => issue.code)).toContain(
+      "graph_write_projection_replay_ref_missing",
+    );
+  });
+
+  it("accepts projection replay proof when it matches policy", () => {
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validReplayAuthority(),
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          expectedProjectionName: "graph/current-state",
+          expectedProjectionVersion: 3,
+          expectedProjectionReplayAuthorityScope: "graph.write.strict",
+          minimumProjectionReplayPosition: 40,
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it("rejects stale or mismatched projection replay proof", () => {
+    const authorityRef: GraphWriteAuthorityRef = {
+      ...validReplayAuthority(),
+      projectionReplayRef: {
+        ...validProjectionReplayRef(),
+        projectionName: "other/current-state",
+        replayedToPosition: 39,
+      },
+    };
+
+    const issues = validateGraphWriteAuthority({
+      authorityRef,
+      policy: {
+        requireAuthorityRef: true,
+        requireProjectionReplayRef: true,
+        expectedProjectionName: "graph/current-state",
+        minimumProjectionReplayPosition: 40,
+      },
+    });
+
+    expect(issues.map((issue) => issue.code)).toEqual([
+      "graph_write_projection_replay_ref_mismatch",
+      "graph_write_projection_replay_ref_stale",
+    ]);
+  });
+
+  it("requires the substrate record to preserve projection replay proof", () => {
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validReplayAuthority(),
+        substrateRecord: validReplaySubstrateRecord(),
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          requireSubstrateRecord: true,
+        },
+      }),
+    ).toEqual([]);
+
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validReplayAuthority(),
+        substrateRecord: {
+          ...validReplaySubstrateRecord(),
+          projectionReplayRef: {
+            ...validProjectionReplayRef(),
+            certificateHash: "sha256:different",
+          },
+        },
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          requireSubstrateRecord: true,
+        },
+      }).map((issue) => issue.code),
+    ).toContain("graph_write_authority_substrate_record_mismatch");
+  });
+
+  it("requires a settled replay root when configured", () => {
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validReplayAuthority(),
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRootSettlementRef: true,
+        },
+      }).map((issue) => issue.code),
+    ).toContain("graph_write_projection_replay_root_settlement_ref_missing");
+  });
+
+  it("accepts a settled replay root only when it matches the replay store root", () => {
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validSettledReplayAuthority(),
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          requireProjectionReplayRootSettlementRef: true,
+        },
+      }),
+    ).toEqual([]);
+
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: {
+          ...validSettledReplayAuthority(),
+          projectionReplayRootSettlementRef: {
+            ...validProjectionReplayRootSettlementRef(),
+            rootHash: "sha256:other_root",
+          },
+        },
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          requireProjectionReplayRootSettlementRef: true,
+        },
+      }).map((issue) => issue.code),
+    ).toContain("graph_write_projection_replay_root_settlement_ref_mismatch");
+  });
+
+  it("requires the substrate record to preserve settled-root proof", () => {
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validSettledReplayAuthority(),
+        substrateRecord: validSettledReplaySubstrateRecord(),
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          requireProjectionReplayRootSettlementRef: true,
+          requireSubstrateRecord: true,
+        },
+      }),
+    ).toEqual([]);
+
+    expect(
+      validateGraphWriteAuthority({
+        authorityRef: validSettledReplayAuthority(),
+        substrateRecord: {
+          ...validSettledReplaySubstrateRecord(),
+          projectionReplayRootSettlementRef: {
+            ...validProjectionReplayRootSettlementRef(),
+            settlementRecordHash: "sha256:different_record",
+          },
+        },
+        policy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          requireProjectionReplayRootSettlementRef: true,
+          requireSubstrateRecord: true,
+        },
+      }).map((issue) => issue.code),
+    ).toContain("graph_write_authority_substrate_record_mismatch");
+  });
 });
 
 describe("PostgresGraph write authority policy", () => {
@@ -196,6 +413,37 @@ describe("PostgresGraph write authority policy", () => {
           requireAuthorityRef: true,
           requireProviderCertificateStatusRef: true,
           requireSubstrateRecord: true,
+        },
+      },
+    );
+
+  const strictReplayGraph = () =>
+    new PostgresGraph(
+      {
+        query: () => {
+          throw new Error("authority guard should run before SQL");
+        },
+      } as never,
+      {
+        writeAuthorityPolicy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+        },
+      },
+    );
+
+  const strictSettledReplayGraph = () =>
+    new PostgresGraph(
+      {
+        query: () => {
+          throw new Error("authority guard should run before SQL");
+        },
+      } as never,
+      {
+        writeAuthorityPolicy: {
+          requireAuthorityRef: true,
+          requireProjectionReplayRef: true,
+          requireProjectionReplayRootSettlementRef: true,
         },
       },
     );
@@ -261,6 +509,30 @@ describe("PostgresGraph write authority policy", () => {
         identity: {},
         schemaVersion: 1,
         writeAuthorityRef: validAuthority(),
+      }),
+    ).rejects.toBeInstanceOf(GraphWriteAuthorityError);
+  });
+
+  it("rejects updateNode before SQL when projection replay proof is missing", async () => {
+    await expect(
+      strictReplayGraph().updateNode({
+        tenantId,
+        id: entityId,
+        identity: {},
+        expectedSchemaVersion: 1,
+        writeAuthorityRef: validAuthority(),
+      }),
+    ).rejects.toBeInstanceOf(GraphWriteAuthorityError);
+  });
+
+  it("rejects createNode before SQL when settled-root proof is missing", async () => {
+    await expect(
+      strictSettledReplayGraph().createNode({
+        tenantId,
+        profile: { tier1: "Engagement", profile: null, concrete: "Engagement" },
+        identity: {},
+        schemaVersion: 1,
+        writeAuthorityRef: validReplayAuthority(),
       }),
     ).rejects.toBeInstanceOf(GraphWriteAuthorityError);
   });

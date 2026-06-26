@@ -1,7 +1,8 @@
-import type {
-  TenantId,
-  TerminalAdmissionProviderCertificateStatus,
-  Timestamp,
+import {
+  tenantId,
+  type TenantId,
+  type TerminalAdmissionProviderCertificateStatus,
+  type Timestamp,
 } from "@pm/types";
 
 import type { EvidenceAdmissionReview } from "./external-evidence.js";
@@ -12,6 +13,8 @@ export const STATE_REVIEW_ARTIFACT_SCHEMA_VERSION =
   "state-review-artifact.v1" as const;
 export const ACTION_OUTCOME_ENVELOPE_SCHEMA_VERSION =
   "action-outcome-envelope.v1" as const;
+export const PROJECTION_REPLAY_CERTIFICATE_SCHEMA_VERSION =
+  "projection-replay-certificate.v1" as const;
 export const STATE_REVIEW_EVENT_TYPE =
   "pm.agent_state.action_proposal_reviewed.v1" as const;
 export const STATE_REVIEW_EVENT_SPEC_VERSION = "1.0" as const;
@@ -64,6 +67,65 @@ export interface AllowedAction {
   readonly requiredRelatedRoles?: readonly RequiredRelatedRole[];
 }
 
+export type ProjectionReplayTransitionRefKind = "event" | "action_outcome_envelope";
+
+export interface ProjectionReplayTransitionRef {
+  readonly ref: StateRef;
+  readonly sequence?: number;
+  readonly contentHash?: string;
+  readonly admittedAt?: Timestamp;
+  readonly authority?: string;
+}
+
+export interface ProjectionReplayFrontierTransition {
+  readonly eventId: string;
+  readonly sequence?: number;
+  readonly contentHash?: string | null;
+  readonly recordedAt?: Timestamp;
+  readonly authority?: string | null;
+}
+
+export interface ProjectionReplayFrontierInput {
+  readonly tenantId: TenantId;
+  readonly projectionName: string;
+  readonly projectionVersion: number;
+  readonly replayedToPosition: number;
+  readonly transitionEvents: readonly ProjectionReplayFrontierTransition[];
+}
+
+export interface ProjectionReplayCertificate {
+  readonly schemaVersion: typeof PROJECTION_REPLAY_CERTIFICATE_SCHEMA_VERSION;
+  readonly certificateId: string;
+  readonly tenantId: TenantId;
+  readonly subject: StateRef;
+  readonly projectionName?: string;
+  readonly authorityScope: string;
+  readonly projectionVersion?: number;
+  readonly replayedAt: Timestamp;
+  readonly replayedBy: string;
+  readonly replayedToPosition?: number;
+  readonly sourceRefs: readonly StateRef[];
+  readonly transitionRefs: readonly ProjectionReplayTransitionRef[];
+  readonly transitionHistoryHash: string;
+  readonly projectionHash: string;
+  readonly certificateHash: string;
+}
+
+export interface ProjectionReplayCertificateRef {
+  readonly certificateId: string;
+  readonly certificateHash: string;
+  readonly projectionName: string;
+  readonly projectionVersion: number;
+  readonly authorityScope: string;
+  readonly replayedToPosition: number;
+  readonly transitionHistoryHash: string;
+  readonly projectionHash: string;
+  readonly certificateStoreSequence?: number;
+  readonly certificateStoreEntryHash?: string;
+  readonly certificateStoreRootHash?: string;
+  readonly checkedAt: Timestamp | string;
+}
+
 export interface CurrentStateView {
   readonly tenantId: TenantId;
   readonly viewId: string;
@@ -77,6 +139,7 @@ export interface CurrentStateView {
   readonly missingSources: readonly string[];
   readonly conflicts: readonly StateConflict[];
   readonly allowedActions: readonly AllowedAction[];
+  readonly replayCertificate?: ProjectionReplayCertificate;
 }
 
 export interface ReadSetEntry {
@@ -220,7 +283,8 @@ export type ActionProposalExecutionReason =
 export type ActionProposalWarningSource =
   | "read_set"
   | "observation_contract"
-  | "contract_binding";
+  | "contract_binding"
+  | "projection_replay";
 
 export interface ActionProposalWarning {
   readonly source: ActionProposalWarningSource;
@@ -242,6 +306,10 @@ export interface ActionProposalReviewOptions {
   readonly evaluatedAt?: Timestamp;
   readonly observationContract?: ObservationContract;
   readonly enforcementMode?: ActionProposalReviewEnforcementMode;
+  readonly requireReplayCertificate?: boolean;
+  readonly expectedReplayAuthorityScope?: string;
+  readonly minimumReplayPosition?: number;
+  readonly requireReplayTransitionContentHash?: boolean;
 }
 
 export interface ActionProposalReview {
@@ -317,6 +385,7 @@ export type StateReviewInvariantClass =
   | "freshness_window"
   | "source_authority"
   | "projection_version"
+  | "projection_replay"
   | "workflow_position"
   | "state_conflict"
   | "capability_contract";
@@ -383,6 +452,11 @@ export const DEFAULT_STATE_REVIEW_INVARIANT_POLICY_MATRIX = {
   projection_version: {
     low: "advisory",
     medium: "advisory",
+    high: "blocking",
+  },
+  projection_replay: {
+    low: "advisory",
+    medium: "blocking",
     high: "blocking",
   },
   workflow_position: {
@@ -481,6 +555,8 @@ export interface ActionOutcomeEnvelope {
   readonly providerCertificateId?: string;
   readonly providerCertificateDigest?: string;
   readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
+  readonly projectionReplayRef?: ProjectionReplayCertificateRef;
+  readonly projectionReplayRootSettlementRef?: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
   readonly policyTransitionRef?: StateRef;
   readonly terminalOutcome: ActionTerminalOutcome;
   readonly decidedAt: Timestamp;
@@ -507,6 +583,8 @@ export interface ActionOutcomeEnvelopeInput {
   readonly providerCertificateId?: string;
   readonly providerCertificateDigest?: string;
   readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
+  readonly projectionReplayRef?: ProjectionReplayCertificateRef;
+  readonly projectionReplayRootSettlementRef?: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
   readonly policyTransitionRef?: StateRef;
   readonly requestedTerminalOutcome: ActionTerminalOutcome;
   readonly decidedAt: Timestamp;
@@ -538,6 +616,8 @@ export interface WorkflowInvocationActionOutcomeEnvelopeSource {
   readonly providerCertificateId?: string;
   readonly providerCertificateDigest?: string;
   readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
+  readonly projectionReplayRef?: ProjectionReplayCertificateRef;
+  readonly projectionReplayRootSettlementRef?: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
   readonly evidenceDecision: {
     readonly valid: boolean;
     readonly reason?: string;
@@ -604,6 +684,1824 @@ export interface ActionOutcomeTerminalIndex {
   readonly valid: boolean;
   readonly entries: readonly ActionOutcomeTerminalIndexEntry[];
   readonly issues: readonly ActionOutcomeTerminalIndexIssue[];
+}
+
+export interface ProjectionReplayCertificateInput {
+  readonly certificateId?: string;
+  readonly projectionName?: string;
+  readonly authorityScope?: string;
+  readonly replayedAt: Timestamp;
+  readonly replayedBy: string;
+  readonly replayedToPosition?: number;
+  readonly transitionRefs: readonly ProjectionReplayTransitionRef[];
+}
+
+export interface ProjectionReplayCertificateFromFrontierInput {
+  readonly certificateId?: string;
+  readonly authorityScope?: string;
+  readonly replayedAt: Timestamp;
+  readonly replayedBy?: string;
+  readonly frontier: ProjectionReplayFrontierInput;
+}
+
+export type ProjectionReplayCertificateIssueCode =
+  | "projection_replay_certificate_missing"
+  | "projection_replay_certificate_hash_mismatch"
+  | "projection_replay_tenant_mismatch"
+  | "projection_replay_subject_mismatch"
+  | "projection_replay_version_mismatch"
+  | "projection_replay_authority_scope_mismatch"
+  | "projection_replay_source_refs_mismatch"
+  | "projection_replay_projection_hash_mismatch"
+  | "projection_replay_transition_history_hash_mismatch"
+  | "projection_replay_transition_history_empty"
+  | "projection_replay_transition_kind_invalid"
+  | "projection_replay_transition_hash_missing"
+  | "projection_replay_position_regression";
+
+export interface ProjectionReplayCertificateIssue {
+  readonly code: ProjectionReplayCertificateIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly ref?: StateRef;
+}
+
+export interface ProjectionReplayCertificateEvaluationOptions {
+  readonly expectedAuthorityScope?: string;
+  readonly minimumReplayPosition?: number;
+  readonly requireTransitionContentHash?: boolean;
+}
+
+export interface ProjectionReplayCertificateEvaluation {
+  readonly valid: boolean;
+  readonly certificateId?: string;
+  readonly issues: readonly ProjectionReplayCertificateIssue[];
+}
+
+export interface ProjectionReplayCertificateRecord {
+  readonly tenantId: TenantId;
+  readonly certificateId: string;
+  readonly certificateHash: string;
+  readonly projectionName: string;
+  readonly subject: StateRef;
+  readonly authorityScope: string;
+  readonly projectionVersion: number;
+  readonly replayedToPosition: number;
+  readonly transitionHistoryHash: string;
+  readonly projectionHash: string;
+  readonly certificate: ProjectionReplayCertificate;
+  readonly recordedAt: Timestamp | string;
+  readonly storeSequence?: number;
+  readonly storePreviousEntryHash?: string;
+  readonly storeEntryHash?: string;
+  readonly storeRootHash?: string;
+  readonly storeRecordedAt?: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateRecordInput {
+  readonly certificate: ProjectionReplayCertificate;
+  readonly projectionName?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateLookupInput {
+  readonly tenantId: TenantId | string;
+  readonly certificateId: string;
+}
+
+export type ProjectionReplayCertificateStoreIssueCode =
+  | "projection_replay_certificate_record_missing"
+  | "projection_replay_certificate_record_invalid"
+  | "projection_replay_certificate_ref_mismatch"
+  | "projection_replay_certificate_store_commitment_missing"
+  | "projection_replay_certificate_store_commitment_mismatch";
+
+export interface ProjectionReplayCertificateStoreIssue {
+  readonly code: ProjectionReplayCertificateStoreIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateRefVerificationInput {
+  readonly tenantId: TenantId | string;
+  readonly ref: ProjectionReplayCertificateRef;
+  readonly requireStoreCommitment?: boolean;
+}
+
+export interface ProjectionReplayCertificateRefVerification {
+  readonly valid: boolean;
+  readonly certificateId: string;
+  readonly record?: ProjectionReplayCertificateRecord;
+  readonly issues: readonly ProjectionReplayCertificateStoreIssue[];
+}
+
+export interface ProjectionReplayCertificateStore {
+  recordProjectionReplayCertificate(
+    input: ProjectionReplayCertificateRecordInput,
+  ): Promise<ProjectionReplayCertificateRecord>;
+
+  getProjectionReplayCertificateRecord(
+    input: ProjectionReplayCertificateLookupInput,
+  ): Promise<ProjectionReplayCertificateRecord | null>;
+
+  verifyProjectionReplayCertificateRef(
+    input: ProjectionReplayCertificateRefVerificationInput,
+  ): Promise<ProjectionReplayCertificateRefVerification>;
+}
+
+export interface ProjectionReplayCertificateDbQueryResult<TRow = unknown> {
+  readonly rows: readonly TRow[];
+}
+
+export interface ProjectionReplayCertificateDbClient {
+  query<TRow = unknown>(
+    sql: string,
+    values?: readonly unknown[],
+  ): Promise<ProjectionReplayCertificateDbQueryResult<TRow>>;
+}
+
+export interface ProjectionReplayCertificateStoreRoot {
+  readonly tenantId: TenantId;
+  readonly sequence: number;
+  readonly rootHash: string;
+  readonly previousRootHash?: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreEntry {
+  readonly tenantId: TenantId;
+  readonly sequence: number;
+  readonly certificateId: string;
+  readonly certificateHash: string;
+  readonly projectionName: string;
+  readonly projectionVersion: number;
+  readonly replayedToPosition: number;
+  readonly transitionHistoryHash: string;
+  readonly projectionHash: string;
+  readonly previousEntryHash?: string;
+  readonly recordedAt: Timestamp | string;
+  readonly entryHash: string;
+}
+
+export type ProjectionReplayCertificateStoreChainIssueCode =
+  | "projection_replay_certificate_store_chain_empty"
+  | "projection_replay_certificate_store_chain_tenant_mismatch"
+  | "projection_replay_certificate_store_chain_sequence_gap"
+  | "projection_replay_certificate_store_chain_previous_hash_mismatch"
+  | "projection_replay_certificate_store_chain_entry_hash_mismatch"
+  | "projection_replay_certificate_store_chain_root_mismatch";
+
+export interface ProjectionReplayCertificateStoreChainIssue {
+  readonly code: ProjectionReplayCertificateStoreChainIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreChainVerification {
+  readonly valid: boolean;
+  readonly root?: ProjectionReplayCertificateStoreRoot;
+  readonly issues: readonly ProjectionReplayCertificateStoreChainIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreConsistencyProof {
+  readonly tenantId: TenantId;
+  readonly fromRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly toRoot: ProjectionReplayCertificateStoreRoot;
+  readonly entries: readonly ProjectionReplayCertificateStoreEntry[];
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessIssueCode =
+  | "projection_replay_certificate_store_root_tenant_mismatch"
+  | "projection_replay_certificate_store_root_fork"
+  | "projection_replay_certificate_store_root_regression"
+  | "projection_replay_certificate_store_root_consistency_proof_missing"
+  | "projection_replay_certificate_store_root_consistency_proof_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootObstructionArtifact {
+  readonly artifactId: string;
+  readonly tenantId: TenantId;
+  readonly generatedAt: Timestamp | string;
+  readonly observerId: string;
+  readonly observedRoot: ProjectionReplayCertificateStoreRoot;
+  readonly latestRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly conflictingRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessIssue[];
+  readonly allowedAction: "request_root_consistency_proof";
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessStatus =
+  | "accepted_initial"
+  | "accepted_duplicate"
+  | "accepted_advance"
+  | "obstructed";
+
+export interface ProjectionReplayCertificateStoreRootObservationInput {
+  readonly tenantId: TenantId | string;
+  readonly observerId: string;
+  readonly observedAt: Timestamp | string;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+  readonly consistencyProof?: ProjectionReplayCertificateStoreConsistencyProof;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessDecision {
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessStatus;
+  readonly observerId: string;
+  readonly observedRoot: ProjectionReplayCertificateStoreRoot;
+  readonly latestRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly acceptedRoots: readonly ProjectionReplayCertificateStoreRoot[];
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessIssue[];
+  readonly obstruction?: ProjectionReplayCertificateStoreRootObstructionArtifact;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitness {
+  observeProjectionReplayCertificateStoreRoot(
+    input: ProjectionReplayCertificateStoreRootObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessDecision>;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessRecord {
+  readonly tenantId: TenantId;
+  readonly witnessSequence: number;
+  readonly observerId: string;
+  readonly observedAt: Timestamp | string;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+  readonly consistencyProof?: ProjectionReplayCertificateStoreConsistencyProof;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessDecision;
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessStatus;
+  readonly previousObservationHash?: string;
+  readonly observationHash: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessRecordInput {
+  readonly witnessSequence: number;
+  readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessDecision;
+  readonly previousObservationHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessLedgerIssueCode =
+  | "projection_replay_certificate_store_root_witness_ledger_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_ledger_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_ledger_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_ledger_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_ledger_decision_mismatch";
+
+export interface ProjectionReplayCertificateStoreRootWitnessLedgerIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessLedgerIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessLedgerReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessRecord[];
+  readonly acceptedRoots: readonly ProjectionReplayCertificateStoreRoot[];
+  readonly latestRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessLedgerIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessLedger {
+  appendProjectionReplayCertificateStoreRootWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<readonly ProjectionReplayCertificateStoreRootWitnessRecord[]>;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind =
+  | "set_quorum"
+  | "admit_witness"
+  | "suspend_witness"
+  | "revoke_witness"
+  | "mark_equivocated";
+
+export type ProjectionReplayCertificateStoreRootWitnessPrincipalStatus =
+  | "active"
+  | "suspended"
+  | "revoked"
+  | "equivocated";
+
+export interface ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionInput {
+  readonly tenantId: TenantId | string;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromRootSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly reason?: string;
+  readonly previousAuthorityHash?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessAuthorityTransition {
+  readonly tenantId: TenantId;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromRootSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly reason?: string;
+  readonly previousAuthorityHash?: string;
+  readonly authorityHash: string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessAuthorityIssueCode =
+  | "projection_replay_certificate_store_root_witness_authority_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_authority_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_authority_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_authority_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_authority_transition_invalid"
+  | "projection_replay_certificate_store_root_witness_authority_witness_missing"
+  | "projection_replay_certificate_store_root_witness_authority_quorum_missing"
+  | "projection_replay_certificate_store_root_witness_authority_quorum_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessAuthorityIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessAuthorityIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessPrincipalState {
+  readonly tenantId: TenantId;
+  readonly witnessId: string;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessPrincipalStatus;
+  readonly validFromRootSequence: number;
+  readonly changedAtAuthoritySequence: number;
+  readonly admittedAt?: Timestamp | string;
+  readonly admittedBy?: string;
+  readonly statusChangedAt?: Timestamp | string;
+  readonly statusChangedBy?: string;
+  readonly reason?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessAuthorityTopology {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly rootSequence: number;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly eligibleWitnessIds: readonly string[];
+  readonly principals: readonly ProjectionReplayCertificateStoreRootWitnessPrincipalState[];
+  readonly transitions: readonly ProjectionReplayCertificateStoreRootWitnessAuthorityTransition[];
+  readonly latestAuthorityHash?: string;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessAuthorityIssue[];
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStatus =
+  | "provisional"
+  | "witnessed"
+  | "settled"
+  | "obstructed";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementIssueCode =
+  | "projection_replay_certificate_store_root_settlement_invalid_policy"
+  | "projection_replay_certificate_store_root_settlement_root_tenant_mismatch"
+  | "projection_replay_certificate_store_root_settlement_authority_topology_invalid"
+  | "projection_replay_certificate_store_root_settlement_policy_authority_mismatch"
+  | "projection_replay_certificate_store_root_settlement_duplicate_witness"
+  | "projection_replay_certificate_store_root_settlement_witness_not_authorized"
+  | "projection_replay_certificate_store_root_settlement_witness_replay_invalid"
+  | "projection_replay_certificate_store_root_settlement_witness_tenant_mismatch"
+  | "projection_replay_certificate_store_root_settlement_conflicting_root"
+  | "projection_replay_certificate_store_root_settlement_no_valid_witnesses"
+  | "projection_replay_certificate_store_root_settlement_quorum_not_met";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementPolicy {
+  readonly requiredWitnesses: number;
+  readonly minimumWitnesses?: number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessLedgerSnapshot {
+  readonly witnessId: string;
+  readonly replay: ProjectionReplayCertificateStoreRootWitnessLedgerReplay;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementAllowedAction =
+  | "collect_more_witnesses"
+  | "resolve_root_conflict"
+  | "correct_settlement_policy"
+  | "correct_authority_topology";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlement {
+  readonly tenantId: TenantId;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStatus;
+  readonly acceptedWitnessIds: readonly string[];
+  readonly obstructingWitnessIds: readonly string[];
+  readonly invalidWitnessIds: readonly string[];
+  readonly eligibleWitnessIds?: readonly string[];
+  readonly authorityTopologyHash?: string;
+  readonly requiredWitnesses: number;
+  readonly minimumWitnesses: number;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementIssue[];
+  readonly authorityBoundary: "projection_replay_certificate_store_root_witness_settlement";
+  readonly allowedAction?: ProjectionReplayCertificateStoreRootWitnessSettlementAllowedAction;
+  readonly settlementHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionAppendInput {
+  readonly tenantId: TenantId | string;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromRootSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly reason?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionStore {
+  appendProjectionReplayCertificateStoreRootWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessAuthorityTransition>;
+
+  listProjectionReplayCertificateStoreRootWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessAuthorityTransition[]
+  >;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRecord {
+  readonly tenantId: TenantId;
+  readonly settlementSequence: number;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+  readonly settlement: ProjectionReplayCertificateStoreRootWitnessSettlement;
+  readonly previousSettlementRecordHash?: string;
+  readonly recordedAt: Timestamp | string;
+  readonly settlementRecordHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead {
+  readonly tenantId: TenantId;
+  readonly settlementSequence: number;
+  readonly settlementRecordHash: string;
+  readonly recordedAt: Timestamp | string;
+  readonly headHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof {
+  readonly tenantId: TenantId | string;
+  readonly fromHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly toHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecord[];
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_fork"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_regression"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObstructionArtifact {
+  readonly artifactId: string;
+  readonly tenantId: TenantId;
+  readonly generatedAt: Timestamp | string;
+  readonly observerId: string;
+  readonly observedHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly conflictingHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[];
+  readonly allowedAction: "request_settlement_store_head_consistency_proof";
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature {
+  readonly principalId: string;
+  readonly keyId: string;
+  readonly algorithm: string;
+  readonly payloadHash: string;
+  readonly signature: string;
+  readonly signedAt?: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureVerificationInput {
+  readonly tenantId: TenantId | string;
+  readonly principalId: string;
+  readonly keyId: string;
+  readonly algorithm: string;
+  readonly payloadHash: string;
+  readonly signature: string;
+  readonly signedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureVerifier = (
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureVerificationInput,
+) => boolean;
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy {
+  readonly required: boolean;
+  readonly verifier: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureVerifier;
+  readonly authorityTopology?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopology;
+  readonly pruningTombstoneHeadAuthorityTopology?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTopology;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessStatus =
+  | "accepted_initial"
+  | "accepted_duplicate"
+  | "accepted_advance"
+  | "obstructed";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput {
+  readonly tenantId: TenantId | string;
+  readonly observerId: string;
+  readonly observedAt: Timestamp | string;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly consistencyProof?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision {
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessStatus;
+  readonly observerId: string;
+  readonly observedHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[];
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[];
+  readonly obstruction?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObstructionArtifact;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitness {
+  observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision>;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord {
+  readonly tenantId: TenantId;
+  readonly witnessSequence: number;
+  readonly observerId: string;
+  readonly observedAt: Timestamp | string;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly consistencyProof?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision;
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessStatus;
+  readonly previousObservationHash?: string;
+  readonly observationHash: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordInput {
+  readonly witnessSequence: number;
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision;
+  readonly previousObservationHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_compaction_checkpoint_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_decision_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_principal_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_payload_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_principal_not_authorized"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_key_not_current"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_key_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[];
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[]
+  >;
+
+  pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number>;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionKind =
+  | ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind
+  | "rotate_signature_key"
+  | "revoke_signature_key"
+  | "seal_authority_epoch";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalStatus =
+  ProjectionReplayCertificateStoreRootWitnessPrincipalStatus;
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatus =
+  | "active"
+  | "revoked";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionInput {
+  readonly tenantId: TenantId | string;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromSettlementSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly sealedThroughSettlementSequence?: number;
+  readonly sealedAuthorityTopologyHash?: string;
+  readonly sealedQuorumCertificateHash?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly reason?: string;
+  readonly previousAuthorityHash?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition {
+  readonly tenantId: TenantId;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromSettlementSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly sealedThroughSettlementSequence?: number;
+  readonly sealedAuthorityTopologyHash?: string;
+  readonly sealedQuorumCertificateHash?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly reason?: string;
+  readonly previousAuthorityHash?: string;
+  readonly authorityHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionAppendInput {
+  readonly tenantId: TenantId | string;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromSettlementSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly sealedThroughSettlementSequence?: number;
+  readonly sealedAuthorityTopologyHash?: string;
+  readonly sealedQuorumCertificateHash?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly reason?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionStore {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[]
+  >;
+
+  pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number>;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_compaction_checkpoint_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_transition_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_witness_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_quorum_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_quorum_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_transition_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_epoch_seal_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_retroactive_transition"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_principal_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_payload_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_principal_not_authorized"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_not_current"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalState {
+  readonly tenantId: TenantId;
+  readonly witnessId: string;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalStatus;
+  readonly validFromSettlementSequence: number;
+  readonly changedAtAuthoritySequence: number;
+  readonly admittedAt?: Timestamp | string;
+  readonly admittedBy?: string;
+  readonly statusChangedAt?: Timestamp | string;
+  readonly statusChangedBy?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signatureKeyStatus?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatus;
+  readonly signatureKeyChangedAtAuthoritySequence?: number;
+  readonly signatureKeyChangedAt?: Timestamp | string;
+  readonly signatureKeyChangedBy?: string;
+  readonly reason?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopology {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly settlementSequence: number;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly effectiveAuthorityHash?: string;
+  readonly sealedThroughSettlementSequence?: number;
+  readonly eligibleWitnessIds: readonly string[];
+  readonly principals: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalState[];
+  readonly authorityEpochSeals: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityEpochSeal[];
+  readonly transitions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[];
+  readonly latestAuthorityHash?: string;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityEpochSeal {
+  readonly tenantId: TenantId;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly sealedThroughSettlementSequence: number;
+  readonly sealedAuthorityTopologyHash: string;
+  readonly sealedQuorumCertificateHash: string;
+  readonly authorityHash: string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateStatus =
+  | "provisional"
+  | "witnessed"
+  | "certified"
+  | "obstructed";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_invalid_policy"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_head_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_authority_topology_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_policy_authority_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_replay_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_not_authorized"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_conflicting_head"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_no_valid_witnesses"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_not_met";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumPolicy {
+  readonly requiredWitnesses: number;
+  readonly minimumWitnesses?: number;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateAllowedAction =
+  | "collect_more_head_witnesses"
+  | "resolve_settlement_store_head_conflict"
+  | "correct_head_witness_policy"
+  | "correct_head_witness_authority_topology";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate {
+  readonly tenantId: TenantId;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateStatus;
+  readonly certified: boolean;
+  readonly acceptedWitnessIds: readonly string[];
+  readonly obstructingWitnessIds: readonly string[];
+  readonly invalidWitnessIds: readonly string[];
+  readonly eligibleWitnessIds?: readonly string[];
+  readonly authorityTopologyHash?: string;
+  readonly requiredWitnesses: number;
+  readonly minimumWitnesses: number;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateIssue[];
+  readonly authorityBoundary: "projection_replay_settlement_store_head_witness_quorum";
+  readonly allowedAction?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateAllowedAction;
+  readonly quorumCertificateHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence {
+  readonly witnessId: string;
+  readonly witnessSequence: number;
+  readonly observationHash: string;
+  readonly observedAt: Timestamp | string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord {
+  readonly tenantId: TenantId;
+  readonly quorumCertificateSequence: number;
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate;
+  readonly acceptedWitnessEvidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence[];
+  readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+  readonly previousQuorumCertificateRecordHash?: string;
+  readonly quorumCertificateRecordHash: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordInput {
+  readonly quorumCertificateSequence: number;
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate;
+  readonly acceptedWitnessEvidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence[];
+  readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+  readonly previousQuorumCertificateRecordHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_certificate_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_witness_evidence_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_key_not_current"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_authority_seal_mismatch";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[];
+  readonly latestCertifiedRecord?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointWitnessLedgerSnapshot {
+  readonly tenantId: TenantId;
+  readonly compactedThroughWitnessSequence: number;
+  readonly compactedThroughObservationHash: string;
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAuthorityTopologySnapshot {
+  readonly tenantId: TenantId;
+  readonly settlementSequence: number;
+  readonly compactedThroughAuthoritySequence: number;
+  readonly compactedThroughAuthorityHash: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly effectiveAuthorityHash?: string;
+  readonly sealedThroughSettlementSequence?: number;
+  readonly principals: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalState[];
+  readonly authorityEpochSeals: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityEpochSeal[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointQuorumCertificateRecordSnapshot {
+  readonly tenantId: TenantId;
+  readonly compactedThroughQuorumCertificateSequence: number;
+  readonly compactedThroughQuorumCertificateRecordHash: string;
+  readonly latestCertifiedRecord?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint {
+  readonly tenantId: TenantId;
+  readonly checkpointId: string;
+  readonly recordedAt: Timestamp | string;
+  readonly witnessLedger?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointWitnessLedgerSnapshot;
+  readonly authorityTopology?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAuthorityTopologySnapshot;
+  readonly quorumCertificateRecords?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointQuorumCertificateRecordSnapshot;
+  readonly checkpointHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointInput {
+  readonly tenantId: TenantId | string;
+  readonly checkpointId: string;
+  readonly recordedAt: Timestamp | string;
+  readonly witnessLedger?: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointWitnessLedgerSnapshot,
+    "tenantId"
+  >;
+  readonly authorityTopology?: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAuthorityTopologySnapshot,
+    "tenantId"
+  >;
+  readonly quorumCertificateRecords?: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointQuorumCertificateRecordSnapshot,
+    "tenantId"
+  >;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionStatus =
+  | "provisional"
+  | "admitted"
+  | "obstructed";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_checkpoint_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_authority_topology_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_invalid_policy"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_witness_not_authorized"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_duplicate_witness"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_principal_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_payload_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_key_not_current"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_key_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_quorum_not_met";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessEvidence {
+  readonly witnessId: string;
+  readonly checkpointHash: string;
+  readonly witnessedAt: Timestamp | string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate {
+  readonly tenantId: TenantId;
+  readonly checkpointHash: string;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionStatus;
+  readonly admitted: boolean;
+  readonly acceptedWitnessIds: readonly string[];
+  readonly invalidWitnessIds: readonly string[];
+  readonly authorityTopologyHash?: string;
+  readonly requiredWitnesses: number;
+  readonly minimumWitnesses: number;
+  readonly witnessEvidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessEvidence[];
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionIssue[];
+  readonly authorityBoundary: "projection_replay_settlement_head_witness_compaction_checkpoint_admission";
+  readonly checkpointAdmissionHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord {
+  readonly tenantId: TenantId;
+  readonly checkpointAdmissionSequence: number;
+  readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+  readonly previousCheckpointAdmissionRecordHash?: string;
+  readonly checkpointAdmissionRecordHash: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordInput {
+  readonly checkpointAdmissionSequence: number;
+  readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+  readonly previousCheckpointAdmissionRecordHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_checkpoint_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_admission_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_admission_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_checkpoint_conflict"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_hash_mismatch";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord[];
+  readonly latestAdmissionRecord?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(input: {
+    readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+    readonly admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+    readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord[]
+  >;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane =
+  | "witness_ledger"
+  | "authority_topology"
+  | "quorum_certificate_records";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionStatus =
+  | "admitted"
+  | "obstructed";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_record_replay_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_record_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_invalid_policy"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_witness_suffix_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_authority_suffix_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_quorum_certificate_suffix_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_checkpoint_lane_missing";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission {
+  readonly tenantId: TenantId;
+  readonly checkpointId: string;
+  readonly checkpointHash: string;
+  readonly checkpointAdmissionRecordHash: string;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionStatus;
+  readonly admitted: boolean;
+  readonly lanes: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane[];
+  readonly witnessSuffixRecordCount: number;
+  readonly authoritySuffixTransitionCount: number;
+  readonly quorumCertificateSuffixRecordCount: number;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionIssue[];
+  readonly authorityBoundary: "projection_replay_settlement_head_witness_compaction_pruning_admission";
+  readonly pruningAdmissionHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier {
+  readonly lane: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane;
+  readonly compactedThroughSequence: number;
+  readonly compactedThroughHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord {
+  readonly tenantId: TenantId;
+  readonly pruningTombstoneSequence: number;
+  readonly checkpointAdmissionRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+  readonly pruningAdmission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission;
+  readonly prunedFrontiers: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier[];
+  readonly previousPruningTombstoneRecordHash?: string;
+  readonly pruningTombstoneRecordHash: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordInput {
+  readonly pruningTombstoneSequence: number;
+  readonly checkpointAdmissionRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+  readonly pruningAdmission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission;
+  readonly previousPruningTombstoneRecordHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_pruning_admission_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_pruning_admission_not_admitted"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_checkpoint_admission_record_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_checkpoint_admission_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_checkpoint_admission_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_frontier_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_frontier_regression"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_hash_mismatch";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[];
+  readonly latestTombstoneRecord?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  readonly latestPrunedFrontiers: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier[];
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead {
+  readonly tenantId: TenantId;
+  readonly pruningTombstoneSequence: number;
+  readonly pruningTombstoneRecordHash: string;
+  readonly recordedAt: Timestamp | string;
+  readonly headHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof {
+  readonly tenantId: TenantId | string;
+  readonly fromHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly toHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[];
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_fork"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_regression"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObstructionArtifact {
+  readonly artifactId: string;
+  readonly tenantId: TenantId;
+  readonly generatedAt: Timestamp | string;
+  readonly observerId: string;
+  readonly observedHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly conflictingHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[];
+  readonly allowedAction: "request_pruning_tombstone_store_head_consistency_proof";
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessStatus =
+  | "accepted_initial"
+  | "accepted_duplicate"
+  | "accepted_advance"
+  | "obstructed";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput {
+  readonly tenantId: TenantId | string;
+  readonly observerId: string;
+  readonly observedAt: Timestamp | string;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly consistencyProof?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision {
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessStatus;
+  readonly observerId: string;
+  readonly observedHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[];
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[];
+  readonly obstruction?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObstructionArtifact;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness {
+  observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision>;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord {
+  readonly tenantId: TenantId;
+  readonly witnessSequence: number;
+  readonly observerId: string;
+  readonly observedAt: Timestamp | string;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly consistencyProof?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision;
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessStatus;
+  readonly previousObservationHash?: string;
+  readonly observationHash: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordInput {
+  readonly witnessSequence: number;
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision;
+  readonly previousObservationHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_decision_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_principal_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_payload_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_principal_not_authorized"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_not_current"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[];
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[];
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[]
+  >;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionKind =
+  | ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind
+  | "seal_authority_epoch";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalStatus =
+  ProjectionReplayCertificateStoreRootWitnessPrincipalStatus;
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionInput {
+  readonly tenantId: TenantId | string;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromPruningTombstoneSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly sealedThroughPruningTombstoneSequence?: number;
+  readonly sealedAuthorityTopologyHash?: string;
+  readonly sealedQuorumCertificateHash?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly reason?: string;
+  readonly previousAuthorityHash?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition {
+  readonly tenantId: TenantId;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromPruningTombstoneSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly sealedThroughPruningTombstoneSequence?: number;
+  readonly sealedAuthorityTopologyHash?: string;
+  readonly sealedQuorumCertificateHash?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly reason?: string;
+  readonly previousAuthorityHash?: string;
+  readonly authorityHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionAppendInput {
+  readonly tenantId: TenantId | string;
+  readonly transitionId: string;
+  readonly transitionKind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionKind;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly effectiveFromPruningTombstoneSequence: number;
+  readonly witnessId?: string;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly sealedThroughPruningTombstoneSequence?: number;
+  readonly sealedAuthorityTopologyHash?: string;
+  readonly sealedQuorumCertificateHash?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly reason?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[]
+  >;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_transition_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_witness_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_quorum_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_quorum_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_retroactive_transition"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_principal_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_payload_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_principal_not_authorized"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_key_not_current"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_key_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_invalid";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalState {
+  readonly tenantId: TenantId;
+  readonly witnessId: string;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalStatus;
+  readonly validFromPruningTombstoneSequence: number;
+  readonly changedAtAuthoritySequence: number;
+  readonly admittedAt?: Timestamp | string;
+  readonly admittedBy?: string;
+  readonly statusChangedAt?: Timestamp | string;
+  readonly statusChangedBy?: string;
+  readonly signatureKeyId?: string;
+  readonly signatureAlgorithm?: string;
+  readonly signaturePublicKeyFingerprint?: string;
+  readonly signatureKeyStatus?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatus;
+  readonly signatureKeyChangedAtAuthoritySequence?: number;
+  readonly signatureKeyChangedAt?: Timestamp | string;
+  readonly signatureKeyChangedBy?: string;
+  readonly reason?: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityEpochSeal {
+  readonly tenantId: TenantId;
+  readonly authoritySequence: number;
+  readonly transitionId: string;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly sealedThroughPruningTombstoneSequence: number;
+  readonly sealedAuthorityTopologyHash: string;
+  readonly sealedQuorumCertificateHash: string;
+  readonly authorityHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTopology {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly pruningTombstoneSequence: number;
+  readonly requiredWitnesses?: number;
+  readonly minimumWitnesses?: number;
+  readonly effectiveAuthorityHash?: string;
+  readonly sealedThroughPruningTombstoneSequence?: number;
+  readonly eligibleWitnessIds: readonly string[];
+  readonly principals: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalState[];
+  readonly authorityEpochSeals: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityEpochSeal[];
+  readonly transitions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[];
+  readonly latestAuthorityHash?: string;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityIssue[];
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateStatus =
+  | "provisional"
+  | "witnessed"
+  | "certified"
+  | "obstructed";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_invalid_policy"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_head_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_authority_topology_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_policy_authority_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_replay_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_not_authorized"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_conflicting_head"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_no_valid_witnesses"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_not_met";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumPolicy {
+  readonly requiredWitnesses: number;
+  readonly minimumWitnesses?: number;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateAllowedAction =
+  | "collect_more_tombstone_head_witnesses"
+  | "resolve_pruning_tombstone_store_head_conflict"
+  | "correct_tombstone_head_witness_policy"
+  | "correct_tombstone_head_witness_authority_topology";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate {
+  readonly tenantId: TenantId;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateStatus;
+  readonly certified: boolean;
+  readonly acceptedWitnessIds: readonly string[];
+  readonly obstructingWitnessIds: readonly string[];
+  readonly invalidWitnessIds: readonly string[];
+  readonly eligibleWitnessIds?: readonly string[];
+  readonly authorityTopologyHash?: string;
+  readonly requiredWitnesses: number;
+  readonly minimumWitnesses: number;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateIssue[];
+  readonly authorityBoundary: "projection_replay_pruning_tombstone_store_head_witness_quorum";
+  readonly allowedAction?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateAllowedAction;
+  readonly quorumCertificateHash: string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence {
+  readonly witnessId: string;
+  readonly witnessSequence: number;
+  readonly observationHash: string;
+  readonly observedAt: Timestamp | string;
+  readonly signature?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord {
+  readonly tenantId: TenantId;
+  readonly quorumCertificateSequence: number;
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate;
+  readonly acceptedWitnessEvidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence[];
+  readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+  readonly previousQuorumCertificateRecordHash?: string;
+  readonly quorumCertificateRecordHash: string;
+  readonly recordedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordInput {
+  readonly quorumCertificateSequence: number;
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate;
+  readonly acceptedWitnessEvidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence[];
+  readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+  readonly previousQuorumCertificateRecordHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_certificate_not_certified"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_certificate_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_witness_evidence_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_authority_seal_mismatch";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord[];
+  readonly latestCertifiedRecord?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordIssue[];
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuityIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_replay_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_stale"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_fork"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_unwitnessed_advance"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_witness_suffix_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_authority_suffix_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_quorum_certificate_suffix_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_witness_suffix_truncated"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_authority_suffix_truncated"
+  | "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_quorum_certificate_suffix_truncated";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuityIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuityIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuity {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly latestTombstoneRecord?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  readonly tombstoneStoreHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuityIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(input: {
+    readonly checkpointAdmissionRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+    readonly pruningAdmission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission;
+    readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[]
+  >;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordStore {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(input: {
+    readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate;
+    readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+    readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+    readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[]
+  >;
+
+  pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number>;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(input: {
+    readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate;
+    readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[];
+    readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+    readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord[]
+  >;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRef {
+  readonly rootSequence: number;
+  readonly rootHash: string;
+  readonly settlementSequence: number;
+  readonly settlementStatus: "settled";
+  readonly settlementHash: string;
+  readonly settlementRecordHash: string;
+  readonly authorityTopologyHash?: string;
+  readonly checkedAt: Timestamp | string;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRecordInput {
+  readonly settlementSequence: number;
+  readonly settlement: ProjectionReplayCertificateStoreRootWitnessSettlement;
+  readonly previousSettlementRecordHash?: string;
+  readonly recordedAt?: Timestamp | string;
+}
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementRecordIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_record_tenant_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_record_sequence_gap"
+  | "projection_replay_certificate_store_root_witness_settlement_record_previous_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_record_root_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_record_settlement_hash_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_record_hash_mismatch";
+
+export type ProjectionReplayCertificateStoreRootWitnessSettlementRefIssueCode =
+  | "projection_replay_certificate_store_root_witness_settlement_ref_missing"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_ledger_invalid"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_root_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_not_settled"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_stale"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_conflict"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_below_currentness_frontier"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_authority_topology_mismatch"
+  | "projection_replay_certificate_store_root_witness_settlement_ref_store_head_mismatch";
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementCurrentnessPolicy {
+  readonly requireLatestSettledRoot?: boolean;
+  readonly requireLatestSettlementForRoot?: boolean;
+  readonly disallowLaterConflictingRoot?: boolean;
+  readonly disallowLaterObstruction?: boolean;
+  readonly minimumSettlementSequence?: number;
+  readonly requiredAuthorityTopologyHash?: string;
+  readonly requiredSettlementStoreHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRecordIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementRecordIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRefIssue {
+  readonly code: ProjectionReplayCertificateStoreRootWitnessSettlementRefIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRecordReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecord[];
+  readonly settledRoots: readonly ProjectionReplayCertificateStoreRoot[];
+  readonly latestSettledRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly settlementStoreHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecordIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRefVerificationInput {
+  readonly tenantId: TenantId | string;
+  readonly ref: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
+  readonly root?: ProjectionReplayCertificateStoreRoot;
+  readonly currentnessPolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementCurrentnessPolicy;
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementRefVerification {
+  readonly valid: boolean;
+  readonly ref: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
+  readonly record?: ProjectionReplayCertificateStoreRootWitnessSettlementRecord;
+  readonly replay: ProjectionReplayCertificateStoreRootWitnessSettlementRecordReplay;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementRefIssue[];
+}
+
+export interface ProjectionReplayCertificateStoreRootWitnessSettlementStore {
+  appendProjectionReplayCertificateStoreRootWitnessSettlementRecord(input: {
+    readonly settlement: ProjectionReplayCertificateStoreRootWitnessSettlement;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementRecord>;
+
+  listProjectionReplayCertificateStoreRootWitnessSettlementRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecord[]
+  >;
+
+  getProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead | null>;
+
+  verifyProjectionReplayCertificateStoreRootWitnessSettlementRef(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementRefVerificationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementRefVerification>;
 }
 
 export interface LocalStateField {
@@ -680,6 +2578,8 @@ export interface ActionOutcomeInvariantCore {
   readonly providerCertificateId?: string;
   readonly providerCertificateDigest?: string;
   readonly providerCertificateStatusRef?: ActionOutcomeProviderCertificateStatusRef;
+  readonly projectionReplayRef?: ProjectionReplayCertificateRef;
+  readonly projectionReplayRootSettlementRef?: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
   readonly evidenceAdmissionReviewIds: readonly string[];
   readonly statusCheckRefs: readonly StateRef[];
   readonly blockingCauseCodes: readonly string[];
@@ -868,6 +2768,15 @@ export function buildActionOutcomeEnvelope(
     ...(input.providerCertificateStatusRef !== undefined
       ? { providerCertificateStatusRef: input.providerCertificateStatusRef }
       : {}),
+    ...(input.projectionReplayRef !== undefined
+      ? { projectionReplayRef: input.projectionReplayRef }
+      : {}),
+    ...(input.projectionReplayRootSettlementRef !== undefined
+      ? {
+          projectionReplayRootSettlementRef:
+            input.projectionReplayRootSettlementRef,
+        }
+      : {}),
     ...(input.policyTransitionRef !== undefined
       ? { policyTransitionRef: input.policyTransitionRef }
       : {}),
@@ -974,6 +2883,15 @@ export function promoteWorkflowInvocationOutcomeEnvelope(
       : {}),
     ...(workflowEnvelope.providerCertificateStatusRef !== undefined
       ? { providerCertificateStatusRef: workflowEnvelope.providerCertificateStatusRef }
+      : {}),
+    ...(workflowEnvelope.projectionReplayRef !== undefined
+      ? { projectionReplayRef: workflowEnvelope.projectionReplayRef }
+      : {}),
+    ...(workflowEnvelope.projectionReplayRootSettlementRef !== undefined
+      ? {
+          projectionReplayRootSettlementRef:
+            workflowEnvelope.projectionReplayRootSettlementRef,
+        }
       : {}),
     ...(input.policyTransitionRef !== undefined
       ? { policyTransitionRef: input.policyTransitionRef }
@@ -1155,6 +3073,13250 @@ export function recoverActionOutcomeBySubstrateRef(
   );
 }
 
+export function buildProjectionReplayCertificate(
+  view: CurrentStateView,
+  input: ProjectionReplayCertificateInput,
+): ProjectionReplayCertificate {
+  const transitionRefs = input.transitionRefs.map((transition) => ({
+    ref: transition.ref,
+    ...(transition.sequence !== undefined ? { sequence: transition.sequence } : {}),
+    ...(transition.contentHash !== undefined
+      ? { contentHash: transition.contentHash }
+      : {}),
+    ...(transition.admittedAt !== undefined ? { admittedAt: transition.admittedAt } : {}),
+    ...(transition.authority !== undefined ? { authority: transition.authority } : {}),
+  }));
+  const authorityScope = input.authorityScope ?? view.authorityRule;
+  const projectionHash = computeCurrentStateViewIdentityHash(view);
+  const transitionHistoryHash =
+    computeProjectionReplayTransitionHistoryHash(transitionRefs);
+  const certificateId =
+    input.certificateId ??
+    `projection_replay_${fingerprint64(
+      canonicalStringify({
+        tenantId: view.tenantId,
+        subject: view.subject,
+        ...(input.projectionName !== undefined
+          ? { projectionName: input.projectionName }
+          : {}),
+        authorityScope,
+        projectionVersion: view.projectionVersion,
+        transitionHistoryHash,
+        projectionHash,
+      }),
+    ).slice(0, 32)}`;
+  const payload: Omit<ProjectionReplayCertificate, "certificateHash"> = {
+    schemaVersion: PROJECTION_REPLAY_CERTIFICATE_SCHEMA_VERSION,
+    certificateId,
+    tenantId: view.tenantId,
+    subject: view.subject,
+    ...(input.projectionName !== undefined
+      ? { projectionName: input.projectionName }
+      : {}),
+    authorityScope,
+    ...(view.projectionVersion !== undefined
+      ? { projectionVersion: view.projectionVersion }
+      : {}),
+    replayedAt: input.replayedAt,
+    replayedBy: input.replayedBy,
+    ...(input.replayedToPosition !== undefined
+      ? { replayedToPosition: input.replayedToPosition }
+      : {}),
+    sourceRefs: uniqueStateRefs(view.sourceRefs),
+    transitionRefs,
+    transitionHistoryHash,
+    projectionHash,
+  };
+
+  return {
+    ...payload,
+    certificateHash: computeProjectionReplayCertificateHash(payload),
+  };
+}
+
+export function buildProjectionReplayCertificateFromFrontier(
+  view: CurrentStateView,
+  input: ProjectionReplayCertificateFromFrontierInput,
+): ProjectionReplayCertificate {
+  const { frontier } = input;
+  if (frontier.tenantId !== view.tenantId) {
+    throw new Error(
+      `projection replay frontier tenant ${frontier.tenantId} does not match current state view tenant ${view.tenantId}`,
+    );
+  }
+  if (frontier.projectionVersion !== view.projectionVersion) {
+    throw new Error(
+      `projection replay frontier version ${frontier.projectionVersion} does not match current state view version ${view.projectionVersion ?? "none"}`,
+    );
+  }
+
+  return buildProjectionReplayCertificate(view, {
+    ...(input.certificateId !== undefined
+      ? { certificateId: input.certificateId }
+      : {}),
+    ...(input.authorityScope !== undefined
+      ? { authorityScope: input.authorityScope }
+      : {}),
+    projectionName: frontier.projectionName,
+    replayedAt: input.replayedAt,
+    replayedBy: input.replayedBy ?? `projection:${frontier.projectionName}`,
+    replayedToPosition: frontier.replayedToPosition,
+    transitionRefs: frontier.transitionEvents.map((event) => ({
+      ref: stateRef("event", event.eventId),
+      ...(event.sequence !== undefined ? { sequence: event.sequence } : {}),
+      ...(event.contentHash !== undefined && event.contentHash !== null
+        ? { contentHash: event.contentHash }
+        : {}),
+      ...(event.recordedAt !== undefined ? { admittedAt: event.recordedAt } : {}),
+      ...(event.authority !== undefined && event.authority !== null
+        ? { authority: event.authority }
+        : {}),
+    })),
+  });
+}
+
+export function computeCurrentStateViewIdentityHash(
+  view: CurrentStateView,
+): string {
+  const {
+    replayCertificate: _replayCertificate,
+    ...viewWithoutReplayCertificate
+  } = view;
+  return fingerprint64(canonicalStringify(viewWithoutReplayCertificate));
+}
+
+export function computeProjectionReplayTransitionHistoryHash(
+  transitionRefs: readonly ProjectionReplayTransitionRef[],
+): string {
+  return fingerprint64(canonicalStringify(transitionRefs));
+}
+
+export function computeProjectionReplayCertificateHash(
+  certificate: Omit<ProjectionReplayCertificate, "certificateHash">,
+): string {
+  return fingerprint64(canonicalStringify(certificate));
+}
+
+export function verifyProjectionReplayCertificateHash(
+  certificate: ProjectionReplayCertificate,
+): StateReviewArtifactHashValidation {
+  const { certificateHash, ...payload } = certificate;
+  const expectedHash = computeProjectionReplayCertificateHash(payload);
+  return {
+    valid: certificateHash === expectedHash,
+    expectedHash,
+    actualHash: certificateHash,
+  };
+}
+
+export function evaluateProjectionReplayCertificate(
+  view: CurrentStateView,
+  options: ProjectionReplayCertificateEvaluationOptions = {},
+): ProjectionReplayCertificateEvaluation {
+  const certificate = view.replayCertificate;
+  if (certificate === undefined) {
+    return {
+      valid: false,
+      issues: [
+        {
+          code: "projection_replay_certificate_missing",
+          path: "/replayCertificate",
+          message:
+            "CurrentStateView cannot authorize action without a replay certificate when replay proof is required.",
+          ref: view.subject,
+        },
+      ],
+    };
+  }
+  return evaluateProjectionReplayCertificateAgainstView(
+    certificate,
+    view,
+    options,
+  );
+}
+
+export function evaluateProjectionReplayCertificateAgainstView(
+  certificate: ProjectionReplayCertificate,
+  view: CurrentStateView,
+  options: ProjectionReplayCertificateEvaluationOptions = {},
+): ProjectionReplayCertificateEvaluation {
+  const issues: ProjectionReplayCertificateIssue[] = [];
+  const hashValidation = verifyProjectionReplayCertificateHash(certificate);
+
+  if (!hashValidation.valid) {
+    issues.push({
+      code: "projection_replay_certificate_hash_mismatch",
+      path: "/replayCertificate/certificateHash",
+      message: `Projection replay certificate hash ${hashValidation.actualHash} does not match recomputed hash ${hashValidation.expectedHash}.`,
+      ref: view.subject,
+    });
+  }
+  if (certificate.tenantId !== view.tenantId) {
+    issues.push({
+      code: "projection_replay_tenant_mismatch",
+      path: "/replayCertificate/tenantId",
+      message: `Projection replay certificate tenant ${certificate.tenantId} does not match current state view tenant ${view.tenantId}.`,
+      ref: view.subject,
+    });
+  }
+  if (!sameStateRef(certificate.subject, view.subject)) {
+    issues.push({
+      code: "projection_replay_subject_mismatch",
+      path: "/replayCertificate/subject",
+      message: `Projection replay certificate subject ${formatStateRef(certificate.subject)} does not match current state view subject ${formatStateRef(view.subject)}.`,
+      ref: certificate.subject,
+    });
+  }
+  if (certificate.projectionVersion !== view.projectionVersion) {
+    issues.push({
+      code: "projection_replay_version_mismatch",
+      path: "/replayCertificate/projectionVersion",
+      message: `Projection replay certificate version ${certificate.projectionVersion} does not match current state view version ${view.projectionVersion}.`,
+      ref: view.subject,
+    });
+  }
+
+  const expectedAuthorityScope =
+    options.expectedAuthorityScope ?? view.authorityRule;
+  if (certificate.authorityScope !== expectedAuthorityScope) {
+    issues.push({
+      code: "projection_replay_authority_scope_mismatch",
+      path: "/replayCertificate/authorityScope",
+      message: `Projection replay certificate authority scope ${certificate.authorityScope} does not match expected scope ${expectedAuthorityScope}.`,
+      ref: view.subject,
+    });
+  }
+
+  if (!sameStateRefSet(certificate.sourceRefs, view.sourceRefs)) {
+    issues.push({
+      code: "projection_replay_source_refs_mismatch",
+      path: "/replayCertificate/sourceRefs",
+      message:
+        "Projection replay certificate source refs do not match the current state view source refs.",
+      ref: view.subject,
+    });
+  }
+
+  const projectionHash = computeCurrentStateViewIdentityHash(view);
+  if (certificate.projectionHash !== projectionHash) {
+    issues.push({
+      code: "projection_replay_projection_hash_mismatch",
+      path: "/replayCertificate/projectionHash",
+      message: `Projection replay certificate projection hash ${certificate.projectionHash} does not match current state view projection hash ${projectionHash}.`,
+      ref: view.subject,
+    });
+  }
+
+  const transitionHistoryHash =
+    computeProjectionReplayTransitionHistoryHash(certificate.transitionRefs);
+  if (certificate.transitionHistoryHash !== transitionHistoryHash) {
+    issues.push({
+      code: "projection_replay_transition_history_hash_mismatch",
+      path: "/replayCertificate/transitionHistoryHash",
+      message: `Projection replay certificate transition history hash ${certificate.transitionHistoryHash} does not match recomputed hash ${transitionHistoryHash}.`,
+      ref: view.subject,
+    });
+  }
+
+  if (certificate.transitionRefs.length === 0) {
+    issues.push({
+      code: "projection_replay_transition_history_empty",
+      path: "/replayCertificate/transitionRefs",
+      message:
+        "Projection replay certificate must cite at least one admitted transition ref.",
+      ref: view.subject,
+    });
+  }
+  for (const [index, transition] of certificate.transitionRefs.entries()) {
+    if (!isProjectionReplayTransitionRefKind(transition.ref.kind)) {
+      issues.push({
+        code: "projection_replay_transition_kind_invalid",
+        path: `/replayCertificate/transitionRefs/${index}/ref/kind`,
+        message: `Projection replay transition ref kind ${transition.ref.kind} is not an admitted transition kind.`,
+        ref: transition.ref,
+      });
+    }
+    if (
+      options.requireTransitionContentHash === true &&
+      (transition.contentHash === undefined ||
+        transition.contentHash.trim() === "")
+    ) {
+      issues.push({
+        code: "projection_replay_transition_hash_missing",
+        path: `/replayCertificate/transitionRefs/${index}/contentHash`,
+        message:
+          "Projection replay transition ref requires a content hash under the configured replay policy.",
+        ref: transition.ref,
+      });
+    }
+  }
+
+  if (
+    options.minimumReplayPosition !== undefined &&
+    (certificate.replayedToPosition === undefined ||
+      certificate.replayedToPosition < options.minimumReplayPosition)
+  ) {
+    issues.push({
+      code: "projection_replay_position_regression",
+      path: "/replayCertificate/replayedToPosition",
+      message: `Projection replay certificate position ${certificate.replayedToPosition ?? "unknown"} is behind required position ${options.minimumReplayPosition}.`,
+      ref: view.subject,
+    });
+  }
+
+  return {
+    certificateId: certificate.certificateId,
+    valid: issues.length === 0,
+    issues,
+  };
+}
+
+export function buildProjectionReplayCertificateRef(
+  certificate: ProjectionReplayCertificate,
+  input: {
+    readonly checkedAt: Timestamp | string;
+    readonly projectionName?: string;
+    readonly storeSequence?: number;
+    readonly storeEntryHash?: string;
+    readonly storeRootHash?: string;
+  },
+): ProjectionReplayCertificateRef {
+  const projectionName = certificate.projectionName;
+  if (projectionName === undefined || projectionName.trim() === "") {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} cannot form a write ref without projectionName`,
+    );
+  }
+  if (
+    input.projectionName !== undefined &&
+    input.projectionName !== projectionName
+  ) {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} projectionName ${projectionName} does not match requested ref projectionName ${input.projectionName}`,
+    );
+  }
+  if (certificate.projectionVersion === undefined) {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} cannot form a write ref without projectionVersion`,
+    );
+  }
+  if (certificate.replayedToPosition === undefined) {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} cannot form a write ref without replayedToPosition`,
+    );
+  }
+
+  return {
+    certificateId: certificate.certificateId,
+    certificateHash: certificate.certificateHash,
+    projectionName,
+    projectionVersion: certificate.projectionVersion,
+    authorityScope: certificate.authorityScope,
+    replayedToPosition: certificate.replayedToPosition,
+    transitionHistoryHash: certificate.transitionHistoryHash,
+    projectionHash: certificate.projectionHash,
+    ...(input.storeSequence !== undefined
+      ? { certificateStoreSequence: input.storeSequence }
+      : {}),
+    ...(input.storeEntryHash !== undefined
+      ? { certificateStoreEntryHash: input.storeEntryHash }
+      : {}),
+    ...(input.storeRootHash !== undefined
+      ? { certificateStoreRootHash: input.storeRootHash }
+      : {}),
+    checkedAt: input.checkedAt,
+  };
+}
+
+export function buildProjectionReplayCertificateRefFromRecord(
+  record: ProjectionReplayCertificateRecord,
+  input: {
+    readonly checkedAt: Timestamp | string;
+  },
+): ProjectionReplayCertificateRef {
+  return buildProjectionReplayCertificateRef(record.certificate, {
+    checkedAt: input.checkedAt,
+    ...(record.storeSequence !== undefined
+      ? { storeSequence: record.storeSequence }
+      : {}),
+    ...(record.storeEntryHash !== undefined
+      ? { storeEntryHash: record.storeEntryHash }
+      : {}),
+    ...(record.storeRootHash !== undefined
+      ? { storeRootHash: record.storeRootHash }
+      : {}),
+  });
+}
+
+export function buildProjectionReplayCertificateRecord(
+  input: ProjectionReplayCertificateRecordInput,
+): ProjectionReplayCertificateRecord {
+  const { certificate } = input;
+  const hashValidation = verifyProjectionReplayCertificateHash(certificate);
+  if (!hashValidation.valid) {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} failed hash validation: ${hashValidation.actualHash} !== ${hashValidation.expectedHash}`,
+    );
+  }
+
+  const projectionName = certificate.projectionName;
+  if (projectionName === undefined || projectionName.trim() === "") {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} requires projectionName before durable admission`,
+    );
+  }
+  if (
+    input.projectionName !== undefined &&
+    input.projectionName !== projectionName
+  ) {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} projectionName ${projectionName} does not match durable record projectionName ${input.projectionName}`,
+    );
+  }
+  if (certificate.projectionVersion === undefined) {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} requires projectionVersion before durable admission`,
+    );
+  }
+  if (certificate.replayedToPosition === undefined) {
+    throw new Error(
+      `projection replay certificate ${certificate.certificateId} requires replayedToPosition before durable admission`,
+    );
+  }
+
+  return {
+    tenantId: certificate.tenantId,
+    certificateId: certificate.certificateId,
+    certificateHash: certificate.certificateHash,
+    projectionName,
+    subject: certificate.subject,
+    authorityScope: certificate.authorityScope,
+    projectionVersion: certificate.projectionVersion,
+    replayedToPosition: certificate.replayedToPosition,
+    transitionHistoryHash: certificate.transitionHistoryHash,
+    projectionHash: certificate.projectionHash,
+    certificate,
+    recordedAt: input.recordedAt ?? certificate.replayedAt,
+  };
+}
+
+export function buildProjectionReplayCertificateStoreEntry(
+  record: ProjectionReplayCertificateRecord,
+  input: {
+    readonly sequence: number;
+    readonly previousEntryHash?: string;
+    readonly recordedAt?: Timestamp | string;
+  },
+): ProjectionReplayCertificateStoreEntry {
+  if (!Number.isInteger(input.sequence) || input.sequence <= 0) {
+    throw new Error(
+      `projection replay certificate store entry sequence must be a positive integer`,
+    );
+  }
+  if (input.sequence === 1 && input.previousEntryHash !== undefined) {
+    throw new Error(
+      "first projection replay certificate store entry cannot cite a previous hash",
+    );
+  }
+  if (input.sequence > 1 && input.previousEntryHash === undefined) {
+    throw new Error(
+      "projection replay certificate store entry after the first requires a previous hash",
+    );
+  }
+
+  const payload: Omit<ProjectionReplayCertificateStoreEntry, "entryHash"> = {
+    tenantId: record.tenantId,
+    sequence: input.sequence,
+    certificateId: record.certificateId,
+    certificateHash: record.certificateHash,
+    projectionName: record.projectionName,
+    projectionVersion: record.projectionVersion,
+    replayedToPosition: record.replayedToPosition,
+    transitionHistoryHash: record.transitionHistoryHash,
+    projectionHash: record.projectionHash,
+    ...(input.previousEntryHash !== undefined
+      ? { previousEntryHash: input.previousEntryHash }
+      : {}),
+    recordedAt: input.recordedAt ?? record.recordedAt,
+  };
+
+  return {
+    ...payload,
+    entryHash: computeProjectionReplayCertificateStoreEntryHash(payload),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreEntryHash(
+  entry: Omit<ProjectionReplayCertificateStoreEntry, "entryHash">,
+): string {
+  return fingerprint64(canonicalStringify(entry));
+}
+
+export function projectionReplayCertificateStoreRootFromEntry(
+  entry: ProjectionReplayCertificateStoreEntry,
+): ProjectionReplayCertificateStoreRoot {
+  return {
+    tenantId: entry.tenantId,
+    sequence: entry.sequence,
+    rootHash: entry.entryHash,
+    ...(entry.previousEntryHash !== undefined
+      ? { previousRootHash: entry.previousEntryHash }
+      : {}),
+    recordedAt: entry.recordedAt,
+  };
+}
+
+export function attachProjectionReplayCertificateStoreEntry(
+  record: ProjectionReplayCertificateRecord,
+  entry: ProjectionReplayCertificateStoreEntry,
+): ProjectionReplayCertificateRecord {
+  return {
+    ...record,
+    storeSequence: entry.sequence,
+    ...(entry.previousEntryHash !== undefined
+      ? { storePreviousEntryHash: entry.previousEntryHash }
+      : {}),
+    storeEntryHash: entry.entryHash,
+    storeRootHash: entry.entryHash,
+    storeRecordedAt: entry.recordedAt,
+  };
+}
+
+export function projectionReplayCertificateStoreEntryFromRecord(
+  record: ProjectionReplayCertificateRecord,
+): ProjectionReplayCertificateStoreEntry | undefined {
+  if (
+    record.storeSequence === undefined ||
+    record.storeEntryHash === undefined ||
+    record.storeRootHash === undefined ||
+    record.storeRecordedAt === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    tenantId: record.tenantId,
+    sequence: record.storeSequence,
+    certificateId: record.certificateId,
+    certificateHash: record.certificateHash,
+    projectionName: record.projectionName,
+    projectionVersion: record.projectionVersion,
+    replayedToPosition: record.replayedToPosition,
+    transitionHistoryHash: record.transitionHistoryHash,
+    projectionHash: record.projectionHash,
+    ...(record.storePreviousEntryHash !== undefined
+      ? { previousEntryHash: record.storePreviousEntryHash }
+      : {}),
+    recordedAt: record.storeRecordedAt,
+    entryHash: record.storeEntryHash,
+  };
+}
+
+export function verifyProjectionReplayCertificateStoreEntries(input: {
+  readonly tenantId: TenantId | string;
+  readonly entries: readonly ProjectionReplayCertificateStoreEntry[];
+  readonly expectedRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly previousRoot?: ProjectionReplayCertificateStoreRoot;
+}): ProjectionReplayCertificateStoreChainVerification {
+  const issues: ProjectionReplayCertificateStoreChainIssue[] = [];
+  const tenant = String(input.tenantId);
+  const entries = [...input.entries].sort((a, b) => a.sequence - b.sequence);
+  if (entries.length === 0) {
+    issues.push({
+      code: "projection_replay_certificate_store_chain_empty",
+      path: "/entries",
+      message: "projection replay certificate store proof contains no entries",
+    });
+    return { valid: false, issues };
+  }
+
+  let expectedSequence =
+    input.previousRoot === undefined ? 1 : input.previousRoot.sequence + 1;
+  let expectedPreviousHash = input.previousRoot?.rootHash;
+
+  for (const [index, entry] of entries.entries()) {
+    if (String(entry.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_chain_tenant_mismatch",
+        path: `/entries/${index}/tenantId`,
+        message: "projection replay certificate store entry tenant mismatch",
+        expected: tenant,
+        actual: String(entry.tenantId),
+      });
+    }
+    if (entry.sequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_chain_sequence_gap",
+        path: `/entries/${index}/sequence`,
+        message:
+          "projection replay certificate store entries must be contiguous",
+        expected: expectedSequence,
+        actual: entry.sequence,
+      });
+    }
+    if ((entry.previousEntryHash ?? "") !== (expectedPreviousHash ?? "")) {
+      issues.push({
+        code: "projection_replay_certificate_store_chain_previous_hash_mismatch",
+        path: `/entries/${index}/previousEntryHash`,
+        message:
+          "projection replay certificate store entry does not chain to the prior root",
+        expected: expectedPreviousHash ?? "",
+        actual: entry.previousEntryHash ?? "",
+      });
+    }
+
+    const { entryHash: actualHash, ...entryPayload } = entry;
+    const expectedEntryHash =
+      computeProjectionReplayCertificateStoreEntryHash(entryPayload);
+    if (actualHash !== expectedEntryHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_chain_entry_hash_mismatch",
+        path: `/entries/${index}/entryHash`,
+        message:
+          "projection replay certificate store entry hash does not match its body",
+        expected: expectedEntryHash,
+        actual: actualHash,
+      });
+    }
+
+    expectedSequence = entry.sequence + 1;
+    expectedPreviousHash = entry.entryHash;
+  }
+
+  const latest = entries[entries.length - 1]!;
+  const root = projectionReplayCertificateStoreRootFromEntry(latest);
+  if (
+    input.expectedRoot !== undefined &&
+    (input.expectedRoot.sequence !== root.sequence ||
+      input.expectedRoot.rootHash !== root.rootHash ||
+      String(input.expectedRoot.tenantId) !== String(root.tenantId))
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_chain_root_mismatch",
+      path: "/expectedRoot",
+      message:
+        "projection replay certificate store proof does not end at the expected root",
+      expected: input.expectedRoot.rootHash,
+      actual: root.rootHash,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    root,
+    issues,
+  };
+}
+
+export function verifyProjectionReplayCertificateStoreConsistencyProof(
+  proof: ProjectionReplayCertificateStoreConsistencyProof,
+): ProjectionReplayCertificateStoreChainVerification {
+  return verifyProjectionReplayCertificateStoreEntries({
+    tenantId: proof.tenantId,
+    entries: proof.entries,
+    expectedRoot: proof.toRoot,
+    ...(proof.fromRoot !== undefined ? { previousRoot: proof.fromRoot } : {}),
+  });
+}
+
+export function evaluateProjectionReplayCertificateStoreRootObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+  readonly knownRoots: readonly ProjectionReplayCertificateStoreRoot[];
+}): ProjectionReplayCertificateStoreRootWitnessDecision {
+  const { observation } = input;
+  const tenant = String(observation.tenantId);
+  const observedRoot = observation.root;
+  const knownRoots = sortedProjectionReplayCertificateStoreRoots(
+    input.knownRoots.filter((root) => String(root.tenantId) === tenant),
+  );
+  const latestRoot = knownRoots[knownRoots.length - 1];
+
+  if (String(observedRoot.tenantId) !== tenant) {
+    return obstructProjectionReplayCertificateStoreRootObservation({
+      observation,
+      ...(latestRoot !== undefined ? { latestRoot } : {}),
+      issues: [
+        {
+          code: "projection_replay_certificate_store_root_tenant_mismatch",
+          path: "/root/tenantId",
+          message:
+            "projection replay certificate store root tenant does not match the observation tenant",
+          expected: tenant,
+          actual: String(observedRoot.tenantId),
+        },
+      ],
+    });
+  }
+
+  const knownAtSequence = knownRoots.find(
+    (root) => root.sequence === observedRoot.sequence,
+  );
+  if (knownAtSequence !== undefined) {
+    if (knownAtSequence.rootHash === observedRoot.rootHash) {
+      return acceptedProjectionReplayCertificateStoreRootObservation({
+        observation,
+        status: "accepted_duplicate",
+        latestRoot: latestRoot ?? observedRoot,
+        acceptedRoots: [observedRoot],
+      });
+    }
+    return obstructProjectionReplayCertificateStoreRootObservation({
+      observation,
+      ...(latestRoot !== undefined ? { latestRoot } : {}),
+      conflictingRoot: knownAtSequence,
+      issues: [
+        {
+          code: "projection_replay_certificate_store_root_fork",
+          path: "/root/rootHash",
+          message:
+            "projection replay certificate store root conflicts with an already witnessed root at the same sequence",
+          expected: knownAtSequence.rootHash,
+          actual: observedRoot.rootHash,
+        },
+      ],
+    });
+  }
+
+  if (latestRoot === undefined) {
+    if (observedRoot.sequence === 1) {
+      return acceptedProjectionReplayCertificateStoreRootObservation({
+        observation,
+        status: "accepted_initial",
+        latestRoot: observedRoot,
+        acceptedRoots: [observedRoot],
+      });
+    }
+    const proof = observation.consistencyProof;
+    if (proof === undefined) {
+      return obstructProjectionReplayCertificateStoreRootObservation({
+        observation,
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_consistency_proof_missing",
+            path: "/consistencyProof",
+            message:
+              "first witness observation after sequence 1 requires a consistency proof from the beginning of the certificate store",
+            expected: 1,
+            actual: observedRoot.sequence,
+          },
+        ],
+      });
+    }
+    const proofIssues = validateProjectionReplayCertificateStoreRootWitnessProof({
+      tenant,
+      observedRoot,
+      proof,
+    });
+    if (proofIssues.length > 0) {
+      return obstructProjectionReplayCertificateStoreRootObservation({
+        observation,
+        issues: proofIssues,
+      });
+    }
+    return acceptedProjectionReplayCertificateStoreRootObservation({
+      observation,
+      status: "accepted_initial",
+      latestRoot: observedRoot,
+      acceptedRoots: rootsFromProjectionReplayCertificateStoreProof(proof),
+    });
+  }
+
+  if (observedRoot.sequence < latestRoot.sequence) {
+    return obstructProjectionReplayCertificateStoreRootObservation({
+      observation,
+      latestRoot,
+      issues: [
+        {
+          code: "projection_replay_certificate_store_root_regression",
+          path: "/root/sequence",
+          message:
+            "projection replay certificate store root regresses behind the latest witnessed root without matching an already witnessed sequence",
+          expected: latestRoot.sequence,
+          actual: observedRoot.sequence,
+        },
+      ],
+    });
+  }
+
+  const proof = observation.consistencyProof;
+  if (proof === undefined) {
+    return obstructProjectionReplayCertificateStoreRootObservation({
+      observation,
+      latestRoot,
+      issues: [
+        {
+          code: "projection_replay_certificate_store_root_consistency_proof_missing",
+          path: "/consistencyProof",
+          message:
+            "projection replay certificate store root advance requires a consistency proof from the latest witnessed root",
+          expected: latestRoot.sequence,
+          actual: observedRoot.sequence,
+        },
+      ],
+    });
+  }
+
+  const proofIssues = validateProjectionReplayCertificateStoreRootWitnessProof({
+    tenant,
+    observedRoot,
+    proof,
+    expectedFromRoot: latestRoot,
+  });
+  if (proofIssues.length > 0) {
+    return obstructProjectionReplayCertificateStoreRootObservation({
+      observation,
+      latestRoot,
+      issues: proofIssues,
+    });
+  }
+
+  return acceptedProjectionReplayCertificateStoreRootObservation({
+    observation,
+    status: "accepted_advance",
+    latestRoot: observedRoot,
+    acceptedRoots: rootsFromProjectionReplayCertificateStoreProof(proof),
+  });
+}
+
+function validateProjectionReplayCertificateStoreRootWitnessProof(input: {
+  readonly tenant: string;
+  readonly observedRoot: ProjectionReplayCertificateStoreRoot;
+  readonly proof: ProjectionReplayCertificateStoreConsistencyProof;
+  readonly expectedFromRoot?: ProjectionReplayCertificateStoreRoot;
+}): ProjectionReplayCertificateStoreRootWitnessIssue[] {
+  const issues: ProjectionReplayCertificateStoreRootWitnessIssue[] = [];
+  const { proof } = input;
+
+  if (String(proof.tenantId) !== input.tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_consistency_proof_invalid",
+      path: "/consistencyProof/tenantId",
+      message:
+        "projection replay certificate store consistency proof tenant does not match the root observation",
+      expected: input.tenant,
+      actual: String(proof.tenantId),
+    });
+  }
+  if (!sameProjectionReplayCertificateStoreRoot(proof.toRoot, input.observedRoot)) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_consistency_proof_invalid",
+      path: "/consistencyProof/toRoot",
+      message:
+        "projection replay certificate store consistency proof does not end at the observed root",
+      expected: input.observedRoot.rootHash,
+      actual: proof.toRoot.rootHash,
+    });
+  }
+  if (
+    input.expectedFromRoot === undefined &&
+    proof.fromRoot !== undefined
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_consistency_proof_invalid",
+      path: "/consistencyProof/fromRoot",
+      message:
+        "first witness observation must prove the root from the beginning of the certificate store",
+      actual: proof.fromRoot.rootHash,
+    });
+  }
+  if (
+    input.expectedFromRoot !== undefined &&
+    !sameProjectionReplayCertificateStoreRoot(
+      proof.fromRoot,
+      input.expectedFromRoot,
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_consistency_proof_invalid",
+      path: "/consistencyProof/fromRoot",
+      message:
+        "projection replay certificate store consistency proof must start at the latest witnessed root",
+      expected: input.expectedFromRoot.rootHash,
+      actual: proof.fromRoot?.rootHash ?? "",
+    });
+  }
+
+  const chainVerification = verifyProjectionReplayCertificateStoreConsistencyProof(
+    proof,
+  );
+  if (!chainVerification.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_consistency_proof_invalid",
+      path: "/consistencyProof/entries",
+      message: `projection replay certificate store consistency proof failed chain verification: ${chainVerification.issues
+        .map((issue) => issue.code)
+        .join(", ")}`,
+    });
+  }
+
+  return issues;
+}
+
+function acceptedProjectionReplayCertificateStoreRootObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+  readonly status: Exclude<
+    ProjectionReplayCertificateStoreRootWitnessStatus,
+    "obstructed"
+  >;
+  readonly latestRoot: ProjectionReplayCertificateStoreRoot;
+  readonly acceptedRoots: readonly ProjectionReplayCertificateStoreRoot[];
+}): ProjectionReplayCertificateStoreRootWitnessDecision {
+  return {
+    accepted: true,
+    status: input.status,
+    observerId: input.observation.observerId,
+    observedRoot: input.observation.root,
+    latestRoot: input.latestRoot,
+    acceptedRoots: sortedProjectionReplayCertificateStoreRoots(input.acceptedRoots),
+    issues: [],
+  };
+}
+
+function obstructProjectionReplayCertificateStoreRootObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+  readonly latestRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly conflictingRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessIssue[];
+}): ProjectionReplayCertificateStoreRootWitnessDecision {
+  const obstruction = buildProjectionReplayCertificateStoreRootObstruction(input);
+  return {
+    accepted: false,
+    status: "obstructed",
+    observerId: input.observation.observerId,
+    observedRoot: input.observation.root,
+    ...(input.latestRoot !== undefined ? { latestRoot: input.latestRoot } : {}),
+    acceptedRoots: [],
+    issues: input.issues,
+    obstruction,
+  };
+}
+
+function buildProjectionReplayCertificateStoreRootObstruction(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+  readonly latestRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly conflictingRoot?: ProjectionReplayCertificateStoreRoot;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessIssue[];
+}): ProjectionReplayCertificateStoreRootObstructionArtifact {
+  const payload = {
+    tenantId: input.observation.tenantId,
+    observerId: input.observation.observerId,
+    observedRoot: input.observation.root,
+    ...(input.latestRoot !== undefined ? { latestRoot: input.latestRoot } : {}),
+    ...(input.conflictingRoot !== undefined
+      ? { conflictingRoot: input.conflictingRoot }
+      : {}),
+    issues: input.issues,
+  };
+  return {
+    artifactId: `projection_replay_root_obstruction_${fingerprint64(
+      canonicalStringify(payload),
+    )}`,
+    tenantId: input.observation.root.tenantId,
+    generatedAt: input.observation.observedAt,
+    observerId: input.observation.observerId,
+    observedRoot: input.observation.root,
+    ...(input.latestRoot !== undefined ? { latestRoot: input.latestRoot } : {}),
+    ...(input.conflictingRoot !== undefined
+      ? { conflictingRoot: input.conflictingRoot }
+      : {}),
+    issues: input.issues,
+    allowedAction: "request_root_consistency_proof",
+  };
+}
+
+function rootsFromProjectionReplayCertificateStoreProof(
+  proof: ProjectionReplayCertificateStoreConsistencyProof,
+): readonly ProjectionReplayCertificateStoreRoot[] {
+  return sortedProjectionReplayCertificateStoreRoots(
+    proof.entries.map((entry) =>
+      projectionReplayCertificateStoreRootFromEntry(entry),
+    ),
+  );
+}
+
+function sortedProjectionReplayCertificateStoreRoots(
+  roots: readonly ProjectionReplayCertificateStoreRoot[],
+): ProjectionReplayCertificateStoreRoot[] {
+  return [...roots].sort((a, b) => {
+    if (a.sequence !== b.sequence) return a.sequence - b.sequence;
+    return a.rootHash.localeCompare(b.rootHash);
+  });
+}
+
+function mergeProjectionReplayCertificateStoreRoots(
+  existing: readonly ProjectionReplayCertificateStoreRoot[],
+  additions: readonly ProjectionReplayCertificateStoreRoot[],
+): ProjectionReplayCertificateStoreRoot[] {
+  const bySequenceAndHash = new Map<string, ProjectionReplayCertificateStoreRoot>();
+  for (const root of [...existing, ...additions]) {
+    bySequenceAndHash.set(
+      `${String(root.tenantId)}:${root.sequence}:${root.rootHash}`,
+      root,
+    );
+  }
+  return sortedProjectionReplayCertificateStoreRoots([
+    ...bySequenceAndHash.values(),
+  ]);
+}
+
+function sameProjectionReplayCertificateStoreRoot(
+  left: ProjectionReplayCertificateStoreRoot | undefined,
+  right: ProjectionReplayCertificateStoreRoot | undefined,
+): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    String(left.tenantId) === String(right.tenantId) &&
+    left.sequence === right.sequence &&
+    left.rootHash === right.rootHash
+  );
+}
+
+function sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+  heads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[],
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[] {
+  return [...heads].sort((a, b) => {
+    if (a.settlementSequence !== b.settlementSequence) {
+      return a.settlementSequence - b.settlementSequence;
+    }
+    return a.settlementRecordHash.localeCompare(b.settlementRecordHash);
+  });
+}
+
+function mergeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+  existing: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[],
+  additions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[],
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[] {
+  const bySequenceAndHash = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead
+  >();
+  for (const head of [...existing, ...additions]) {
+    bySequenceAndHash.set(
+      `${String(head.tenantId)}:${head.settlementSequence}:${head.settlementRecordHash}:${head.headHash}`,
+      head,
+    );
+  }
+  return sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads([
+    ...bySequenceAndHash.values(),
+  ]);
+}
+
+function sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+  left:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead
+    | undefined,
+  right:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead
+    | undefined,
+): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    String(left.tenantId) === String(right.tenantId) &&
+    left.settlementSequence === right.settlementSequence &&
+    left.settlementRecordHash === right.settlementRecordHash &&
+    left.headHash === right.headHash
+  );
+}
+
+function sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+  heads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[],
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[] {
+  return [...heads].sort((a, b) => {
+    if (a.pruningTombstoneSequence !== b.pruningTombstoneSequence) {
+      return a.pruningTombstoneSequence - b.pruningTombstoneSequence;
+    }
+    return a.pruningTombstoneRecordHash.localeCompare(
+      b.pruningTombstoneRecordHash,
+    );
+  });
+}
+
+function mergeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+  existing: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[],
+  additions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[],
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[] {
+  const bySequenceAndHash = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead
+  >();
+  for (const head of [...existing, ...additions]) {
+    bySequenceAndHash.set(
+      `${String(head.tenantId)}:${head.pruningTombstoneSequence}:${head.pruningTombstoneRecordHash}:${head.headHash}`,
+      head,
+    );
+  }
+  return sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+    [...bySequenceAndHash.values()],
+  );
+}
+
+function sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+  left:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead
+    | undefined,
+  right:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead
+    | undefined,
+): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    String(left.tenantId) === String(right.tenantId) &&
+    left.pruningTombstoneSequence === right.pruningTombstoneSequence &&
+    left.pruningTombstoneRecordHash === right.pruningTombstoneRecordHash &&
+    left.headHash === right.headHash
+  );
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessRecord,
+    "observationHash"
+  > = {
+    tenantId: tenantId(String(input.observation.tenantId)),
+    witnessSequence: input.witnessSequence,
+    observerId: input.observation.observerId,
+    observedAt: input.observation.observedAt,
+    root: input.observation.root,
+    ...(input.observation.consistencyProof !== undefined
+      ? { consistencyProof: input.observation.consistencyProof }
+      : {}),
+    decision: input.decision,
+    accepted: input.decision.accepted,
+    status: input.decision.status,
+    ...(input.previousObservationHash !== undefined
+      ? { previousObservationHash: input.previousObservationHash }
+      : {}),
+    recordedAt: input.recordedAt ?? input.observation.observedAt,
+  };
+
+  return {
+    ...payload,
+    observationHash:
+      computeProjectionReplayCertificateStoreRootWitnessRecordHash(payload),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessRecord,
+    "observationHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessRecord[];
+}): ProjectionReplayCertificateStoreRootWitnessLedgerReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) => a.witnessSequence - b.witnessSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessLedgerIssue[] = [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let acceptedRoots: readonly ProjectionReplayCertificateStoreRoot[] = [];
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_ledger_tenant_mismatch",
+        path: `/records/${index}/tenantId`,
+        message:
+          "projection replay certificate store root witness record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (record.witnessSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_ledger_sequence_gap",
+        path: `/records/${index}/witnessSequence`,
+        message:
+          "projection replay certificate store root witness records must be contiguous",
+        expected: expectedSequence,
+        actual: record.witnessSequence,
+      });
+    }
+    if (
+      (record.previousObservationHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_ledger_previous_hash_mismatch",
+        path: `/records/${index}/previousObservationHash`,
+        message:
+          "projection replay certificate store root witness record does not chain to the prior observation",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousObservationHash ?? "",
+      });
+    }
+
+    const { observationHash, ...recordPayload } = record;
+    const expectedObservationHash =
+      computeProjectionReplayCertificateStoreRootWitnessRecordHash(
+        recordPayload,
+      );
+    if (observationHash !== expectedObservationHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_ledger_hash_mismatch",
+        path: `/records/${index}/observationHash`,
+        message:
+          "projection replay certificate store root witness record hash does not match its body",
+        expected: expectedObservationHash,
+        actual: observationHash,
+      });
+    }
+
+    const expectedDecision =
+      evaluateProjectionReplayCertificateStoreRootObservation({
+        observation: projectionReplayCertificateStoreRootObservationFromRecord(
+          record,
+        ),
+        knownRoots: acceptedRoots,
+      });
+    if (
+      canonicalStringify(record.decision) !== canonicalStringify(expectedDecision)
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_ledger_decision_mismatch",
+        path: `/records/${index}/decision`,
+        message:
+          "projection replay certificate store root witness record decision does not replay from prior accepted observations",
+      });
+    }
+
+    if (issues.length === issueCountBefore && record.decision.accepted) {
+      acceptedRoots = mergeProjectionReplayCertificateStoreRoots(
+        acceptedRoots,
+        record.decision.acceptedRoots,
+      );
+    }
+    expectedSequence = record.witnessSequence + 1;
+    expectedPreviousHash = record.observationHash;
+  }
+
+  const sortedAcceptedRoots =
+    sortedProjectionReplayCertificateStoreRoots(acceptedRoots);
+  const latestRoot = sortedAcceptedRoots[sortedAcceptedRoots.length - 1];
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    acceptedRoots: sortedAcceptedRoots,
+    ...(latestRoot !== undefined ? { latestRoot } : {}),
+    issues,
+  };
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessAuthorityTransition(
+  input: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionInput,
+): ProjectionReplayCertificateStoreRootWitnessAuthorityTransition {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessAuthorityTransition,
+    "authorityHash"
+  > = {
+    tenantId: tenantId(String(input.tenantId)),
+    authoritySequence: input.authoritySequence,
+    transitionId: input.transitionId,
+    transitionKind: input.transitionKind,
+    recordedAt: input.recordedAt,
+    recordedBy: input.recordedBy,
+    effectiveFromRootSequence: input.effectiveFromRootSequence,
+    ...(input.witnessId !== undefined ? { witnessId: input.witnessId } : {}),
+    ...(input.requiredWitnesses !== undefined
+      ? { requiredWitnesses: input.requiredWitnesses }
+      : {}),
+    ...(input.minimumWitnesses !== undefined
+      ? { minimumWitnesses: input.minimumWitnesses }
+      : {}),
+    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+    ...(input.previousAuthorityHash !== undefined
+      ? { previousAuthorityHash: input.previousAuthorityHash }
+      : {}),
+  };
+
+  return {
+    ...payload,
+    authorityHash:
+      computeProjectionReplayCertificateStoreRootWitnessAuthorityTransitionHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessAuthorityTransitionHash(
+  transition: Omit<
+    ProjectionReplayCertificateStoreRootWitnessAuthorityTransition,
+    "authorityHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(transition));
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessAuthorityTransitions(input: {
+  readonly tenantId: TenantId | string;
+  readonly rootSequence: number;
+  readonly transitions: readonly ProjectionReplayCertificateStoreRootWitnessAuthorityTransition[];
+}): ProjectionReplayCertificateStoreRootWitnessAuthorityTopology {
+  const tenant = String(input.tenantId);
+  const transitions = [...input.transitions].sort(
+    (a, b) => a.authoritySequence - b.authoritySequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessAuthorityIssue[] = [];
+  const principals = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessPrincipalState
+  >();
+  let requiredWitnesses: number | undefined;
+  let minimumWitnesses: number | undefined;
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let latestAuthorityHash: string | undefined;
+
+  if (!Number.isInteger(input.rootSequence) || input.rootSequence < 1) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_authority_transition_invalid",
+      path: "/rootSequence",
+      message:
+        "projection replay root witness authority topology requires a positive root sequence",
+      expected: 1,
+      actual: input.rootSequence,
+    });
+  }
+
+  for (const [index, transition] of transitions.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(transition.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_authority_tenant_mismatch",
+        path: `/transitions/${index}/tenantId`,
+        message:
+          "projection replay root witness authority transition tenant mismatch",
+        expected: tenant,
+        actual: String(transition.tenantId),
+      });
+    }
+    if (transition.authoritySequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_authority_sequence_gap",
+        path: `/transitions/${index}/authoritySequence`,
+        message:
+          "projection replay root witness authority transitions must be contiguous",
+        expected: expectedSequence,
+        actual: transition.authoritySequence,
+      });
+    }
+    if (
+      (transition.previousAuthorityHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_authority_previous_hash_mismatch",
+        path: `/transitions/${index}/previousAuthorityHash`,
+        message:
+          "projection replay root witness authority transition does not chain to the prior transition",
+        expected: expectedPreviousHash ?? "",
+        actual: transition.previousAuthorityHash ?? "",
+      });
+    }
+    const { authorityHash, ...transitionPayload } = transition;
+    const expectedAuthorityHash =
+      computeProjectionReplayCertificateStoreRootWitnessAuthorityTransitionHash(
+        transitionPayload,
+      );
+    if (authorityHash !== expectedAuthorityHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_authority_hash_mismatch",
+        path: `/transitions/${index}/authorityHash`,
+        message:
+          "projection replay root witness authority transition hash does not match its body",
+        expected: expectedAuthorityHash,
+        actual: authorityHash,
+      });
+    }
+    if (
+      !Number.isInteger(transition.effectiveFromRootSequence) ||
+      transition.effectiveFromRootSequence < 1
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_authority_transition_invalid",
+        path: `/transitions/${index}/effectiveFromRootSequence`,
+        message:
+          "projection replay root witness authority transition requires a positive effective root sequence",
+        expected: 1,
+        actual: transition.effectiveFromRootSequence,
+      });
+    }
+
+    const transitionIssuesStart = issues.length;
+    if (transition.transitionKind === "set_quorum") {
+      if (
+        !Number.isInteger(transition.requiredWitnesses) ||
+        (transition.requiredWitnesses ?? 0) < 1
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/requiredWitnesses`,
+          message:
+            "projection replay root witness authority quorum requires at least one required witness",
+          expected: 1,
+          actual: transition.requiredWitnesses ?? 0,
+        });
+      }
+      if (
+        transition.minimumWitnesses !== undefined &&
+        (!Number.isInteger(transition.minimumWitnesses) ||
+          transition.minimumWitnesses < 1)
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/minimumWitnesses`,
+          message:
+            "projection replay root witness authority quorum requires a positive minimum witness count",
+          expected: 1,
+          actual: transition.minimumWitnesses,
+        });
+      }
+      if (
+        transition.minimumWitnesses !== undefined &&
+        transition.requiredWitnesses !== undefined &&
+        transition.minimumWitnesses > transition.requiredWitnesses
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/minimumWitnesses`,
+          message:
+            "projection replay root witness authority quorum minimum cannot exceed required witnesses",
+          expected: transition.requiredWitnesses,
+          actual: transition.minimumWitnesses,
+        });
+      }
+    } else if (transition.witnessId === undefined || transition.witnessId === "") {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_authority_witness_missing",
+        path: `/transitions/${index}/witnessId`,
+        message:
+          "projection replay root witness authority transition requires a witness id",
+      });
+    }
+
+    if (
+      issues.length === transitionIssuesStart &&
+      issues.length === issueCountBefore &&
+      transition.effectiveFromRootSequence <= input.rootSequence
+    ) {
+      applyProjectionReplayCertificateStoreRootWitnessAuthorityTransition({
+        transition,
+        principals,
+        setQuorum: (required, minimum) => {
+          requiredWitnesses = required;
+          minimumWitnesses = minimum;
+        },
+      });
+    }
+
+    expectedSequence = transition.authoritySequence + 1;
+    expectedPreviousHash = transition.authorityHash;
+    latestAuthorityHash = transition.authorityHash;
+  }
+
+  if (requiredWitnesses === undefined) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_authority_quorum_missing",
+      path: "/transitions",
+      message:
+        "projection replay root witness authority topology requires an effective quorum transition",
+    });
+  }
+
+  const principalStates = [...principals.values()].sort((a, b) =>
+    a.witnessId.localeCompare(b.witnessId),
+  );
+  const eligibleWitnessIds = principalStates
+    .filter(
+      (principal) =>
+        principal.status === "active" &&
+        principal.validFromRootSequence <= input.rootSequence,
+    )
+    .map((principal) => principal.witnessId)
+    .sort((a, b) => a.localeCompare(b));
+
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    rootSequence: input.rootSequence,
+    ...(requiredWitnesses !== undefined ? { requiredWitnesses } : {}),
+    ...(minimumWitnesses !== undefined ? { minimumWitnesses } : {}),
+    eligibleWitnessIds,
+    principals: principalStates,
+    transitions,
+    ...(latestAuthorityHash !== undefined ? { latestAuthorityHash } : {}),
+    issues,
+  };
+}
+
+function applyProjectionReplayCertificateStoreRootWitnessAuthorityTransition(input: {
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessAuthorityTransition;
+  readonly principals: Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessPrincipalState
+  >;
+  readonly setQuorum: (required: number, minimum?: number) => void;
+}): void {
+  const { transition } = input;
+  if (transition.transitionKind === "set_quorum") {
+    input.setQuorum(
+      transition.requiredWitnesses!,
+      transition.minimumWitnesses ?? 1,
+    );
+    return;
+  }
+  const witnessId = transition.witnessId!;
+  const existing = input.principals.get(witnessId);
+  const status = projectionReplayCertificateStoreRootWitnessAuthorityStatusFromTransition(
+    transition.transitionKind,
+  );
+  input.principals.set(witnessId, {
+    tenantId: tenantId(String(transition.tenantId)),
+    witnessId,
+    status,
+    validFromRootSequence:
+      transition.transitionKind === "admit_witness"
+        ? transition.effectiveFromRootSequence
+        : existing?.validFromRootSequence ?? transition.effectiveFromRootSequence,
+    changedAtAuthoritySequence: transition.authoritySequence,
+    ...(transition.transitionKind === "admit_witness"
+      ? {
+          admittedAt: transition.recordedAt,
+          admittedBy: transition.recordedBy,
+        }
+      : existing?.admittedAt !== undefined
+        ? { admittedAt: existing.admittedAt }
+        : {}),
+    ...(transition.transitionKind !== "admit_witness"
+      ? {
+          statusChangedAt: transition.recordedAt,
+          statusChangedBy: transition.recordedBy,
+        }
+      : existing?.statusChangedAt !== undefined
+        ? {
+            statusChangedAt: existing.statusChangedAt,
+            ...(existing.statusChangedBy !== undefined
+              ? { statusChangedBy: existing.statusChangedBy }
+              : {}),
+          }
+        : {}),
+    ...(transition.transitionKind !== "admit_witness" &&
+    existing?.admittedBy !== undefined
+      ? { admittedBy: existing.admittedBy }
+      : {}),
+    ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
+  });
+}
+
+function projectionReplayCertificateStoreRootWitnessAuthorityStatusFromTransition(
+  transitionKind: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind,
+): ProjectionReplayCertificateStoreRootWitnessPrincipalStatus {
+  switch (transitionKind) {
+    case "admit_witness":
+      return "active";
+    case "suspend_witness":
+      return "suspended";
+    case "revoke_witness":
+      return "revoked";
+    case "mark_equivocated":
+      return "equivocated";
+    case "set_quorum":
+      return "active";
+  }
+}
+
+export function evaluateProjectionReplayCertificateStoreRootWitnessSettlement(input: {
+  readonly tenantId: TenantId | string;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+  readonly witnessLedgers: readonly ProjectionReplayCertificateStoreRootWitnessLedgerSnapshot[];
+  readonly policy?: ProjectionReplayCertificateStoreRootWitnessSettlementPolicy;
+  readonly authorityTopology?: ProjectionReplayCertificateStoreRootWitnessAuthorityTopology;
+}): ProjectionReplayCertificateStoreRootWitnessSettlement {
+  const tenant = String(input.tenantId);
+  const requestedRequiredWitnesses =
+    input.authorityTopology?.requiredWitnesses ??
+    input.policy?.requiredWitnesses ??
+    1;
+  const requestedMinimumWitnesses =
+    input.authorityTopology?.minimumWitnesses ??
+    input.policy?.minimumWitnesses ??
+    1;
+  const requiredWitnesses = Number.isInteger(requestedRequiredWitnesses)
+    ? Math.max(1, requestedRequiredWitnesses)
+    : 1;
+  const minimumWitnesses = Number.isInteger(requestedMinimumWitnesses)
+    ? Math.max(1, requestedMinimumWitnesses)
+    : 1;
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementIssue[] = [];
+  const acceptedWitnessIds = new Set<string>();
+  const obstructingWitnessIds = new Set<string>();
+  const invalidWitnessIds = new Set<string>();
+  const validWitnessIds = new Set<string>();
+  const countedWitnessIds = new Set<string>();
+  const topology = input.authorityTopology;
+  const topologyEligibleWitnessIds = new Set(topology?.eligibleWitnessIds ?? []);
+  let authorityTopologyInvalid = false;
+
+  if (!Number.isInteger(requestedRequiredWitnesses) || requestedRequiredWitnesses < 1) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_settlement_invalid_policy",
+      path: "/policy/requiredWitnesses",
+      message:
+        "projection replay root witness settlement requires at least one required witness",
+      expected: 1,
+      actual: requestedRequiredWitnesses,
+    });
+  }
+  if (!Number.isInteger(requestedMinimumWitnesses) || requestedMinimumWitnesses < 1) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_settlement_invalid_policy",
+      path: "/policy/minimumWitnesses",
+      message:
+        "projection replay root witness settlement requires at least one minimum witness",
+      expected: 1,
+      actual: requestedMinimumWitnesses,
+    });
+  }
+  if (
+    Number.isInteger(requestedRequiredWitnesses) &&
+    Number.isInteger(requestedMinimumWitnesses) &&
+    requestedMinimumWitnesses > requestedRequiredWitnesses
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_settlement_invalid_policy",
+      path: "/policy/minimumWitnesses",
+      message:
+        "projection replay root witness settlement minimum cannot exceed required witnesses",
+      expected: requestedRequiredWitnesses,
+      actual: requestedMinimumWitnesses,
+    });
+  }
+  if (String(input.root.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_settlement_root_tenant_mismatch",
+      path: "/root/tenantId",
+      message:
+        "projection replay root witness settlement root tenant does not match the settlement tenant",
+      expected: tenant,
+      actual: String(input.root.tenantId),
+    });
+  }
+  if (topology !== undefined) {
+    if (!topology.valid) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_authority_topology_invalid",
+        path: "/authorityTopology",
+        message:
+          "projection replay root witness settlement cannot use an invalid witness authority topology",
+        actual: topology.issues.map((issue) => issue.code).join(", "),
+      });
+    }
+    if (String(topology.tenantId) !== tenant) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_authority_topology_invalid",
+        path: "/authorityTopology/tenantId",
+        message:
+          "projection replay root witness settlement authority topology tenant does not match the settlement tenant",
+        expected: tenant,
+        actual: String(topology.tenantId),
+      });
+    }
+    if (topology.rootSequence !== input.root.sequence) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_authority_topology_invalid",
+        path: "/authorityTopology/rootSequence",
+        message:
+          "projection replay root witness settlement authority topology must be replayed for the root sequence being settled",
+        expected: input.root.sequence,
+        actual: topology.rootSequence,
+      });
+    }
+    if (
+      input.policy !== undefined &&
+      (input.policy.requiredWitnesses !== topology.requiredWitnesses ||
+        (input.policy.minimumWitnesses ?? 1) !==
+          (topology.minimumWitnesses ?? 1))
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_policy_authority_mismatch",
+        path: "/policy",
+        message:
+          "projection replay root witness settlement policy must match the replayed witness authority topology",
+        expected: `${topology.requiredWitnesses ?? ""}:${
+          topology.minimumWitnesses ?? 1
+        }`,
+        actual: `${input.policy.requiredWitnesses}:${
+          input.policy.minimumWitnesses ?? 1
+        }`,
+      });
+    }
+  }
+
+  for (const [index, witness] of input.witnessLedgers.entries()) {
+    const witnessId = witness.witnessId;
+    const countWitness = !countedWitnessIds.has(witnessId);
+    if (!countWitness) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_duplicate_witness",
+        path: `/witnessLedgers/${index}/witnessId`,
+        message:
+          "projection replay root witness settlement cannot count the same witness twice",
+        actual: witnessId,
+      });
+    }
+    countedWitnessIds.add(witnessId);
+
+    if (authorityTopologyInvalid) {
+      invalidWitnessIds.add(witnessId);
+      continue;
+    }
+    if (
+      topology !== undefined &&
+      (!topologyEligibleWitnessIds.has(witnessId) || !countWitness)
+    ) {
+      invalidWitnessIds.add(witnessId);
+      if (countWitness) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_settlement_witness_not_authorized",
+          path: `/witnessLedgers/${index}/witnessId`,
+          message:
+            "projection replay root witness settlement cannot count a witness outside the replayed authority topology",
+          expected: topology.eligibleWitnessIds.join(", "),
+          actual: witnessId,
+        });
+      }
+      continue;
+    }
+
+    if (!witness.replay.valid) {
+      invalidWitnessIds.add(witnessId);
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_witness_replay_invalid",
+        path: `/witnessLedgers/${index}/replay`,
+        message:
+          "projection replay root witness settlement cannot count a witness ledger that fails replay",
+        actual: witness.replay.issues.map((issue) => issue.code).join(", "),
+      });
+      continue;
+    }
+    if (String(witness.replay.tenantId) !== tenant) {
+      invalidWitnessIds.add(witnessId);
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_witness_tenant_mismatch",
+        path: `/witnessLedgers/${index}/replay/tenantId`,
+        message:
+          "projection replay root witness settlement cannot count a witness ledger from another tenant",
+        expected: tenant,
+        actual: String(witness.replay.tenantId),
+      });
+      continue;
+    }
+
+    validWitnessIds.add(witnessId);
+    const acceptedTarget = witness.replay.acceptedRoots.some((root) =>
+      sameProjectionReplayCertificateStoreRoot(root, input.root),
+    );
+    const conflictingAcceptedRoot = witness.replay.acceptedRoots.find((root) =>
+      conflictsWithProjectionReplayCertificateStoreRoot(root, input.root),
+    );
+    const forkObstruction = witness.replay.records.find((record) =>
+      projectionReplayCertificateStoreRootWitnessRecordObstructsSettlement({
+        record,
+        root: input.root,
+      }),
+    );
+
+    if (conflictingAcceptedRoot !== undefined || forkObstruction !== undefined) {
+      const conflictingRootHash =
+        conflictingAcceptedRoot?.rootHash ??
+        forkObstruction?.decision.obstruction?.conflictingRoot?.rootHash ??
+        forkObstruction?.root.rootHash ??
+        "";
+      obstructingWitnessIds.add(witnessId);
+      issues.push({
+        code: "projection_replay_certificate_store_root_settlement_conflicting_root",
+        path: `/witnessLedgers/${index}/replay/acceptedRoots`,
+        message:
+          "projection replay root witness settlement found a valid witness history for a conflicting root at the same sequence",
+        expected: input.root.rootHash,
+        actual: conflictingRootHash,
+      });
+    }
+
+    if (acceptedTarget && countWitness) {
+      acceptedWitnessIds.add(witnessId);
+    }
+  }
+
+  if (validWitnessIds.size === 0) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_settlement_no_valid_witnesses",
+      path: "/witnessLedgers",
+      message:
+        "projection replay root witness settlement requires at least one valid replayed witness ledger",
+      expected: 1,
+      actual: 0,
+    });
+  }
+
+  const invalidPolicy = issues.some(
+    (issue) =>
+      issue.code ===
+        "projection_replay_certificate_store_root_settlement_invalid_policy" ||
+      issue.code ===
+        "projection_replay_certificate_store_root_settlement_policy_authority_mismatch",
+  );
+  const tenantMismatch = issues.some(
+    (issue) =>
+      issue.code ===
+      "projection_replay_certificate_store_root_settlement_root_tenant_mismatch",
+  );
+  const acceptedCount = acceptedWitnessIds.size;
+  const quorumMet = acceptedCount >= requiredWitnesses;
+  if (
+    !invalidPolicy &&
+    !tenantMismatch &&
+    obstructingWitnessIds.size === 0 &&
+    !quorumMet
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_settlement_quorum_not_met",
+      path: "/acceptedWitnessIds",
+      message:
+        "projection replay root witness settlement has not reached the required witness quorum",
+      expected: requiredWitnesses,
+      actual: acceptedCount,
+    });
+  }
+
+  const status: ProjectionReplayCertificateStoreRootWitnessSettlementStatus =
+    invalidPolicy ||
+    tenantMismatch ||
+    authorityTopologyInvalid ||
+    obstructingWitnessIds.size > 0
+      ? "obstructed"
+      : quorumMet
+        ? "settled"
+        : acceptedCount >= minimumWitnesses
+          ? "witnessed"
+          : "provisional";
+
+  const allowedAction:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementAllowedAction
+    | undefined =
+    authorityTopologyInvalid
+      ? "correct_authority_topology"
+      : invalidPolicy || tenantMismatch
+      ? "correct_settlement_policy"
+      : obstructingWitnessIds.size > 0
+        ? "resolve_root_conflict"
+        : status === "settled"
+          ? undefined
+          : "collect_more_witnesses";
+
+  return buildProjectionReplayCertificateStoreRootWitnessSettlement({
+    tenantId: tenantId(tenant),
+    root: input.root,
+    status,
+    acceptedWitnessIds: sortedUniqueStrings([...acceptedWitnessIds]),
+    obstructingWitnessIds: sortedUniqueStrings([...obstructingWitnessIds]),
+    invalidWitnessIds: sortedUniqueStrings([...invalidWitnessIds]),
+    ...(topology !== undefined
+      ? {
+          eligibleWitnessIds: sortedUniqueStrings([...topologyEligibleWitnessIds]),
+        }
+      : {}),
+    ...(topology?.latestAuthorityHash !== undefined
+      ? { authorityTopologyHash: topology.latestAuthorityHash }
+      : {}),
+    requiredWitnesses,
+    minimumWitnesses,
+    issues,
+    authorityBoundary:
+      "projection_replay_certificate_store_root_witness_settlement",
+    ...(allowedAction !== undefined ? { allowedAction } : {}),
+  });
+}
+
+function buildProjectionReplayCertificateStoreRootWitnessSettlement(
+  input: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlement,
+    "settlementHash"
+  >,
+): ProjectionReplayCertificateStoreRootWitnessSettlement {
+  return {
+    ...input,
+    settlementHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementHash(input),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementHash(
+  settlement: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlement,
+    "settlementHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(settlement));
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementRecord,
+    "settlementRecordHash"
+  > = {
+    tenantId: tenantId(String(input.settlement.tenantId)),
+    settlementSequence: input.settlementSequence,
+    root: input.settlement.root,
+    settlement: input.settlement,
+    ...(input.previousSettlementRecordHash !== undefined
+      ? { previousSettlementRecordHash: input.previousSettlementRecordHash }
+      : {}),
+    recordedAt: input.recordedAt ?? input.settlement.root.recordedAt,
+  };
+
+  return {
+    ...payload,
+    settlementRecordHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementRecord,
+    "settlementRecordHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadFromRecord(
+  record: ProjectionReplayCertificateStoreRootWitnessSettlementRecord,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead,
+    "headHash"
+  > = {
+    tenantId: record.tenantId,
+    settlementSequence: record.settlementSequence,
+    settlementRecordHash: record.settlementRecordHash,
+    recordedAt: record.recordedAt,
+  };
+  return {
+    ...payload,
+    headHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadHash(
+  head: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead,
+    "headHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(head));
+}
+
+export function verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof(
+  proof: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof,
+): {
+  readonly valid: boolean;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[];
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[];
+} {
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[] =
+    [];
+  const tenant = String(proof.tenantId);
+  const records = [...proof.records].sort(
+    (a, b) => a.settlementSequence - b.settlementSequence,
+  );
+  if (String(proof.toHead.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/toHead/tenantId",
+      message:
+        "projection replay settlement store head consistency proof toHead tenant mismatch",
+      expected: tenant,
+      actual: String(proof.toHead.tenantId),
+    });
+  }
+  if (
+    proof.fromHead !== undefined &&
+    String(proof.fromHead.tenantId) !== tenant
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/fromHead/tenantId",
+      message:
+        "projection replay settlement store head consistency proof fromHead tenant mismatch",
+      expected: tenant,
+      actual: String(proof.fromHead.tenantId),
+    });
+  }
+  const toHeadHash = computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadHash(
+    {
+      tenantId: proof.toHead.tenantId,
+      settlementSequence: proof.toHead.settlementSequence,
+      settlementRecordHash: proof.toHead.settlementRecordHash,
+      recordedAt: proof.toHead.recordedAt,
+    },
+  );
+  if (proof.toHead.headHash !== toHeadHash) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_hash_mismatch",
+      path: "/toHead/headHash",
+      message:
+        "projection replay settlement store head hash does not match its body",
+      expected: toHeadHash,
+      actual: proof.toHead.headHash,
+    });
+  }
+  if (proof.fromHead !== undefined) {
+    const fromHeadHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadHash(
+        {
+          tenantId: proof.fromHead.tenantId,
+          settlementSequence: proof.fromHead.settlementSequence,
+          settlementRecordHash: proof.fromHead.settlementRecordHash,
+          recordedAt: proof.fromHead.recordedAt,
+        },
+      );
+    if (proof.fromHead.headHash !== fromHeadHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_hash_mismatch",
+        path: "/fromHead/headHash",
+        message:
+          "projection replay settlement store head fromHead hash does not match its body",
+        expected: fromHeadHash,
+        actual: proof.fromHead.headHash,
+      });
+    }
+  }
+  if (records.length === 0) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/records",
+      message:
+        "projection replay settlement store head consistency proof contains no settlement records",
+    });
+    return { valid: false, issues, acceptedHeads: [] };
+  }
+
+  let expectedSequence =
+    proof.fromHead === undefined ? 1 : proof.fromHead.settlementSequence + 1;
+  let expectedPreviousHash = proof.fromHead?.settlementRecordHash;
+  const acceptedHeads: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[] =
+    [];
+
+  for (const [index, record] of records.entries()) {
+    const recordPath = `/records/${index}`;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+        path: `${recordPath}/tenantId`,
+        message:
+          "projection replay settlement store head consistency proof record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (String(record.settlement.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+        path: `${recordPath}/settlement/tenantId`,
+        message:
+          "projection replay settlement store head consistency proof cannot contain a settlement for another tenant",
+        expected: tenant,
+        actual: String(record.settlement.tenantId),
+      });
+    }
+    if (record.settlementSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+        path: `${recordPath}/settlementSequence`,
+        message:
+          "projection replay settlement store head consistency proof records must be contiguous",
+        expected: expectedSequence,
+        actual: record.settlementSequence,
+      });
+    }
+    if (
+      (record.previousSettlementRecordHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+        path: `${recordPath}/previousSettlementRecordHash`,
+        message:
+          "projection replay settlement store head consistency proof record does not chain to the prior head",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousSettlementRecordHash ?? "",
+      });
+    }
+    if (!sameProjectionReplayCertificateStoreRoot(record.root, record.settlement.root)) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+        path: `${recordPath}/root`,
+        message:
+          "projection replay settlement store head consistency proof record root must match settlement root",
+        expected: record.settlement.root.rootHash,
+        actual: record.root.rootHash,
+      });
+    }
+
+    const { settlementHash, ...settlementPayload } = record.settlement;
+    const expectedSettlementHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementHash(
+        settlementPayload,
+      );
+    if (settlementHash !== expectedSettlementHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+        path: `${recordPath}/settlement/settlementHash`,
+        message:
+          "projection replay settlement store head consistency proof settlement hash mismatch",
+        expected: expectedSettlementHash,
+        actual: settlementHash,
+      });
+    }
+
+    const { settlementRecordHash, ...recordPayload } = record;
+    const expectedRecordHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementRecordHash(
+        recordPayload,
+      );
+    if (settlementRecordHash !== expectedRecordHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+        path: `${recordPath}/settlementRecordHash`,
+        message:
+          "projection replay settlement store head consistency proof record hash mismatch",
+        expected: expectedRecordHash,
+        actual: settlementRecordHash,
+      });
+    }
+
+    acceptedHeads.push(
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadFromRecord(
+        record,
+      ),
+    );
+    expectedSequence = record.settlementSequence + 1;
+    expectedPreviousHash = record.settlementRecordHash;
+  }
+
+  const lastHead = acceptedHeads[acceptedHeads.length - 1];
+  if (
+    lastHead === undefined ||
+    !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+      lastHead,
+      proof.toHead,
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/toHead",
+      message:
+        "projection replay settlement store head consistency proof does not end at the declared toHead",
+      expected: `${proof.toHead.settlementSequence}:${proof.toHead.settlementRecordHash}`,
+      actual:
+        lastHead === undefined
+          ? ""
+          : `${lastHead.settlementSequence}:${lastHead.settlementRecordHash}`,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    acceptedHeads,
+  };
+}
+
+export function evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+  readonly knownHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision {
+  const { observation } = input;
+  const tenant = String(observation.tenantId);
+  const observedHead = observation.head;
+  const knownHeads =
+    sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+      input.knownHeads.filter((head) => String(head.tenantId) === tenant),
+    );
+  const latestHead = knownHeads[knownHeads.length - 1];
+  const observedHeadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadHash({
+      tenantId: observedHead.tenantId,
+      settlementSequence: observedHead.settlementSequence,
+      settlementRecordHash: observedHead.settlementRecordHash,
+      recordedAt: observedHead.recordedAt,
+    });
+
+  if (String(observedHead.tenantId) !== tenant) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+      {
+        observation,
+        ...(latestHead !== undefined ? { latestHead } : {}),
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_tenant_mismatch",
+            path: "/head/tenantId",
+            message:
+              "projection replay settlement store head tenant does not match the observation tenant",
+            expected: tenant,
+            actual: String(observedHead.tenantId),
+          },
+        ],
+      },
+    );
+  }
+  if (observedHead.headHash !== observedHeadHash) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+      {
+        observation,
+        ...(latestHead !== undefined ? { latestHead } : {}),
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_hash_mismatch",
+            path: "/head/headHash",
+            message:
+              "projection replay settlement store head hash does not match its body",
+            expected: observedHeadHash,
+            actual: observedHead.headHash,
+          },
+        ],
+      },
+    );
+  }
+
+  const knownAtSequence = knownHeads.find(
+    (head) => head.settlementSequence === observedHead.settlementSequence,
+  );
+  if (knownAtSequence !== undefined) {
+    if (
+      sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+        knownAtSequence,
+        observedHead,
+      )
+    ) {
+      if (
+        latestHead !== undefined &&
+        observedHead.settlementSequence < latestHead.settlementSequence
+      ) {
+        return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+          {
+            observation,
+            latestHead,
+            issues: [
+              {
+                code: "projection_replay_certificate_store_root_witness_settlement_store_head_regression",
+                path: "/head/settlementSequence",
+                message:
+                  "projection replay settlement store head is older than the latest witnessed settlement head",
+                expected: latestHead.settlementSequence,
+                actual: observedHead.settlementSequence,
+              },
+            ],
+          },
+        );
+      }
+      return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+        {
+          observation,
+          status: "accepted_duplicate",
+          latestHead: latestHead ?? observedHead,
+          acceptedHeads: [observedHead],
+        },
+      );
+    }
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+      {
+        observation,
+        ...(latestHead !== undefined ? { latestHead } : {}),
+        conflictingHead: knownAtSequence,
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_fork",
+            path: "/head/settlementRecordHash",
+            message:
+              "projection replay settlement store head conflicts with an already witnessed head at the same settlement sequence",
+            expected: knownAtSequence.settlementRecordHash,
+            actual: observedHead.settlementRecordHash,
+          },
+        ],
+      },
+    );
+  }
+
+  if (latestHead === undefined) {
+    const proof = observation.consistencyProof;
+    if (observedHead.settlementSequence === 1 && proof === undefined) {
+      return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+        {
+          observation,
+          status: "accepted_initial",
+          latestHead: observedHead,
+          acceptedHeads: [observedHead],
+        },
+      );
+    }
+    if (proof === undefined) {
+      return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+        {
+          observation,
+          issues: [
+            {
+              code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_missing",
+              path: "/consistencyProof",
+              message:
+                "first settlement store head observation after sequence 1 requires a consistency proof from the beginning of the settlement store",
+              expected: 1,
+              actual: observedHead.settlementSequence,
+            },
+          ],
+        },
+      );
+    }
+    const proofIssues =
+      validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadProof({
+        tenant,
+        observedHead,
+        proof,
+      });
+    if (proofIssues.length > 0) {
+      return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+        { observation, issues: proofIssues },
+      );
+    }
+    const proofVerification =
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof(
+        proof,
+      );
+    return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+      {
+        observation,
+        status: "accepted_initial",
+        latestHead: observedHead,
+        acceptedHeads: proofVerification.acceptedHeads,
+      },
+    );
+  }
+
+  if (observedHead.settlementSequence < latestHead.settlementSequence) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+      {
+        observation,
+        latestHead,
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_regression",
+            path: "/head/settlementSequence",
+            message:
+              "projection replay settlement store head regresses behind the latest witnessed settlement head",
+            expected: latestHead.settlementSequence,
+            actual: observedHead.settlementSequence,
+          },
+        ],
+      },
+    );
+  }
+
+  const proof = observation.consistencyProof;
+  if (proof === undefined) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+      {
+        observation,
+        latestHead,
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_missing",
+            path: "/consistencyProof",
+            message:
+              "projection replay settlement store head advance requires a consistency proof from the latest witnessed settlement head",
+            expected: latestHead.settlementSequence,
+            actual: observedHead.settlementSequence,
+          },
+        ],
+      },
+    );
+  }
+
+  const proofIssues =
+    validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadProof({
+      tenant,
+      observedHead,
+      proof,
+      expectedFromHead: latestHead,
+    });
+  if (proofIssues.length > 0) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+      {
+        observation,
+        latestHead,
+        issues: proofIssues,
+      },
+    );
+  }
+
+  const proofVerification =
+    verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof(
+      proof,
+    );
+  return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+    {
+      observation,
+      status: "accepted_advance",
+      latestHead: observedHead,
+      acceptedHeads: proofVerification.acceptedHeads,
+    },
+  );
+}
+
+function validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadProof(input: {
+  readonly tenant: string;
+  readonly observedHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly proof: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof;
+  readonly expectedFromHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[] {
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[] =
+    [];
+  const { proof } = input;
+
+  if (String(proof.tenantId) !== input.tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/tenantId",
+      message:
+        "projection replay settlement store head consistency proof tenant does not match the head observation",
+      expected: input.tenant,
+      actual: String(proof.tenantId),
+    });
+  }
+  if (
+    !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+      proof.toHead,
+      input.observedHead,
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/toHead",
+      message:
+        "projection replay settlement store head consistency proof does not end at the observed head",
+      expected: input.observedHead.headHash,
+      actual: proof.toHead.headHash,
+    });
+  }
+  if (
+    input.expectedFromHead === undefined &&
+    proof.fromHead !== undefined
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/fromHead",
+      message:
+        "first settlement store head witness observation must prove the head from the beginning of the settlement store",
+      actual: proof.fromHead.headHash,
+    });
+  }
+  if (
+    input.expectedFromHead !== undefined &&
+    !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+      proof.fromHead,
+      input.expectedFromHead,
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/fromHead",
+      message:
+        "projection replay settlement store head consistency proof must start at the latest witnessed settlement head",
+      expected: input.expectedFromHead.headHash,
+      actual: proof.fromHead?.headHash ?? "",
+    });
+  }
+
+  const proofVerification =
+    verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof(
+      proof,
+    );
+  if (!proofVerification.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/records",
+      message: `projection replay settlement store head consistency proof failed record verification: ${proofVerification.issues
+        .map((issue) => issue.code)
+        .join(", ")}`,
+    });
+  }
+
+  return issues;
+}
+
+function acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+  readonly status: Exclude<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessStatus,
+    "obstructed"
+  >;
+  readonly latestHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision {
+  return {
+    accepted: true,
+    status: input.status,
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    latestHead: input.latestHead,
+    acceptedHeads:
+      sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+        input.acceptedHeads,
+      ),
+    issues: [],
+  };
+}
+
+function obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly conflictingHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision {
+  const obstruction =
+    buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObstruction(
+      input,
+    );
+  return {
+    accepted: false,
+    status: "obstructed",
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    ...(input.latestHead !== undefined ? { latestHead: input.latestHead } : {}),
+    acceptedHeads: [],
+    issues: input.issues,
+    obstruction,
+  };
+}
+
+function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObstruction(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly conflictingHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessIssue[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObstructionArtifact {
+  const payload = {
+    tenantId: input.observation.tenantId,
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    ...(input.latestHead !== undefined ? { latestHead: input.latestHead } : {}),
+    ...(input.conflictingHead !== undefined
+      ? { conflictingHead: input.conflictingHead }
+      : {}),
+    issues: input.issues,
+  };
+  return {
+    artifactId: `projection_replay_settlement_store_head_obstruction_${fingerprint64(
+      canonicalStringify(payload),
+    )}`,
+    tenantId: input.observation.head.tenantId,
+    generatedAt: input.observation.observedAt,
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    ...(input.latestHead !== undefined ? { latestHead: input.latestHead } : {}),
+    ...(input.conflictingHead !== undefined
+      ? { conflictingHead: input.conflictingHead }
+      : {}),
+    issues: input.issues,
+    allowedAction: "request_settlement_store_head_consistency_proof",
+  };
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord,
+    "observationHash"
+  > = {
+    tenantId: tenantId(String(input.observation.tenantId)),
+    witnessSequence: input.witnessSequence,
+    observerId: input.observation.observerId,
+    observedAt: input.observation.observedAt,
+    head: input.observation.head,
+    ...(input.observation.consistencyProof !== undefined
+      ? { consistencyProof: input.observation.consistencyProof }
+      : {}),
+    ...(input.observation.signature !== undefined
+      ? { signature: input.observation.signature }
+      : {}),
+    decision: input.decision,
+    accepted: input.decision.accepted,
+    status: input.decision.status,
+    ...(input.previousObservationHash !== undefined
+      ? { previousObservationHash: input.previousObservationHash }
+      : {}),
+    recordedAt: input.recordedAt ?? input.observation.observedAt,
+  };
+
+  return {
+    ...payload,
+    observationHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord,
+    "observationHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessObservationSignaturePayloadHash(
+  observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput,
+): string {
+  return fingerprint64(
+    canonicalStringify({
+      tenantId: tenantId(String(observation.tenantId)),
+      observerId: observation.observerId,
+      observedAt: observation.observedAt,
+      head: observation.head,
+      ...(observation.consistencyProof !== undefined
+        ? { consistencyProof: observation.consistencyProof }
+        : {}),
+    }),
+  );
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+  readonly compactionCheckpoint?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly compactionCheckpointAdmission?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) => a.witnessSequence - b.witnessSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerIssue[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[] =
+    [];
+  const witnessCheckpoint = input.compactionCheckpoint?.witnessLedger;
+  if (witnessCheckpoint !== undefined) {
+    const admissionValidation =
+      validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: input.tenantId,
+          checkpoint: input.compactionCheckpoint!,
+          ...(input.compactionCheckpointAdmission !== undefined
+            ? { admission: input.compactionCheckpointAdmission }
+            : {}),
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!admissionValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_compaction_checkpoint_invalid",
+        path: "/compactionCheckpointAdmission",
+        message: admissionValidation.message,
+      });
+    }
+    const checkpointValidation =
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+        input.compactionCheckpoint!,
+      );
+    if (!checkpointValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/checkpointHash",
+        message:
+          "projection replay settlement-store head witness ledger compaction checkpoint hash does not match its body",
+        expected: checkpointValidation.expectedHash,
+        actual: input.compactionCheckpoint!.checkpointHash,
+      });
+    }
+    if (
+      String(input.compactionCheckpoint!.tenantId) !== tenant ||
+      String(witnessCheckpoint.tenantId) !== tenant
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/tenantId",
+        message:
+          "projection replay settlement-store head witness ledger compaction checkpoint tenant mismatch",
+        expected: tenant,
+        actual: String(input.compactionCheckpoint!.tenantId),
+      });
+    }
+    if (
+      !Number.isInteger(witnessCheckpoint.compactedThroughWitnessSequence) ||
+      witnessCheckpoint.compactedThroughWitnessSequence < 1 ||
+      witnessCheckpoint.compactedThroughObservationHash === ""
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/witnessLedger",
+        message:
+          "projection replay settlement-store head witness ledger compaction checkpoint requires a positive compacted witness sequence and observation hash",
+        actual: `${witnessCheckpoint.compactedThroughWitnessSequence}:${witnessCheckpoint.compactedThroughObservationHash}`,
+      });
+    }
+    if (issues.length === 0) {
+      expectedSequence =
+        witnessCheckpoint.compactedThroughWitnessSequence + 1;
+      expectedPreviousHash =
+        witnessCheckpoint.compactedThroughObservationHash;
+      acceptedHeads = witnessCheckpoint.acceptedHeads;
+    }
+  }
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_tenant_mismatch",
+        path: `/records/${index}/tenantId`,
+        message:
+          "projection replay settlement store head witness record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (record.witnessSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_sequence_gap",
+        path: `/records/${index}/witnessSequence`,
+        message:
+          "projection replay settlement store head witness records must be contiguous",
+        expected: expectedSequence,
+        actual: record.witnessSequence,
+      });
+    }
+    if (
+      (record.previousObservationHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_previous_hash_mismatch",
+        path: `/records/${index}/previousObservationHash`,
+        message:
+          "projection replay settlement store head witness record does not chain to the prior observation",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousObservationHash ?? "",
+      });
+    }
+
+    const { observationHash, ...recordPayload } = record;
+    const expectedObservationHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordHash(
+        recordPayload,
+      );
+    if (observationHash !== expectedObservationHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_hash_mismatch",
+        path: `/records/${index}/observationHash`,
+        message:
+          "projection replay settlement store head witness record hash does not match its body",
+        expected: expectedObservationHash,
+        actual: observationHash,
+      });
+    }
+
+    const expectedDecision =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+        {
+          observation:
+            projectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationFromRecord(
+              record,
+            ),
+          knownHeads: acceptedHeads,
+        },
+      );
+    if (
+      canonicalStringify(record.decision) !== canonicalStringify(expectedDecision)
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_decision_mismatch",
+        path: `/records/${index}/decision`,
+        message:
+          "projection replay settlement store head witness record decision does not replay from prior accepted observations",
+      });
+    }
+
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordSignatureIssues(
+      {
+        issues,
+        path: `/records/${index}/signature`,
+        tenantId: tenant,
+        record,
+        ...(input.signaturePolicy !== undefined
+          ? { signaturePolicy: input.signaturePolicy }
+          : {}),
+      },
+    );
+
+    if (issues.length === issueCountBefore && record.decision.accepted) {
+      acceptedHeads =
+        mergeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+          acceptedHeads,
+          record.decision.acceptedHeads,
+        );
+    }
+    expectedSequence = record.witnessSequence + 1;
+    expectedPreviousHash = record.observationHash;
+  }
+
+  const sortedAcceptedHeads =
+    sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+      acceptedHeads,
+    );
+  const latestHead = sortedAcceptedHeads[sortedAcceptedHeads.length - 1];
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    acceptedHeads: sortedAcceptedHeads,
+    ...(latestHead !== undefined ? { latestHead } : {}),
+    issues,
+  };
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordSignatureIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerIssue[];
+  readonly path: string;
+  readonly tenantId: TenantId | string;
+  readonly record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord;
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): void {
+  const policy = input.signaturePolicy;
+  if (policy === undefined) {
+    return;
+  }
+  const signature = input.record.signature;
+  if (signature === undefined) {
+    if (policy.required) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_missing",
+        path: input.path,
+        message:
+          "projection replay settlement-store head witness record requires a witness principal signature",
+      });
+    }
+    return;
+  }
+
+  if (signature.principalId !== input.record.observerId) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_principal_mismatch",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay settlement-store head witness record signature principal must match the observer id",
+      expected: input.record.observerId,
+      actual: signature.principalId,
+    });
+  }
+
+  const expectedPayloadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessObservationSignaturePayloadHash(
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationFromRecord(
+        input.record,
+      ),
+    );
+  if (signature.payloadHash !== expectedPayloadHash) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_payload_mismatch",
+      path: `${input.path}/payloadHash`,
+      message:
+        "projection replay settlement-store head witness record signature payload hash does not match the observation body",
+      expected: expectedPayloadHash,
+      actual: signature.payloadHash,
+    });
+  }
+
+  const principal = policy.authorityTopology?.principals.find(
+    (candidate) =>
+      candidate.witnessId === input.record.observerId &&
+      candidate.status === "active" &&
+      candidate.validFromSettlementSequence <=
+        input.record.head.settlementSequence,
+  );
+  if (policy.authorityTopology !== undefined && principal === undefined) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_principal_not_authorized",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay settlement-store head witness record signature principal is not active in the replayed authority topology",
+      actual: signature.principalId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyStatus !== undefined &&
+    principal.signatureKeyStatus !== "active"
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness record signature key is not current in the replayed authority topology",
+      expected: "active",
+      actual: principal.signatureKeyStatus,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId === undefined &&
+    policy.required
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness record signature has no active admitted key in the replayed authority topology",
+      expected: "active admitted key",
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId !== undefined &&
+    signature.keyId !== principal.signatureKeyId
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_key_mismatch",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness record signature key does not match the admitted witness principal key",
+      expected: principal.signatureKeyId,
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureAlgorithm !== undefined &&
+    signature.algorithm !== principal.signatureAlgorithm
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_key_mismatch",
+      path: `${input.path}/algorithm`,
+      message:
+        "projection replay settlement-store head witness record signature algorithm does not match the admitted witness principal algorithm",
+      expected: principal.signatureAlgorithm,
+      actual: signature.algorithm,
+    });
+  }
+
+  const verified = policy.verifier({
+    tenantId: input.tenantId,
+    principalId: signature.principalId,
+    keyId: signature.keyId,
+    algorithm: signature.algorithm,
+    payloadHash: signature.payloadHash,
+    signature: signature.signature,
+    ...(signature.signedAt !== undefined ? { signedAt: signature.signedAt } : {}),
+  });
+  if (!verified) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_ledger_signature_invalid",
+      path: `${input.path}/signature`,
+      message:
+        "projection replay settlement-store head witness record signature verifier rejected the signature",
+    });
+  }
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecord[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementRecordReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) => a.settlementSequence - b.settlementSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementRecordIssue[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let settledRoots: readonly ProjectionReplayCertificateStoreRoot[] = [];
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_record_tenant_mismatch",
+        path: `/records/${index}/tenantId`,
+        message:
+          "projection replay root witness settlement record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (String(record.settlement.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_record_tenant_mismatch",
+        path: `/records/${index}/settlement/tenantId`,
+        message:
+          "projection replay root witness settlement record cannot contain a settlement for another tenant",
+        expected: tenant,
+        actual: String(record.settlement.tenantId),
+      });
+    }
+    if (record.settlementSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_record_sequence_gap",
+        path: `/records/${index}/settlementSequence`,
+        message:
+          "projection replay root witness settlement records must be contiguous",
+        expected: expectedSequence,
+        actual: record.settlementSequence,
+      });
+    }
+    if (
+      (record.previousSettlementRecordHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_record_previous_hash_mismatch",
+        path: `/records/${index}/previousSettlementRecordHash`,
+        message:
+          "projection replay root witness settlement record does not chain to the prior settlement record",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousSettlementRecordHash ?? "",
+      });
+    }
+    if (
+      !sameProjectionReplayCertificateStoreRoot(
+        record.root,
+        record.settlement.root,
+      )
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_record_root_mismatch",
+        path: `/records/${index}/root`,
+        message:
+          "projection replay root witness settlement record root must match the settlement root",
+        expected: record.settlement.root.rootHash,
+        actual: record.root.rootHash,
+      });
+    }
+
+    const { settlementHash, ...settlementPayload } = record.settlement;
+    const expectedSettlementHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementHash(
+        settlementPayload,
+      );
+    if (settlementHash !== expectedSettlementHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_record_settlement_hash_mismatch",
+        path: `/records/${index}/settlement/settlementHash`,
+        message:
+          "projection replay root witness settlement record contains a settlement hash that does not match its body",
+        expected: expectedSettlementHash,
+        actual: settlementHash,
+      });
+    }
+
+    const { settlementRecordHash, ...recordPayload } = record;
+    const expectedRecordHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementRecordHash(
+        recordPayload,
+      );
+    if (settlementRecordHash !== expectedRecordHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_record_hash_mismatch",
+        path: `/records/${index}/settlementRecordHash`,
+        message:
+          "projection replay root witness settlement record hash does not match its body",
+        expected: expectedRecordHash,
+        actual: settlementRecordHash,
+      });
+    }
+
+    if (
+      issues.length === issueCountBefore &&
+      record.settlement.status === "settled"
+    ) {
+      settledRoots = mergeProjectionReplayCertificateStoreRoots(settledRoots, [
+        record.root,
+      ]);
+    }
+    expectedSequence = record.settlementSequence + 1;
+    expectedPreviousHash = record.settlementRecordHash;
+  }
+
+  const sortedSettledRoots =
+    sortedProjectionReplayCertificateStoreRoots(settledRoots);
+  const latestSettledRoot = sortedSettledRoots[sortedSettledRoots.length - 1];
+  const latestRecord = records[records.length - 1];
+  const settlementStoreHead =
+    issues.length === 0 && latestRecord !== undefined
+      ? projectionReplayCertificateStoreRootWitnessSettlementStoreHeadFromRecord(
+          latestRecord,
+        )
+      : undefined;
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    settledRoots: sortedSettledRoots,
+    ...(latestSettledRoot !== undefined ? { latestSettledRoot } : {}),
+    ...(settlementStoreHead !== undefined ? { settlementStoreHead } : {}),
+    issues,
+  };
+}
+
+export function projectionReplayCertificateStoreRootWitnessSettlementRefFromRecord(
+  record: ProjectionReplayCertificateStoreRootWitnessSettlementRecord,
+  input: {
+    readonly checkedAt?: Timestamp | string;
+  } = {},
+): ProjectionReplayCertificateStoreRootWitnessSettlementRef | undefined {
+  if (record.settlement.status !== "settled") return undefined;
+  return {
+    rootSequence: record.root.sequence,
+    rootHash: record.root.rootHash,
+    settlementSequence: record.settlementSequence,
+    settlementStatus: "settled",
+    settlementHash: record.settlement.settlementHash,
+    settlementRecordHash: record.settlementRecordHash,
+    ...(record.settlement.authorityTopologyHash !== undefined
+      ? { authorityTopologyHash: record.settlement.authorityTopologyHash }
+      : {}),
+    checkedAt: input.checkedAt ?? record.recordedAt,
+  };
+}
+
+export function verifyProjectionReplayCertificateStoreRootWitnessSettlementRef(input: {
+  readonly tenantId: TenantId | string;
+  readonly ref: ProjectionReplayCertificateStoreRootWitnessSettlementRef;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecord[];
+  readonly root?: ProjectionReplayCertificateStoreRoot;
+  readonly currentnessPolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementCurrentnessPolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementRefVerification {
+  const replay = replayProjectionReplayCertificateStoreRootWitnessSettlementRecords({
+    tenantId: input.tenantId,
+    records: input.records,
+  });
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementRefIssue[] =
+    [];
+  if (!replay.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_ref_ledger_invalid",
+      path: "/records",
+      message:
+        "projection replay root witness settlement ref cannot be verified against an invalid settlement ledger",
+      actual: replay.issues.map((issue) => issue.code).join(", "),
+    });
+  }
+
+  const record = replay.records.find(
+    (candidate) =>
+      candidate.settlementSequence === input.ref.settlementSequence &&
+      candidate.settlementRecordHash === input.ref.settlementRecordHash,
+  );
+  if (record === undefined) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_ref_missing",
+      path: "/ref/settlementRecordHash",
+      message:
+        "projection replay root witness settlement ref does not resolve to an admitted settlement record",
+      actual: input.ref.settlementRecordHash,
+    });
+    return {
+      valid: false,
+      ref: input.ref,
+      replay,
+      issues,
+    };
+  }
+
+  if (input.root !== undefined && !sameProjectionReplayCertificateStoreRoot(record.root, input.root)) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_ref_root_mismatch",
+      path: "/root",
+      message:
+        "projection replay root witness settlement ref does not match the required certificate-store root",
+      expected: input.root.rootHash,
+      actual: record.root.rootHash,
+    });
+  }
+  if (
+    record.root.sequence !== input.ref.rootSequence ||
+    record.root.rootHash !== input.ref.rootHash
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_ref_mismatch",
+      path: "/ref/root",
+      message:
+        "projection replay root witness settlement ref root does not match the admitted settlement record",
+      expected: `${record.root.sequence}:${record.root.rootHash}`,
+      actual: `${input.ref.rootSequence}:${input.ref.rootHash}`,
+    });
+  }
+  if (record.settlement.status !== "settled") {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_ref_not_settled",
+      path: "/record/settlement/status",
+      message:
+        "projection replay root witness settlement ref requires an admitted settled settlement record",
+      expected: "settled",
+      actual: record.settlement.status,
+    });
+  }
+  if (
+    input.ref.settlementStatus !== "settled" ||
+    input.ref.settlementHash !== record.settlement.settlementHash ||
+    input.ref.authorityTopologyHash !== record.settlement.authorityTopologyHash
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_ref_mismatch",
+      path: "/ref/settlement",
+      message:
+        "projection replay root witness settlement ref does not match the admitted settlement body",
+      expected: record.settlement.settlementHash,
+      actual: input.ref.settlementHash,
+    });
+  }
+
+  const currentnessPolicy = input.currentnessPolicy;
+  if (currentnessPolicy !== undefined && replay.valid) {
+    const minimumSettlementSequence =
+      currentnessPolicy.minimumSettlementSequence;
+    if (
+      minimumSettlementSequence !== undefined &&
+      record.settlementSequence < minimumSettlementSequence
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_ref_below_currentness_frontier",
+        path: "/ref/settlementSequence",
+        message:
+          "projection replay root witness settlement ref is older than the required settlement frontier",
+        expected: minimumSettlementSequence,
+        actual: record.settlementSequence,
+      });
+    }
+
+    const requiredAuthorityTopologyHash =
+      currentnessPolicy.requiredAuthorityTopologyHash;
+    if (
+      requiredAuthorityTopologyHash !== undefined &&
+      record.settlement.authorityTopologyHash !== requiredAuthorityTopologyHash
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_ref_authority_topology_mismatch",
+        path: "/record/settlement/authorityTopologyHash",
+        message:
+          "projection replay root witness settlement ref was admitted under a different witness authority topology",
+        expected: requiredAuthorityTopologyHash,
+        actual: record.settlement.authorityTopologyHash ?? "",
+      });
+    }
+
+    const requiredSettlementStoreHead =
+      currentnessPolicy.requiredSettlementStoreHead;
+    if (
+      requiredSettlementStoreHead !== undefined &&
+      !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+        replay.settlementStoreHead,
+        requiredSettlementStoreHead,
+      )
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_ref_store_head_mismatch",
+        path: "/currentnessPolicy/requiredSettlementStoreHead",
+        message:
+          "projection replay root witness settlement ref was verified against a settlement store head that does not match the required witnessed head",
+        expected: `${requiredSettlementStoreHead.settlementSequence}:${requiredSettlementStoreHead.settlementRecordHash}:${requiredSettlementStoreHead.headHash}`,
+        actual:
+          replay.settlementStoreHead === undefined
+            ? ""
+            : `${replay.settlementStoreHead.settlementSequence}:${replay.settlementStoreHead.settlementRecordHash}:${replay.settlementStoreHead.headHash}`,
+      });
+    }
+
+    if (
+      currentnessPolicy.requireLatestSettledRoot === true &&
+      replay.latestSettledRoot !== undefined &&
+      !sameProjectionReplayCertificateStoreRoot(
+        record.root,
+        replay.latestSettledRoot,
+      )
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_ref_stale",
+        path: "/ref/root",
+        message:
+          "projection replay root witness settlement ref does not cite the latest settled certificate-store root",
+        expected: `${replay.latestSettledRoot.sequence}:${replay.latestSettledRoot.rootHash}`,
+        actual: `${record.root.sequence}:${record.root.rootHash}`,
+      });
+    }
+
+    const laterSameRootRecord = replay.records.find(
+      (candidate) =>
+        candidate.settlementSequence > record.settlementSequence &&
+        sameProjectionReplayCertificateStoreRoot(candidate.root, record.root),
+    );
+    if (
+      currentnessPolicy.requireLatestSettlementForRoot === true &&
+      laterSameRootRecord !== undefined
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_ref_stale",
+        path: "/ref/settlementSequence",
+        message:
+          "projection replay root witness settlement ref has been superseded by a later settlement record for the same root",
+        expected: laterSameRootRecord.settlementSequence,
+        actual: record.settlementSequence,
+      });
+    }
+
+    const laterConflictingRootRecord = replay.records.find(
+      (candidate) =>
+        candidate.settlementSequence > record.settlementSequence &&
+        conflictsWithProjectionReplayCertificateStoreRoot(
+          candidate.root,
+          record.root,
+        ),
+    );
+    if (
+      currentnessPolicy.disallowLaterConflictingRoot === true &&
+      laterConflictingRootRecord !== undefined
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_ref_conflict",
+        path: "/records",
+        message:
+          "projection replay root witness settlement ref is followed by a conflicting same-sequence root record",
+        expected: `${record.root.sequence}:${record.root.rootHash}`,
+        actual: `${laterConflictingRootRecord.root.sequence}:${laterConflictingRootRecord.root.rootHash}`,
+      });
+    }
+
+    const laterObstructionRecord = replay.records.find(
+      (candidate) =>
+        candidate.settlementSequence > record.settlementSequence &&
+        candidate.settlement.status === "obstructed",
+    );
+    if (
+      currentnessPolicy.disallowLaterObstruction === true &&
+      laterObstructionRecord !== undefined
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_ref_stale",
+        path: "/records",
+        message:
+          "projection replay root witness settlement ref is followed by an obstructed settlement record",
+        expected: "no later obstruction",
+        actual: `${laterObstructionRecord.settlementSequence}:${laterObstructionRecord.root.rootHash}`,
+      });
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    ref: input.ref,
+    record,
+    replay,
+    issues,
+  };
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition,
+    "authorityHash"
+  > = {
+    tenantId: tenantId(String(input.tenantId)),
+    authoritySequence: input.authoritySequence,
+    transitionId: input.transitionId,
+    transitionKind: input.transitionKind,
+    recordedAt: input.recordedAt,
+    recordedBy: input.recordedBy,
+    effectiveFromSettlementSequence: input.effectiveFromSettlementSequence,
+    ...(input.witnessId !== undefined ? { witnessId: input.witnessId } : {}),
+    ...(input.requiredWitnesses !== undefined
+      ? { requiredWitnesses: input.requiredWitnesses }
+      : {}),
+    ...(input.minimumWitnesses !== undefined
+      ? { minimumWitnesses: input.minimumWitnesses }
+      : {}),
+    ...(input.sealedThroughSettlementSequence !== undefined
+      ? { sealedThroughSettlementSequence: input.sealedThroughSettlementSequence }
+      : {}),
+    ...(input.sealedAuthorityTopologyHash !== undefined
+      ? { sealedAuthorityTopologyHash: input.sealedAuthorityTopologyHash }
+      : {}),
+    ...(input.sealedQuorumCertificateHash !== undefined
+      ? { sealedQuorumCertificateHash: input.sealedQuorumCertificateHash }
+      : {}),
+    ...(input.signatureKeyId !== undefined
+      ? { signatureKeyId: input.signatureKeyId }
+      : {}),
+    ...(input.signatureAlgorithm !== undefined
+      ? { signatureAlgorithm: input.signatureAlgorithm }
+      : {}),
+    ...(input.signaturePublicKeyFingerprint !== undefined
+      ? { signaturePublicKeyFingerprint: input.signaturePublicKeyFingerprint }
+      : {}),
+    ...(input.signature !== undefined ? { signature: input.signature } : {}),
+    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+    ...(input.previousAuthorityHash !== undefined
+      ? { previousAuthorityHash: input.previousAuthorityHash }
+      : {}),
+  };
+
+  return {
+    ...payload,
+    authorityHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionHash(
+  transition: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition,
+    "authorityHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(transition));
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionSignaturePayloadHash(
+  transition: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition,
+    "authorityHash" | "signature"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(transition));
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(input: {
+  readonly tenantId: TenantId | string;
+  readonly settlementSequence: number;
+  readonly transitions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[];
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+  readonly compactionCheckpoint?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly compactionCheckpointAdmission?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopology {
+  const tenant = String(input.tenantId);
+  const transitions = [...input.transitions].sort(
+    (a, b) => a.authoritySequence - b.authoritySequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityIssue[] =
+    [];
+  const principals = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalState
+  >();
+  const validAuthorityTransitions: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[] =
+    [];
+  const authorityEpochSeals: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityEpochSeal[] =
+    [];
+  let requiredWitnesses: number | undefined;
+  let minimumWitnesses: number | undefined;
+  let effectiveAuthorityHash: string | undefined;
+  let sealedThroughSettlementSequence: number | undefined;
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let latestAuthorityHash: string | undefined;
+  const authorityCheckpoint = input.compactionCheckpoint?.authorityTopology;
+
+  if (
+    !Number.isInteger(input.settlementSequence) ||
+    input.settlementSequence < 1
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_transition_invalid",
+      path: "/settlementSequence",
+      message:
+        "projection replay settlement-store head witness authority topology requires a positive settlement sequence",
+      expected: 1,
+      actual: input.settlementSequence,
+    });
+  }
+  if (authorityCheckpoint !== undefined) {
+    const admissionValidation =
+      validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: input.tenantId,
+          checkpoint: input.compactionCheckpoint!,
+          ...(input.compactionCheckpointAdmission !== undefined
+            ? { admission: input.compactionCheckpointAdmission }
+            : {}),
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!admissionValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_compaction_checkpoint_invalid",
+        path: "/compactionCheckpointAdmission",
+        message: admissionValidation.message,
+      });
+    }
+    const checkpointValidation =
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+        input.compactionCheckpoint!,
+      );
+    if (!checkpointValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/checkpointHash",
+        message:
+          "projection replay settlement-store head witness authority compaction checkpoint hash does not match its body",
+        expected: checkpointValidation.expectedHash,
+        actual: input.compactionCheckpoint!.checkpointHash,
+      });
+    }
+    if (
+      String(input.compactionCheckpoint!.tenantId) !== tenant ||
+      String(authorityCheckpoint.tenantId) !== tenant
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/tenantId",
+        message:
+          "projection replay settlement-store head witness authority compaction checkpoint tenant mismatch",
+        expected: tenant,
+        actual: String(input.compactionCheckpoint!.tenantId),
+      });
+    }
+    if (authorityCheckpoint.settlementSequence !== input.settlementSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/authorityTopology/settlementSequence",
+        message:
+          "projection replay settlement-store head witness authority compaction checkpoint must target the replay settlement sequence",
+        expected: input.settlementSequence,
+        actual: authorityCheckpoint.settlementSequence,
+      });
+    }
+    if (
+      !Number.isInteger(authorityCheckpoint.compactedThroughAuthoritySequence) ||
+      authorityCheckpoint.compactedThroughAuthoritySequence < 1 ||
+      authorityCheckpoint.compactedThroughAuthorityHash === ""
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/authorityTopology",
+        message:
+          "projection replay settlement-store head witness authority compaction checkpoint requires a positive compacted authority sequence and authority hash",
+        actual: `${authorityCheckpoint.compactedThroughAuthoritySequence}:${authorityCheckpoint.compactedThroughAuthorityHash}`,
+      });
+    }
+    if (issues.length === 0) {
+      expectedSequence =
+        authorityCheckpoint.compactedThroughAuthoritySequence + 1;
+      expectedPreviousHash =
+        authorityCheckpoint.compactedThroughAuthorityHash;
+      latestAuthorityHash = authorityCheckpoint.compactedThroughAuthorityHash;
+      requiredWitnesses = authorityCheckpoint.requiredWitnesses;
+      minimumWitnesses = authorityCheckpoint.minimumWitnesses;
+      effectiveAuthorityHash = authorityCheckpoint.effectiveAuthorityHash;
+      sealedThroughSettlementSequence =
+        authorityCheckpoint.sealedThroughSettlementSequence;
+      for (const principal of authorityCheckpoint.principals) {
+        principals.set(principal.witnessId, principal);
+      }
+      authorityEpochSeals.push(...authorityCheckpoint.authorityEpochSeals);
+    }
+  }
+
+  for (const [index, transition] of transitions.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(transition.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_tenant_mismatch",
+        path: `/transitions/${index}/tenantId`,
+        message:
+          "projection replay settlement-store head witness authority transition tenant mismatch",
+        expected: tenant,
+        actual: String(transition.tenantId),
+      });
+    }
+    if (transition.authoritySequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_sequence_gap",
+        path: `/transitions/${index}/authoritySequence`,
+        message:
+          "projection replay settlement-store head witness authority transitions must be contiguous",
+        expected: expectedSequence,
+        actual: transition.authoritySequence,
+      });
+    }
+    if (
+      (transition.previousAuthorityHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_previous_hash_mismatch",
+        path: `/transitions/${index}/previousAuthorityHash`,
+        message:
+          "projection replay settlement-store head witness authority transition does not chain to the prior transition",
+        expected: expectedPreviousHash ?? "",
+        actual: transition.previousAuthorityHash ?? "",
+      });
+    }
+    const { authorityHash, ...transitionPayload } = transition;
+    const expectedAuthorityHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionHash(
+        transitionPayload,
+      );
+    if (authorityHash !== expectedAuthorityHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_hash_mismatch",
+        path: `/transitions/${index}/authorityHash`,
+        message:
+          "projection replay settlement-store head witness authority transition hash does not match its body",
+        expected: expectedAuthorityHash,
+        actual: authorityHash,
+      });
+    }
+    if (
+      !Number.isInteger(transition.effectiveFromSettlementSequence) ||
+      transition.effectiveFromSettlementSequence < 1
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_transition_invalid",
+        path: `/transitions/${index}/effectiveFromSettlementSequence`,
+        message:
+          "projection replay settlement-store head witness authority transition requires a positive effective settlement sequence",
+        expected: 1,
+        actual: transition.effectiveFromSettlementSequence,
+      });
+    }
+
+    const transitionIssuesStart = issues.length;
+    if (transition.transitionKind === "seal_authority_epoch") {
+      if (
+        !Number.isInteger(transition.sealedThroughSettlementSequence) ||
+        (transition.sealedThroughSettlementSequence ?? 0) < 1
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedThroughSettlementSequence`,
+          message:
+            "projection replay settlement-store head witness authority epoch seal requires a positive sealed settlement sequence",
+          expected: 1,
+          actual: transition.sealedThroughSettlementSequence ?? 0,
+        });
+      }
+      if (
+        transition.sealedThroughSettlementSequence !== undefined &&
+        transition.effectiveFromSettlementSequence !==
+          transition.sealedThroughSettlementSequence
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/effectiveFromSettlementSequence`,
+          message:
+            "projection replay settlement-store head witness authority epoch seal must be effective at the sealed settlement sequence",
+          expected: transition.sealedThroughSettlementSequence,
+          actual: transition.effectiveFromSettlementSequence,
+        });
+      }
+      if (
+        transition.sealedThroughSettlementSequence !== undefined &&
+        sealedThroughSettlementSequence !== undefined &&
+        transition.sealedThroughSettlementSequence <=
+          sealedThroughSettlementSequence
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedThroughSettlementSequence`,
+          message:
+            "projection replay settlement-store head witness authority epoch seals must advance monotonically",
+          expected: sealedThroughSettlementSequence + 1,
+          actual: transition.sealedThroughSettlementSequence,
+        });
+      }
+      const expectedSealedAuthorityHash =
+        transition.sealedThroughSettlementSequence === undefined
+          ? undefined
+          : ([...validAuthorityTransitions]
+              .reverse()
+              .find(
+                (priorTransition) =>
+                  priorTransition.transitionKind !== "seal_authority_epoch" &&
+                  priorTransition.effectiveFromSettlementSequence <=
+                    transition.sealedThroughSettlementSequence!,
+              )?.authorityHash ?? authorityCheckpoint?.effectiveAuthorityHash);
+      if (
+        expectedSealedAuthorityHash === undefined ||
+        transition.sealedAuthorityTopologyHash !==
+          expectedSealedAuthorityHash
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedAuthorityTopologyHash`,
+          message:
+            "projection replay settlement-store head witness authority epoch seal must bind the effective authority topology hash",
+          expected: expectedSealedAuthorityHash ?? "",
+          actual: transition.sealedAuthorityTopologyHash ?? "",
+        });
+      }
+      if (
+        transition.sealedQuorumCertificateHash === undefined ||
+        transition.sealedQuorumCertificateHash === ""
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedQuorumCertificateHash`,
+          message:
+            "projection replay settlement-store head witness authority epoch seal requires the quorum certificate hash it finalizes",
+        });
+      }
+      appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionSignatureIssues(
+        {
+          issues,
+          path: `/transitions/${index}/signature`,
+          tenantId: tenant,
+          transition,
+          principals,
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    } else if (
+      sealedThroughSettlementSequence !== undefined &&
+      transition.effectiveFromSettlementSequence <=
+        sealedThroughSettlementSequence
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_retroactive_transition",
+        path: `/transitions/${index}/effectiveFromSettlementSequence`,
+        message:
+          "projection replay settlement-store head witness authority transition cannot modify a sealed settlement epoch",
+        expected: sealedThroughSettlementSequence + 1,
+        actual: transition.effectiveFromSettlementSequence,
+      });
+    } else if (transition.transitionKind === "set_quorum") {
+      if (
+        !Number.isInteger(transition.requiredWitnesses) ||
+        (transition.requiredWitnesses ?? 0) < 1
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/requiredWitnesses`,
+          message:
+            "projection replay settlement-store head witness authority quorum requires at least one required witness",
+          expected: 1,
+          actual: transition.requiredWitnesses ?? 0,
+        });
+      }
+      if (
+        transition.minimumWitnesses !== undefined &&
+        (!Number.isInteger(transition.minimumWitnesses) ||
+          transition.minimumWitnesses < 1)
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/minimumWitnesses`,
+          message:
+            "projection replay settlement-store head witness authority quorum requires a positive minimum witness count",
+          expected: 1,
+          actual: transition.minimumWitnesses,
+        });
+      }
+      if (
+        transition.minimumWitnesses !== undefined &&
+        transition.requiredWitnesses !== undefined &&
+        transition.minimumWitnesses > transition.requiredWitnesses
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/minimumWitnesses`,
+          message:
+            "projection replay settlement-store head witness authority quorum minimum cannot exceed required witnesses",
+          expected: transition.requiredWitnesses,
+          actual: transition.minimumWitnesses,
+        });
+      }
+    } else if (
+      transition.transitionKind === "rotate_signature_key" ||
+      transition.transitionKind === "revoke_signature_key"
+    ) {
+      if (transition.witnessId === undefined || transition.witnessId === "") {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_witness_missing",
+          path: `/transitions/${index}/witnessId`,
+          message:
+            "projection replay settlement-store head witness signature-key transition requires a witness id",
+        });
+      }
+      const principal =
+        transition.witnessId === undefined
+          ? undefined
+          : principals.get(transition.witnessId);
+      if (
+        transition.effectiveFromSettlementSequence <= input.settlementSequence &&
+        (principal === undefined ||
+          principal.status !== "active" ||
+          principal.validFromSettlementSequence >
+            transition.effectiveFromSettlementSequence)
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_transition_invalid",
+          path: `/transitions/${index}/witnessId`,
+          message:
+            "projection replay settlement-store head witness signature-key transition must target an active admitted principal",
+          actual: transition.witnessId ?? "",
+        });
+      }
+      if (
+        transition.transitionKind === "rotate_signature_key" &&
+        (transition.signatureKeyId === undefined ||
+          transition.signatureKeyId === "" ||
+          transition.signatureAlgorithm === undefined ||
+          transition.signatureAlgorithm === "")
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_transition_invalid",
+          path: `/transitions/${index}/signatureKeyId`,
+          message:
+            "projection replay settlement-store head witness key rotation requires a new signature key id and algorithm",
+        });
+      }
+      if (
+        transition.transitionKind === "revoke_signature_key" &&
+        (transition.signatureKeyId === undefined ||
+          transition.signatureKeyId === "")
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_transition_invalid",
+          path: `/transitions/${index}/signatureKeyId`,
+          message:
+            "projection replay settlement-store head witness key revocation requires the revoked signature key id",
+        });
+      }
+      if (
+        transition.transitionKind === "revoke_signature_key" &&
+        principal !== undefined &&
+        principal.signatureKeyId !== undefined &&
+        transition.signatureKeyId !== principal.signatureKeyId
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_transition_invalid",
+          path: `/transitions/${index}/signatureKeyId`,
+          message:
+            "projection replay settlement-store head witness key revocation must target the currently admitted signature key",
+          expected: principal.signatureKeyId,
+          actual: transition.signatureKeyId ?? "",
+        });
+      }
+    } else if (transition.witnessId === undefined || transition.witnessId === "") {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_witness_missing",
+        path: `/transitions/${index}/witnessId`,
+        message:
+          "projection replay settlement-store head witness authority transition requires a witness id",
+      });
+    }
+
+    if (
+      issues.length === transitionIssuesStart &&
+      issues.length === issueCountBefore &&
+      transition.transitionKind === "seal_authority_epoch"
+    ) {
+      const seal: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityEpochSeal =
+        {
+          tenantId: tenantId(String(transition.tenantId)),
+          authoritySequence: transition.authoritySequence,
+          transitionId: transition.transitionId,
+          recordedAt: transition.recordedAt,
+          recordedBy: transition.recordedBy,
+          sealedThroughSettlementSequence:
+            transition.sealedThroughSettlementSequence!,
+          sealedAuthorityTopologyHash: transition.sealedAuthorityTopologyHash!,
+          sealedQuorumCertificateHash: transition.sealedQuorumCertificateHash!,
+          authorityHash: transition.authorityHash,
+        };
+      sealedThroughSettlementSequence = seal.sealedThroughSettlementSequence;
+      authorityEpochSeals.push(seal);
+    } else if (
+      issues.length === transitionIssuesStart &&
+      issues.length === issueCountBefore
+    ) {
+      validAuthorityTransitions.push(transition);
+      if (transition.effectiveFromSettlementSequence <= input.settlementSequence) {
+        applyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+          {
+            transition,
+            principals,
+            setQuorum: (required, minimum) => {
+              requiredWitnesses = required;
+              minimumWitnesses = minimum;
+            },
+          },
+        );
+        effectiveAuthorityHash = transition.authorityHash;
+      }
+    }
+
+    expectedSequence = transition.authoritySequence + 1;
+    expectedPreviousHash = transition.authorityHash;
+    latestAuthorityHash = transition.authorityHash;
+  }
+
+  if (requiredWitnesses === undefined) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_quorum_missing",
+      path: "/transitions",
+      message:
+        "projection replay settlement-store head witness authority topology requires an effective quorum transition",
+    });
+  }
+
+  const principalStates = [...principals.values()].sort((a, b) =>
+    a.witnessId.localeCompare(b.witnessId),
+  );
+  const eligibleWitnessIds = principalStates
+    .filter(
+      (principal) =>
+        principal.status === "active" &&
+        principal.validFromSettlementSequence <= input.settlementSequence,
+    )
+    .map((principal) => principal.witnessId)
+    .sort((a, b) => a.localeCompare(b));
+
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    settlementSequence: input.settlementSequence,
+    ...(requiredWitnesses !== undefined ? { requiredWitnesses } : {}),
+    ...(minimumWitnesses !== undefined ? { minimumWitnesses } : {}),
+    ...(effectiveAuthorityHash !== undefined ? { effectiveAuthorityHash } : {}),
+    ...(sealedThroughSettlementSequence !== undefined
+      ? { sealedThroughSettlementSequence }
+      : {}),
+    eligibleWitnessIds,
+    principals: principalStates,
+    authorityEpochSeals,
+    transitions,
+    ...(latestAuthorityHash !== undefined ? { latestAuthorityHash } : {}),
+    issues,
+  };
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionSignatureIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityIssue[];
+  readonly path: string;
+  readonly tenantId: TenantId | string;
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+  readonly principals: ReadonlyMap<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalState
+  >;
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): void {
+  const policy = input.signaturePolicy;
+  if (policy === undefined) {
+    return;
+  }
+  const signature = input.transition.signature;
+  if (signature === undefined) {
+    if (policy.required) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_missing",
+        path: input.path,
+        message:
+          "projection replay settlement-store head witness authority epoch seal requires a finalizer principal signature",
+      });
+    }
+    return;
+  }
+  const principal = input.principals.get(signature.principalId);
+  if (
+    principal === undefined ||
+    principal.status !== "active" ||
+    principal.validFromSettlementSequence >
+      input.transition.effectiveFromSettlementSequence
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_principal_not_authorized",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay settlement-store head witness authority epoch seal signature principal is not active in the replayed authority topology",
+      actual: signature.principalId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId !== undefined &&
+    signature.keyId !== principal.signatureKeyId
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_mismatch",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness authority epoch seal signature key does not match the admitted principal key",
+      expected: principal.signatureKeyId,
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyStatus !== undefined &&
+    principal.signatureKeyStatus !== "active"
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness authority epoch seal signature key is not current in the replayed authority topology",
+      expected: "active",
+      actual: principal.signatureKeyStatus,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId === undefined &&
+    policy.required
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness authority epoch seal signature has no active admitted key in the replayed authority topology",
+      expected: "active admitted key",
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureAlgorithm !== undefined &&
+    signature.algorithm !== principal.signatureAlgorithm
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_key_mismatch",
+      path: `${input.path}/algorithm`,
+      message:
+        "projection replay settlement-store head witness authority epoch seal signature algorithm does not match the admitted principal algorithm",
+      expected: principal.signatureAlgorithm,
+      actual: signature.algorithm,
+    });
+  }
+  const { authorityHash, signature: _signature, ...signaturePayload } =
+    input.transition;
+  const expectedPayloadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionSignaturePayloadHash(
+      signaturePayload,
+    );
+  if (signature.payloadHash !== expectedPayloadHash) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_payload_mismatch",
+      path: `${input.path}/payloadHash`,
+      message:
+        "projection replay settlement-store head witness authority epoch seal signature payload hash does not match the transition body",
+      expected: expectedPayloadHash,
+      actual: signature.payloadHash,
+    });
+  }
+  const verified = policy.verifier({
+    tenantId: input.tenantId,
+    principalId: signature.principalId,
+    keyId: signature.keyId,
+    algorithm: signature.algorithm,
+    payloadHash: signature.payloadHash,
+    signature: signature.signature,
+    ...(signature.signedAt !== undefined ? { signedAt: signature.signedAt } : {}),
+  });
+  if (!verified) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_authority_signature_invalid",
+      path: `${input.path}/signature`,
+      message:
+        "projection replay settlement-store head witness authority epoch seal signature verifier rejected the signature",
+    });
+  }
+}
+
+function applyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(input: {
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+  readonly principals: Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalState
+  >;
+  readonly setQuorum: (required: number, minimum?: number) => void;
+}): void {
+  const { transition } = input;
+  if (transition.transitionKind === "seal_authority_epoch") {
+    return;
+  }
+  if (transition.transitionKind === "set_quorum") {
+    input.setQuorum(
+      transition.requiredWitnesses!,
+      transition.minimumWitnesses ?? 1,
+    );
+    return;
+  }
+  const witnessId = transition.witnessId!;
+  const existing = input.principals.get(witnessId);
+  const status =
+    transition.transitionKind === "rotate_signature_key" ||
+    transition.transitionKind === "revoke_signature_key"
+      ? existing?.status ?? "active"
+      : projectionReplayCertificateStoreRootWitnessAuthorityStatusFromTransition(
+          transition.transitionKind,
+        );
+  const isSignatureKeyTransition =
+    transition.transitionKind === "rotate_signature_key" ||
+    transition.transitionKind === "revoke_signature_key";
+  const signatureKeyStatus:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatus
+    | undefined =
+    transition.transitionKind === "revoke_signature_key"
+      ? "revoked"
+      : transition.transitionKind === "rotate_signature_key" ||
+          (transition.transitionKind === "admit_witness" &&
+            transition.signatureKeyId !== undefined)
+        ? "active"
+        : existing?.signatureKeyStatus;
+  input.principals.set(witnessId, {
+    tenantId: tenantId(String(transition.tenantId)),
+    witnessId,
+    status,
+    validFromSettlementSequence:
+      transition.transitionKind === "admit_witness"
+        ? transition.effectiveFromSettlementSequence
+        : existing?.validFromSettlementSequence ??
+          transition.effectiveFromSettlementSequence,
+    changedAtAuthoritySequence: transition.authoritySequence,
+    ...(transition.transitionKind === "admit_witness"
+      ? {
+          admittedAt: transition.recordedAt,
+          admittedBy: transition.recordedBy,
+        }
+      : existing?.admittedAt !== undefined
+        ? { admittedAt: existing.admittedAt }
+        : {}),
+    ...(transition.transitionKind !== "admit_witness"
+      ? {
+          statusChangedAt: transition.recordedAt,
+          statusChangedBy: transition.recordedBy,
+        }
+      : existing?.statusChangedAt !== undefined
+        ? {
+            statusChangedAt: existing.statusChangedAt,
+            ...(existing.statusChangedBy !== undefined
+              ? { statusChangedBy: existing.statusChangedBy }
+              : {}),
+          }
+        : {}),
+    ...(transition.transitionKind !== "admit_witness" &&
+    existing?.admittedBy !== undefined
+      ? { admittedBy: existing.admittedBy }
+      : {}),
+    ...(transition.signatureKeyId !== undefined
+      ? { signatureKeyId: transition.signatureKeyId }
+      : existing?.signatureKeyId !== undefined
+        ? { signatureKeyId: existing.signatureKeyId }
+        : {}),
+    ...(transition.signatureAlgorithm !== undefined
+      ? { signatureAlgorithm: transition.signatureAlgorithm }
+      : existing?.signatureAlgorithm !== undefined
+        ? { signatureAlgorithm: existing.signatureAlgorithm }
+        : {}),
+    ...(transition.signaturePublicKeyFingerprint !== undefined
+      ? {
+          signaturePublicKeyFingerprint:
+            transition.signaturePublicKeyFingerprint,
+        }
+      : existing?.signaturePublicKeyFingerprint !== undefined
+        ? {
+            signaturePublicKeyFingerprint:
+              existing.signaturePublicKeyFingerprint,
+          }
+        : {}),
+    ...(signatureKeyStatus !== undefined ? { signatureKeyStatus } : {}),
+    ...(isSignatureKeyTransition || transition.transitionKind === "admit_witness"
+      ? {
+          signatureKeyChangedAtAuthoritySequence:
+            transition.authoritySequence,
+          signatureKeyChangedAt: transition.recordedAt,
+          signatureKeyChangedBy: transition.recordedBy,
+        }
+      : existing?.signatureKeyChangedAtAuthoritySequence !== undefined
+        ? {
+            signatureKeyChangedAtAuthoritySequence:
+              existing.signatureKeyChangedAtAuthoritySequence,
+            ...(existing.signatureKeyChangedAt !== undefined
+              ? { signatureKeyChangedAt: existing.signatureKeyChangedAt }
+              : {}),
+            ...(existing.signatureKeyChangedBy !== undefined
+              ? { signatureKeyChangedBy: existing.signatureKeyChangedBy }
+              : {}),
+          }
+        : {}),
+    ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
+  });
+}
+
+export function evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate(input: {
+  readonly tenantId: TenantId | string;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly witnessReplay: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedgerReplay;
+  readonly policy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumPolicy;
+  readonly authorityTopology?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopology;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate {
+  const tenant = String(input.tenantId);
+  const requestedRequiredWitnesses =
+    input.authorityTopology?.requiredWitnesses ??
+    input.policy?.requiredWitnesses ??
+    1;
+  const requestedMinimumWitnesses =
+    input.authorityTopology?.minimumWitnesses ??
+    input.policy?.minimumWitnesses ??
+    1;
+  const requiredWitnesses = Number.isInteger(requestedRequiredWitnesses)
+    ? Math.max(1, requestedRequiredWitnesses)
+    : 1;
+  const minimumWitnesses = Number.isInteger(requestedMinimumWitnesses)
+    ? Math.max(1, requestedMinimumWitnesses)
+    : 1;
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateIssue[] =
+    [];
+  const acceptedWitnessIds = new Set<string>();
+  const obstructingWitnessIds = new Set<string>();
+  const invalidWitnessIds = new Set<string>();
+  const validWitnessIds = new Set<string>();
+  const topology = input.authorityTopology;
+  const topologyEligibleWitnessIds = new Set(topology?.eligibleWitnessIds ?? []);
+  let authorityTopologyInvalid = false;
+
+  if (!Number.isInteger(requestedRequiredWitnesses) || requestedRequiredWitnesses < 1) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_invalid_policy",
+      path: "/policy/requiredWitnesses",
+      message:
+        "projection replay settlement-store head witness quorum requires at least one required witness",
+      expected: 1,
+      actual: requestedRequiredWitnesses,
+    });
+  }
+  if (!Number.isInteger(requestedMinimumWitnesses) || requestedMinimumWitnesses < 1) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_invalid_policy",
+      path: "/policy/minimumWitnesses",
+      message:
+        "projection replay settlement-store head witness quorum requires at least one minimum witness",
+      expected: 1,
+      actual: requestedMinimumWitnesses,
+    });
+  }
+  if (
+    Number.isInteger(requestedRequiredWitnesses) &&
+    Number.isInteger(requestedMinimumWitnesses) &&
+    requestedMinimumWitnesses > requestedRequiredWitnesses
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_invalid_policy",
+      path: "/policy/minimumWitnesses",
+      message:
+        "projection replay settlement-store head witness quorum minimum cannot exceed required witnesses",
+      expected: requestedRequiredWitnesses,
+      actual: requestedMinimumWitnesses,
+    });
+  }
+  if (String(input.head.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_head_tenant_mismatch",
+      path: "/head/tenantId",
+      message:
+        "projection replay settlement-store head witness quorum head tenant does not match the quorum tenant",
+      expected: tenant,
+      actual: String(input.head.tenantId),
+    });
+  }
+  if (!input.witnessReplay.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_replay_invalid",
+      path: "/witnessReplay",
+      message:
+        "projection replay settlement-store head witness quorum cannot use a witness replay that fails replay verification",
+      actual: input.witnessReplay.issues.map((issue) => issue.code).join(", "),
+    });
+  }
+  if (String(input.witnessReplay.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_tenant_mismatch",
+      path: "/witnessReplay/tenantId",
+      message:
+        "projection replay settlement-store head witness quorum cannot count witness records from another tenant",
+      expected: tenant,
+      actual: String(input.witnessReplay.tenantId),
+    });
+  }
+  if (topology !== undefined) {
+    if (!topology.valid) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_authority_topology_invalid",
+        path: "/authorityTopology",
+        message:
+          "projection replay settlement-store head witness quorum cannot use an invalid witness authority topology",
+        actual: topology.issues.map((issue) => issue.code).join(", "),
+      });
+    }
+    if (String(topology.tenantId) !== tenant) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_authority_topology_invalid",
+        path: "/authorityTopology/tenantId",
+        message:
+          "projection replay settlement-store head witness authority topology tenant does not match the quorum tenant",
+        expected: tenant,
+        actual: String(topology.tenantId),
+      });
+    }
+    if (topology.settlementSequence !== input.head.settlementSequence) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_authority_topology_invalid",
+        path: "/authorityTopology/settlementSequence",
+        message:
+          "projection replay settlement-store head witness authority topology must be replayed for the observed head sequence",
+        expected: input.head.settlementSequence,
+        actual: topology.settlementSequence,
+      });
+    }
+    if (
+      input.policy !== undefined &&
+      (input.policy.requiredWitnesses !== topology.requiredWitnesses ||
+        (input.policy.minimumWitnesses ?? 1) !==
+          (topology.minimumWitnesses ?? 1))
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_policy_authority_mismatch",
+        path: "/policy",
+        message:
+          "projection replay settlement-store head witness quorum policy must match the replayed witness authority topology",
+        expected: `${topology.requiredWitnesses ?? ""}:${
+          topology.minimumWitnesses ?? 1
+        }`,
+        actual: `${input.policy.requiredWitnesses}:${
+          input.policy.minimumWitnesses ?? 1
+        }`,
+      });
+    }
+  }
+
+  if (
+    input.witnessReplay.valid &&
+    String(input.witnessReplay.tenantId) === tenant &&
+    !authorityTopologyInvalid
+  ) {
+    for (const [index, record] of input.witnessReplay.records.entries()) {
+      if (!record.accepted) {
+        continue;
+      }
+      const witnessId = record.observerId;
+      const acceptedTarget = record.decision.acceptedHeads.some((head) =>
+        sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+          head,
+          input.head,
+        ),
+      );
+      const conflictingAcceptedHead = record.decision.acceptedHeads.find(
+        (head) =>
+          head.settlementSequence === input.head.settlementSequence &&
+          !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+            head,
+            input.head,
+          ),
+      );
+      if (conflictingAcceptedHead !== undefined) {
+        obstructingWitnessIds.add(witnessId);
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_conflicting_head",
+          path: `/witnessReplay/records/${index}/decision/acceptedHeads`,
+          message:
+            "projection replay settlement-store head witness quorum found a witness record accepting a conflicting head at the same settlement sequence",
+          expected: input.head.settlementRecordHash,
+          actual: conflictingAcceptedHead.settlementRecordHash,
+        });
+        continue;
+      }
+      if (!acceptedTarget) {
+        continue;
+      }
+      validWitnessIds.add(witnessId);
+      if (
+        topology !== undefined &&
+        !topologyEligibleWitnessIds.has(witnessId)
+      ) {
+        invalidWitnessIds.add(witnessId);
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_not_authorized",
+          path: `/witnessReplay/records/${index}/observerId`,
+          message:
+            "projection replay settlement-store head witness quorum cannot count a witness outside the replayed authority topology",
+          expected: topology.eligibleWitnessIds.join(", "),
+          actual: witnessId,
+        });
+        continue;
+      }
+      acceptedWitnessIds.add(witnessId);
+    }
+  }
+
+  if (
+    input.witnessReplay.valid &&
+    validWitnessIds.size === 0 &&
+    !authorityTopologyInvalid
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_no_valid_witnesses",
+      path: "/witnessReplay/records",
+      message:
+        "projection replay settlement-store head witness quorum requires at least one accepted witness record for the head",
+      expected: 1,
+      actual: 0,
+    });
+  }
+
+  const invalidPolicy = issues.some(
+    (issue) =>
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_invalid_policy" ||
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_policy_authority_mismatch",
+  );
+  const tenantMismatch = issues.some(
+    (issue) =>
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_head_tenant_mismatch" ||
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_tenant_mismatch",
+  );
+  const acceptedCount = acceptedWitnessIds.size;
+  const quorumMet = acceptedCount >= requiredWitnesses;
+  if (
+    !invalidPolicy &&
+    !tenantMismatch &&
+    !authorityTopologyInvalid &&
+    obstructingWitnessIds.size === 0 &&
+    !quorumMet
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_not_met",
+      path: "/acceptedWitnessIds",
+      message:
+        "projection replay settlement-store head witness quorum has not reached the required witness threshold",
+      expected: requiredWitnesses,
+      actual: acceptedCount,
+    });
+  }
+
+  const replayInvalid = issues.some(
+    (issue) =>
+      issue.code ===
+      "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_witness_replay_invalid",
+  );
+  const status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateStatus =
+    invalidPolicy ||
+    tenantMismatch ||
+    replayInvalid ||
+    authorityTopologyInvalid ||
+    obstructingWitnessIds.size > 0
+      ? "obstructed"
+      : quorumMet
+        ? "certified"
+        : acceptedCount >= minimumWitnesses
+          ? "witnessed"
+          : "provisional";
+
+  const allowedAction:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateAllowedAction
+    | undefined =
+    authorityTopologyInvalid
+      ? "correct_head_witness_authority_topology"
+      : invalidPolicy || tenantMismatch || replayInvalid
+        ? "correct_head_witness_policy"
+        : obstructingWitnessIds.size > 0
+          ? "resolve_settlement_store_head_conflict"
+          : status === "certified"
+            ? undefined
+            : "collect_more_head_witnesses";
+
+  return buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate(
+    {
+      tenantId: tenantId(tenant),
+      head: input.head,
+      status,
+      acceptedWitnessIds: sortedUniqueStrings([...acceptedWitnessIds]),
+      obstructingWitnessIds: sortedUniqueStrings([...obstructingWitnessIds]),
+      invalidWitnessIds: sortedUniqueStrings([...invalidWitnessIds]),
+      ...(topology !== undefined
+        ? {
+            eligibleWitnessIds: sortedUniqueStrings([
+              ...topologyEligibleWitnessIds,
+            ]),
+          }
+        : {}),
+      ...(topology?.latestAuthorityHash !== undefined
+        ? {
+            authorityTopologyHash:
+              topology.effectiveAuthorityHash ?? topology.latestAuthorityHash,
+          }
+        : {}),
+      requiredWitnesses,
+      minimumWitnesses,
+      issues,
+      authorityBoundary:
+        "projection_replay_settlement_store_head_witness_quorum",
+      ...(allowedAction !== undefined ? { allowedAction } : {}),
+    },
+  );
+}
+
+function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate(
+  input: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate,
+    "certified" | "quorumCertificateHash"
+  >,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate {
+  const certificate = {
+    ...input,
+    certified: input.status === "certified",
+  };
+  return {
+    ...certificate,
+    quorumCertificateHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateHash(
+        certificate,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateHash(
+  certificate: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate,
+    "quorumCertificateHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(certificate));
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord,
+    "quorumCertificateRecordHash"
+  > = {
+    tenantId: tenantId(String(input.certificate.tenantId)),
+    quorumCertificateSequence: input.quorumCertificateSequence,
+    certificate: input.certificate,
+    acceptedWitnessEvidence:
+      sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence(
+        input.acceptedWitnessEvidence,
+      ),
+    ...(input.authorityEpochSeal !== undefined
+      ? { authorityEpochSeal: input.authorityEpochSeal }
+      : {}),
+    ...(input.previousQuorumCertificateRecordHash !== undefined
+      ? {
+          previousQuorumCertificateRecordHash:
+            input.previousQuorumCertificateRecordHash,
+        }
+      : {}),
+    recordedAt: input.recordedAt ?? new Date().toISOString(),
+  };
+
+  return {
+    ...payload,
+    quorumCertificateRecordHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord,
+    "quorumCertificateRecordHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint,
+    "checkpointHash"
+  > = {
+    tenantId: tenantId(String(input.tenantId)),
+    checkpointId: input.checkpointId,
+    recordedAt: input.recordedAt,
+    ...(input.witnessLedger !== undefined
+      ? {
+          witnessLedger: {
+            tenantId: tenantId(String(input.tenantId)),
+            compactedThroughWitnessSequence:
+              input.witnessLedger.compactedThroughWitnessSequence,
+            compactedThroughObservationHash:
+              input.witnessLedger.compactedThroughObservationHash,
+            acceptedHeads:
+              sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+                input.witnessLedger.acceptedHeads,
+              ),
+          },
+        }
+      : {}),
+    ...(input.authorityTopology !== undefined
+      ? {
+          authorityTopology: {
+            tenantId: tenantId(String(input.tenantId)),
+            settlementSequence: input.authorityTopology.settlementSequence,
+            compactedThroughAuthoritySequence:
+              input.authorityTopology.compactedThroughAuthoritySequence,
+            compactedThroughAuthorityHash:
+              input.authorityTopology.compactedThroughAuthorityHash,
+            ...(input.authorityTopology.requiredWitnesses !== undefined
+              ? { requiredWitnesses: input.authorityTopology.requiredWitnesses }
+              : {}),
+            ...(input.authorityTopology.minimumWitnesses !== undefined
+              ? { minimumWitnesses: input.authorityTopology.minimumWitnesses }
+              : {}),
+            ...(input.authorityTopology.effectiveAuthorityHash !== undefined
+              ? {
+                  effectiveAuthorityHash:
+                    input.authorityTopology.effectiveAuthorityHash,
+                }
+              : {}),
+            ...(input.authorityTopology.sealedThroughSettlementSequence !==
+            undefined
+              ? {
+                  sealedThroughSettlementSequence:
+                    input.authorityTopology.sealedThroughSettlementSequence,
+                }
+              : {}),
+            principals: [...input.authorityTopology.principals].sort((a, b) =>
+              a.witnessId.localeCompare(b.witnessId),
+            ),
+            authorityEpochSeals: [
+              ...input.authorityTopology.authorityEpochSeals,
+            ].sort((a, b) => a.authoritySequence - b.authoritySequence),
+          },
+        }
+      : {}),
+    ...(input.quorumCertificateRecords !== undefined
+      ? {
+          quorumCertificateRecords: {
+            tenantId: tenantId(String(input.tenantId)),
+            compactedThroughQuorumCertificateSequence:
+              input.quorumCertificateRecords
+                .compactedThroughQuorumCertificateSequence,
+            compactedThroughQuorumCertificateRecordHash:
+              input.quorumCertificateRecords
+                .compactedThroughQuorumCertificateRecordHash,
+            ...(input.quorumCertificateRecords.latestCertifiedRecord !==
+            undefined
+              ? {
+                  latestCertifiedRecord:
+                    input.quorumCertificateRecords.latestCertifiedRecord,
+                }
+              : {}),
+          },
+        }
+      : {}),
+  };
+
+  return {
+    ...payload,
+    checkpointHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+  checkpoint: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint,
+    "checkpointHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(checkpoint));
+}
+
+function verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+  checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint,
+): { readonly valid: boolean; readonly expectedHash: string } {
+  const { checkpointHash: _checkpointHash, ...payload } = checkpoint;
+  const expectedHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+      payload,
+    );
+  return {
+    valid: checkpoint.checkpointHash === expectedHash,
+    expectedHash,
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(input: {
+  readonly tenantId: TenantId | string;
+  readonly witnessId: string;
+  readonly checkpointHash: string;
+  readonly witnessedAt: Timestamp | string;
+}): string {
+  return fingerprint64(
+    canonicalStringify({
+      tenantId: tenantId(String(input.tenantId)),
+      witnessId: input.witnessId,
+      checkpointHash: input.checkpointHash,
+      witnessedAt: input.witnessedAt,
+    }),
+  );
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionHash(
+  admission: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate,
+    "checkpointAdmissionHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(admission));
+}
+
+function verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionHash(
+  admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate,
+): { readonly valid: boolean; readonly expectedHash: string } {
+  const { checkpointAdmissionHash: _checkpointAdmissionHash, ...payload } =
+    admission;
+  const expectedHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionHash(
+      payload,
+    );
+  return {
+    valid: admission.checkpointAdmissionHash === expectedHash,
+    expectedHash,
+  };
+}
+
+export function evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(input: {
+  readonly tenantId: TenantId | string;
+  readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly authorityTopology: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopology;
+  readonly witnessEvidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessEvidence[];
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+  readonly policy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumPolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate {
+  const tenant = String(input.tenantId);
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionIssue[] =
+    [];
+  const checkpointValidation =
+    verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+      input.checkpoint,
+    );
+  if (!checkpointValidation.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_checkpoint_invalid",
+      path: "/checkpoint/checkpointHash",
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission requires a hash-valid checkpoint",
+      expected: checkpointValidation.expectedHash,
+      actual: input.checkpoint.checkpointHash,
+    });
+  }
+  if (String(input.checkpoint.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_checkpoint_invalid",
+      path: "/checkpoint/tenantId",
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission tenant mismatch",
+      expected: tenant,
+      actual: String(input.checkpoint.tenantId),
+    });
+  }
+  if (
+    !input.authorityTopology.valid ||
+    String(input.authorityTopology.tenantId) !== tenant
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_authority_topology_invalid",
+      path: "/authorityTopology",
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission requires a valid replayed authority topology",
+      expected: tenant,
+      actual: String(input.authorityTopology.tenantId),
+    });
+  }
+
+  const authorityTopologyHash =
+    input.authorityTopology.effectiveAuthorityHash ??
+    input.authorityTopology.latestAuthorityHash;
+  const requiredWitnesses =
+    input.policy?.requiredWitnesses ??
+    input.authorityTopology.requiredWitnesses ??
+    1;
+  const minimumWitnesses =
+    input.policy?.minimumWitnesses ??
+    input.authorityTopology.minimumWitnesses ??
+    1;
+  if (
+    !Number.isInteger(requiredWitnesses) ||
+    requiredWitnesses < 1 ||
+    !Number.isInteger(minimumWitnesses) ||
+    minimumWitnesses < 1 ||
+    minimumWitnesses > requiredWitnesses
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_invalid_policy",
+      path: "/policy",
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission requires positive quorum thresholds",
+      expected: requiredWitnesses,
+      actual: minimumWitnesses,
+    });
+  }
+
+  const acceptedWitnessIds = new Set<string>();
+  const invalidWitnessIds = new Set<string>();
+  const seenWitnessIds = new Set<string>();
+  const sortedEvidence = [...input.witnessEvidence].sort((a, b) =>
+    a.witnessId.localeCompare(b.witnessId),
+  );
+  for (const [index, evidence] of sortedEvidence.entries()) {
+    const evidenceIssueCount = issues.length;
+    const path = `/witnessEvidence/${index}`;
+    if (seenWitnessIds.has(evidence.witnessId)) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_duplicate_witness",
+        path: `${path}/witnessId`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission cannot count duplicate witness evidence",
+        actual: evidence.witnessId,
+      });
+    }
+    seenWitnessIds.add(evidence.witnessId);
+    if (evidence.checkpointHash !== input.checkpoint.checkpointHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_checkpoint_invalid",
+        path: `${path}/checkpointHash`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission evidence must bind the admitted checkpoint hash",
+        expected: input.checkpoint.checkpointHash,
+        actual: evidence.checkpointHash,
+      });
+    }
+    const principal = input.authorityTopology.principals.find(
+      (candidate) =>
+        candidate.witnessId === evidence.witnessId &&
+        candidate.status === "active" &&
+        candidate.validFromSettlementSequence <=
+          input.authorityTopology.settlementSequence,
+    );
+    if (principal === undefined) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_witness_not_authorized",
+        path: `${path}/witnessId`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission witness is not active in the replayed authority topology",
+        actual: evidence.witnessId,
+      });
+    }
+
+    const signature = evidence.signature;
+    if (signature === undefined) {
+      if (input.signaturePolicy?.required === true) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_missing",
+          path: `${path}/signature`,
+          message:
+            "projection replay settlement-head witness compaction checkpoint admission evidence requires a witness signature",
+        });
+      }
+    } else {
+      if (signature.principalId !== evidence.witnessId) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_principal_mismatch",
+          path: `${path}/signature/principalId`,
+          message:
+            "projection replay settlement-head witness compaction checkpoint admission signature principal must match the witness id",
+          expected: evidence.witnessId,
+          actual: signature.principalId,
+        });
+      }
+      const expectedPayloadHash =
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+          {
+            tenantId: input.tenantId,
+            witnessId: evidence.witnessId,
+            checkpointHash: evidence.checkpointHash,
+            witnessedAt: evidence.witnessedAt,
+          },
+        );
+      if (signature.payloadHash !== expectedPayloadHash) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_payload_mismatch",
+          path: `${path}/signature/payloadHash`,
+          message:
+            "projection replay settlement-head witness compaction checkpoint admission signature payload hash does not match the checkpoint witness body",
+          expected: expectedPayloadHash,
+          actual: signature.payloadHash,
+        });
+      }
+      if (
+        principal !== undefined &&
+        principal.signatureKeyStatus !== undefined &&
+        principal.signatureKeyStatus !== "active"
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_key_not_current",
+          path: `${path}/signature/keyId`,
+          message:
+            "projection replay settlement-head witness compaction checkpoint admission signature key is not current in the replayed authority topology",
+          expected: "active",
+          actual: principal.signatureKeyStatus,
+        });
+      }
+      if (
+        principal !== undefined &&
+        principal.signatureKeyId === undefined &&
+        input.signaturePolicy?.required === true
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_key_not_current",
+          path: `${path}/signature/keyId`,
+          message:
+            "projection replay settlement-head witness compaction checkpoint admission signature has no active admitted key in the replayed authority topology",
+          expected: "active admitted key",
+          actual: signature.keyId,
+        });
+      }
+      if (
+        principal !== undefined &&
+        principal.signatureKeyId !== undefined &&
+        signature.keyId !== principal.signatureKeyId
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_key_mismatch",
+          path: `${path}/signature/keyId`,
+          message:
+            "projection replay settlement-head witness compaction checkpoint admission signature key does not match the admitted witness principal key",
+          expected: principal.signatureKeyId,
+          actual: signature.keyId,
+        });
+      }
+      if (
+        principal !== undefined &&
+        principal.signatureAlgorithm !== undefined &&
+        signature.algorithm !== principal.signatureAlgorithm
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_key_mismatch",
+          path: `${path}/signature/algorithm`,
+          message:
+            "projection replay settlement-head witness compaction checkpoint admission signature algorithm does not match the admitted witness principal algorithm",
+          expected: principal.signatureAlgorithm,
+          actual: signature.algorithm,
+        });
+      }
+      if (input.signaturePolicy !== undefined) {
+        const verified = input.signaturePolicy.verifier({
+          tenantId: input.tenantId,
+          principalId: signature.principalId,
+          keyId: signature.keyId,
+          algorithm: signature.algorithm,
+          payloadHash: signature.payloadHash,
+          signature: signature.signature,
+          ...(signature.signedAt !== undefined
+            ? { signedAt: signature.signedAt }
+            : {}),
+        });
+        if (!verified) {
+          issues.push({
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_signature_invalid",
+            path: `${path}/signature`,
+            message:
+              "projection replay settlement-head witness compaction checkpoint admission verifier rejected witness signature",
+          });
+        }
+      }
+    }
+    if (issues.length === evidenceIssueCount) {
+      acceptedWitnessIds.add(evidence.witnessId);
+    } else {
+      invalidWitnessIds.add(evidence.witnessId);
+    }
+  }
+
+  if (
+    issues.length === 0 &&
+    acceptedWitnessIds.size < requiredWitnesses
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_quorum_not_met",
+      path: "/acceptedWitnessIds",
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission has not reached the required witness threshold",
+      expected: requiredWitnesses,
+      actual: acceptedWitnessIds.size,
+    });
+  }
+
+  const status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionStatus =
+    issues.length > 0
+      ? "obstructed"
+      : acceptedWitnessIds.size >= requiredWitnesses
+        ? "admitted"
+        : acceptedWitnessIds.size >= minimumWitnesses
+          ? "provisional"
+          : "obstructed";
+  const admissionPayload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate,
+    "checkpointAdmissionHash"
+  > = {
+    tenantId: tenantId(tenant),
+    checkpointHash: input.checkpoint.checkpointHash,
+    status,
+    admitted: status === "admitted",
+    acceptedWitnessIds: sortedUniqueStrings([...acceptedWitnessIds]),
+    invalidWitnessIds: sortedUniqueStrings([...invalidWitnessIds]),
+    ...(authorityTopologyHash !== undefined ? { authorityTopologyHash } : {}),
+    requiredWitnesses,
+    minimumWitnesses,
+    witnessEvidence: sortedEvidence,
+    issues,
+    authorityBoundary:
+      "projection_replay_settlement_head_witness_compaction_checkpoint_admission",
+  };
+  return {
+    ...admissionPayload,
+    checkpointAdmissionHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionHash(
+        admissionPayload,
+      ),
+  };
+}
+
+function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopologyFromCompactionCheckpoint(
+  checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopology | undefined {
+  const snapshot = checkpoint.authorityTopology;
+  if (snapshot === undefined) {
+    return undefined;
+  }
+  const eligibleWitnessIds = snapshot.principals
+    .filter(
+      (principal) =>
+        principal.status === "active" &&
+        principal.validFromSettlementSequence <= snapshot.settlementSequence,
+    )
+    .map((principal) => principal.witnessId)
+    .sort((a, b) => a.localeCompare(b));
+  return {
+    valid: true,
+    tenantId: snapshot.tenantId,
+    settlementSequence: snapshot.settlementSequence,
+    ...(snapshot.requiredWitnesses !== undefined
+      ? { requiredWitnesses: snapshot.requiredWitnesses }
+      : {}),
+    ...(snapshot.minimumWitnesses !== undefined
+      ? { minimumWitnesses: snapshot.minimumWitnesses }
+      : {}),
+    ...(snapshot.effectiveAuthorityHash !== undefined
+      ? { effectiveAuthorityHash: snapshot.effectiveAuthorityHash }
+      : {}),
+    ...(snapshot.sealedThroughSettlementSequence !== undefined
+      ? {
+          sealedThroughSettlementSequence:
+            snapshot.sealedThroughSettlementSequence,
+        }
+      : {}),
+    eligibleWitnessIds,
+    principals: snapshot.principals,
+    authorityEpochSeals: snapshot.authorityEpochSeals,
+    transitions: [],
+    latestAuthorityHash: snapshot.compactedThroughAuthorityHash,
+    issues: [],
+  };
+}
+
+function validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(input: {
+  readonly tenantId: TenantId | string;
+  readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly admission?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): { readonly valid: boolean; readonly message: string } {
+  const admission = input.admission;
+  if (admission === undefined) {
+    return {
+      valid: false,
+      message:
+        "projection replay settlement-head witness compaction checkpoint requires an admission certificate",
+    };
+  }
+  if (input.signaturePolicy?.required !== true) {
+    return {
+      valid: false,
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission requires a strict witness signature policy",
+    };
+  }
+  const authorityTopology =
+    projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTopologyFromCompactionCheckpoint(
+      input.checkpoint,
+    );
+  if (authorityTopology === undefined) {
+    return {
+      valid: false,
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission requires an authority topology snapshot",
+    };
+  }
+  const hashValidation =
+    verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionHash(
+      admission,
+    );
+  if (!hashValidation.valid) {
+    return {
+      valid: false,
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission hash does not match its body",
+    };
+  }
+  const reevaluated =
+    evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(
+      {
+        tenantId: input.tenantId,
+        checkpoint: input.checkpoint,
+        authorityTopology,
+        witnessEvidence: admission.witnessEvidence,
+        ...(input.signaturePolicy !== undefined
+          ? { signaturePolicy: input.signaturePolicy }
+          : {}),
+      },
+    );
+  if (
+    !reevaluated.admitted ||
+    reevaluated.checkpointAdmissionHash !== admission.checkpointAdmissionHash ||
+    reevaluated.checkpointHash !== admission.checkpointHash
+  ) {
+    return {
+      valid: false,
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission does not replay as admitted",
+    };
+  }
+  if (admission.checkpointHash !== input.checkpoint.checkpointHash) {
+    return {
+      valid: false,
+      message:
+        "projection replay settlement-head witness compaction checkpoint admission does not bind the checkpoint hash",
+    };
+  }
+  return {
+    valid: true,
+    message:
+      "projection replay settlement-head witness compaction checkpoint admission is valid",
+  };
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord,
+    "checkpointAdmissionRecordHash"
+  > = {
+    tenantId: tenantId(String(input.checkpoint.tenantId)),
+    checkpointAdmissionSequence: input.checkpointAdmissionSequence,
+    checkpoint: input.checkpoint,
+    admission: input.admission,
+    ...(input.previousCheckpointAdmissionRecordHash !== undefined
+      ? {
+          previousCheckpointAdmissionRecordHash:
+            input.previousCheckpointAdmissionRecordHash,
+        }
+      : {}),
+    recordedAt: input.recordedAt ?? new Date().toISOString(),
+  };
+  return {
+    ...payload,
+    checkpointAdmissionRecordHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord,
+    "checkpointAdmissionRecordHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointFrontierKey(
+  checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint,
+): string {
+  return canonicalStringify({
+    witnessLedger:
+      checkpoint.witnessLedger === undefined
+        ? undefined
+        : {
+            sequence:
+              checkpoint.witnessLedger.compactedThroughWitnessSequence,
+            hash: checkpoint.witnessLedger.compactedThroughObservationHash,
+          },
+    authorityTopology:
+      checkpoint.authorityTopology === undefined
+        ? undefined
+        : {
+            settlementSequence:
+              checkpoint.authorityTopology.settlementSequence,
+            sequence:
+              checkpoint.authorityTopology.compactedThroughAuthoritySequence,
+            hash: checkpoint.authorityTopology.compactedThroughAuthorityHash,
+          },
+    quorumCertificateRecords:
+      checkpoint.quorumCertificateRecords === undefined
+        ? undefined
+        : {
+            sequence:
+              checkpoint.quorumCertificateRecords
+                .compactedThroughQuorumCertificateSequence,
+            hash:
+              checkpoint.quorumCertificateRecords
+                .compactedThroughQuorumCertificateRecordHash,
+          },
+  });
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord[];
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) =>
+      a.checkpointAdmissionSequence - b.checkpointAdmissionSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordIssue[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let latestAdmissionRecord:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord
+    | undefined;
+  const checkpointHashesById = new Map<string, string>();
+  const checkpointHashesByFrontier = new Map<string, string>();
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    const path = `/records/${index}`;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_tenant_mismatch",
+        path: `${path}/tenantId`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (
+      String(record.checkpoint.tenantId) !== tenant ||
+      String(record.admission.tenantId) !== tenant
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_tenant_mismatch",
+        path,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record checkpoint/admission tenant mismatch",
+        expected: tenant,
+        actual: `${record.checkpoint.tenantId}:${record.admission.tenantId}`,
+      });
+    }
+    if (record.checkpointAdmissionSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_sequence_gap",
+        path: `${path}/checkpointAdmissionSequence`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission records must be contiguous",
+        expected: expectedSequence,
+        actual: record.checkpointAdmissionSequence,
+      });
+    }
+    if (
+      (record.previousCheckpointAdmissionRecordHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_previous_hash_mismatch",
+        path: `${path}/previousCheckpointAdmissionRecordHash`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record does not chain to the prior record",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousCheckpointAdmissionRecordHash ?? "",
+      });
+    }
+
+    const checkpointValidation =
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+        record.checkpoint,
+      );
+    if (!checkpointValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_checkpoint_hash_mismatch",
+        path: `${path}/checkpoint/checkpointHash`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record checkpoint hash does not match its body",
+        expected: checkpointValidation.expectedHash,
+        actual: record.checkpoint.checkpointHash,
+      });
+    }
+
+    const admissionHashValidation =
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionHash(
+        record.admission,
+      );
+    if (!admissionHashValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_admission_hash_mismatch",
+        path: `${path}/admission/checkpointAdmissionHash`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record admission hash does not match its body",
+        expected: admissionHashValidation.expectedHash,
+        actual: record.admission.checkpointAdmissionHash,
+      });
+    }
+
+    const admissionValidation =
+      validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: input.tenantId,
+          checkpoint: record.checkpoint,
+          admission: record.admission,
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!admissionValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_admission_invalid",
+        path: `${path}/admission`,
+        message: admissionValidation.message,
+      });
+    }
+
+    const priorCheckpointHash = checkpointHashesById.get(
+      record.checkpoint.checkpointId,
+    );
+    if (
+      priorCheckpointHash !== undefined &&
+      priorCheckpointHash !== record.checkpoint.checkpointHash
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_checkpoint_conflict",
+        path: `${path}/checkpoint/checkpointId`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record cannot admit a second checkpoint hash for the same checkpoint id",
+        expected: priorCheckpointHash,
+        actual: record.checkpoint.checkpointHash,
+      });
+    }
+    const frontierKey =
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointFrontierKey(
+        record.checkpoint,
+      );
+    const priorFrontierCheckpointHash =
+      checkpointHashesByFrontier.get(frontierKey);
+    if (
+      priorFrontierCheckpointHash !== undefined &&
+      priorFrontierCheckpointHash !== record.checkpoint.checkpointHash
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_checkpoint_conflict",
+        path: `${path}/checkpoint`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record cannot admit conflicting checkpoint bodies for the same compacted frontier",
+        expected: priorFrontierCheckpointHash,
+        actual: record.checkpoint.checkpointHash,
+      });
+    }
+
+    const { checkpointAdmissionRecordHash, ...recordPayload } = record;
+    const expectedRecordHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordHash(
+        recordPayload,
+      );
+    if (checkpointAdmissionRecordHash !== expectedRecordHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_checkpoint_admission_record_hash_mismatch",
+        path: `${path}/checkpointAdmissionRecordHash`,
+        message:
+          "projection replay settlement-head witness compaction checkpoint admission record hash does not match its body",
+        expected: expectedRecordHash,
+        actual: checkpointAdmissionRecordHash,
+      });
+    }
+
+    if (issues.length === issueCountBefore) {
+      latestAdmissionRecord = record;
+      checkpointHashesById.set(
+        record.checkpoint.checkpointId,
+        record.checkpoint.checkpointHash,
+      );
+      checkpointHashesByFrontier.set(frontierKey, record.checkpoint.checkpointHash);
+    }
+    expectedSequence = record.checkpointAdmissionSequence + 1;
+    expectedPreviousHash = record.checkpointAdmissionRecordHash;
+  }
+
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    ...(latestAdmissionRecord !== undefined ? { latestAdmissionRecord } : {}),
+    issues,
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionHash(
+  admission: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission,
+    "pruningAdmissionHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(admission));
+}
+
+export function evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission(input: {
+  readonly tenantId: TenantId | string;
+  readonly checkpointAdmissionRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+  readonly checkpointAdmissionRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord[];
+  readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+  readonly lanes?: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane[];
+  readonly witnessRecords?: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+  readonly authorityTransitions?: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[];
+  readonly quorumCertificateRecords?: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission {
+  const tenant = String(input.tenantId);
+  const checkpoint = input.checkpointAdmissionRecord.checkpoint;
+  const checkpointAdmission = input.checkpointAdmissionRecord.admission;
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionIssue[] =
+    [];
+  const admissionRecordReplay =
+    replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+      {
+        tenantId: input.tenantId,
+        records: input.checkpointAdmissionRecords,
+        signaturePolicy: input.signaturePolicy,
+      },
+    );
+  if (!admissionRecordReplay.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_record_replay_invalid",
+      path: "/checkpointAdmissionRecords",
+      message:
+        "projection replay settlement-head witness compaction pruning requires a replay-valid checkpoint-admission record history",
+      actual: admissionRecordReplay.issues
+        .map((issue) => issue.code)
+        .join(", "),
+    });
+  }
+  const matchingRecord = admissionRecordReplay.records.find(
+    (record) =>
+      record.checkpointAdmissionRecordHash ===
+      input.checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+  );
+  if (matchingRecord === undefined) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_record_missing",
+      path: "/checkpointAdmissionRecord/checkpointAdmissionRecordHash",
+      message:
+        "projection replay settlement-head witness compaction pruning requires the checkpoint admission record to be present in durable replay history",
+      expected: input.checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+    });
+  } else if (
+    canonicalStringify(matchingRecord) !==
+    canonicalStringify(input.checkpointAdmissionRecord)
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_record_missing",
+      path: "/checkpointAdmissionRecord",
+      message:
+        "projection replay settlement-head witness compaction pruning requires the supplied checkpoint admission record to match durable replay history",
+      expected: matchingRecord.checkpointAdmissionRecordHash,
+      actual: input.checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+    });
+  }
+
+  const lanes =
+    input.lanes === undefined || input.lanes.length === 0
+      ? ([
+          ...(checkpoint.witnessLedger !== undefined
+            ? ["witness_ledger" as const]
+            : []),
+          ...(checkpoint.authorityTopology !== undefined
+            ? ["authority_topology" as const]
+            : []),
+          ...(checkpoint.quorumCertificateRecords !== undefined
+            ? ["quorum_certificate_records" as const]
+            : []),
+        ] as const)
+      : sortedUniqueStrings(input.lanes) as readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane[];
+  if (lanes.length === 0) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_invalid_policy",
+      path: "/lanes",
+      message:
+        "projection replay settlement-head witness compaction pruning requires at least one prunable lane",
+    });
+  }
+
+  if (lanes.includes("witness_ledger")) {
+    if (checkpoint.witnessLedger === undefined) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_checkpoint_lane_missing",
+        path: "/checkpoint/witnessLedger",
+        message:
+          "projection replay settlement-head witness compaction pruning cannot prune witness records without a witness-ledger checkpoint snapshot",
+      });
+    } else {
+      const replay =
+        replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(
+          {
+            tenantId: input.tenantId,
+            records: input.witnessRecords ?? [],
+            signaturePolicy: input.signaturePolicy,
+            compactionCheckpoint: checkpoint,
+            compactionCheckpointAdmission: checkpointAdmission,
+          },
+        );
+      if (!replay.valid) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_witness_suffix_invalid",
+          path: "/witnessRecords",
+          message:
+            "projection replay settlement-head witness compaction pruning requires the retained witness suffix to replay from the admitted checkpoint frontier",
+          actual: replay.issues.map((issue) => issue.code).join(", "),
+        });
+      }
+    }
+  }
+
+  if (lanes.includes("authority_topology")) {
+    if (checkpoint.authorityTopology === undefined) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_checkpoint_lane_missing",
+        path: "/checkpoint/authorityTopology",
+        message:
+          "projection replay settlement-head witness compaction pruning cannot prune authority transitions without an authority-topology checkpoint snapshot",
+      });
+    } else {
+      const replay =
+        replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(
+          {
+            tenantId: input.tenantId,
+            settlementSequence: checkpoint.authorityTopology.settlementSequence,
+            transitions: input.authorityTransitions ?? [],
+            signaturePolicy: input.signaturePolicy,
+            compactionCheckpoint: checkpoint,
+            compactionCheckpointAdmission: checkpointAdmission,
+          },
+        );
+      if (!replay.valid) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_authority_suffix_invalid",
+          path: "/authorityTransitions",
+          message:
+            "projection replay settlement-head witness compaction pruning requires the retained authority suffix to replay from the admitted checkpoint frontier",
+          actual: replay.issues.map((issue) => issue.code).join(", "),
+        });
+      }
+    }
+  }
+
+  if (lanes.includes("quorum_certificate_records")) {
+    if (checkpoint.quorumCertificateRecords === undefined) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_checkpoint_lane_missing",
+        path: "/checkpoint/quorumCertificateRecords",
+        message:
+          "projection replay settlement-head witness compaction pruning cannot prune quorum-certificate records without a quorum-certificate-record checkpoint snapshot",
+      });
+    } else {
+      const replay =
+        replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(
+          {
+            tenantId: input.tenantId,
+            records: input.quorumCertificateRecords ?? [],
+            signaturePolicy: input.signaturePolicy,
+            compactionCheckpoint: checkpoint,
+            compactionCheckpointAdmission: checkpointAdmission,
+          },
+        );
+      if (!replay.valid) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_admission_quorum_certificate_suffix_invalid",
+          path: "/quorumCertificateRecords",
+          message:
+            "projection replay settlement-head witness compaction pruning requires the retained quorum-certificate suffix to replay from the admitted checkpoint frontier",
+          actual: replay.issues.map((issue) => issue.code).join(", "),
+        });
+      }
+    }
+  }
+
+  const status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionStatus =
+    issues.length === 0 ? "admitted" : "obstructed";
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission,
+    "pruningAdmissionHash"
+  > = {
+    tenantId: tenantId(tenant),
+    checkpointId: checkpoint.checkpointId,
+    checkpointHash: checkpoint.checkpointHash,
+    checkpointAdmissionRecordHash:
+      input.checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+    status,
+    admitted: status === "admitted",
+    lanes,
+    witnessSuffixRecordCount: input.witnessRecords?.length ?? 0,
+    authoritySuffixTransitionCount: input.authorityTransitions?.length ?? 0,
+    quorumCertificateSuffixRecordCount:
+      input.quorumCertificateRecords?.length ?? 0,
+    issues,
+    authorityBoundary:
+      "projection_replay_settlement_head_witness_compaction_pruning_admission",
+  };
+  return {
+    ...payload,
+    pruningAdmissionHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionHash(
+        payload,
+      ),
+  };
+}
+
+function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneFrontiersFromCheckpoint(input: {
+  readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly lanes: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane[];
+}): readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier[] {
+  const frontiers: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier[] =
+    [];
+  for (const lane of input.lanes) {
+    if (lane === "witness_ledger" && input.checkpoint.witnessLedger !== undefined) {
+      frontiers.push({
+        lane,
+        compactedThroughSequence:
+          input.checkpoint.witnessLedger.compactedThroughWitnessSequence,
+        compactedThroughHash:
+          input.checkpoint.witnessLedger.compactedThroughObservationHash,
+      });
+    }
+    if (
+      lane === "authority_topology" &&
+      input.checkpoint.authorityTopology !== undefined
+    ) {
+      frontiers.push({
+        lane,
+        compactedThroughSequence:
+          input.checkpoint.authorityTopology.compactedThroughAuthoritySequence,
+        compactedThroughHash:
+          input.checkpoint.authorityTopology.compactedThroughAuthorityHash,
+      });
+    }
+    if (
+      lane === "quorum_certificate_records" &&
+      input.checkpoint.quorumCertificateRecords !== undefined
+    ) {
+      frontiers.push({
+        lane,
+        compactedThroughSequence:
+          input.checkpoint.quorumCertificateRecords
+            .compactedThroughQuorumCertificateSequence,
+        compactedThroughHash:
+          input.checkpoint.quorumCertificateRecords
+            .compactedThroughQuorumCertificateRecordHash,
+      });
+    }
+  }
+  return frontiers.sort((a, b) => a.lane.localeCompare(b.lane));
+}
+
+function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneFrontierForLane(
+  record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord,
+  lane: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane,
+):
+  | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier
+  | undefined {
+  return record.prunedFrontiers.find((frontier) => frontier.lane === lane);
+}
+
+function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneSuffixCountForLane(
+  admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission,
+  lane: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane,
+): number {
+  if (lane === "witness_ledger") return admission.witnessSuffixRecordCount;
+  if (lane === "authority_topology") return admission.authoritySuffixTransitionCount;
+  return admission.quorumCertificateSuffixRecordCount;
+}
+
+function assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordAdmitsLane(input: {
+  readonly tenantId: TenantId | string;
+  readonly record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  readonly lane: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier {
+  const tenant = String(input.tenantId);
+  if (String(input.record.tenantId) !== tenant) {
+    throw new Error(
+      "projection replay settlement-head witness compaction pruning tombstone tenant mismatch",
+    );
+  }
+  if (!input.record.pruningAdmission.admitted) {
+    throw new Error(
+      "projection replay settlement-head witness compaction pruning tombstone is not admitted",
+    );
+  }
+  const { pruningTombstoneRecordHash, ...recordPayload } = input.record;
+  const expectedRecordHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordHash(
+      recordPayload,
+    );
+  if (pruningTombstoneRecordHash !== expectedRecordHash) {
+    throw new Error(
+      "projection replay settlement-head witness compaction pruning tombstone hash mismatch",
+    );
+  }
+  const { pruningAdmissionHash, ...admissionPayload } =
+    input.record.pruningAdmission;
+  const expectedAdmissionHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionHash(
+      admissionPayload,
+    );
+  if (pruningAdmissionHash !== expectedAdmissionHash) {
+    throw new Error(
+      "projection replay settlement-head witness compaction pruning admission hash mismatch",
+    );
+  }
+  const frontier =
+    projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneFrontierForLane(
+      input.record,
+      input.lane,
+    );
+  if (frontier === undefined) {
+    throw new Error(
+      "projection replay settlement-head witness compaction pruning tombstone does not admit the requested lane",
+    );
+  }
+  return frontier;
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord,
+    "pruningTombstoneRecordHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord,
+    "pruningTombstoneRecordHash"
+  > = {
+    tenantId: tenantId(String(input.checkpointAdmissionRecord.tenantId)),
+    pruningTombstoneSequence: input.pruningTombstoneSequence,
+    checkpointAdmissionRecord: input.checkpointAdmissionRecord,
+    pruningAdmission: input.pruningAdmission,
+    prunedFrontiers:
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneFrontiersFromCheckpoint(
+        {
+          checkpoint: input.checkpointAdmissionRecord.checkpoint,
+          lanes: input.pruningAdmission.lanes,
+        },
+      ),
+    ...(input.previousPruningTombstoneRecordHash !== undefined
+      ? {
+          previousPruningTombstoneRecordHash:
+            input.previousPruningTombstoneRecordHash,
+        }
+      : {}),
+    recordedAt: input.recordedAt ?? new Date().toISOString(),
+  };
+  return {
+    ...payload,
+    pruningTombstoneRecordHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+  head: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead,
+    "headHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(head));
+}
+
+export function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord(
+  record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead,
+    "headHash"
+  > = {
+    tenantId: record.tenantId,
+    pruningTombstoneSequence: record.pruningTombstoneSequence,
+    pruningTombstoneRecordHash: record.pruningTombstoneRecordHash,
+    recordedAt: record.recordedAt,
+  };
+  return {
+    ...payload,
+    headHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+        payload,
+      ),
+  };
+}
+
+export function verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof(input: {
+  readonly proof: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof;
+  readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): {
+  readonly valid: boolean;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[];
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[];
+} {
+  const { proof } = input;
+  const tenant = String(proof.tenantId);
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[] =
+    [];
+  if (String(proof.toHead.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/toHead/tenantId",
+      message:
+        "projection replay pruning tombstone-store head consistency proof toHead tenant mismatch",
+      expected: tenant,
+      actual: String(proof.toHead.tenantId),
+    });
+  }
+  if (
+    proof.fromHead !== undefined &&
+    String(proof.fromHead.tenantId) !== tenant
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/fromHead/tenantId",
+      message:
+        "projection replay pruning tombstone-store head consistency proof fromHead tenant mismatch",
+      expected: tenant,
+      actual: String(proof.fromHead.tenantId),
+    });
+  }
+  const toHeadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+      {
+        tenantId: proof.toHead.tenantId,
+        pruningTombstoneSequence: proof.toHead.pruningTombstoneSequence,
+        pruningTombstoneRecordHash: proof.toHead.pruningTombstoneRecordHash,
+        recordedAt: proof.toHead.recordedAt,
+      },
+    );
+  if (proof.toHead.headHash !== toHeadHash) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_hash_mismatch",
+      path: "/toHead/headHash",
+      message:
+        "projection replay pruning tombstone-store head hash does not match its body",
+      expected: toHeadHash,
+      actual: proof.toHead.headHash,
+    });
+  }
+  if (proof.fromHead !== undefined) {
+    const fromHeadHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+        {
+          tenantId: proof.fromHead.tenantId,
+          pruningTombstoneSequence: proof.fromHead.pruningTombstoneSequence,
+          pruningTombstoneRecordHash: proof.fromHead.pruningTombstoneRecordHash,
+          recordedAt: proof.fromHead.recordedAt,
+        },
+      );
+    if (proof.fromHead.headHash !== fromHeadHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_hash_mismatch",
+        path: "/fromHead/headHash",
+        message:
+          "projection replay pruning tombstone-store head fromHead hash does not match its body",
+        expected: fromHeadHash,
+        actual: proof.fromHead.headHash,
+      });
+    }
+  }
+  if (proof.records.length === 0) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/records",
+      message:
+        "projection replay pruning tombstone-store head consistency proof contains no tombstone records",
+    });
+    return { valid: false, issues, acceptedHeads: [] };
+  }
+
+  const replay =
+    replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+      {
+        tenantId: proof.tenantId,
+        records: proof.records,
+        signaturePolicy: input.signaturePolicy,
+      },
+    );
+  if (!replay.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/records",
+      message: `projection replay pruning tombstone-store head consistency proof failed tombstone replay: ${replay.issues
+        .map((issue) => issue.code)
+        .join(", ")}`,
+    });
+  }
+
+  const acceptedHeads = replay.records.map((record) =>
+    projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord(
+      record,
+    ),
+  );
+  const lastHead = acceptedHeads[acceptedHeads.length - 1];
+  if (
+    lastHead === undefined ||
+    !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      lastHead,
+      proof.toHead,
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/toHead",
+      message:
+        "projection replay pruning tombstone-store head consistency proof does not end at the declared toHead",
+      expected: `${proof.toHead.pruningTombstoneSequence}:${proof.toHead.pruningTombstoneRecordHash}`,
+      actual:
+        lastHead === undefined
+          ? ""
+          : `${lastHead.pruningTombstoneSequence}:${lastHead.pruningTombstoneRecordHash}`,
+    });
+  }
+  if (
+    proof.fromHead !== undefined &&
+    !acceptedHeads.some((head) =>
+      sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        head,
+        proof.fromHead,
+      ),
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/fromHead",
+      message:
+        "projection replay pruning tombstone-store head consistency proof does not include the latest witnessed tombstone head",
+      expected: proof.fromHead.headHash,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    acceptedHeads,
+  };
+}
+
+export function evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+  readonly knownHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[];
+  readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision {
+  const { observation } = input;
+  const tenant = String(observation.tenantId);
+  const observedHead = observation.head;
+  const knownHeads =
+    sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+      input.knownHeads.filter((head) => String(head.tenantId) === tenant),
+    );
+  const latestHead = knownHeads[knownHeads.length - 1];
+  const observedHeadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+      {
+        tenantId: observedHead.tenantId,
+        pruningTombstoneSequence: observedHead.pruningTombstoneSequence,
+        pruningTombstoneRecordHash: observedHead.pruningTombstoneRecordHash,
+        recordedAt: observedHead.recordedAt,
+      },
+    );
+
+  if (String(observedHead.tenantId) !== tenant) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+      {
+        observation,
+        ...(latestHead !== undefined ? { latestHead } : {}),
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_tenant_mismatch",
+            path: "/head/tenantId",
+            message:
+              "projection replay pruning tombstone-store head tenant does not match the observation tenant",
+            expected: tenant,
+            actual: String(observedHead.tenantId),
+          },
+        ],
+      },
+    );
+  }
+  if (observedHead.headHash !== observedHeadHash) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+      {
+        observation,
+        ...(latestHead !== undefined ? { latestHead } : {}),
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_hash_mismatch",
+            path: "/head/headHash",
+            message:
+              "projection replay pruning tombstone-store head hash does not match its body",
+            expected: observedHeadHash,
+            actual: observedHead.headHash,
+          },
+        ],
+      },
+    );
+  }
+
+  const knownAtSequence = knownHeads.find(
+    (head) =>
+      head.pruningTombstoneSequence ===
+      observedHead.pruningTombstoneSequence,
+  );
+  if (knownAtSequence !== undefined) {
+    if (
+      sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        knownAtSequence,
+        observedHead,
+      )
+    ) {
+      if (
+        latestHead !== undefined &&
+        observedHead.pruningTombstoneSequence <
+          latestHead.pruningTombstoneSequence
+      ) {
+        return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+          {
+            observation,
+            latestHead,
+            issues: [
+              {
+                code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_regression",
+                path: "/head/pruningTombstoneSequence",
+                message:
+                  "projection replay pruning tombstone-store head is older than the latest witnessed tombstone head",
+                expected: latestHead.pruningTombstoneSequence,
+                actual: observedHead.pruningTombstoneSequence,
+              },
+            ],
+          },
+        );
+      }
+      return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+        {
+          observation,
+          status: "accepted_duplicate",
+          latestHead: latestHead ?? observedHead,
+          acceptedHeads: [observedHead],
+        },
+      );
+    }
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+      {
+        observation,
+        ...(latestHead !== undefined ? { latestHead } : {}),
+        conflictingHead: knownAtSequence,
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_fork",
+            path: "/head/pruningTombstoneRecordHash",
+            message:
+              "projection replay pruning tombstone-store head conflicts with an already witnessed head at the same tombstone sequence",
+            expected: knownAtSequence.pruningTombstoneRecordHash,
+            actual: observedHead.pruningTombstoneRecordHash,
+          },
+        ],
+      },
+    );
+  }
+
+  if (latestHead === undefined) {
+    const proof = observation.consistencyProof;
+    if (observedHead.pruningTombstoneSequence === 1 && proof === undefined) {
+      return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+        {
+          observation,
+          status: "accepted_initial",
+          latestHead: observedHead,
+          acceptedHeads: [observedHead],
+        },
+      );
+    }
+    if (proof === undefined) {
+      return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+        {
+          observation,
+          issues: [
+            {
+              code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_missing",
+              path: "/consistencyProof",
+              message:
+                "first pruning tombstone-store head observation after sequence 1 requires a consistency proof from the beginning of the tombstone store",
+              expected: 1,
+              actual: observedHead.pruningTombstoneSequence,
+            },
+          ],
+        },
+      );
+    }
+    const proofIssues =
+      validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadProof(
+        {
+          tenant,
+          observedHead,
+          proof,
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    if (proofIssues.length > 0) {
+      return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+        { observation, issues: proofIssues },
+      );
+    }
+    const proofVerification =
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof(
+        { proof, signaturePolicy: input.signaturePolicy },
+      );
+    return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+      {
+        observation,
+        status: "accepted_initial",
+        latestHead: observedHead,
+        acceptedHeads: proofVerification.acceptedHeads,
+      },
+    );
+  }
+
+  if (
+    observedHead.pruningTombstoneSequence < latestHead.pruningTombstoneSequence
+  ) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+      {
+        observation,
+        latestHead,
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_regression",
+            path: "/head/pruningTombstoneSequence",
+            message:
+              "projection replay pruning tombstone-store head regresses behind the latest witnessed tombstone head",
+            expected: latestHead.pruningTombstoneSequence,
+            actual: observedHead.pruningTombstoneSequence,
+          },
+        ],
+      },
+    );
+  }
+
+  const proof = observation.consistencyProof;
+  if (proof === undefined) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+      {
+        observation,
+        latestHead,
+        issues: [
+          {
+            code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_missing",
+            path: "/consistencyProof",
+            message:
+              "projection replay pruning tombstone-store head advance requires a consistency proof from the latest witnessed tombstone head",
+            expected: latestHead.pruningTombstoneSequence,
+            actual: observedHead.pruningTombstoneSequence,
+          },
+        ],
+      },
+    );
+  }
+
+  const proofIssues =
+    validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadProof(
+      {
+        tenant,
+        observedHead,
+        proof,
+        expectedFromHead: latestHead,
+        signaturePolicy: input.signaturePolicy,
+      },
+    );
+  if (proofIssues.length > 0) {
+    return obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+      {
+        observation,
+        latestHead,
+        issues: proofIssues,
+      },
+    );
+  }
+  const proofVerification =
+    verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof(
+      { proof, signaturePolicy: input.signaturePolicy },
+    );
+  return acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+    {
+      observation,
+      status: "accepted_advance",
+      latestHead: observedHead,
+      acceptedHeads: proofVerification.acceptedHeads,
+    },
+  );
+}
+
+function validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadProof(input: {
+  readonly tenant: string;
+  readonly observedHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly proof: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof;
+  readonly expectedFromHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[] {
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[] =
+    [];
+  const { proof } = input;
+  if (String(proof.tenantId) !== input.tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/tenantId",
+      message:
+        "projection replay pruning tombstone-store head consistency proof tenant does not match the head observation",
+      expected: input.tenant,
+      actual: String(proof.tenantId),
+    });
+  }
+  if (
+    !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      proof.toHead,
+      input.observedHead,
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/toHead",
+      message:
+        "projection replay pruning tombstone-store head consistency proof does not end at the observed head",
+      expected: input.observedHead.headHash,
+      actual: proof.toHead.headHash,
+    });
+  }
+  if (
+    input.expectedFromHead === undefined &&
+    proof.fromHead !== undefined
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/fromHead",
+      message:
+        "first pruning tombstone-store head witness observation must prove the head from the beginning of the tombstone store",
+      actual: proof.fromHead.headHash,
+    });
+  }
+  if (
+    input.expectedFromHead !== undefined &&
+    !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      proof.fromHead,
+      input.expectedFromHead,
+    )
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/fromHead",
+      message:
+        "projection replay pruning tombstone-store head consistency proof must start at the latest witnessed tombstone head",
+      expected: input.expectedFromHead.headHash,
+      actual: proof.fromHead?.headHash ?? "",
+    });
+  }
+  const proofVerification =
+    verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof(
+      { proof, signaturePolicy: input.signaturePolicy },
+    );
+  if (!proofVerification.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_consistency_proof_invalid",
+      path: "/consistencyProof/records",
+      message: `projection replay pruning tombstone-store head consistency proof failed record verification: ${proofVerification.issues
+        .map((issue) => issue.code)
+        .join(", ")}`,
+    });
+  }
+  return issues;
+}
+
+function acceptedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+  readonly status: Exclude<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessStatus,
+    "obstructed"
+  >;
+  readonly latestHead: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision {
+  return {
+    accepted: true,
+    status: input.status,
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    latestHead: input.latestHead,
+    acceptedHeads:
+      sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+        input.acceptedHeads,
+      ),
+    issues: [],
+  };
+}
+
+function obstructProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly conflictingHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision {
+  const obstruction =
+    buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObstruction(
+      input,
+    );
+  return {
+    accepted: false,
+    status: "obstructed",
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    ...(input.latestHead !== undefined ? { latestHead: input.latestHead } : {}),
+    acceptedHeads: [],
+    issues: input.issues,
+    obstruction,
+  };
+}
+
+function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObstruction(input: {
+  readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+  readonly latestHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly conflictingHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly issues: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessIssue[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObstructionArtifact {
+  const payload = {
+    tenantId: input.observation.tenantId,
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    ...(input.latestHead !== undefined ? { latestHead: input.latestHead } : {}),
+    ...(input.conflictingHead !== undefined
+      ? { conflictingHead: input.conflictingHead }
+      : {}),
+    issues: input.issues,
+  };
+  return {
+    artifactId: `projection_replay_pruning_tombstone_store_head_obstruction_${fingerprint64(
+      canonicalStringify(payload),
+    )}`,
+    tenantId: input.observation.head.tenantId,
+    generatedAt: input.observation.observedAt,
+    observerId: input.observation.observerId,
+    observedHead: input.observation.head,
+    ...(input.latestHead !== undefined ? { latestHead: input.latestHead } : {}),
+    ...(input.conflictingHead !== undefined
+      ? { conflictingHead: input.conflictingHead }
+      : {}),
+    issues: input.issues,
+    allowedAction: "request_pruning_tombstone_store_head_consistency_proof",
+  };
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord,
+    "observationHash"
+  > = {
+    tenantId: tenantId(String(input.observation.tenantId)),
+    witnessSequence: input.witnessSequence,
+    observerId: input.observation.observerId,
+    observedAt: input.observation.observedAt,
+    head: input.observation.head,
+    ...(input.observation.consistencyProof !== undefined
+      ? { consistencyProof: input.observation.consistencyProof }
+      : {}),
+    ...(input.observation.signature !== undefined
+      ? { signature: input.observation.signature }
+      : {}),
+    decision: input.decision,
+    accepted: input.decision.accepted,
+    status: input.decision.status,
+    ...(input.previousObservationHash !== undefined
+      ? { previousObservationHash: input.previousObservationHash }
+      : {}),
+    recordedAt: input.recordedAt ?? input.observation.observedAt,
+  };
+  return {
+    ...payload,
+    observationHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord,
+    "observationHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessObservationSignaturePayloadHash(
+  observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput,
+): string {
+  return fingerprint64(
+    canonicalStringify({
+      tenantId: tenantId(String(observation.tenantId)),
+      observerId: observation.observerId,
+      observedAt: observation.observedAt,
+      head: observation.head,
+      ...(observation.consistencyProof !== undefined
+        ? { consistencyProof: observation.consistencyProof }
+        : {}),
+    }),
+  );
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[];
+  readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) => a.witnessSequence - b.witnessSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerIssue[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let acceptedHeads: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[] =
+    [];
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_tenant_mismatch",
+        path: `/records/${index}/tenantId`,
+        message:
+          "projection replay pruning tombstone-store head witness record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (record.witnessSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_sequence_gap",
+        path: `/records/${index}/witnessSequence`,
+        message:
+          "projection replay pruning tombstone-store head witness records must be contiguous",
+        expected: expectedSequence,
+        actual: record.witnessSequence,
+      });
+    }
+    if (
+      (record.previousObservationHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_previous_hash_mismatch",
+        path: `/records/${index}/previousObservationHash`,
+        message:
+          "projection replay pruning tombstone-store head witness record does not chain to the prior observation",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousObservationHash ?? "",
+      });
+    }
+    const { observationHash, ...recordPayload } = record;
+    const expectedObservationHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordHash(
+        recordPayload,
+      );
+    if (observationHash !== expectedObservationHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_hash_mismatch",
+        path: `/records/${index}/observationHash`,
+        message:
+          "projection replay pruning tombstone-store head witness record hash does not match its body",
+        expected: expectedObservationHash,
+        actual: observationHash,
+      });
+    }
+    const expectedDecision =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+        {
+          observation:
+            projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationFromRecord(
+              record,
+            ),
+          knownHeads: acceptedHeads,
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    if (
+      canonicalStringify(record.decision) !== canonicalStringify(expectedDecision)
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_decision_mismatch",
+        path: `/records/${index}/decision`,
+        message:
+          "projection replay pruning tombstone-store head witness record decision does not replay from prior accepted observations",
+      });
+    }
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordSignatureIssues(
+      {
+        issues,
+        path: `/records/${index}/signature`,
+        tenantId: tenant,
+        record,
+        signaturePolicy: input.signaturePolicy,
+      },
+    );
+    if (issues.length === issueCountBefore && record.decision.accepted) {
+      acceptedHeads =
+        mergeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+          acceptedHeads,
+          record.decision.acceptedHeads,
+        );
+    }
+    expectedSequence = record.witnessSequence + 1;
+    expectedPreviousHash = record.observationHash;
+  }
+
+  const sortedAcceptedHeads =
+    sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+      acceptedHeads,
+    );
+  const latestHead = sortedAcceptedHeads[sortedAcceptedHeads.length - 1];
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    acceptedHeads: sortedAcceptedHeads,
+    ...(latestHead !== undefined ? { latestHead } : {}),
+    issues,
+  };
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordSignatureIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerIssue[];
+  readonly path: string;
+  readonly tenantId: TenantId | string;
+  readonly record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord;
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): void {
+  const policy = input.signaturePolicy;
+  if (policy === undefined) {
+    return;
+  }
+  const signature = input.record.signature;
+  if (signature === undefined) {
+    if (policy.required) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_missing",
+        path: input.path,
+        message:
+          "projection replay pruning tombstone-store head witness record requires a witness principal signature",
+      });
+    }
+    return;
+  }
+
+  if (signature.principalId !== input.record.observerId) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_principal_mismatch",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature principal must match the observer id",
+      expected: input.record.observerId,
+      actual: signature.principalId,
+    });
+  }
+
+  const expectedPayloadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessObservationSignaturePayloadHash(
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationFromRecord(
+        input.record,
+      ),
+    );
+  if (signature.payloadHash !== expectedPayloadHash) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_payload_mismatch",
+      path: `${input.path}/payloadHash`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature payload hash does not match the observation body",
+      expected: expectedPayloadHash,
+      actual: signature.payloadHash,
+    });
+  }
+
+  const principal =
+    policy.pruningTombstoneHeadAuthorityTopology?.principals.find(
+      (candidate) =>
+        candidate.witnessId === input.record.observerId &&
+        candidate.status === "active" &&
+        candidate.validFromPruningTombstoneSequence <=
+          input.record.head.pruningTombstoneSequence,
+    );
+  if (
+    policy.pruningTombstoneHeadAuthorityTopology !== undefined &&
+    principal === undefined
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_principal_not_authorized",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature principal is not active in the replayed tombstone-head authority topology",
+      actual: signature.principalId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyStatus !== undefined &&
+    principal.signatureKeyStatus !== "active"
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature key is not current in the replayed tombstone-head authority topology",
+      expected: "active",
+      actual: principal.signatureKeyStatus,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId === undefined &&
+    policy.required
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature has no active admitted key in the replayed tombstone-head authority topology",
+      expected: "active admitted key",
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId !== undefined &&
+    signature.keyId !== principal.signatureKeyId
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_mismatch",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature key does not match the admitted witness principal key",
+      expected: principal.signatureKeyId,
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureAlgorithm !== undefined &&
+    signature.algorithm !== principal.signatureAlgorithm
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_mismatch",
+      path: `${input.path}/algorithm`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature algorithm does not match the admitted witness principal algorithm",
+      expected: principal.signatureAlgorithm,
+      actual: signature.algorithm,
+    });
+  }
+
+  const verified = policy.verifier({
+    tenantId: input.tenantId,
+    principalId: signature.principalId,
+    keyId: signature.keyId,
+    algorithm: signature.algorithm,
+    payloadHash: signature.payloadHash,
+    signature: signature.signature,
+    ...(signature.signedAt !== undefined ? { signedAt: signature.signedAt } : {}),
+  });
+  if (!verified) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_invalid",
+      path: `${input.path}/signature`,
+      message:
+        "projection replay pruning tombstone-store head witness record signature verifier rejected the signature",
+    });
+  }
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition,
+    "authorityHash"
+  > = {
+    tenantId: tenantId(String(input.tenantId)),
+    authoritySequence: input.authoritySequence,
+    transitionId: input.transitionId,
+    transitionKind: input.transitionKind,
+    recordedAt: input.recordedAt,
+    recordedBy: input.recordedBy,
+    effectiveFromPruningTombstoneSequence:
+      input.effectiveFromPruningTombstoneSequence,
+    ...(input.witnessId !== undefined ? { witnessId: input.witnessId } : {}),
+    ...(input.requiredWitnesses !== undefined
+      ? { requiredWitnesses: input.requiredWitnesses }
+      : {}),
+    ...(input.minimumWitnesses !== undefined
+      ? { minimumWitnesses: input.minimumWitnesses }
+      : {}),
+    ...(input.sealedThroughPruningTombstoneSequence !== undefined
+      ? {
+          sealedThroughPruningTombstoneSequence:
+            input.sealedThroughPruningTombstoneSequence,
+        }
+      : {}),
+    ...(input.sealedAuthorityTopologyHash !== undefined
+      ? { sealedAuthorityTopologyHash: input.sealedAuthorityTopologyHash }
+      : {}),
+    ...(input.sealedQuorumCertificateHash !== undefined
+      ? { sealedQuorumCertificateHash: input.sealedQuorumCertificateHash }
+      : {}),
+    ...(input.signatureKeyId !== undefined
+      ? { signatureKeyId: input.signatureKeyId }
+      : {}),
+    ...(input.signatureAlgorithm !== undefined
+      ? { signatureAlgorithm: input.signatureAlgorithm }
+      : {}),
+    ...(input.signaturePublicKeyFingerprint !== undefined
+      ? { signaturePublicKeyFingerprint: input.signaturePublicKeyFingerprint }
+      : {}),
+    ...(input.signature !== undefined ? { signature: input.signature } : {}),
+    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+    ...(input.previousAuthorityHash !== undefined
+      ? { previousAuthorityHash: input.previousAuthorityHash }
+      : {}),
+  };
+  return {
+    ...payload,
+    authorityHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionHash(
+  transition: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition,
+    "authorityHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(transition));
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionSignaturePayloadHash(
+  transition: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition,
+    "authorityHash" | "signature"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(transition));
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(input: {
+  readonly tenantId: TenantId | string;
+  readonly pruningTombstoneSequence: number;
+  readonly transitions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[];
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTopology {
+  const tenant = String(input.tenantId);
+  const transitions = [...input.transitions].sort(
+    (a, b) => a.authoritySequence - b.authoritySequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityIssue[] =
+    [];
+  const principals = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalState
+  >();
+  let requiredWitnesses: number | undefined;
+  let minimumWitnesses: number | undefined;
+  let effectiveAuthorityHash: string | undefined;
+  let sealedThroughPruningTombstoneSequence: number | undefined;
+  const authorityEpochSeals: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityEpochSeal[] =
+    [];
+  const validAuthorityTransitions: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let latestAuthorityHash: string | undefined;
+
+  if (
+    !Number.isInteger(input.pruningTombstoneSequence) ||
+    input.pruningTombstoneSequence < 1
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_transition_invalid",
+      path: "/pruningTombstoneSequence",
+      message:
+        "projection replay pruning tombstone-head witness authority topology requires a positive tombstone sequence",
+      expected: 1,
+      actual: input.pruningTombstoneSequence,
+    });
+  }
+
+  for (const [index, transition] of transitions.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(transition.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_tenant_mismatch",
+        path: `/transitions/${index}/tenantId`,
+        message:
+          "projection replay pruning tombstone-head witness authority transition tenant mismatch",
+        expected: tenant,
+        actual: String(transition.tenantId),
+      });
+    }
+    if (transition.authoritySequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_sequence_gap",
+        path: `/transitions/${index}/authoritySequence`,
+        message:
+          "projection replay pruning tombstone-head witness authority transitions must be contiguous",
+        expected: expectedSequence,
+        actual: transition.authoritySequence,
+      });
+    }
+    if (
+      (transition.previousAuthorityHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_previous_hash_mismatch",
+        path: `/transitions/${index}/previousAuthorityHash`,
+        message:
+          "projection replay pruning tombstone-head witness authority transition does not chain to the prior transition",
+        expected: expectedPreviousHash ?? "",
+        actual: transition.previousAuthorityHash ?? "",
+      });
+    }
+    const { authorityHash, ...transitionPayload } = transition;
+    const expectedAuthorityHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionHash(
+        transitionPayload,
+      );
+    if (authorityHash !== expectedAuthorityHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_hash_mismatch",
+        path: `/transitions/${index}/authorityHash`,
+        message:
+          "projection replay pruning tombstone-head witness authority transition hash does not match its body",
+        expected: expectedAuthorityHash,
+        actual: authorityHash,
+      });
+    }
+    if (
+      !Number.isInteger(transition.effectiveFromPruningTombstoneSequence) ||
+      transition.effectiveFromPruningTombstoneSequence < 1
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_transition_invalid",
+        path: `/transitions/${index}/effectiveFromPruningTombstoneSequence`,
+        message:
+          "projection replay pruning tombstone-head witness authority transition requires a positive effective tombstone sequence",
+        expected: 1,
+        actual: transition.effectiveFromPruningTombstoneSequence,
+      });
+    }
+
+    const transitionIssuesStart = issues.length;
+    if (transition.transitionKind === "seal_authority_epoch") {
+      if (
+        !Number.isInteger(transition.sealedThroughPruningTombstoneSequence) ||
+        (transition.sealedThroughPruningTombstoneSequence ?? 0) < 1
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedThroughPruningTombstoneSequence`,
+          message:
+            "projection replay pruning tombstone-head witness authority epoch seal requires a positive sealed tombstone sequence",
+          expected: 1,
+          actual: transition.sealedThroughPruningTombstoneSequence ?? 0,
+        });
+      }
+      if (
+        transition.sealedThroughPruningTombstoneSequence !== undefined &&
+        transition.effectiveFromPruningTombstoneSequence !==
+          transition.sealedThroughPruningTombstoneSequence
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/effectiveFromPruningTombstoneSequence`,
+          message:
+            "projection replay pruning tombstone-head witness authority epoch seal must be effective at the sealed tombstone sequence",
+          expected: transition.sealedThroughPruningTombstoneSequence,
+          actual: transition.effectiveFromPruningTombstoneSequence,
+        });
+      }
+      if (
+        transition.sealedThroughPruningTombstoneSequence !== undefined &&
+        sealedThroughPruningTombstoneSequence !== undefined &&
+        transition.sealedThroughPruningTombstoneSequence <=
+          sealedThroughPruningTombstoneSequence
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedThroughPruningTombstoneSequence`,
+          message:
+            "projection replay pruning tombstone-head witness authority epoch seals must advance monotonically",
+          expected: sealedThroughPruningTombstoneSequence + 1,
+          actual: transition.sealedThroughPruningTombstoneSequence,
+        });
+      }
+      const expectedSealedAuthorityHash =
+        transition.sealedThroughPruningTombstoneSequence === undefined
+          ? undefined
+          : [...validAuthorityTransitions]
+              .reverse()
+              .find(
+                (priorTransition) =>
+                  priorTransition.transitionKind !== "seal_authority_epoch" &&
+                  priorTransition.effectiveFromPruningTombstoneSequence <=
+                    transition.sealedThroughPruningTombstoneSequence!,
+              )?.authorityHash;
+      if (
+        expectedSealedAuthorityHash === undefined ||
+        transition.sealedAuthorityTopologyHash !==
+          expectedSealedAuthorityHash
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedAuthorityTopologyHash`,
+          message:
+            "projection replay pruning tombstone-head witness authority epoch seal must bind the effective authority topology hash",
+          expected: expectedSealedAuthorityHash ?? "",
+          actual: transition.sealedAuthorityTopologyHash ?? "",
+        });
+      }
+      if (
+        transition.sealedQuorumCertificateHash === undefined ||
+        transition.sealedQuorumCertificateHash === ""
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid",
+          path: `/transitions/${index}/sealedQuorumCertificateHash`,
+          message:
+            "projection replay pruning tombstone-head witness authority epoch seal requires the quorum certificate hash it finalizes",
+        });
+      }
+      appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionSignatureIssues(
+        {
+          issues,
+          path: `/transitions/${index}/signature`,
+          tenantId: tenant,
+          transition,
+          principals,
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    } else if (
+      sealedThroughPruningTombstoneSequence !== undefined &&
+      transition.effectiveFromPruningTombstoneSequence <=
+        sealedThroughPruningTombstoneSequence
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_retroactive_transition",
+        path: `/transitions/${index}/effectiveFromPruningTombstoneSequence`,
+        message:
+          "projection replay pruning tombstone-head witness authority transition cannot modify a sealed tombstone epoch",
+        expected: sealedThroughPruningTombstoneSequence + 1,
+        actual: transition.effectiveFromPruningTombstoneSequence,
+      });
+    } else if (transition.transitionKind === "set_quorum") {
+      if (
+        !Number.isInteger(transition.requiredWitnesses) ||
+        (transition.requiredWitnesses ?? 0) < 1
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/requiredWitnesses`,
+          message:
+            "projection replay pruning tombstone-head witness authority quorum requires at least one required witness",
+          expected: 1,
+          actual: transition.requiredWitnesses ?? 0,
+        });
+      }
+      if (
+        transition.minimumWitnesses !== undefined &&
+        (!Number.isInteger(transition.minimumWitnesses) ||
+          transition.minimumWitnesses < 1)
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/minimumWitnesses`,
+          message:
+            "projection replay pruning tombstone-head witness authority quorum requires a positive minimum witness count",
+          expected: 1,
+          actual: transition.minimumWitnesses,
+        });
+      }
+      if (
+        transition.minimumWitnesses !== undefined &&
+        transition.requiredWitnesses !== undefined &&
+        transition.minimumWitnesses > transition.requiredWitnesses
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_quorum_invalid",
+          path: `/transitions/${index}/minimumWitnesses`,
+          message:
+            "projection replay pruning tombstone-head witness authority quorum minimum cannot exceed required witnesses",
+          expected: transition.requiredWitnesses,
+          actual: transition.minimumWitnesses,
+        });
+      }
+    } else if (transition.witnessId === undefined || transition.witnessId === "") {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_witness_missing",
+        path: `/transitions/${index}/witnessId`,
+        message:
+          "projection replay pruning tombstone-head witness authority transition requires a witness id",
+      });
+    }
+
+    if (
+      issues.length === transitionIssuesStart &&
+      issues.length === issueCountBefore &&
+      transition.transitionKind === "seal_authority_epoch"
+    ) {
+      const seal: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityEpochSeal =
+        {
+          tenantId: tenantId(String(transition.tenantId)),
+          authoritySequence: transition.authoritySequence,
+          transitionId: transition.transitionId,
+          recordedAt: transition.recordedAt,
+          recordedBy: transition.recordedBy,
+          sealedThroughPruningTombstoneSequence:
+            transition.sealedThroughPruningTombstoneSequence!,
+          sealedAuthorityTopologyHash: transition.sealedAuthorityTopologyHash!,
+          sealedQuorumCertificateHash: transition.sealedQuorumCertificateHash!,
+          authorityHash: transition.authorityHash,
+        };
+      sealedThroughPruningTombstoneSequence =
+        seal.sealedThroughPruningTombstoneSequence;
+      authorityEpochSeals.push(seal);
+    } else if (
+      issues.length === transitionIssuesStart &&
+      issues.length === issueCountBefore
+    ) {
+      validAuthorityTransitions.push(transition);
+      if (
+        transition.effectiveFromPruningTombstoneSequence <=
+        input.pruningTombstoneSequence
+      ) {
+        applyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+          {
+            transition,
+            principals,
+            setQuorum: (required, minimum) => {
+              requiredWitnesses = required;
+              minimumWitnesses = minimum;
+            },
+          },
+        );
+        effectiveAuthorityHash = transition.authorityHash;
+      }
+    }
+
+    expectedSequence = transition.authoritySequence + 1;
+    expectedPreviousHash = transition.authorityHash;
+    latestAuthorityHash = transition.authorityHash;
+  }
+
+  if (requiredWitnesses === undefined) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_quorum_missing",
+      path: "/transitions",
+      message:
+        "projection replay pruning tombstone-head witness authority topology requires an effective quorum transition",
+    });
+  }
+
+  const principalStates = [...principals.values()].sort((a, b) =>
+    a.witnessId.localeCompare(b.witnessId),
+  );
+  const eligibleWitnessIds = principalStates
+    .filter(
+      (principal) =>
+        principal.status === "active" &&
+        principal.validFromPruningTombstoneSequence <=
+          input.pruningTombstoneSequence,
+    )
+    .map((principal) => principal.witnessId)
+    .sort((a, b) => a.localeCompare(b));
+
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    pruningTombstoneSequence: input.pruningTombstoneSequence,
+    ...(requiredWitnesses !== undefined ? { requiredWitnesses } : {}),
+    ...(minimumWitnesses !== undefined ? { minimumWitnesses } : {}),
+    ...(effectiveAuthorityHash !== undefined ? { effectiveAuthorityHash } : {}),
+    ...(sealedThroughPruningTombstoneSequence !== undefined
+      ? { sealedThroughPruningTombstoneSequence }
+      : {}),
+    eligibleWitnessIds,
+    principals: principalStates,
+    authorityEpochSeals,
+    transitions,
+    ...(latestAuthorityHash !== undefined ? { latestAuthorityHash } : {}),
+    issues,
+  };
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionSignatureIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityIssue[];
+  readonly path: string;
+  readonly tenantId: TenantId | string;
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+  readonly principals: ReadonlyMap<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalState
+  >;
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): void {
+  const policy = input.signaturePolicy;
+  if (policy === undefined) {
+    return;
+  }
+  const signature = input.transition.signature;
+  if (signature === undefined) {
+    if (policy.required) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_missing",
+        path: input.path,
+        message:
+          "projection replay pruning tombstone-head witness authority epoch seal requires a finalizer principal signature",
+      });
+    }
+    return;
+  }
+  const principal = input.principals.get(signature.principalId);
+  if (
+    principal === undefined ||
+    principal.status !== "active" ||
+    principal.validFromPruningTombstoneSequence >
+      input.transition.effectiveFromPruningTombstoneSequence
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_principal_not_authorized",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay pruning tombstone-head witness authority epoch seal signature principal is not active in the replayed tombstone-head authority topology",
+      actual: signature.principalId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyStatus !== undefined &&
+    principal.signatureKeyStatus !== "active"
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-head witness authority epoch seal signature key is not current in the replayed tombstone-head authority topology",
+      expected: "active",
+      actual: principal.signatureKeyStatus,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId === undefined &&
+    policy.required
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-head witness authority epoch seal signature has no active admitted key in the replayed tombstone-head authority topology",
+      expected: "active admitted key",
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureKeyId !== undefined &&
+    signature.keyId !== principal.signatureKeyId
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_key_mismatch",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-head witness authority epoch seal signature key does not match the admitted principal key",
+      expected: principal.signatureKeyId,
+      actual: signature.keyId,
+    });
+  }
+  if (
+    principal !== undefined &&
+    principal.signatureAlgorithm !== undefined &&
+    signature.algorithm !== principal.signatureAlgorithm
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_key_mismatch",
+      path: `${input.path}/algorithm`,
+      message:
+        "projection replay pruning tombstone-head witness authority epoch seal signature algorithm does not match the admitted principal algorithm",
+      expected: principal.signatureAlgorithm,
+      actual: signature.algorithm,
+    });
+  }
+  const { authorityHash, signature: _signature, ...signaturePayload } =
+    input.transition;
+  const expectedPayloadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionSignaturePayloadHash(
+      signaturePayload,
+    );
+  if (signature.payloadHash !== expectedPayloadHash) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_payload_mismatch",
+      path: `${input.path}/payloadHash`,
+      message:
+        "projection replay pruning tombstone-head witness authority epoch seal signature payload hash does not match the transition body",
+      expected: expectedPayloadHash,
+      actual: signature.payloadHash,
+    });
+  }
+  const verified = policy.verifier({
+    tenantId: input.tenantId,
+    principalId: signature.principalId,
+    keyId: signature.keyId,
+    algorithm: signature.algorithm,
+    payloadHash: signature.payloadHash,
+    signature: signature.signature,
+    ...(signature.signedAt !== undefined ? { signedAt: signature.signedAt } : {}),
+  });
+  if (!verified) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_signature_invalid",
+      path: `${input.path}/signature`,
+      message:
+        "projection replay pruning tombstone-head witness authority epoch seal signature verifier rejected the signature",
+    });
+  }
+}
+
+function applyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(input: {
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+  readonly principals: Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalState
+  >;
+  readonly setQuorum: (required: number, minimum?: number) => void;
+}): void {
+  const { transition } = input;
+  if (transition.transitionKind === "seal_authority_epoch") {
+    return;
+  }
+  if (transition.transitionKind === "set_quorum") {
+    input.setQuorum(
+      transition.requiredWitnesses!,
+      transition.minimumWitnesses ?? 1,
+    );
+    return;
+  }
+  const witnessId = transition.witnessId!;
+  const existing = input.principals.get(witnessId);
+  const status = projectionReplayCertificateStoreRootWitnessAuthorityStatusFromTransition(
+    transition.transitionKind,
+  );
+  const signatureKeyStatus:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatus
+    | undefined =
+    transition.transitionKind === "admit_witness" &&
+    transition.signatureKeyId !== undefined
+      ? "active"
+      : existing?.signatureKeyStatus;
+  input.principals.set(witnessId, {
+    tenantId: tenantId(String(transition.tenantId)),
+    witnessId,
+    status,
+    validFromPruningTombstoneSequence:
+      transition.transitionKind === "admit_witness"
+        ? transition.effectiveFromPruningTombstoneSequence
+        : existing?.validFromPruningTombstoneSequence ??
+          transition.effectiveFromPruningTombstoneSequence,
+    changedAtAuthoritySequence: transition.authoritySequence,
+    ...(transition.transitionKind === "admit_witness"
+      ? {
+          admittedAt: transition.recordedAt,
+          admittedBy: transition.recordedBy,
+        }
+      : existing?.admittedAt !== undefined
+        ? { admittedAt: existing.admittedAt }
+        : {}),
+    ...(transition.transitionKind !== "admit_witness"
+      ? {
+          statusChangedAt: transition.recordedAt,
+          statusChangedBy: transition.recordedBy,
+        }
+      : existing?.statusChangedAt !== undefined
+        ? {
+            statusChangedAt: existing.statusChangedAt,
+            ...(existing.statusChangedBy !== undefined
+              ? { statusChangedBy: existing.statusChangedBy }
+              : {}),
+          }
+        : {}),
+    ...(transition.transitionKind !== "admit_witness" &&
+    existing?.admittedBy !== undefined
+      ? { admittedBy: existing.admittedBy }
+      : {}),
+    ...(transition.signatureKeyId !== undefined
+      ? { signatureKeyId: transition.signatureKeyId }
+      : existing?.signatureKeyId !== undefined
+        ? { signatureKeyId: existing.signatureKeyId }
+        : {}),
+    ...(transition.signatureAlgorithm !== undefined
+      ? { signatureAlgorithm: transition.signatureAlgorithm }
+      : existing?.signatureAlgorithm !== undefined
+        ? { signatureAlgorithm: existing.signatureAlgorithm }
+        : {}),
+    ...(transition.signaturePublicKeyFingerprint !== undefined
+      ? {
+          signaturePublicKeyFingerprint:
+            transition.signaturePublicKeyFingerprint,
+        }
+      : existing?.signaturePublicKeyFingerprint !== undefined
+        ? {
+            signaturePublicKeyFingerprint:
+              existing.signaturePublicKeyFingerprint,
+          }
+        : {}),
+    ...(signatureKeyStatus !== undefined ? { signatureKeyStatus } : {}),
+    ...(transition.transitionKind === "admit_witness"
+      ? {
+          signatureKeyChangedAtAuthoritySequence:
+            transition.authoritySequence,
+          signatureKeyChangedAt: transition.recordedAt,
+          signatureKeyChangedBy: transition.recordedBy,
+        }
+      : existing?.signatureKeyChangedAtAuthoritySequence !== undefined
+        ? {
+            signatureKeyChangedAtAuthoritySequence:
+              existing.signatureKeyChangedAtAuthoritySequence,
+            ...(existing.signatureKeyChangedAt !== undefined
+              ? { signatureKeyChangedAt: existing.signatureKeyChangedAt }
+              : {}),
+            ...(existing.signatureKeyChangedBy !== undefined
+              ? { signatureKeyChangedBy: existing.signatureKeyChangedBy }
+              : {}),
+          }
+        : {}),
+    ...(transition.reason !== undefined ? { reason: transition.reason } : {}),
+  });
+}
+
+export function evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate(input: {
+  readonly tenantId: TenantId | string;
+  readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly witnessReplay: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedgerReplay;
+  readonly policy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumPolicy;
+  readonly authorityTopology?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTopology;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate {
+  const tenant = String(input.tenantId);
+  const requestedRequiredWitnesses =
+    input.authorityTopology?.requiredWitnesses ??
+    input.policy?.requiredWitnesses ??
+    1;
+  const requestedMinimumWitnesses =
+    input.authorityTopology?.minimumWitnesses ??
+    input.policy?.minimumWitnesses ??
+    1;
+  const requiredWitnesses = Number.isInteger(requestedRequiredWitnesses)
+    ? Math.max(1, requestedRequiredWitnesses)
+    : 1;
+  const minimumWitnesses = Number.isInteger(requestedMinimumWitnesses)
+    ? Math.max(1, requestedMinimumWitnesses)
+    : 1;
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateIssue[] =
+    [];
+  const acceptedWitnessIds = new Set<string>();
+  const obstructingWitnessIds = new Set<string>();
+  const invalidWitnessIds = new Set<string>();
+  const validWitnessIds = new Set<string>();
+  const topology = input.authorityTopology;
+  const topologyEligibleWitnessIds = new Set(topology?.eligibleWitnessIds ?? []);
+  let authorityTopologyInvalid = false;
+
+  if (!Number.isInteger(requestedRequiredWitnesses) || requestedRequiredWitnesses < 1) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_invalid_policy",
+      path: "/policy/requiredWitnesses",
+      message:
+        "projection replay pruning tombstone-head witness quorum requires at least one required witness",
+      expected: 1,
+      actual: requestedRequiredWitnesses,
+    });
+  }
+  if (!Number.isInteger(requestedMinimumWitnesses) || requestedMinimumWitnesses < 1) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_invalid_policy",
+      path: "/policy/minimumWitnesses",
+      message:
+        "projection replay pruning tombstone-head witness quorum requires at least one minimum witness",
+      expected: 1,
+      actual: requestedMinimumWitnesses,
+    });
+  }
+  if (
+    Number.isInteger(requestedRequiredWitnesses) &&
+    Number.isInteger(requestedMinimumWitnesses) &&
+    requestedMinimumWitnesses > requestedRequiredWitnesses
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_invalid_policy",
+      path: "/policy/minimumWitnesses",
+      message:
+        "projection replay pruning tombstone-head witness quorum minimum cannot exceed required witnesses",
+      expected: requestedRequiredWitnesses,
+      actual: requestedMinimumWitnesses,
+    });
+  }
+  if (String(input.head.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_head_tenant_mismatch",
+      path: "/head/tenantId",
+      message:
+        "projection replay pruning tombstone-head witness quorum head tenant does not match the quorum tenant",
+      expected: tenant,
+      actual: String(input.head.tenantId),
+    });
+  }
+  if (!input.witnessReplay.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_replay_invalid",
+      path: "/witnessReplay",
+      message:
+        "projection replay pruning tombstone-head witness quorum cannot use a witness replay that fails replay verification",
+      actual: input.witnessReplay.issues.map((issue) => issue.code).join(", "),
+    });
+  }
+  if (String(input.witnessReplay.tenantId) !== tenant) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_tenant_mismatch",
+      path: "/witnessReplay/tenantId",
+      message:
+        "projection replay pruning tombstone-head witness quorum cannot count witness records from another tenant",
+      expected: tenant,
+      actual: String(input.witnessReplay.tenantId),
+    });
+  }
+  if (topology !== undefined) {
+    if (!topology.valid) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_authority_topology_invalid",
+        path: "/authorityTopology",
+        message:
+          "projection replay pruning tombstone-head witness quorum cannot use an invalid witness authority topology",
+        actual: topology.issues.map((issue) => issue.code).join(", "),
+      });
+    }
+    if (String(topology.tenantId) !== tenant) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_authority_topology_invalid",
+        path: "/authorityTopology/tenantId",
+        message:
+          "projection replay pruning tombstone-head witness authority topology tenant does not match the quorum tenant",
+        expected: tenant,
+        actual: String(topology.tenantId),
+      });
+    }
+    if (
+      topology.pruningTombstoneSequence !== input.head.pruningTombstoneSequence
+    ) {
+      authorityTopologyInvalid = true;
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_authority_topology_invalid",
+        path: "/authorityTopology/pruningTombstoneSequence",
+        message:
+          "projection replay pruning tombstone-head witness authority topology must be replayed for the observed tombstone head sequence",
+        expected: input.head.pruningTombstoneSequence,
+        actual: topology.pruningTombstoneSequence,
+      });
+    }
+    if (
+      input.policy !== undefined &&
+      (input.policy.requiredWitnesses !== topology.requiredWitnesses ||
+        (input.policy.minimumWitnesses ?? 1) !==
+          (topology.minimumWitnesses ?? 1))
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_policy_authority_mismatch",
+        path: "/policy",
+        message:
+          "projection replay pruning tombstone-head witness quorum policy must match the replayed witness authority topology",
+        expected: `${topology.requiredWitnesses ?? ""}:${
+          topology.minimumWitnesses ?? 1
+        }`,
+        actual: `${input.policy.requiredWitnesses}:${
+          input.policy.minimumWitnesses ?? 1
+        }`,
+      });
+    }
+  }
+
+  if (
+    input.witnessReplay.valid &&
+    String(input.witnessReplay.tenantId) === tenant &&
+    !authorityTopologyInvalid
+  ) {
+    for (const [index, record] of input.witnessReplay.records.entries()) {
+      if (!record.accepted) {
+        continue;
+      }
+      const witnessId = record.observerId;
+      const acceptedTarget = record.decision.acceptedHeads.some((head) =>
+        sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+          head,
+          input.head,
+        ),
+      );
+      const conflictingAcceptedHead = record.decision.acceptedHeads.find(
+        (head) =>
+          head.pruningTombstoneSequence ===
+            input.head.pruningTombstoneSequence &&
+          !sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+            head,
+            input.head,
+          ),
+      );
+      if (conflictingAcceptedHead !== undefined) {
+        obstructingWitnessIds.add(witnessId);
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_conflicting_head",
+          path: `/witnessReplay/records/${index}/decision/acceptedHeads`,
+          message:
+            "projection replay pruning tombstone-head witness quorum found a witness record accepting a conflicting head at the same tombstone sequence",
+          expected: input.head.pruningTombstoneRecordHash,
+          actual: conflictingAcceptedHead.pruningTombstoneRecordHash,
+        });
+        continue;
+      }
+      if (!acceptedTarget) {
+        continue;
+      }
+      validWitnessIds.add(witnessId);
+      if (
+        topology !== undefined &&
+        !topologyEligibleWitnessIds.has(witnessId)
+      ) {
+        invalidWitnessIds.add(witnessId);
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_not_authorized",
+          path: `/witnessReplay/records/${index}/observerId`,
+          message:
+            "projection replay pruning tombstone-head witness quorum cannot count a witness outside the replayed authority topology",
+          expected: topology.eligibleWitnessIds.join(", "),
+          actual: witnessId,
+        });
+        continue;
+      }
+      acceptedWitnessIds.add(witnessId);
+    }
+  }
+
+  if (
+    input.witnessReplay.valid &&
+    validWitnessIds.size === 0 &&
+    !authorityTopologyInvalid
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_no_valid_witnesses",
+      path: "/witnessReplay/records",
+      message:
+        "projection replay pruning tombstone-head witness quorum requires at least one accepted witness record for the head",
+      expected: 1,
+      actual: 0,
+    });
+  }
+
+  const invalidPolicy = issues.some(
+    (issue) =>
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_invalid_policy" ||
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_policy_authority_mismatch",
+  );
+  const tenantMismatch = issues.some(
+    (issue) =>
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_head_tenant_mismatch" ||
+      issue.code ===
+        "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_tenant_mismatch",
+  );
+  const acceptedCount = acceptedWitnessIds.size;
+  const quorumMet = acceptedCount >= requiredWitnesses;
+  if (
+    !invalidPolicy &&
+    !tenantMismatch &&
+    !authorityTopologyInvalid &&
+    obstructingWitnessIds.size === 0 &&
+    !quorumMet
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_not_met",
+      path: "/acceptedWitnessIds",
+      message:
+        "projection replay pruning tombstone-head witness quorum has not reached the required witness threshold",
+      expected: requiredWitnesses,
+      actual: acceptedCount,
+    });
+  }
+
+  const replayInvalid = issues.some(
+    (issue) =>
+      issue.code ===
+      "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_replay_invalid",
+  );
+  const status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateStatus =
+    invalidPolicy ||
+    tenantMismatch ||
+    replayInvalid ||
+    authorityTopologyInvalid ||
+    obstructingWitnessIds.size > 0
+      ? "obstructed"
+      : quorumMet
+        ? "certified"
+        : acceptedCount >= minimumWitnesses
+          ? "witnessed"
+          : "provisional";
+  const allowedAction:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateAllowedAction
+    | undefined =
+    authorityTopologyInvalid
+      ? "correct_tombstone_head_witness_authority_topology"
+      : invalidPolicy || tenantMismatch || replayInvalid
+        ? "correct_tombstone_head_witness_policy"
+        : obstructingWitnessIds.size > 0
+          ? "resolve_pruning_tombstone_store_head_conflict"
+          : status === "certified"
+            ? undefined
+            : "collect_more_tombstone_head_witnesses";
+
+  return buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate(
+    {
+      tenantId: tenantId(tenant),
+      head: input.head,
+      status,
+      acceptedWitnessIds: sortedUniqueStrings([...acceptedWitnessIds]),
+      obstructingWitnessIds: sortedUniqueStrings([...obstructingWitnessIds]),
+      invalidWitnessIds: sortedUniqueStrings([...invalidWitnessIds]),
+      ...(topology !== undefined
+        ? {
+            eligibleWitnessIds: sortedUniqueStrings([
+              ...topologyEligibleWitnessIds,
+            ]),
+          }
+        : {}),
+      ...(topology?.latestAuthorityHash !== undefined
+        ? {
+            authorityTopologyHash:
+              topology.effectiveAuthorityHash ?? topology.latestAuthorityHash,
+          }
+        : {}),
+      requiredWitnesses,
+      minimumWitnesses,
+      issues,
+      authorityBoundary:
+        "projection_replay_pruning_tombstone_store_head_witness_quorum",
+      ...(allowedAction !== undefined ? { allowedAction } : {}),
+    },
+  );
+}
+
+function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate(
+  input: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate,
+    "certified" | "quorumCertificateHash"
+  >,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate {
+  const certificate = {
+    ...input,
+    certified: input.status === "certified",
+  };
+  return {
+    ...certificate,
+    quorumCertificateHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateHash(
+        certificate,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateHash(
+  certificate: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate,
+    "quorumCertificateHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(certificate));
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordInput,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord {
+  const payload: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord,
+    "quorumCertificateRecordHash"
+  > = {
+    tenantId: tenantId(String(input.certificate.tenantId)),
+    quorumCertificateSequence: input.quorumCertificateSequence,
+    certificate: input.certificate,
+    acceptedWitnessEvidence:
+      sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence(
+        input.acceptedWitnessEvidence,
+      ),
+    ...(input.authorityEpochSeal !== undefined
+      ? { authorityEpochSeal: input.authorityEpochSeal }
+      : {}),
+    ...(input.previousQuorumCertificateRecordHash !== undefined
+      ? {
+          previousQuorumCertificateRecordHash:
+            input.previousQuorumCertificateRecordHash,
+        }
+      : {}),
+    recordedAt: input.recordedAt ?? new Date().toISOString(),
+  };
+
+  return {
+    ...payload,
+    quorumCertificateRecordHash:
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordHash(
+  record: Omit<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord,
+    "quorumCertificateRecordHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordWitnessEvidence(input: {
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate;
+  readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[];
+}): readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence[] {
+  return sortedUniqueStrings(input.certificate.acceptedWitnessIds).map(
+    (witnessId) => {
+      const record = input.witnessRecords.find(
+        (candidate) =>
+          candidate.observerId === witnessId &&
+          candidate.accepted &&
+          candidate.decision.acceptedHeads.some((head) =>
+            sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+              head,
+              input.certificate.head,
+            ),
+          ),
+      );
+      if (record === undefined) {
+        throw new Error(
+          `projection replay pruning tombstone-store head quorum certificate missing accepted witness record for ${witnessId}`,
+        );
+      }
+      return {
+        witnessId,
+        witnessSequence: record.witnessSequence,
+        observationHash: record.observationHash,
+        observedAt: record.observedAt,
+        ...(record.signature !== undefined ? { signature: record.signature } : {}),
+      };
+    },
+  );
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord[];
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) => a.quorumCertificateSequence - b.quorumCertificateSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordIssue[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let latestCertifiedRecord:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord
+    | undefined;
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_tenant_mismatch",
+        path: `/records/${index}/tenantId`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (String(record.certificate.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_tenant_mismatch",
+        path: `/records/${index}/certificate/tenantId`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate tenant mismatch",
+        expected: tenant,
+        actual: String(record.certificate.tenantId),
+      });
+    }
+    if (record.quorumCertificateSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_sequence_gap",
+        path: `/records/${index}/quorumCertificateSequence`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate records must be contiguous",
+        expected: expectedSequence,
+        actual: record.quorumCertificateSequence,
+      });
+    }
+    if (
+      (record.previousQuorumCertificateRecordHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_previous_hash_mismatch",
+        path: `/records/${index}/previousQuorumCertificateRecordHash`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record does not chain to the prior record",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousQuorumCertificateRecordHash ?? "",
+      });
+    }
+    if (!record.certificate.certified || record.certificate.status !== "certified") {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_certificate_not_certified",
+        path: `/records/${index}/certificate/status`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record can only admit a certified certificate as durable proof",
+        expected: "certified",
+        actual: record.certificate.status,
+      });
+    }
+
+    const { quorumCertificateHash, ...certificatePayload } = record.certificate;
+    const expectedCertificateHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateHash(
+        certificatePayload,
+      );
+    if (quorumCertificateHash !== expectedCertificateHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_certificate_hash_mismatch",
+        path: `/records/${index}/certificate/quorumCertificateHash`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record contains a certificate with a mismatched hash",
+        expected: expectedCertificateHash,
+        actual: quorumCertificateHash,
+      });
+    }
+
+    const { quorumCertificateRecordHash, ...recordPayload } = record;
+    const expectedRecordHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordHash(
+        recordPayload,
+      );
+    if (quorumCertificateRecordHash !== expectedRecordHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_hash_mismatch",
+        path: `/records/${index}/quorumCertificateRecordHash`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record hash does not match its body",
+        expected: expectedRecordHash,
+        actual: quorumCertificateRecordHash,
+      });
+    }
+
+    const expectedWitnessIds = sortedUniqueStrings(
+      record.certificate.acceptedWitnessIds,
+    );
+    const actualWitnessIds = sortedUniqueStrings(
+      record.acceptedWitnessEvidence.map((evidence) => evidence.witnessId),
+    );
+    if (canonicalStringify(actualWitnessIds) !== canonicalStringify(expectedWitnessIds)) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_witness_evidence_mismatch",
+        path: `/records/${index}/acceptedWitnessEvidence`,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record evidence must match accepted witness ids",
+        expected: expectedWitnessIds.join(", "),
+        actual: actualWitnessIds.join(", "),
+      });
+    }
+    for (const [evidenceIndex, evidence] of record.acceptedWitnessEvidence.entries()) {
+      if (
+        !Number.isInteger(evidence.witnessSequence) ||
+        evidence.witnessSequence < 1 ||
+        evidence.observationHash === ""
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_witness_evidence_mismatch",
+          path: `/records/${index}/acceptedWitnessEvidence/${evidenceIndex}`,
+          message:
+            "projection replay pruning tombstone-store head witness quorum certificate evidence requires a positive witness sequence and observation hash",
+          actual: `${evidence.witnessSequence}:${evidence.observationHash}`,
+        });
+      }
+    }
+
+    const seal = record.authorityEpochSeal;
+    if (seal !== undefined) {
+      const { authorityHash, ...sealPayload } = seal;
+      const expectedSealHash =
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionHash(
+          sealPayload,
+        );
+      if (
+        seal.transitionKind !== "seal_authority_epoch" ||
+        seal.sealedQuorumCertificateHash !==
+          record.certificate.quorumCertificateHash ||
+        seal.sealedAuthorityTopologyHash !==
+          record.certificate.authorityTopologyHash ||
+        seal.sealedThroughPruningTombstoneSequence !==
+          record.certificate.head.pruningTombstoneSequence ||
+        authorityHash !== expectedSealHash
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_authority_seal_mismatch",
+          path: `/records/${index}/authorityEpochSeal`,
+          message:
+            "projection replay pruning tombstone-store head witness quorum certificate record seal must bind the certificate hash, authority topology, tombstone sequence, and transition hash",
+          expected: `${record.certificate.quorumCertificateHash}:${
+            record.certificate.authorityTopologyHash ?? ""
+          }:${record.certificate.head.pruningTombstoneSequence}`,
+          actual: `${seal.sealedQuorumCertificateHash ?? ""}:${
+            seal.sealedAuthorityTopologyHash ?? ""
+          }:${seal.sealedThroughPruningTombstoneSequence ?? ""}`,
+        });
+      }
+    }
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordSignatureIssues(
+      {
+        issues,
+        path: `/records/${index}`,
+        tenantId: tenant,
+        record,
+        ...(input.signaturePolicy !== undefined
+          ? { signaturePolicy: input.signaturePolicy }
+          : {}),
+      },
+    );
+
+    if (issues.length === issueCountBefore && record.certificate.certified) {
+      latestCertifiedRecord = record;
+    }
+    expectedSequence = record.quorumCertificateSequence + 1;
+    expectedPreviousHash = record.quorumCertificateRecordHash;
+  }
+
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    ...(latestCertifiedRecord !== undefined ? { latestCertifiedRecord } : {}),
+    issues,
+  };
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordSignatureIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordIssue[];
+  readonly path: string;
+  readonly tenantId: TenantId | string;
+  readonly record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord;
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): void {
+  const policy = input.signaturePolicy;
+  if (policy === undefined) {
+    return;
+  }
+  for (const [index, evidence] of input.record.acceptedWitnessEvidence.entries()) {
+    const path = `${input.path}/acceptedWitnessEvidence/${index}/signature`;
+    const signature = evidence.signature;
+    if (signature === undefined) {
+      if (policy.required) {
+        input.issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid",
+          path,
+          message:
+            "projection replay pruning tombstone-store head witness quorum certificate record evidence requires a witness signature",
+        });
+      }
+      continue;
+    }
+    const expectedPayloadHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessObservationSignaturePayloadHash(
+        {
+          tenantId: input.record.tenantId,
+          observerId: evidence.witnessId,
+          observedAt: evidence.observedAt,
+          head: input.record.certificate.head,
+        },
+      );
+    if (
+      signature.principalId !== evidence.witnessId ||
+      signature.payloadHash !== expectedPayloadHash
+    ) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record evidence signature does not bind the witness and head payload",
+        expected: `${evidence.witnessId}:${expectedPayloadHash}`,
+        actual: `${signature.principalId}:${signature.payloadHash}`,
+      });
+    }
+    const principal =
+      policy.pruningTombstoneHeadAuthorityTopology?.principals.find(
+        (candidate) =>
+          candidate.witnessId === evidence.witnessId &&
+          candidate.status === "active" &&
+          candidate.validFromPruningTombstoneSequence <=
+            input.record.certificate.head.pruningTombstoneSequence,
+      );
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordSignatureKeyStatusIssues(
+      {
+        issues: input.issues,
+        path,
+        signature,
+        ...(principal !== undefined ? { principal } : {}),
+        required: policy.required,
+      },
+    );
+    const verified = policy.verifier({
+      tenantId: input.tenantId,
+      principalId: signature.principalId,
+      keyId: signature.keyId,
+      algorithm: signature.algorithm,
+      payloadHash: signature.payloadHash,
+      signature: signature.signature,
+      ...(signature.signedAt !== undefined
+        ? { signedAt: signature.signedAt }
+        : {}),
+    });
+    if (!verified) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record verifier rejected witness evidence signature",
+      });
+    }
+  }
+
+  const seal = input.record.authorityEpochSeal;
+  const sealSignature = seal?.signature;
+  if (seal !== undefined) {
+    const path = `${input.path}/authorityEpochSeal/signature`;
+    if (sealSignature === undefined) {
+      if (policy.required) {
+        input.issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid",
+          path,
+          message:
+            "projection replay pruning tombstone-store head witness quorum certificate record authority seal requires a finalizer signature",
+        });
+      }
+      return;
+    }
+    const principal =
+      policy.pruningTombstoneHeadAuthorityTopology?.principals.find(
+        (candidate) =>
+          candidate.witnessId === sealSignature.principalId &&
+          candidate.status === "active" &&
+          candidate.validFromPruningTombstoneSequence <=
+            seal.effectiveFromPruningTombstoneSequence,
+      );
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordSignatureKeyStatusIssues(
+      {
+        issues: input.issues,
+        path,
+        signature: sealSignature,
+        ...(principal !== undefined ? { principal } : {}),
+        required: policy.required,
+      },
+    );
+    const { authorityHash, signature: _signature, ...signaturePayload } = seal;
+    const expectedPayloadHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionSignaturePayloadHash(
+        signaturePayload,
+      );
+    if (sealSignature.payloadHash !== expectedPayloadHash) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record seal signature payload hash does not match the seal body",
+        expected: expectedPayloadHash,
+        actual: sealSignature.payloadHash,
+      });
+    }
+    const verified = policy.verifier({
+      tenantId: input.tenantId,
+      principalId: sealSignature.principalId,
+      keyId: sealSignature.keyId,
+      algorithm: sealSignature.algorithm,
+      payloadHash: sealSignature.payloadHash,
+      signature: sealSignature.signature,
+      ...(sealSignature.signedAt !== undefined
+        ? { signedAt: sealSignature.signedAt }
+        : {}),
+    });
+    if (!verified) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay pruning tombstone-store head witness quorum certificate record verifier rejected authority seal signature",
+      });
+    }
+  }
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordSignatureKeyStatusIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordIssue[];
+  readonly path: string;
+  readonly signature: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly principal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessPrincipalState;
+  readonly required: boolean;
+}): void {
+  const { principal } = input;
+  if (principal === undefined) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay pruning tombstone-store head witness quorum certificate record signature principal is not active in the replayed tombstone-head authority topology",
+      actual: input.signature.principalId,
+    });
+    return;
+  }
+  if (
+    principal.signatureKeyStatus !== undefined &&
+    principal.signatureKeyStatus !== "active"
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-store head witness quorum certificate record signature key is not current in the replayed tombstone-head authority topology",
+      expected: "active",
+      actual: principal.signatureKeyStatus,
+    });
+  }
+  if (principal.signatureKeyId === undefined && input.required) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-store head witness quorum certificate record signature has no active admitted key",
+      expected: "active admitted key",
+      actual: input.signature.keyId,
+    });
+  }
+  if (
+    principal.signatureKeyId !== undefined &&
+    input.signature.keyId !== principal.signatureKeyId
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay pruning tombstone-store head witness quorum certificate record signature key does not match the current admitted principal key",
+      expected: principal.signatureKeyId,
+      actual: input.signature.keyId,
+    });
+  }
+  if (
+    principal.signatureAlgorithm !== undefined &&
+    input.signature.algorithm !== principal.signatureAlgorithm
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/algorithm`,
+      message:
+        "projection replay pruning tombstone-store head witness quorum certificate record signature algorithm does not match the current admitted principal algorithm",
+      expected: principal.signatureAlgorithm,
+      actual: input.signature.algorithm,
+    });
+  }
+}
+
+function sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence(
+  evidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence[],
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence[] {
+  return [...evidence].sort((a, b) =>
+    a.witnessId === b.witnessId
+      ? a.witnessSequence - b.witnessSequence
+      : a.witnessId.localeCompare(b.witnessId),
+  );
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[];
+  readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) => a.pruningTombstoneSequence - b.pruningTombstoneSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordIssue[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let latestTombstoneRecord:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord
+    | undefined;
+  const latestFrontierByLane = new Map<
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier
+  >();
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    const path = `/records/${index}`;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_tenant_mismatch",
+        path: `${path}/tenantId`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (
+      String(record.checkpointAdmissionRecord.tenantId) !== tenant ||
+      String(record.pruningAdmission.tenantId) !== tenant
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_tenant_mismatch",
+        path,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone embedded admission tenant mismatch",
+        expected: tenant,
+        actual: `${record.checkpointAdmissionRecord.tenantId}:${record.pruningAdmission.tenantId}`,
+      });
+    }
+    if (record.pruningTombstoneSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_sequence_gap",
+        path: `${path}/pruningTombstoneSequence`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstones must be contiguous",
+        expected: expectedSequence,
+        actual: record.pruningTombstoneSequence,
+      });
+    }
+    if (
+      (record.previousPruningTombstoneRecordHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_previous_hash_mismatch",
+        path: `${path}/previousPruningTombstoneRecordHash`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone does not chain to the prior record",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousPruningTombstoneRecordHash ?? "",
+      });
+    }
+
+    const { pruningAdmissionHash, ...admissionPayload } =
+      record.pruningAdmission;
+    const expectedPruningAdmissionHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmissionHash(
+        admissionPayload,
+      );
+    if (record.pruningAdmission.pruningAdmissionHash !== expectedPruningAdmissionHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_pruning_admission_hash_mismatch",
+        path: `${path}/pruningAdmission/pruningAdmissionHash`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone admission hash does not match its body",
+        expected: expectedPruningAdmissionHash,
+        actual: record.pruningAdmission.pruningAdmissionHash,
+      });
+    }
+    if (!record.pruningAdmission.admitted) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_pruning_admission_not_admitted",
+        path: `${path}/pruningAdmission/status`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone requires an admitted pruning admission",
+        expected: "admitted",
+        actual: record.pruningAdmission.status,
+      });
+    }
+
+    const { checkpointAdmissionRecordHash, ...checkpointRecordPayload } =
+      record.checkpointAdmissionRecord;
+    const expectedCheckpointAdmissionRecordHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordHash(
+        checkpointRecordPayload,
+      );
+    if (
+      record.checkpointAdmissionRecord.checkpointAdmissionRecordHash !==
+      expectedCheckpointAdmissionRecordHash
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_checkpoint_admission_record_hash_mismatch",
+        path: `${path}/checkpointAdmissionRecord/checkpointAdmissionRecordHash`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone checkpoint admission record hash does not match its body",
+        expected: expectedCheckpointAdmissionRecordHash,
+        actual:
+          record.checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+      });
+    }
+
+    const checkpointAdmissionValidation =
+      validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: input.tenantId,
+          checkpoint: record.checkpointAdmissionRecord.checkpoint,
+          admission: record.checkpointAdmissionRecord.admission,
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    if (!checkpointAdmissionValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_checkpoint_admission_invalid",
+        path: `${path}/checkpointAdmissionRecord/admission`,
+        message: checkpointAdmissionValidation.message,
+      });
+    }
+
+    if (
+      record.pruningAdmission.checkpointAdmissionRecordHash !==
+      record.checkpointAdmissionRecord.checkpointAdmissionRecordHash
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_checkpoint_admission_mismatch",
+        path: `${path}/pruningAdmission/checkpointAdmissionRecordHash`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone admission must bind the checkpoint admission record",
+        expected: record.checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+        actual: record.pruningAdmission.checkpointAdmissionRecordHash,
+      });
+    }
+    if (
+      record.pruningAdmission.checkpointHash !==
+        record.checkpointAdmissionRecord.checkpoint.checkpointHash ||
+      record.pruningAdmission.checkpointId !==
+        record.checkpointAdmissionRecord.checkpoint.checkpointId
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_checkpoint_admission_mismatch",
+        path: `${path}/pruningAdmission/checkpointHash`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone admission must bind the checkpoint frontier",
+        expected: record.checkpointAdmissionRecord.checkpoint.checkpointHash,
+        actual: record.pruningAdmission.checkpointHash,
+      });
+    }
+
+    const expectedFrontiers =
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneFrontiersFromCheckpoint(
+        {
+          checkpoint: record.checkpointAdmissionRecord.checkpoint,
+          lanes: record.pruningAdmission.lanes,
+        },
+      );
+    if (
+      canonicalStringify(record.prunedFrontiers) !==
+      canonicalStringify(expectedFrontiers)
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_frontier_mismatch",
+        path: `${path}/prunedFrontiers`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone frontiers must match the admitted checkpoint snapshots",
+        expected: canonicalStringify(expectedFrontiers),
+        actual: canonicalStringify(record.prunedFrontiers),
+      });
+    }
+
+    for (const frontier of record.prunedFrontiers) {
+      const priorFrontier = latestFrontierByLane.get(frontier.lane);
+      if (
+        priorFrontier !== undefined &&
+        frontier.compactedThroughSequence <=
+          priorFrontier.compactedThroughSequence
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_frontier_regression",
+          path: `${path}/prunedFrontiers/${frontier.lane}/compactedThroughSequence`,
+          message:
+            "projection replay settlement-head witness compaction pruning tombstone cannot regress or duplicate a lane frontier",
+          expected: priorFrontier.compactedThroughSequence + 1,
+          actual: frontier.compactedThroughSequence,
+        });
+      }
+    }
+
+    const { pruningTombstoneRecordHash, ...recordPayload } = record;
+    const expectedRecordHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordHash(
+        recordPayload,
+      );
+    if (record.pruningTombstoneRecordHash !== expectedRecordHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_hash_mismatch",
+        path: `${path}/pruningTombstoneRecordHash`,
+        message:
+          "projection replay settlement-head witness compaction pruning tombstone hash does not match its body",
+        expected: expectedRecordHash,
+        actual: record.pruningTombstoneRecordHash,
+      });
+    }
+
+    if (issues.length === issueCountBefore) {
+      latestTombstoneRecord = record;
+      for (const frontier of record.prunedFrontiers) {
+        latestFrontierByLane.set(frontier.lane, frontier);
+      }
+    }
+    expectedSequence = record.pruningTombstoneSequence + 1;
+    expectedPreviousHash = record.pruningTombstoneRecordHash;
+  }
+
+  const latestPrunedFrontiers = [...latestFrontierByLane.values()].sort((a, b) =>
+    a.lane.localeCompare(b.lane),
+  );
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    ...(latestTombstoneRecord !== undefined
+      ? { latestTombstoneRecord }
+      : {}),
+    latestPrunedFrontiers,
+    issues,
+  };
+}
+
+function latestProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordForLane(input: {
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[];
+  readonly lane: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningLane;
+}):
+  | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord
+  | undefined {
+  return [...input.records]
+    .sort((a, b) => b.pruningTombstoneSequence - a.pruningTombstoneSequence)
+    .find((record) =>
+      record.prunedFrontiers.some((frontier) => frontier.lane === input.lane),
+    );
+}
+
+export function verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuity(input: {
+  readonly tenantId: TenantId | string;
+  readonly tombstoneRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[];
+  readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+  readonly requiredTombstoneStoreHead?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly witnessRecords?: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+  readonly authorityTransitions?: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[];
+  readonly quorumCertificateRecords?: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[];
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuity {
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuityIssue[] =
+    [];
+  const tombstoneReplay =
+    replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+      {
+        tenantId: input.tenantId,
+        records: input.tombstoneRecords,
+        signaturePolicy: input.signaturePolicy,
+      },
+    );
+  if (!tombstoneReplay.valid) {
+    issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_replay_invalid",
+      path: "/tombstoneRecords",
+      message:
+        "projection replay settlement-head witness compaction pruned store continuity requires replay-valid pruning tombstones",
+        actual: tombstoneReplay.issues.map((issue) => issue.code).join(", "),
+      });
+  }
+  const tombstoneStoreHead =
+    tombstoneReplay.latestTombstoneRecord === undefined
+      ? undefined
+      : projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord(
+          tombstoneReplay.latestTombstoneRecord,
+        );
+  if (input.requiredTombstoneStoreHead !== undefined) {
+    const requiredHead = input.requiredTombstoneStoreHead;
+    const expectedRequiredHeadHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+        {
+          tenantId: requiredHead.tenantId,
+          pruningTombstoneSequence: requiredHead.pruningTombstoneSequence,
+          pruningTombstoneRecordHash: requiredHead.pruningTombstoneRecordHash,
+          recordedAt: requiredHead.recordedAt,
+        },
+      );
+    if (requiredHead.headHash !== expectedRequiredHeadHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_hash_mismatch",
+        path: "/requiredTombstoneStoreHead/headHash",
+        message:
+          "projection replay settlement-head witness compaction pruned store required tombstone-store head hash does not match its body",
+        expected: expectedRequiredHeadHash,
+        actual: requiredHead.headHash,
+      });
+    }
+    if (tombstoneStoreHead === undefined) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_missing",
+        path: "/tombstoneRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store has no tombstone head to compare with the witnessed tombstone-store head",
+        expected: requiredHead.pruningTombstoneSequence,
+      });
+    } else if (
+      tombstoneStoreHead.pruningTombstoneSequence <
+      requiredHead.pruningTombstoneSequence
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_stale",
+        path: "/tombstoneRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store tombstone history is behind the witnessed tombstone-store head",
+        expected: requiredHead.pruningTombstoneSequence,
+        actual: tombstoneStoreHead.pruningTombstoneSequence,
+      });
+    } else if (
+      tombstoneStoreHead.pruningTombstoneSequence >
+      requiredHead.pruningTombstoneSequence
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_unwitnessed_advance",
+        path: "/tombstoneRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store tombstone history advances beyond the witnessed tombstone-store head",
+        expected: requiredHead.pruningTombstoneSequence,
+        actual: tombstoneStoreHead.pruningTombstoneSequence,
+      });
+    } else if (
+      tombstoneStoreHead.pruningTombstoneRecordHash !==
+        requiredHead.pruningTombstoneRecordHash ||
+      tombstoneStoreHead.headHash !== requiredHead.headHash
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_tombstone_store_head_fork",
+        path: "/tombstoneRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store tombstone history forks from the witnessed tombstone-store head",
+        expected: requiredHead.pruningTombstoneRecordHash,
+        actual: tombstoneStoreHead.pruningTombstoneRecordHash,
+      });
+    }
+  }
+
+  const witnessTombstone =
+    latestProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordForLane(
+      {
+        records: tombstoneReplay.records,
+        lane: "witness_ledger",
+      },
+    );
+  if (witnessTombstone !== undefined) {
+    const witnessRecords = input.witnessRecords ?? [];
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+          records: witnessRecords,
+          signaturePolicy: input.signaturePolicy,
+          compactionCheckpoint:
+            witnessTombstone.checkpointAdmissionRecord.checkpoint,
+          compactionCheckpointAdmission:
+            witnessTombstone.checkpointAdmissionRecord.admission,
+        },
+      );
+    if (!replay.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_witness_suffix_invalid",
+        path: "/witnessRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store retained witness suffix does not replay from the latest tombstone frontier",
+        actual: replay.issues.map((issue) => issue.code).join(", "),
+      });
+    }
+    const expectedCount =
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneSuffixCountForLane(
+        witnessTombstone.pruningAdmission,
+        "witness_ledger",
+      );
+    if (witnessRecords.length < expectedCount) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_witness_suffix_truncated",
+        path: "/witnessRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store is missing records retained when the latest witness tombstone was admitted",
+        expected: expectedCount,
+        actual: witnessRecords.length,
+      });
+    }
+  }
+
+  const authorityTombstone =
+    latestProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordForLane(
+      {
+        records: tombstoneReplay.records,
+        lane: "authority_topology",
+      },
+    );
+  if (authorityTombstone !== undefined) {
+    const authorityTransitions = input.authorityTransitions ?? [];
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: input.tenantId,
+          settlementSequence:
+            authorityTombstone.checkpointAdmissionRecord.checkpoint
+              .authorityTopology!.settlementSequence,
+          transitions: authorityTransitions,
+          signaturePolicy: input.signaturePolicy,
+          compactionCheckpoint:
+            authorityTombstone.checkpointAdmissionRecord.checkpoint,
+          compactionCheckpointAdmission:
+            authorityTombstone.checkpointAdmissionRecord.admission,
+        },
+      );
+    if (!replay.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_authority_suffix_invalid",
+        path: "/authorityTransitions",
+        message:
+          "projection replay settlement-head witness compaction pruned store retained authority suffix does not replay from the latest tombstone frontier",
+        actual: replay.issues.map((issue) => issue.code).join(", "),
+      });
+    }
+    const expectedCount =
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneSuffixCountForLane(
+        authorityTombstone.pruningAdmission,
+        "authority_topology",
+      );
+    if (authorityTransitions.length < expectedCount) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_authority_suffix_truncated",
+        path: "/authorityTransitions",
+        message:
+          "projection replay settlement-head witness compaction pruned store is missing transitions retained when the latest authority tombstone was admitted",
+        expected: expectedCount,
+        actual: authorityTransitions.length,
+      });
+    }
+  }
+
+  const quorumCertificateTombstone =
+    latestProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordForLane(
+      {
+        records: tombstoneReplay.records,
+        lane: "quorum_certificate_records",
+      },
+    );
+  if (quorumCertificateTombstone !== undefined) {
+    const quorumCertificateRecords = input.quorumCertificateRecords ?? [];
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: input.tenantId,
+          records: quorumCertificateRecords,
+          signaturePolicy: input.signaturePolicy,
+          compactionCheckpoint:
+            quorumCertificateTombstone.checkpointAdmissionRecord.checkpoint,
+          compactionCheckpointAdmission:
+            quorumCertificateTombstone.checkpointAdmissionRecord.admission,
+        },
+      );
+    if (!replay.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_quorum_certificate_suffix_invalid",
+        path: "/quorumCertificateRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store retained quorum-certificate suffix does not replay from the latest tombstone frontier",
+        actual: replay.issues.map((issue) => issue.code).join(", "),
+      });
+    }
+    const expectedCount =
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneSuffixCountForLane(
+        quorumCertificateTombstone.pruningAdmission,
+        "quorum_certificate_records",
+      );
+    if (quorumCertificateRecords.length < expectedCount) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruned_store_quorum_certificate_suffix_truncated",
+        path: "/quorumCertificateRecords",
+        message:
+          "projection replay settlement-head witness compaction pruned store is missing records retained when the latest quorum-certificate tombstone was admitted",
+        expected: expectedCount,
+        actual: quorumCertificateRecords.length,
+      });
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    ...(tombstoneReplay.latestTombstoneRecord !== undefined
+      ? { latestTombstoneRecord: tombstoneReplay.latestTombstoneRecord }
+      : {}),
+    ...(tombstoneStoreHead !== undefined ? { tombstoneStoreHead } : {}),
+    issues,
+  };
+}
+
+export function buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordWitnessEvidence(input: {
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate;
+  readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+}): readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence[] {
+  return input.certificate.acceptedWitnessIds.map((witnessId) => {
+    const record = input.witnessRecords.find(
+      (candidate) =>
+        candidate.observerId === witnessId &&
+        candidate.accepted &&
+        candidate.decision.acceptedHeads.some((head) =>
+          sameProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+            head,
+            input.certificate.head,
+          ),
+        ),
+    );
+    if (record === undefined) {
+      throw new Error(
+        `projection replay settlement store head quorum certificate missing accepted witness record for ${witnessId}`,
+      );
+    }
+    return {
+      witnessId,
+      witnessSequence: record.witnessSequence,
+      observationHash: record.observationHash,
+      observedAt: record.observedAt,
+      ...(record.signature !== undefined ? { signature: record.signature } : {}),
+    };
+  });
+}
+
+export function replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(input: {
+  readonly tenantId: TenantId | string;
+  readonly records: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[];
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+  readonly compactionCheckpoint?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly compactionCheckpointAdmission?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+}): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordReplay {
+  const tenant = String(input.tenantId);
+  const records = [...input.records].sort(
+    (a, b) => a.quorumCertificateSequence - b.quorumCertificateSequence,
+  );
+  const issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordIssue[] =
+    [];
+  let expectedSequence = 1;
+  let expectedPreviousHash: string | undefined;
+  let latestCertifiedRecord:
+    | ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord
+    | undefined;
+  const recordCheckpoint =
+    input.compactionCheckpoint?.quorumCertificateRecords;
+  if (recordCheckpoint !== undefined) {
+    const admissionValidation =
+      validateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: input.tenantId,
+          checkpoint: input.compactionCheckpoint!,
+          ...(input.compactionCheckpointAdmission !== undefined
+            ? { admission: input.compactionCheckpointAdmission }
+            : {}),
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!admissionValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid",
+        path: "/compactionCheckpointAdmission",
+        message: admissionValidation.message,
+      });
+    }
+    const checkpointValidation =
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointHash(
+        input.compactionCheckpoint!,
+      );
+    if (!checkpointValidation.valid) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/checkpointHash",
+        message:
+          "projection replay settlement-store head witness quorum certificate record compaction checkpoint hash does not match its body",
+        expected: checkpointValidation.expectedHash,
+        actual: input.compactionCheckpoint!.checkpointHash,
+      });
+    }
+    if (
+      String(input.compactionCheckpoint!.tenantId) !== tenant ||
+      String(recordCheckpoint.tenantId) !== tenant
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/tenantId",
+        message:
+          "projection replay settlement-store head witness quorum certificate record compaction checkpoint tenant mismatch",
+        expected: tenant,
+        actual: String(input.compactionCheckpoint!.tenantId),
+      });
+    }
+    if (
+      !Number.isInteger(
+        recordCheckpoint.compactedThroughQuorumCertificateSequence,
+      ) ||
+      recordCheckpoint.compactedThroughQuorumCertificateSequence < 1 ||
+      recordCheckpoint.compactedThroughQuorumCertificateRecordHash === ""
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid",
+        path: "/compactionCheckpoint/quorumCertificateRecords",
+        message:
+          "projection replay settlement-store head witness quorum certificate record compaction checkpoint requires a positive compacted certificate-record sequence and record hash",
+        actual: `${recordCheckpoint.compactedThroughQuorumCertificateSequence}:${recordCheckpoint.compactedThroughQuorumCertificateRecordHash}`,
+      });
+    }
+    const latest = recordCheckpoint.latestCertifiedRecord;
+    if (latest !== undefined) {
+      const { quorumCertificateRecordHash, ...latestPayload } = latest;
+      const expectedLatestHash =
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordHash(
+          latestPayload,
+        );
+      if (
+        quorumCertificateRecordHash !== expectedLatestHash ||
+        !latest.certificate.certified ||
+        latest.quorumCertificateSequence >
+          recordCheckpoint.compactedThroughQuorumCertificateSequence
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid",
+          path: "/compactionCheckpoint/quorumCertificateRecords/latestCertifiedRecord",
+          message:
+            "projection replay settlement-store head witness quorum certificate record compaction checkpoint latest certified record must be certified, within the compacted prefix, and hash-valid",
+          expected: expectedLatestHash,
+          actual: quorumCertificateRecordHash,
+        });
+      }
+    }
+    if (issues.length === 0) {
+      expectedSequence =
+        recordCheckpoint.compactedThroughQuorumCertificateSequence + 1;
+      expectedPreviousHash =
+        recordCheckpoint.compactedThroughQuorumCertificateRecordHash;
+      latestCertifiedRecord = latest;
+    }
+  }
+
+  for (const [index, record] of records.entries()) {
+    const issueCountBefore = issues.length;
+    if (String(record.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_tenant_mismatch",
+        path: `/records/${index}/tenantId`,
+        message:
+          "projection replay settlement-store head witness quorum certificate record tenant mismatch",
+        expected: tenant,
+        actual: String(record.tenantId),
+      });
+    }
+    if (String(record.certificate.tenantId) !== tenant) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_tenant_mismatch",
+        path: `/records/${index}/certificate/tenantId`,
+        message:
+          "projection replay settlement-store head witness quorum certificate tenant mismatch",
+        expected: tenant,
+        actual: String(record.certificate.tenantId),
+      });
+    }
+    if (record.quorumCertificateSequence !== expectedSequence) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_sequence_gap",
+        path: `/records/${index}/quorumCertificateSequence`,
+        message:
+          "projection replay settlement-store head witness quorum certificate records must be contiguous",
+        expected: expectedSequence,
+        actual: record.quorumCertificateSequence,
+      });
+    }
+    if (
+      (record.previousQuorumCertificateRecordHash ?? "") !==
+      (expectedPreviousHash ?? "")
+    ) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_previous_hash_mismatch",
+        path: `/records/${index}/previousQuorumCertificateRecordHash`,
+        message:
+          "projection replay settlement-store head witness quorum certificate record does not chain to the prior record",
+        expected: expectedPreviousHash ?? "",
+        actual: record.previousQuorumCertificateRecordHash ?? "",
+      });
+    }
+
+    const { quorumCertificateHash, ...certificatePayload } = record.certificate;
+    const expectedCertificateHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateHash(
+        certificatePayload,
+      );
+    if (quorumCertificateHash !== expectedCertificateHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_certificate_hash_mismatch",
+        path: `/records/${index}/certificate/quorumCertificateHash`,
+        message:
+          "projection replay settlement-store head witness quorum certificate record contains a certificate with a mismatched hash",
+        expected: expectedCertificateHash,
+        actual: quorumCertificateHash,
+      });
+    }
+
+    const { quorumCertificateRecordHash, ...recordPayload } = record;
+    const expectedRecordHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordHash(
+        recordPayload,
+      );
+    if (quorumCertificateRecordHash !== expectedRecordHash) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_hash_mismatch",
+        path: `/records/${index}/quorumCertificateRecordHash`,
+        message:
+          "projection replay settlement-store head witness quorum certificate record hash does not match its body",
+        expected: expectedRecordHash,
+        actual: quorumCertificateRecordHash,
+      });
+    }
+
+    const expectedWitnessIds = sortedUniqueStrings(
+      record.certificate.acceptedWitnessIds,
+    );
+    const actualWitnessIds = sortedUniqueStrings(
+      record.acceptedWitnessEvidence.map((evidence) => evidence.witnessId),
+    );
+    if (canonicalStringify(actualWitnessIds) !== canonicalStringify(expectedWitnessIds)) {
+      issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_witness_evidence_mismatch",
+        path: `/records/${index}/acceptedWitnessEvidence`,
+        message:
+          "projection replay settlement-store head witness quorum certificate record evidence must match accepted witness ids",
+        expected: expectedWitnessIds.join(", "),
+        actual: actualWitnessIds.join(", "),
+      });
+    }
+    for (const [evidenceIndex, evidence] of record.acceptedWitnessEvidence.entries()) {
+      if (
+        !Number.isInteger(evidence.witnessSequence) ||
+        evidence.witnessSequence < 1 ||
+        evidence.observationHash === ""
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_witness_evidence_mismatch",
+          path: `/records/${index}/acceptedWitnessEvidence/${evidenceIndex}`,
+          message:
+            "projection replay settlement-store head witness quorum certificate evidence requires a positive witness sequence and observation hash",
+          actual: `${evidence.witnessSequence}:${evidence.observationHash}`,
+        });
+      }
+    }
+
+    const seal = record.authorityEpochSeal;
+    if (seal !== undefined) {
+      const { authorityHash, ...sealPayload } = seal;
+      const expectedSealHash =
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionHash(
+          sealPayload,
+        );
+      if (
+        seal.transitionKind !== "seal_authority_epoch" ||
+        seal.sealedQuorumCertificateHash !==
+          record.certificate.quorumCertificateHash ||
+        seal.sealedAuthorityTopologyHash !==
+          record.certificate.authorityTopologyHash ||
+        seal.sealedThroughSettlementSequence !==
+          record.certificate.head.settlementSequence ||
+        authorityHash !== expectedSealHash
+      ) {
+        issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_authority_seal_mismatch",
+          path: `/records/${index}/authorityEpochSeal`,
+          message:
+            "projection replay settlement-store head witness quorum certificate record seal must bind the certificate hash, authority topology, settlement sequence, and transition hash",
+          expected: `${record.certificate.quorumCertificateHash}:${record.certificate.authorityTopologyHash ?? ""}:${record.certificate.head.settlementSequence}`,
+          actual: `${seal.sealedQuorumCertificateHash ?? ""}:${seal.sealedAuthorityTopologyHash ?? ""}:${seal.sealedThroughSettlementSequence ?? ""}`,
+        });
+      }
+    }
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordSignatureIssues(
+      {
+        issues,
+        path: `/records/${index}`,
+        tenantId: tenant,
+        record,
+        ...(input.signaturePolicy !== undefined
+          ? { signaturePolicy: input.signaturePolicy }
+          : {}),
+      },
+    );
+
+    if (issues.length === issueCountBefore && record.certificate.certified) {
+      latestCertifiedRecord = record;
+    }
+    expectedSequence = record.quorumCertificateSequence + 1;
+    expectedPreviousHash = record.quorumCertificateRecordHash;
+  }
+
+  return {
+    valid: issues.length === 0,
+    tenantId: input.tenantId,
+    records,
+    ...(latestCertifiedRecord !== undefined ? { latestCertifiedRecord } : {}),
+    issues,
+  };
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordSignatureIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordIssue[];
+  readonly path: string;
+  readonly tenantId: TenantId | string;
+  readonly record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord;
+  readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+}): void {
+  const policy = input.signaturePolicy;
+  if (policy === undefined) {
+    return;
+  }
+  for (const [index, evidence] of input.record.acceptedWitnessEvidence.entries()) {
+    const path = `${input.path}/acceptedWitnessEvidence/${index}/signature`;
+    const signature = evidence.signature;
+    if (signature === undefined) {
+      if (policy.required) {
+        input.issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_invalid",
+          path,
+          message:
+            "projection replay settlement-store head witness quorum certificate record evidence requires a witness signature",
+        });
+      }
+      continue;
+    }
+    const expectedPayloadHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessObservationSignaturePayloadHash(
+        {
+          tenantId: input.record.tenantId,
+          observerId: evidence.witnessId,
+          observedAt: evidence.observedAt,
+          head: input.record.certificate.head,
+        },
+      );
+    if (
+      signature.principalId !== evidence.witnessId ||
+      signature.payloadHash !== expectedPayloadHash
+    ) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay settlement-store head witness quorum certificate record evidence signature does not bind the witness and head payload",
+        expected: `${evidence.witnessId}:${expectedPayloadHash}`,
+        actual: `${signature.principalId}:${signature.payloadHash}`,
+      });
+    }
+    const principal = policy.authorityTopology?.principals.find(
+      (candidate) =>
+        candidate.witnessId === evidence.witnessId &&
+        candidate.status === "active" &&
+        candidate.validFromSettlementSequence <=
+          input.record.certificate.head.settlementSequence,
+    );
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatusRecordIssues(
+      {
+        issues: input.issues,
+        path,
+        signature,
+        ...(principal !== undefined ? { principal } : {}),
+        required: policy.required,
+      },
+    );
+    const verified = policy.verifier({
+      tenantId: input.tenantId,
+      principalId: signature.principalId,
+      keyId: signature.keyId,
+      algorithm: signature.algorithm,
+      payloadHash: signature.payloadHash,
+      signature: signature.signature,
+      ...(signature.signedAt !== undefined
+        ? { signedAt: signature.signedAt }
+        : {}),
+    });
+    if (!verified) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay settlement-store head witness quorum certificate record verifier rejected witness evidence signature",
+      });
+    }
+  }
+
+  const seal = input.record.authorityEpochSeal;
+  const sealSignature = seal?.signature;
+  if (seal !== undefined) {
+    const path = `${input.path}/authorityEpochSeal/signature`;
+    if (sealSignature === undefined) {
+      if (policy.required) {
+        input.issues.push({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_invalid",
+          path,
+          message:
+            "projection replay settlement-store head witness quorum certificate record authority seal requires a finalizer signature",
+        });
+      }
+      return;
+    }
+    const principal = policy.authorityTopology?.principals.find(
+      (candidate) =>
+        candidate.witnessId === sealSignature.principalId &&
+        candidate.status === "active" &&
+        candidate.validFromSettlementSequence <=
+          seal.effectiveFromSettlementSequence,
+    );
+    appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatusRecordIssues(
+      {
+        issues: input.issues,
+        path,
+        signature: sealSignature,
+        ...(principal !== undefined ? { principal } : {}),
+        required: policy.required,
+      },
+    );
+    const { authorityHash, signature: _signature, ...signaturePayload } = seal;
+    const expectedPayloadHash =
+      computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionSignaturePayloadHash(
+        signaturePayload,
+      );
+    if (sealSignature.payloadHash !== expectedPayloadHash) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay settlement-store head witness quorum certificate record seal signature payload hash does not match the seal body",
+        expected: expectedPayloadHash,
+        actual: sealSignature.payloadHash,
+      });
+    }
+    const verified = policy.verifier({
+      tenantId: input.tenantId,
+      principalId: sealSignature.principalId,
+      keyId: sealSignature.keyId,
+      algorithm: sealSignature.algorithm,
+      payloadHash: sealSignature.payloadHash,
+      signature: sealSignature.signature,
+      ...(sealSignature.signedAt !== undefined
+        ? { signedAt: sealSignature.signedAt }
+        : {}),
+    });
+    if (!verified) {
+      input.issues.push({
+        code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_invalid",
+        path,
+        message:
+          "projection replay settlement-store head witness quorum certificate record verifier rejected authority seal signature",
+      });
+    }
+  }
+}
+
+function appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignatureKeyStatusRecordIssues(input: {
+  readonly issues: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordIssue[];
+  readonly path: string;
+  readonly signature: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature;
+  readonly principal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalState;
+  readonly required: boolean;
+}): void {
+  const { principal } = input;
+  if (principal === undefined) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/principalId`,
+      message:
+        "projection replay settlement-store head witness quorum certificate record signature principal is not active in the replayed authority topology",
+      actual: input.signature.principalId,
+    });
+    return;
+  }
+  if (
+    principal.signatureKeyStatus !== undefined &&
+    principal.signatureKeyStatus !== "active"
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness quorum certificate record signature key is not current in the replayed authority topology",
+      expected: "active",
+      actual: principal.signatureKeyStatus,
+    });
+  }
+  if (principal.signatureKeyId === undefined && input.required) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness quorum certificate record signature has no active admitted key",
+      expected: "active admitted key",
+      actual: input.signature.keyId,
+    });
+  }
+  if (
+    principal.signatureKeyId !== undefined &&
+    input.signature.keyId !== principal.signatureKeyId
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/keyId`,
+      message:
+        "projection replay settlement-store head witness quorum certificate record signature key does not match the current admitted principal key",
+      expected: principal.signatureKeyId,
+      actual: input.signature.keyId,
+    });
+  }
+  if (
+    principal.signatureAlgorithm !== undefined &&
+    input.signature.algorithm !== principal.signatureAlgorithm
+  ) {
+    input.issues.push({
+      code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_quorum_certificate_record_signature_key_not_current",
+      path: `${input.path}/algorithm`,
+      message:
+        "projection replay settlement-store head witness quorum certificate record signature algorithm does not match the current admitted principal algorithm",
+      expected: principal.signatureAlgorithm,
+      actual: input.signature.algorithm,
+    });
+  }
+}
+
+function sortedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence(
+  evidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence[],
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence[] {
+  return [...evidence].sort((a, b) =>
+    a.witnessId === b.witnessId
+      ? a.witnessSequence - b.witnessSequence
+      : a.witnessId.localeCompare(b.witnessId),
+  );
+}
+
+function assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionIsNotRetroactive(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionAppendInput,
+  transitions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[],
+): void {
+  if (input.transitionKind === "seal_authority_epoch") {
+    return;
+  }
+  const sealedThroughSettlementSequence = Math.max(
+    0,
+    ...transitions
+      .filter(
+        (transition) =>
+          transition.transitionKind === "seal_authority_epoch" &&
+          Number.isInteger(transition.sealedThroughSettlementSequence),
+      )
+      .map((transition) => transition.sealedThroughSettlementSequence ?? 0),
+  );
+  if (
+    sealedThroughSettlementSequence > 0 &&
+    input.effectiveFromSettlementSequence <= sealedThroughSettlementSequence
+  ) {
+    throw new Error(
+      `projection replay settlement store head witness authority transition ${input.transitionId} cannot modify sealed settlement epoch ${sealedThroughSettlementSequence}`,
+    );
+  }
+}
+
+function assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionIsNotRetroactive(
+  input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionAppendInput,
+  transitions: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[],
+): void {
+  if (input.transitionKind === "seal_authority_epoch") {
+    return;
+  }
+  const sealedThroughPruningTombstoneSequence = Math.max(
+    0,
+    ...transitions
+      .filter(
+        (transition) =>
+          transition.transitionKind === "seal_authority_epoch" &&
+          Number.isInteger(transition.sealedThroughPruningTombstoneSequence),
+      )
+      .map(
+        (transition) =>
+          transition.sealedThroughPruningTombstoneSequence ?? 0,
+      ),
+  );
+  if (
+    sealedThroughPruningTombstoneSequence > 0 &&
+    input.effectiveFromPruningTombstoneSequence <=
+      sealedThroughPruningTombstoneSequence
+  ) {
+    throw new Error(
+      `projection replay pruning tombstone-store head witness authority transition ${input.transitionId} cannot modify sealed pruning tombstone epoch ${sealedThroughPruningTombstoneSequence}`,
+    );
+  }
+}
+
+function conflictsWithProjectionReplayCertificateStoreRoot(
+  candidate: ProjectionReplayCertificateStoreRoot,
+  root: ProjectionReplayCertificateStoreRoot,
+): boolean {
+  return (
+    String(candidate.tenantId) === String(root.tenantId) &&
+    candidate.sequence === root.sequence &&
+    candidate.rootHash !== root.rootHash
+  );
+}
+
+function projectionReplayCertificateStoreRootWitnessRecordObstructsSettlement(input: {
+  readonly record: ProjectionReplayCertificateStoreRootWitnessRecord;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+}): boolean {
+  const { record, root } = input;
+  if (record.status !== "obstructed" || record.decision.obstruction === undefined) {
+    return false;
+  }
+  const hasForkIssue = record.decision.issues.some(
+    (issue) => issue.code === "projection_replay_certificate_store_root_fork",
+  );
+  return hasForkIssue && sameProjectionReplayCertificateStoreRoot(record.root, root);
+}
+
+function sortedUniqueStrings(values: readonly string[]): string[] {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+}
+
+function projectionReplayCertificateStoreRootObservationFromRecord(
+  record: ProjectionReplayCertificateStoreRootWitnessRecord,
+): ProjectionReplayCertificateStoreRootObservationInput {
+  return {
+    tenantId: record.tenantId,
+    observerId: record.observerId,
+    observedAt: record.observedAt,
+    root: record.root,
+    ...(record.consistencyProof !== undefined
+      ? { consistencyProof: record.consistencyProof }
+      : {}),
+  };
+}
+
+function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationFromRecord(
+  record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput {
+  return {
+    tenantId: record.tenantId,
+    observerId: record.observerId,
+    observedAt: record.observedAt,
+    head: record.head,
+    ...(record.consistencyProof !== undefined
+      ? { consistencyProof: record.consistencyProof }
+      : {}),
+    ...(record.signature !== undefined ? { signature: record.signature } : {}),
+  };
+}
+
+function projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationFromRecord(
+  record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput {
+  return {
+    tenantId: record.tenantId,
+    observerId: record.observerId,
+    observedAt: record.observedAt,
+    head: record.head,
+    ...(record.consistencyProof !== undefined
+      ? { consistencyProof: record.consistencyProof }
+      : {}),
+  };
+}
+
+export function verifyProjectionReplayCertificateRecordRef(input: {
+  readonly tenantId: TenantId | string;
+  readonly ref: ProjectionReplayCertificateRef;
+  readonly record: ProjectionReplayCertificateRecord;
+  readonly requireStoreCommitment?: boolean;
+}): ProjectionReplayCertificateRefVerification {
+  const { ref, record } = input;
+  const issues: ProjectionReplayCertificateStoreIssue[] = [];
+  const recordHashValidation = verifyProjectionReplayCertificateHash(
+    record.certificate,
+  );
+
+  if (!recordHashValidation.valid) {
+    issues.push({
+      code: "projection_replay_certificate_record_invalid",
+      path: "/certificate/certificateHash",
+      message:
+        "stored projection replay certificate hash does not match its body",
+      expected: recordHashValidation.expectedHash,
+      actual: recordHashValidation.actualHash,
+    });
+  }
+
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/tenantId",
+    message: "stored projection replay certificate tenant does not match lookup",
+    expected: String(input.tenantId),
+    actual: String(record.tenantId),
+  });
+
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/certificateId",
+    message:
+      "stored projection replay certificate id does not match replay ref",
+    expected: ref.certificateId,
+    actual: record.certificateId,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/certificateHash",
+    message:
+      "stored projection replay certificate hash does not match replay ref",
+    expected: ref.certificateHash,
+    actual: record.certificateHash,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/projectionName",
+    message:
+      "stored projection replay certificate projection name does not match replay ref",
+    expected: ref.projectionName,
+    actual: record.projectionName,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/projectionVersion",
+    message:
+      "stored projection replay certificate projection version does not match replay ref",
+    expected: ref.projectionVersion,
+    actual: record.projectionVersion,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/authorityScope",
+    message:
+      "stored projection replay certificate authority scope does not match replay ref",
+    expected: ref.authorityScope,
+    actual: record.authorityScope,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/replayedToPosition",
+    message:
+      "stored projection replay certificate replay position does not match replay ref",
+    expected: ref.replayedToPosition,
+    actual: record.replayedToPosition,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/transitionHistoryHash",
+    message:
+      "stored projection replay certificate transition history hash does not match replay ref",
+    expected: ref.transitionHistoryHash,
+    actual: record.transitionHistoryHash,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/projectionHash",
+    message:
+      "stored projection replay certificate projection hash does not match replay ref",
+    expected: ref.projectionHash,
+    actual: record.projectionHash,
+  });
+
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/certificate/certificateHash",
+    message:
+      "stored projection replay certificate record hash does not match certificate body hash",
+    expected: record.certificate.certificateHash,
+    actual: record.certificateHash,
+  });
+  pushStoreMismatchIfDifferent(issues, {
+    path: "/certificate/projectionName",
+    message:
+      "stored projection replay certificate record projection name does not match certificate body",
+    expected: record.certificate.projectionName ?? "",
+    actual: record.projectionName,
+  });
+
+  if (
+    input.requireStoreCommitment === true ||
+    ref.certificateStoreSequence !== undefined ||
+    ref.certificateStoreEntryHash !== undefined ||
+    ref.certificateStoreRootHash !== undefined
+  ) {
+    verifyProjectionReplayCertificateStoreCommitment({
+      issues,
+      ref,
+      record,
+      requireStoreCommitment: input.requireStoreCommitment === true,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    certificateId: ref.certificateId,
+    record,
+    issues,
+  };
+}
+
+export class InMemoryProjectionReplayCertificateStore
+  implements ProjectionReplayCertificateStore {
+  readonly #records = new Map<string, ProjectionReplayCertificateRecord>();
+  readonly #entries = new Map<string, ProjectionReplayCertificateStoreEntry[]>();
+
+  async recordProjectionReplayCertificate(
+    input: ProjectionReplayCertificateRecordInput,
+  ): Promise<ProjectionReplayCertificateRecord> {
+    const record = buildProjectionReplayCertificateRecord(input);
+    const key = projectionReplayCertificateStoreKey(
+      record.tenantId,
+      record.certificateId,
+    );
+    const existing = this.#records.get(key);
+    if (existing !== undefined) {
+      if (existing.certificateHash !== record.certificateHash) {
+        throw new Error(
+          `projection replay certificate ${record.certificateId} already exists with a different hash`,
+        );
+      }
+      return existing;
+    }
+    const tenantKey = String(record.tenantId);
+    const entries = this.#entries.get(tenantKey) ?? [];
+    const latest = entries[entries.length - 1];
+    const entry = buildProjectionReplayCertificateStoreEntry(record, {
+      sequence: entries.length + 1,
+      ...(latest !== undefined
+        ? { previousEntryHash: latest.entryHash }
+        : {}),
+      recordedAt: record.recordedAt,
+    });
+    const committedRecord = attachProjectionReplayCertificateStoreEntry(
+      record,
+      entry,
+    );
+    this.#records.set(key, committedRecord);
+    this.#entries.set(tenantKey, [...entries, entry]);
+    return committedRecord;
+  }
+
+  async getProjectionReplayCertificateRecord(
+    input: ProjectionReplayCertificateLookupInput,
+  ): Promise<ProjectionReplayCertificateRecord | null> {
+    return (
+      this.#records.get(
+        projectionReplayCertificateStoreKey(
+          input.tenantId,
+          input.certificateId,
+        ),
+      ) ?? null
+    );
+  }
+
+  async verifyProjectionReplayCertificateRef(
+    input: ProjectionReplayCertificateRefVerificationInput,
+  ): Promise<ProjectionReplayCertificateRefVerification> {
+    const record = await this.getProjectionReplayCertificateRecord({
+      tenantId: input.tenantId,
+      certificateId: input.ref.certificateId,
+    });
+    if (record === null) {
+      return missingProjectionReplayCertificateRecord(input.ref);
+    }
+    return verifyProjectionReplayCertificateRecordRef({
+      tenantId: input.tenantId,
+      ref: input.ref,
+      record,
+      requireStoreCommitment: input.requireStoreCommitment === true,
+    });
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitness
+  implements ProjectionReplayCertificateStoreRootWitness {
+  readonly #roots = new Map<string, ProjectionReplayCertificateStoreRoot[]>();
+
+  async observeProjectionReplayCertificateStoreRoot(
+    input: ProjectionReplayCertificateStoreRootObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessDecision> {
+    const tenantKey = String(input.tenantId);
+    const knownRoots = this.#roots.get(tenantKey) ?? [];
+    const decision = evaluateProjectionReplayCertificateStoreRootObservation({
+      observation: input,
+      knownRoots,
+    });
+
+    if (decision.accepted) {
+      this.#roots.set(
+        tenantKey,
+        mergeProjectionReplayCertificateStoreRoots(
+          knownRoots,
+          decision.acceptedRoots,
+        ),
+      );
+    }
+
+    return decision;
+  }
+
+  observedProjectionReplayCertificateStoreRoots(
+    tenant: TenantId | string,
+  ): readonly ProjectionReplayCertificateStoreRoot[] {
+    return this.#roots.get(String(tenant)) ?? [];
+  }
+}
+
+export class LedgerBackedProjectionReplayCertificateStoreRootWitness
+  implements ProjectionReplayCertificateStoreRootWitness {
+  constructor(
+    private readonly ledger: ProjectionReplayCertificateStoreRootWitnessLedger,
+  ) {}
+
+  async observeProjectionReplayCertificateStoreRoot(
+    input: ProjectionReplayCertificateStoreRootObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessDecision> {
+    const records =
+      await this.ledger.listProjectionReplayCertificateStoreRootWitnessRecords({
+        tenantId: input.tenantId,
+      });
+    const replay = replayProjectionReplayCertificateStoreRootWitnessRecords({
+      tenantId: input.tenantId,
+      records,
+    });
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay certificate store root witness ledger failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+
+    const decision = evaluateProjectionReplayCertificateStoreRootObservation({
+      observation: input,
+      knownRoots: replay.acceptedRoots,
+    });
+    await this.ledger.appendProjectionReplayCertificateStoreRootWitnessRecord({
+      observation: input,
+      decision,
+    });
+    return decision;
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessLedger
+  implements ProjectionReplayCertificateStoreRootWitnessLedger {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessRecord> {
+    const tenantKey = String(input.observation.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record = buildProjectionReplayCertificateStoreRootWitnessRecord({
+      witnessSequence: records.length + 1,
+      observation: input.observation,
+      decision: input.decision,
+      ...(latest !== undefined
+        ? { previousObservationHash: latest.observationHash }
+        : {}),
+      ...(input.recordedAt !== undefined ? { recordedAt: input.recordedAt } : {}),
+    });
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<readonly ProjectionReplayCertificateStoreRootWitnessRecord[]> {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessLedger
+  implements ProjectionReplayCertificateStoreRootWitnessLedger {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessRecord> {
+    const latest = await this.#latestRecord(input.observation.tenantId);
+    const record = buildProjectionReplayCertificateStoreRootWitnessRecord({
+      witnessSequence: latest === null ? 1 : latest.witnessSequence + 1,
+      observation: input.observation,
+      decision: input.decision,
+      ...(latest !== null
+        ? { previousObservationHash: latest.observationHash }
+        : {}),
+      ...(input.recordedAt !== undefined ? { recordedAt: input.recordedAt } : {}),
+    });
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessRecordRow>(
+        `INSERT INTO agent_state.projection_replay_certificate_root_witness_observations (
+           tenant_id,
+           witness_sequence,
+           observer_id,
+           observed_at,
+           root_sequence,
+           root_hash,
+           root,
+           consistency_proof,
+           decision,
+           accepted,
+           status,
+           previous_observation_hash,
+           observation_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4::timestamptz, $5, $6, $7::jsonb, $8::jsonb,
+           $9::jsonb, $10, $11, $12, $13, $14::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_CERTIFICATE_ROOT_WITNESS_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.witnessSequence,
+          record.observerId,
+          record.observedAt,
+          record.root.sequence,
+          record.root.rootHash,
+          JSON.stringify(record.root),
+          record.consistencyProof === undefined
+            ? null
+            : JSON.stringify(record.consistencyProof),
+          JSON.stringify(record.decision),
+          record.accepted,
+          record.status,
+          record.previousObservationHash ?? null,
+          record.observationHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay certificate store root witness observation was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessRecord(row);
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<readonly ProjectionReplayCertificateStoreRootWitnessRecord[]> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_CERTIFICATE_ROOT_WITNESS_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_certificate_root_witness_observations
+          WHERE tenant_id = $1
+          ORDER BY witness_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(rowToProjectionReplayCertificateStoreRootWitnessRecord);
+  }
+
+  async #latestRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_CERTIFICATE_ROOT_WITNESS_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_certificate_root_witness_observations
+          WHERE tenant_id = $1
+          ORDER BY witness_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessRecord(row);
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessAuthorityTransitionStore
+  implements ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionStore {
+  readonly #transitions = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessAuthorityTransition[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessAuthorityTransition> {
+    const tenantKey = String(input.tenantId);
+    const transitions = this.#transitions.get(tenantKey) ?? [];
+    const latest = transitions[transitions.length - 1];
+    const transition =
+      buildProjectionReplayCertificateStoreRootWitnessAuthorityTransition({
+        ...input,
+        authoritySequence: transitions.length + 1,
+        ...(latest !== undefined
+          ? { previousAuthorityHash: latest.authorityHash }
+          : {}),
+      });
+    this.#transitions.set(tenantKey, [...transitions, transition]);
+    return transition;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessAuthorityTransition[]
+  > {
+    return [...(this.#transitions.get(String(input.tenantId)) ?? [])];
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessAuthorityTransitionStore
+  implements ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessAuthorityTransition> {
+    const latest = await this.#latestTransition(input.tenantId);
+    const transition =
+      buildProjectionReplayCertificateStoreRootWitnessAuthorityTransition({
+        ...input,
+        authoritySequence:
+          latest === null ? 1 : latest.authoritySequence + 1,
+        ...(latest !== null
+          ? { previousAuthorityHash: latest.authorityHash }
+          : {}),
+      });
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionRow>(
+        `INSERT INTO agent_state.projection_replay_root_witness_authority_transitions (
+           tenant_id,
+           authority_sequence,
+           transition_id,
+           transition_kind,
+           recorded_at,
+           recorded_by,
+           effective_from_root_sequence,
+           witness_id,
+           required_witnesses,
+           minimum_witnesses,
+           reason,
+           previous_authority_hash,
+           authority_hash,
+           transition
+         ) VALUES (
+           $1, $2, $3, $4, $5::timestamptz, $6, $7, $8, $9, $10, $11, $12, $13,
+           $14::jsonb
+         )
+         RETURNING ${PROJECTION_REPLAY_ROOT_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}`,
+        [
+          transition.tenantId,
+          transition.authoritySequence,
+          transition.transitionId,
+          transition.transitionKind,
+          transition.recordedAt,
+          transition.recordedBy,
+          transition.effectiveFromRootSequence,
+          transition.witnessId ?? null,
+          transition.requiredWitnesses ?? null,
+          transition.minimumWitnesses ?? null,
+          transition.reason ?? null,
+          transition.previousAuthorityHash ?? null,
+          transition.authorityHash,
+          JSON.stringify(transition),
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay root witness authority transition was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessAuthorityTransition(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessAuthorityTransition[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionRow>(
+        `SELECT ${PROJECTION_REPLAY_ROOT_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_root_witness_authority_transitions
+          WHERE tenant_id = $1
+          ORDER BY authority_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessAuthorityTransition,
+    );
+  }
+
+  async #latestTransition(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessAuthorityTransition | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionRow>(
+        `SELECT ${PROJECTION_REPLAY_ROOT_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_root_witness_authority_transitions
+          WHERE tenant_id = $1
+          ORDER BY authority_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessAuthorityTransition(row);
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionStore {
+  readonly #transitions = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition> {
+    const tenantKey = String(input.tenantId);
+    const transitions = this.#transitions.get(tenantKey) ?? [];
+    assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionIsNotRetroactive(
+      input,
+      transitions,
+    );
+    const latest = transitions[transitions.length - 1];
+    const transition =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+        {
+          ...input,
+          authoritySequence: transitions.length + 1,
+          ...(latest !== undefined
+            ? { previousAuthorityHash: latest.authorityHash }
+            : {}),
+        },
+      );
+    this.#transitions.set(tenantKey, [...transitions, transition]);
+    return transition;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[]
+  > {
+    return [...(this.#transitions.get(String(input.tenantId)) ?? [])];
+  }
+
+  async pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number> {
+    const frontier =
+      assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordAdmitsLane(
+        {
+          tenantId: input.tenantId,
+          record: input.pruningTombstoneRecord,
+          lane: "authority_topology",
+        },
+      );
+    const tenantKey = String(input.tenantId);
+    const transitions = this.#transitions.get(tenantKey) ?? [];
+    const retained = transitions.filter(
+      (transition) =>
+        transition.authoritySequence > frontier.compactedThroughSequence,
+    );
+    this.#transitions.set(tenantKey, retained);
+    return transitions.length - retained.length;
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition> {
+    const transitions =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionIsNotRetroactive(
+      input,
+      transitions,
+    );
+    const latest = transitions[transitions.length - 1] ?? null;
+    const transition =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+        {
+          ...input,
+          authoritySequence:
+            latest === null ? 1 : latest.authoritySequence + 1,
+          ...(latest !== null
+            ? { previousAuthorityHash: latest.authorityHash }
+            : {}),
+        },
+      );
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionRow>(
+        `INSERT INTO agent_state.projection_replay_settlement_head_witness_authority_transitions (
+           tenant_id,
+           authority_sequence,
+           transition_id,
+           transition_kind,
+           recorded_at,
+           recorded_by,
+           effective_from_settlement_sequence,
+           witness_id,
+           required_witnesses,
+           minimum_witnesses,
+           sealed_through_settlement_sequence,
+           sealed_authority_topology_hash,
+           sealed_quorum_certificate_hash,
+           signature_key_id,
+           signature_algorithm,
+           signature_public_key_fingerprint,
+           signature,
+           reason,
+           previous_authority_hash,
+           authority_hash,
+           transition
+         ) VALUES (
+           $1, $2, $3, $4, $5::timestamptz, $6, $7, $8, $9, $10, $11, $12, $13,
+           $14, $15, $16, $17::jsonb, $18, $19, $20, $21::jsonb
+         )
+         RETURNING ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}`,
+        [
+          transition.tenantId,
+          transition.authoritySequence,
+          transition.transitionId,
+          transition.transitionKind,
+          transition.recordedAt,
+          transition.recordedBy,
+          transition.effectiveFromSettlementSequence,
+          transition.witnessId ?? null,
+          transition.requiredWitnesses ?? null,
+          transition.minimumWitnesses ?? null,
+          transition.sealedThroughSettlementSequence ?? null,
+          transition.sealedAuthorityTopologyHash ?? null,
+          transition.sealedQuorumCertificateHash ?? null,
+          transition.signatureKeyId ?? null,
+          transition.signatureAlgorithm ?? null,
+          transition.signaturePublicKeyFingerprint ?? null,
+          transition.signature === undefined
+            ? null
+            : JSON.stringify(transition.signature),
+          transition.reason ?? null,
+          transition.previousAuthorityHash ?? null,
+          transition.authorityHash,
+          JSON.stringify(transition),
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay settlement store head witness authority transition was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_authority_transitions
+          WHERE tenant_id = $1
+          ORDER BY authority_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition,
+    );
+  }
+
+  async pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number> {
+    const frontier =
+      assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordAdmitsLane(
+        {
+          tenantId: input.tenantId,
+          record: input.pruningTombstoneRecord,
+          lane: "authority_topology",
+        },
+      );
+    const result =
+      await this.db.query<{ readonly authority_sequence: number | string }>(
+        `DELETE FROM agent_state.projection_replay_settlement_head_witness_authority_transitions
+          WHERE tenant_id = $1
+            AND authority_sequence <= $2
+          RETURNING authority_sequence`,
+        [input.tenantId, frontier.compactedThroughSequence],
+      );
+    return result.rows.length;
+  }
+
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitness
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitness {
+  readonly #heads = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[]
+  >();
+
+  async observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision> {
+    const tenantKey = String(input.tenantId);
+    const knownHeads = this.#heads.get(tenantKey) ?? [];
+    const decision =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+        {
+          observation: input,
+          knownHeads,
+        },
+      );
+
+    if (decision.accepted) {
+      this.#heads.set(
+        tenantKey,
+        mergeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+          knownHeads,
+          decision.acceptedHeads,
+        ),
+      );
+    }
+
+    return decision;
+  }
+
+  observedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeads(
+    tenant: TenantId | string,
+  ): readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead[] {
+    return this.#heads.get(String(tenant)) ?? [];
+  }
+}
+
+export class LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitness
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitness {
+  constructor(
+    private readonly ledger: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger,
+  ) {}
+
+  async observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision> {
+    const records =
+      await this.ledger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+          records,
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay settlement store head witness ledger failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+
+    const decision =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation(
+        {
+          observation: input,
+          knownHeads: replay.acceptedHeads,
+        },
+      );
+    await this.ledger.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(
+      {
+        observation: input,
+        decision,
+      },
+    );
+    return decision;
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(input: {
+    readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+    readonly admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+    readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord> {
+    const tenantKey = String(input.checkpoint.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpointAdmissionSequence: records.length + 1,
+          checkpoint: input.checkpoint,
+          admission: input.admission,
+          ...(latest !== undefined
+            ? {
+                previousCheckpointAdmissionRecordHash:
+                  latest.checkpointAdmissionRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: input.checkpoint.tenantId,
+          records: [...records, record],
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay settlement store head witness compaction checkpoint admission record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord[]
+  > {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(input: {
+    readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+    readonly admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+    readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord> {
+    const latest = await this.#latestRecord(input.checkpoint.tenantId);
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpointAdmissionSequence:
+            latest === null
+              ? 1
+              : latest.checkpointAdmissionSequence + 1,
+          checkpoint: input.checkpoint,
+          admission: input.admission,
+          ...(latest !== null
+            ? {
+                previousCheckpointAdmissionRecordHash:
+                  latest.checkpointAdmissionRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const existing =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: input.checkpoint.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: input.checkpoint.tenantId,
+          records: [...existing, record],
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay settlement store head witness compaction checkpoint admission record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordRow>(
+        `INSERT INTO agent_state.projection_replay_settlement_head_witness_checkpoint_admissions (
+           tenant_id,
+           checkpoint_admission_sequence,
+           checkpoint_id,
+           checkpoint_hash,
+           checkpoint_admission_hash,
+           authority_topology_hash,
+           checkpoint,
+           admission,
+           previous_checkpoint_admission_record_hash,
+           checkpoint_admission_record_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10,
+           $11::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_CHECKPOINT_ADMISSION_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.checkpointAdmissionSequence,
+          record.checkpoint.checkpointId,
+          record.checkpoint.checkpointHash,
+          record.admission.checkpointAdmissionHash,
+          record.admission.authorityTopologyHash ?? null,
+          JSON.stringify(record.checkpoint),
+          JSON.stringify(record.admission),
+          record.previousCheckpointAdmissionRecordHash ?? null,
+          record.checkpointAdmissionRecordHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay settlement store head witness compaction checkpoint admission record was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_CHECKPOINT_ADMISSION_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_checkpoint_admissions
+          WHERE tenant_id = $1
+          ORDER BY checkpoint_admission_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord,
+    );
+  }
+
+  async #latestRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_CHECKPOINT_ADMISSION_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_checkpoint_admissions
+          WHERE tenant_id = $1
+          ORDER BY checkpoint_admission_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+          row,
+        );
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(input: {
+    readonly checkpointAdmissionRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+    readonly pruningAdmission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission;
+    readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord> {
+    const tenantKey = String(input.checkpointAdmissionRecord.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+        {
+          pruningTombstoneSequence: records.length + 1,
+          checkpointAdmissionRecord: input.checkpointAdmissionRecord,
+          pruningAdmission: input.pruningAdmission,
+          ...(latest !== undefined
+            ? {
+                previousPruningTombstoneRecordHash:
+                  latest.pruningTombstoneRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: input.checkpointAdmissionRecord.tenantId,
+          records: [...records, record],
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay settlement store head witness compaction pruning tombstone record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[]
+  > {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(input: {
+    readonly checkpointAdmissionRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+    readonly pruningAdmission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission;
+    readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord> {
+    const latest = await this.#latestRecord(input.checkpointAdmissionRecord.tenantId);
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+        {
+          pruningTombstoneSequence:
+            latest === null ? 1 : latest.pruningTombstoneSequence + 1,
+          checkpointAdmissionRecord: input.checkpointAdmissionRecord,
+          pruningAdmission: input.pruningAdmission,
+          ...(latest !== null
+            ? {
+                previousPruningTombstoneRecordHash:
+                  latest.pruningTombstoneRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const existing =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: input.checkpointAdmissionRecord.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: input.checkpointAdmissionRecord.tenantId,
+          records: [...existing, record],
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay settlement store head witness compaction pruning tombstone record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordRow>(
+        `INSERT INTO agent_state.projection_replay_settlement_head_witness_pruning_tombstones (
+           tenant_id,
+           pruning_tombstone_sequence,
+           checkpoint_id,
+           checkpoint_hash,
+           checkpoint_admission_record_hash,
+           pruning_admission_hash,
+           checkpoint_admission_record,
+           pruning_admission,
+           pruned_frontiers,
+           previous_pruning_tombstone_record_hash,
+           pruning_tombstone_record_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11,
+           $12::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_PRUNING_TOMBSTONE_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.pruningTombstoneSequence,
+          record.checkpointAdmissionRecord.checkpoint.checkpointId,
+          record.checkpointAdmissionRecord.checkpoint.checkpointHash,
+          record.checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+          record.pruningAdmission.pruningAdmissionHash,
+          JSON.stringify(record.checkpointAdmissionRecord),
+          JSON.stringify(record.pruningAdmission),
+          JSON.stringify(record.prunedFrontiers),
+          record.previousPruningTombstoneRecordHash ?? null,
+          record.pruningTombstoneRecordHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay settlement store head witness compaction pruning tombstone record was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_PRUNING_TOMBSTONE_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_pruning_tombstones
+          WHERE tenant_id = $1
+          ORDER BY pruning_tombstone_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord,
+    );
+  }
+
+  async #latestRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_PRUNING_TOMBSTONE_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_pruning_tombstones
+          WHERE tenant_id = $1
+          ORDER BY pruning_tombstone_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+          row,
+        );
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord> {
+    const tenantKey = String(input.observation.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+        {
+          witnessSequence: records.length + 1,
+          observation: input.observation,
+          decision: input.decision,
+          ...(latest !== undefined
+            ? { previousObservationHash: latest.observationHash }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[]
+  > {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord> {
+    const latest = await this.#latestRecord(input.observation.tenantId);
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+        {
+          witnessSequence: latest === null ? 1 : latest.witnessSequence + 1,
+          observation: input.observation,
+          decision: input.decision,
+          ...(latest !== null
+            ? { previousObservationHash: latest.observationHash }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordRow>(
+        `INSERT INTO agent_state.projection_replay_pruning_tombstone_head_witness_observations (
+           tenant_id,
+           witness_sequence,
+           observer_id,
+           observed_at,
+           pruning_tombstone_sequence,
+           pruning_tombstone_record_hash,
+           pruning_tombstone_store_head,
+           consistency_proof,
+           signature,
+           decision,
+           accepted,
+           status,
+           previous_observation_hash,
+           observation_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4::timestamptz, $5, $6, $7::jsonb, $8::jsonb,
+           $9::jsonb, $10::jsonb, $11, $12, $13, $14, $15::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.witnessSequence,
+          record.observerId,
+          record.observedAt,
+          record.head.pruningTombstoneSequence,
+          record.head.pruningTombstoneRecordHash,
+          JSON.stringify(record.head),
+          record.consistencyProof === undefined
+            ? null
+            : JSON.stringify(record.consistencyProof),
+          record.signature === undefined
+            ? null
+            : JSON.stringify(record.signature),
+          JSON.stringify(record.decision),
+          record.accepted,
+          record.status,
+          record.previousObservationHash ?? null,
+          record.observationHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay pruning tombstone-store head witness observation was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_pruning_tombstone_head_witness_observations
+          WHERE tenant_id = $1
+          ORDER BY witness_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord,
+    );
+  }
+
+  async #latestRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_pruning_tombstone_head_witness_observations
+          WHERE tenant_id = $1
+          ORDER BY witness_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+          row,
+        );
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore {
+  readonly #transitions = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition> {
+    const tenantKey = String(input.tenantId);
+    const transitions = this.#transitions.get(tenantKey) ?? [];
+    assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionIsNotRetroactive(
+      input,
+      transitions,
+    );
+    const latest = transitions[transitions.length - 1];
+    const transition =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          ...input,
+          authoritySequence: transitions.length + 1,
+          ...(latest !== undefined
+            ? { previousAuthorityHash: latest.authorityHash }
+            : {}),
+        },
+      );
+    this.#transitions.set(tenantKey, [...transitions, transition]);
+    return transition;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[]
+  > {
+    return [...(this.#transitions.get(String(input.tenantId)) ?? [])];
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionAppendInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition> {
+    const transitions =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionIsNotRetroactive(
+      input,
+      transitions,
+    );
+    const latest = transitions[transitions.length - 1] ?? null;
+    const transition =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          ...input,
+          authoritySequence:
+            latest === null ? 1 : latest.authoritySequence + 1,
+          ...(latest !== null
+            ? { previousAuthorityHash: latest.authorityHash }
+            : {}),
+        },
+      );
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionRow>(
+        `INSERT INTO agent_state.projection_replay_pruning_tombstone_head_witness_authority_transitions (
+           tenant_id,
+           authority_sequence,
+           transition_id,
+           transition_kind,
+           recorded_at,
+           recorded_by,
+           effective_from_pruning_tombstone_sequence,
+           witness_id,
+           required_witnesses,
+           minimum_witnesses,
+           sealed_through_pruning_tombstone_sequence,
+           sealed_authority_topology_hash,
+           sealed_quorum_certificate_hash,
+           signature_key_id,
+           signature_algorithm,
+           signature_public_key_fingerprint,
+           signature,
+           reason,
+           previous_authority_hash,
+           authority_hash,
+           transition
+         ) VALUES (
+           $1, $2, $3, $4, $5::timestamptz, $6, $7, $8, $9, $10, $11, $12, $13,
+           $14, $15, $16, $17::jsonb, $18, $19, $20, $21::jsonb
+         )
+         RETURNING ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}`,
+        [
+          transition.tenantId,
+          transition.authoritySequence,
+          transition.transitionId,
+          transition.transitionKind,
+          transition.recordedAt,
+          transition.recordedBy,
+          transition.effectiveFromPruningTombstoneSequence,
+          transition.witnessId ?? null,
+          transition.requiredWitnesses ?? null,
+          transition.minimumWitnesses ?? null,
+          transition.sealedThroughPruningTombstoneSequence ?? null,
+          transition.sealedAuthorityTopologyHash ?? null,
+          transition.sealedQuorumCertificateHash ?? null,
+          transition.signatureKeyId ?? null,
+          transition.signatureAlgorithm ?? null,
+          transition.signaturePublicKeyFingerprint ?? null,
+          transition.signature === undefined
+            ? null
+            : JSON.stringify(transition.signature),
+          transition.reason ?? null,
+          transition.previousAuthorityHash ?? null,
+          transition.authorityHash,
+          JSON.stringify(transition),
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay pruning tombstone-store head witness authority transition was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionRow>(
+        `SELECT ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_pruning_tombstone_head_witness_authority_transitions
+          WHERE tenant_id = $1
+          ORDER BY authority_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition,
+    );
+  }
+
+  async #latestTransition(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionRow>(
+        `SELECT ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_pruning_tombstone_head_witness_authority_transitions
+          WHERE tenant_id = $1
+          ORDER BY authority_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+          row,
+        );
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(input: {
+    readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate;
+    readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[];
+    readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+    readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord> {
+    const tenantKey = String(input.certificate.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence: records.length + 1,
+          certificate: input.certificate,
+          acceptedWitnessEvidence:
+            buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordWitnessEvidence(
+              {
+                certificate: input.certificate,
+                witnessRecords: input.witnessRecords,
+              },
+            ),
+          ...(input.authorityEpochSeal !== undefined
+            ? { authorityEpochSeal: input.authorityEpochSeal }
+            : {}),
+          ...(latest !== undefined
+            ? {
+                previousQuorumCertificateRecordHash:
+                  latest.quorumCertificateRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: input.certificate.tenantId,
+          records: [...records, record],
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay pruning tombstone-store head witness quorum certificate record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord[]
+  > {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(input: {
+    readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate;
+    readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord[];
+    readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+    readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord> {
+    const latest = await this.#latestRecord(input.certificate.tenantId);
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence:
+            latest === null ? 1 : latest.quorumCertificateSequence + 1,
+          certificate: input.certificate,
+          acceptedWitnessEvidence:
+            buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordWitnessEvidence(
+              {
+                certificate: input.certificate,
+                witnessRecords: input.witnessRecords,
+              },
+            ),
+          ...(input.authorityEpochSeal !== undefined
+            ? { authorityEpochSeal: input.authorityEpochSeal }
+            : {}),
+          ...(latest !== null
+            ? {
+                previousQuorumCertificateRecordHash:
+                  latest.quorumCertificateRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const existing =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: input.certificate.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: input.certificate.tenantId,
+          records: [...existing, record],
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay pruning tombstone-store head witness quorum certificate record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordRow>(
+        `INSERT INTO agent_state.projection_replay_pruning_tombstone_head_witness_quorum_certificates (
+           tenant_id,
+           quorum_certificate_sequence,
+           pruning_tombstone_sequence,
+           pruning_tombstone_record_hash,
+           quorum_certificate_hash,
+           authority_topology_hash,
+           certificate,
+           accepted_witness_evidence,
+           authority_epoch_seal,
+           previous_quorum_certificate_record_hash,
+           quorum_certificate_record_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11,
+           $12::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.quorumCertificateSequence,
+          record.certificate.head.pruningTombstoneSequence,
+          record.certificate.head.pruningTombstoneRecordHash,
+          record.certificate.quorumCertificateHash,
+          record.certificate.authorityTopologyHash ?? null,
+          JSON.stringify(record.certificate),
+          JSON.stringify(record.acceptedWitnessEvidence),
+          record.authorityEpochSeal === undefined
+            ? null
+            : JSON.stringify(record.authorityEpochSeal),
+          record.previousQuorumCertificateRecordHash ?? null,
+          record.quorumCertificateRecordHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay pruning tombstone-store head witness quorum certificate record was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_pruning_tombstone_head_witness_quorum_certificates
+          WHERE tenant_id = $1
+          ORDER BY quorum_certificate_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord,
+    );
+  }
+
+  async #latestRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_pruning_tombstone_head_witness_quorum_certificates
+          WHERE tenant_id = $1
+          ORDER BY quorum_certificate_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+          row,
+        );
+  }
+}
+
+export class StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier {
+  constructor(
+    private readonly authorityTransitionStore: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore,
+    private readonly witnessLedger: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger,
+  ) {}
+
+  async certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(input: {
+    readonly tenantId: TenantId | string;
+    readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+    readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly policy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumPolicy;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate> {
+    const transitions =
+      await this.authorityTransitionStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const authorityTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: input.tenantId,
+          pruningTombstoneSequence: input.head.pruningTombstoneSequence,
+          transitions,
+          signaturePolicy: input.signaturePolicy,
+        },
+      );
+    const witnessRecords =
+      await this.witnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const witnessReplay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+          records: witnessRecords,
+          signaturePolicy: {
+            ...input.signaturePolicy,
+            pruningTombstoneHeadAuthorityTopology: authorityTopology,
+          },
+        },
+      );
+
+    return evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate(
+      {
+        tenantId: input.tenantId,
+        head: input.head,
+        witnessReplay,
+        authorityTopology,
+        ...(input.policy !== undefined ? { policy: input.policy } : {}),
+      },
+    );
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness {
+  readonly #heads = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[]
+  >();
+
+  constructor(
+    private readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy,
+  ) {}
+
+  async observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision> {
+    const tenantKey = String(input.tenantId);
+    const knownHeads = this.#heads.get(tenantKey) ?? [];
+    const decision =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+        {
+          observation: input,
+          knownHeads,
+          signaturePolicy: this.signaturePolicy,
+        },
+      );
+    if (decision.accepted) {
+      this.#heads.set(
+        tenantKey,
+        mergeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+          knownHeads,
+          decision.acceptedHeads,
+        ),
+      );
+    }
+    return decision;
+  }
+
+  observedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeads(
+    tenant: TenantId | string,
+  ): readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead[] {
+    return this.#heads.get(String(tenant)) ?? [];
+  }
+}
+
+export class LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness {
+  constructor(
+    private readonly ledger: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger,
+    private readonly signaturePolicy: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy,
+  ) {}
+
+  async observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision> {
+    const records =
+      await this.ledger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+          records,
+          signaturePolicy: this.signaturePolicy,
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay pruning tombstone-store head witness ledger failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    const decision =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadObservation(
+        {
+          observation: input,
+          knownHeads: replay.acceptedHeads,
+          signaturePolicy: this.signaturePolicy,
+        },
+      );
+    await this.ledger.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+      {
+        observation: input,
+        decision,
+      },
+    );
+    return decision;
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord> {
+    const tenantKey = String(input.observation.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(
+        {
+          witnessSequence: records.length + 1,
+          observation: input.observation,
+          decision: input.decision,
+          ...(latest !== undefined
+            ? { previousObservationHash: latest.observationHash }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[]
+  > {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+
+  async pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number> {
+    const frontier =
+      assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordAdmitsLane(
+        {
+          tenantId: input.tenantId,
+          record: input.pruningTombstoneRecord,
+          lane: "witness_ledger",
+        },
+      );
+    const tenantKey = String(input.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const retained = records.filter(
+      (record) => record.witnessSequence > frontier.compactedThroughSequence,
+    );
+    this.#records.set(tenantKey, retained);
+    return records.length - retained.length;
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(input: {
+    readonly observation: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservationInput;
+    readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord> {
+    const latest = await this.#latestRecord(input.observation.tenantId);
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(
+        {
+          witnessSequence: latest === null ? 1 : latest.witnessSequence + 1,
+          observation: input.observation,
+          decision: input.decision,
+          ...(latest !== null
+            ? { previousObservationHash: latest.observationHash }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordRow>(
+        `INSERT INTO agent_state.projection_replay_settlement_head_witness_observations (
+           tenant_id,
+           witness_sequence,
+           observer_id,
+           observed_at,
+           settlement_sequence,
+           settlement_record_hash,
+           settlement_store_head,
+           consistency_proof,
+           signature,
+           decision,
+           accepted,
+           status,
+           previous_observation_hash,
+           observation_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4::timestamptz, $5, $6, $7::jsonb, $8::jsonb,
+           $9::jsonb, $10::jsonb, $11, $12, $13, $14, $15::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.witnessSequence,
+          record.observerId,
+          record.observedAt,
+          record.head.settlementSequence,
+          record.head.settlementRecordHash,
+          JSON.stringify(record.head),
+          record.consistencyProof === undefined
+            ? null
+            : JSON.stringify(record.consistencyProof),
+          record.signature === undefined
+            ? null
+            : JSON.stringify(record.signature),
+          JSON.stringify(record.decision),
+          record.accepted,
+          record.status,
+          record.previousObservationHash ?? null,
+          record.observationHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay settlement store head witness observation was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_observations
+          WHERE tenant_id = $1
+          ORDER BY witness_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord,
+    );
+  }
+
+  async pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number> {
+    const frontier =
+      assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordAdmitsLane(
+        {
+          tenantId: input.tenantId,
+          record: input.pruningTombstoneRecord,
+          lane: "witness_ledger",
+        },
+      );
+    const result =
+      await this.db.query<{ readonly witness_sequence: number | string }>(
+        `DELETE FROM agent_state.projection_replay_settlement_head_witness_observations
+          WHERE tenant_id = $1
+            AND witness_sequence <= $2
+          RETURNING witness_sequence`,
+        [input.tenantId, frontier.compactedThroughSequence],
+      );
+    return result.rows.length;
+  }
+
+  async #latestRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_observations
+          WHERE tenant_id = $1
+          ORDER BY witness_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(
+          row,
+        );
+  }
+}
+
+export class StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertifier {
+  constructor(
+    private readonly authorityTransitionStore: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionStore,
+    private readonly witnessLedger: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger,
+  ) {}
+
+  async certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(input: {
+    readonly tenantId: TenantId | string;
+    readonly head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+    readonly policy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumPolicy;
+    readonly signaturePolicy?: Omit<
+      ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy,
+      "authorityTopology"
+    >;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate> {
+    const transitions =
+      await this.authorityTransitionStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const authorityTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: input.tenantId,
+          settlementSequence: input.head.settlementSequence,
+          transitions,
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    const witnessRecords =
+      await this.witnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const witnessReplay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords(
+        {
+          tenantId: input.tenantId,
+          records: witnessRecords,
+          ...(input.signaturePolicy !== undefined
+            ? {
+                signaturePolicy: {
+                  ...input.signaturePolicy,
+                  authorityTopology,
+                },
+              }
+            : {}),
+        },
+      );
+
+    return evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate(
+      {
+        tenantId: input.tenantId,
+        head: input.head,
+        witnessReplay,
+        authorityTopology,
+        ...(input.policy !== undefined ? { policy: input.policy } : {}),
+      },
+    );
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordStore {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(input: {
+    readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate;
+    readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+    readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+    readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord> {
+    const tenantKey = String(input.certificate.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence: records.length + 1,
+          certificate: input.certificate,
+          acceptedWitnessEvidence:
+            buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordWitnessEvidence(
+              {
+                certificate: input.certificate,
+                witnessRecords: input.witnessRecords,
+              },
+            ),
+          ...(input.authorityEpochSeal !== undefined
+            ? { authorityEpochSeal: input.authorityEpochSeal }
+            : {}),
+          ...(latest !== undefined
+            ? {
+                previousQuorumCertificateRecordHash:
+                  latest.quorumCertificateRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: input.certificate.tenantId,
+          records: [...records, record],
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay settlement store head witness quorum certificate record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[]
+  > {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+
+  async pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number> {
+    const frontier =
+      assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordAdmitsLane(
+        {
+          tenantId: input.tenantId,
+          record: input.pruningTombstoneRecord,
+          lane: "quorum_certificate_records",
+        },
+      );
+    const tenantKey = String(input.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const retained = records.filter(
+      (record) =>
+        record.quorumCertificateSequence > frontier.compactedThroughSequence,
+    );
+    this.#records.set(tenantKey, retained);
+    return records.length - retained.length;
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(input: {
+    readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate;
+    readonly witnessRecords: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord[];
+    readonly authorityEpochSeal?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+    readonly signaturePolicy?: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessSignaturePolicy;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord> {
+    const latest = await this.#latestRecord(input.certificate.tenantId);
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence:
+            latest === null ? 1 : latest.quorumCertificateSequence + 1,
+          certificate: input.certificate,
+          acceptedWitnessEvidence:
+            buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordWitnessEvidence(
+              {
+                certificate: input.certificate,
+                witnessRecords: input.witnessRecords,
+              },
+            ),
+          ...(input.authorityEpochSeal !== undefined
+            ? { authorityEpochSeal: input.authorityEpochSeal }
+            : {}),
+          ...(latest !== null
+            ? {
+                previousQuorumCertificateRecordHash:
+                  latest.quorumCertificateRecordHash,
+              }
+            : {}),
+          ...(input.recordedAt !== undefined
+            ? { recordedAt: input.recordedAt }
+            : {}),
+        },
+      );
+    const existing =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: input.certificate.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: input.certificate.tenantId,
+          records: [...existing, record],
+          ...(input.signaturePolicy !== undefined
+            ? { signaturePolicy: input.signaturePolicy }
+            : {}),
+        },
+      );
+    if (!replay.valid) {
+      throw new Error(
+        `projection replay settlement store head witness quorum certificate record failed replay: ${replay.issues
+          .map((issue) => issue.code)
+          .join(", ")}`,
+      );
+    }
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordRow>(
+        `INSERT INTO agent_state.projection_replay_settlement_head_witness_quorum_certificates (
+           tenant_id,
+           quorum_certificate_sequence,
+           settlement_sequence,
+           settlement_record_hash,
+           quorum_certificate_hash,
+           authority_topology_hash,
+           certificate,
+           accepted_witness_evidence,
+           authority_epoch_seal,
+           previous_quorum_certificate_record_hash,
+           quorum_certificate_record_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11,
+           $12::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.quorumCertificateSequence,
+          record.certificate.head.settlementSequence,
+          record.certificate.head.settlementRecordHash,
+          record.certificate.quorumCertificateHash,
+          record.certificate.authorityTopologyHash ?? null,
+          JSON.stringify(record.certificate),
+          JSON.stringify(record.acceptedWitnessEvidence),
+          record.authorityEpochSeal === undefined
+            ? null
+            : JSON.stringify(record.authorityEpochSeal),
+          record.previousQuorumCertificateRecordHash ?? null,
+          record.quorumCertificateRecordHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay settlement store head witness quorum certificate record was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(
+      row,
+    );
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_quorum_certificates
+          WHERE tenant_id = $1
+          ORDER BY quorum_certificate_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord,
+    );
+  }
+
+  async pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords(input: {
+    readonly tenantId: TenantId | string;
+    readonly pruningTombstoneRecord: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord;
+  }): Promise<number> {
+    const frontier =
+      assertProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordAdmitsLane(
+        {
+          tenantId: input.tenantId,
+          record: input.pruningTombstoneRecord,
+          lane: "quorum_certificate_records",
+        },
+      );
+    const result =
+      await this.db.query<{
+        readonly quorum_certificate_sequence: number | string;
+      }>(
+        `DELETE FROM agent_state.projection_replay_settlement_head_witness_quorum_certificates
+          WHERE tenant_id = $1
+            AND quorum_certificate_sequence <= $2
+          RETURNING quorum_certificate_sequence`,
+        [input.tenantId, frontier.compactedThroughSequence],
+      );
+    return result.rows.length;
+  }
+
+  async #latestRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_settlement_head_witness_quorum_certificates
+          WHERE tenant_id = $1
+          ORDER BY quorum_certificate_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(
+          row,
+        );
+  }
+}
+
+export class InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStore {
+  readonly #records = new Map<
+    string,
+    ProjectionReplayCertificateStoreRootWitnessSettlementRecord[]
+  >();
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementRecord(input: {
+    readonly settlement: ProjectionReplayCertificateStoreRootWitnessSettlement;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementRecord> {
+    const tenantKey = String(input.settlement.tenantId);
+    const records = this.#records.get(tenantKey) ?? [];
+    const latest = records[records.length - 1];
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementRecord({
+        settlementSequence: records.length + 1,
+        settlement: input.settlement,
+        ...(latest !== undefined
+          ? { previousSettlementRecordHash: latest.settlementRecordHash }
+          : {}),
+        ...(input.recordedAt !== undefined ? { recordedAt: input.recordedAt } : {}),
+      });
+    this.#records.set(tenantKey, [...records, record]);
+    return record;
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecord[]
+  > {
+    return [...(this.#records.get(String(input.tenantId)) ?? [])];
+  }
+
+  async getProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead | null> {
+    const records =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementRecords(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementRecords({
+        tenantId: input.tenantId,
+        records,
+      });
+    return replay.valid ? replay.settlementStoreHead ?? null : null;
+  }
+
+  async verifyProjectionReplayCertificateStoreRootWitnessSettlementRef(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementRefVerificationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementRefVerification> {
+    const records =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementRecords({
+        tenantId: input.tenantId,
+      });
+    return verifyProjectionReplayCertificateStoreRootWitnessSettlementRef({
+      tenantId: input.tenantId,
+      ref: input.ref,
+      records,
+      ...(input.root !== undefined ? { root: input.root } : {}),
+      ...(input.currentnessPolicy !== undefined
+        ? { currentnessPolicy: input.currentnessPolicy }
+        : {}),
+    });
+  }
+}
+
+export class PostgresProjectionReplayCertificateStoreRootWitnessSettlementStore
+  implements ProjectionReplayCertificateStoreRootWitnessSettlementStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async appendProjectionReplayCertificateStoreRootWitnessSettlementRecord(input: {
+    readonly settlement: ProjectionReplayCertificateStoreRootWitnessSettlement;
+    readonly recordedAt?: Timestamp | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementRecord> {
+    const latest = await this.#latestSettlementRecord(input.settlement.tenantId);
+    const record =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementRecord({
+        settlementSequence:
+          latest === null ? 1 : latest.settlementSequence + 1,
+        settlement: input.settlement,
+        ...(latest !== null
+          ? { previousSettlementRecordHash: latest.settlementRecordHash }
+          : {}),
+        ...(input.recordedAt !== undefined ? { recordedAt: input.recordedAt } : {}),
+      });
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementRecordRow>(
+        `INSERT INTO agent_state.projection_replay_root_witness_settlements (
+           tenant_id,
+           settlement_sequence,
+           root_sequence,
+           root_hash,
+           root,
+           settlement,
+           status,
+           settlement_hash,
+           authority_topology_hash,
+           previous_settlement_record_hash,
+           settlement_record_hash,
+           recorded_at
+         ) VALUES (
+           $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $10, $11,
+           $12::timestamptz
+         )
+         RETURNING ${PROJECTION_REPLAY_ROOT_WITNESS_SETTLEMENT_RECORD_SELECT_COLUMNS}`,
+        [
+          record.tenantId,
+          record.settlementSequence,
+          record.root.sequence,
+          record.root.rootHash,
+          JSON.stringify(record.root),
+          JSON.stringify(record.settlement),
+          record.settlement.status,
+          record.settlement.settlementHash,
+          record.settlement.authorityTopologyHash ?? null,
+          record.previousSettlementRecordHash ?? null,
+          record.settlementRecordHash,
+          record.recordedAt,
+        ],
+      );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error(
+        "projection replay root witness settlement record was not recorded",
+      );
+    }
+    return rowToProjectionReplayCertificateStoreRootWitnessSettlementRecord(row);
+  }
+
+  async listProjectionReplayCertificateStoreRootWitnessSettlementRecords(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<
+    readonly ProjectionReplayCertificateStoreRootWitnessSettlementRecord[]
+  > {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_ROOT_WITNESS_SETTLEMENT_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_root_witness_settlements
+          WHERE tenant_id = $1
+          ORDER BY settlement_sequence ASC`,
+        [input.tenantId],
+      );
+    return result.rows.map(
+      rowToProjectionReplayCertificateStoreRootWitnessSettlementRecord,
+    );
+  }
+
+  async getProjectionReplayCertificateStoreRootWitnessSettlementStoreHead(input: {
+    readonly tenantId: TenantId | string;
+  }): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead | null> {
+    const records =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementRecords(
+        {
+          tenantId: input.tenantId,
+        },
+      );
+    const replay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementRecords({
+        tenantId: input.tenantId,
+        records,
+      });
+    return replay.valid ? replay.settlementStoreHead ?? null : null;
+  }
+
+  async verifyProjectionReplayCertificateStoreRootWitnessSettlementRef(
+    input: ProjectionReplayCertificateStoreRootWitnessSettlementRefVerificationInput,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementRefVerification> {
+    const records =
+      await this.listProjectionReplayCertificateStoreRootWitnessSettlementRecords({
+        tenantId: input.tenantId,
+      });
+    return verifyProjectionReplayCertificateStoreRootWitnessSettlementRef({
+      tenantId: input.tenantId,
+      ref: input.ref,
+      records,
+      ...(input.root !== undefined ? { root: input.root } : {}),
+      ...(input.currentnessPolicy !== undefined
+        ? { currentnessPolicy: input.currentnessPolicy }
+        : {}),
+    });
+  }
+
+  async #latestSettlementRecord(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreRootWitnessSettlementRecord | null> {
+    const result =
+      await this.db.query<ProjectionReplayCertificateStoreRootWitnessSettlementRecordRow>(
+        `SELECT ${PROJECTION_REPLAY_ROOT_WITNESS_SETTLEMENT_RECORD_SELECT_COLUMNS}
+           FROM agent_state.projection_replay_root_witness_settlements
+          WHERE tenant_id = $1
+          ORDER BY settlement_sequence DESC
+          LIMIT 1`,
+        [tenant],
+      );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreRootWitnessSettlementRecord(row);
+  }
+}
+
+export class PostgresProjectionReplayCertificateStore
+  implements ProjectionReplayCertificateStore {
+  constructor(private readonly db: ProjectionReplayCertificateDbClient) {}
+
+  async recordProjectionReplayCertificate(
+    input: ProjectionReplayCertificateRecordInput,
+  ): Promise<ProjectionReplayCertificateRecord> {
+    const record = buildProjectionReplayCertificateRecord(input);
+    const existing = await this.getProjectionReplayCertificateRecord({
+      tenantId: record.tenantId,
+      certificateId: record.certificateId,
+    });
+    if (existing !== null) {
+      if (existing.certificateHash !== record.certificateHash) {
+        throw new Error(
+          `projection replay certificate ${record.certificateId} already exists with a different hash`,
+        );
+      }
+      return existing;
+    }
+    const latestEntry = await this.#latestStoreEntry(record.tenantId);
+    const entry = buildProjectionReplayCertificateStoreEntry(record, {
+      sequence: latestEntry === null ? 1 : latestEntry.sequence + 1,
+      ...(latestEntry !== null
+        ? { previousEntryHash: latestEntry.entryHash }
+        : {}),
+      recordedAt: record.recordedAt,
+    });
+    const committedRecord = attachProjectionReplayCertificateStoreEntry(
+      record,
+      entry,
+    );
+
+    const result = await this.db.query<ProjectionReplayCertificateRow>(
+      `INSERT INTO agent_state.projection_replay_certificates (
+         tenant_id,
+         certificate_id,
+         certificate_hash,
+         projection_name,
+         subject_kind,
+         subject_id,
+         subject_label,
+         authority_scope,
+         projection_version,
+         replayed_to_position,
+         transition_history_hash,
+         projection_hash,
+         certificate,
+         recorded_at,
+         store_sequence,
+         store_previous_entry_hash,
+         store_entry_hash,
+         store_root_hash,
+         store_recorded_at
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7,
+         $8, $9, $10, $11, $12, $13::jsonb, $14::timestamptz,
+         $15, $16, $17, $18, $19::timestamptz
+       )
+       ON CONFLICT (tenant_id, certificate_id) DO NOTHING
+       RETURNING ${PROJECTION_REPLAY_CERTIFICATE_SELECT_COLUMNS}`,
+      [
+        committedRecord.tenantId,
+        committedRecord.certificateId,
+        committedRecord.certificateHash,
+        committedRecord.projectionName,
+        committedRecord.subject.kind,
+        committedRecord.subject.id,
+        committedRecord.subject.label ?? null,
+        committedRecord.authorityScope,
+        committedRecord.projectionVersion,
+        committedRecord.replayedToPosition,
+        committedRecord.transitionHistoryHash,
+        committedRecord.projectionHash,
+        JSON.stringify(committedRecord.certificate),
+        committedRecord.recordedAt,
+        committedRecord.storeSequence,
+        committedRecord.storePreviousEntryHash ?? null,
+        committedRecord.storeEntryHash,
+        committedRecord.storeRootHash,
+        committedRecord.storeRecordedAt,
+      ],
+    );
+    const inserted = result.rows[0];
+    if (inserted !== undefined) {
+      await this.#recordStoreEntry(entry);
+      return rowToProjectionReplayCertificateRecord(inserted);
+    }
+
+    const concurrent = await this.getProjectionReplayCertificateRecord({
+      tenantId: record.tenantId,
+      certificateId: record.certificateId,
+    });
+    if (
+      concurrent !== null &&
+      concurrent.certificateHash === record.certificateHash
+    ) {
+      return concurrent;
+    }
+    throw new Error(
+      `projection replay certificate ${record.certificateId} already exists with a different hash`,
+    );
+  }
+
+  async getProjectionReplayCertificateRecord(
+    input: ProjectionReplayCertificateLookupInput,
+  ): Promise<ProjectionReplayCertificateRecord | null> {
+    const result = await this.db.query<ProjectionReplayCertificateRow>(
+      `SELECT ${PROJECTION_REPLAY_CERTIFICATE_SELECT_COLUMNS}
+         FROM agent_state.projection_replay_certificates
+        WHERE tenant_id = $1 AND certificate_id = $2
+        LIMIT 1`,
+      [input.tenantId, input.certificateId],
+    );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateRecord(row);
+  }
+
+  async verifyProjectionReplayCertificateRef(
+    input: ProjectionReplayCertificateRefVerificationInput,
+  ): Promise<ProjectionReplayCertificateRefVerification> {
+    const record = await this.getProjectionReplayCertificateRecord({
+      tenantId: input.tenantId,
+      certificateId: input.ref.certificateId,
+    });
+    if (record === null) {
+      return missingProjectionReplayCertificateRecord(input.ref);
+    }
+    return verifyProjectionReplayCertificateRecordRef({
+      tenantId: input.tenantId,
+      ref: input.ref,
+      record,
+      requireStoreCommitment: input.requireStoreCommitment === true,
+    });
+  }
+
+  async #latestStoreEntry(
+    tenant: TenantId | string,
+  ): Promise<ProjectionReplayCertificateStoreEntry | null> {
+    const result = await this.db.query<ProjectionReplayCertificateStoreEntryRow>(
+      `SELECT ${PROJECTION_REPLAY_CERTIFICATE_STORE_ENTRY_SELECT_COLUMNS}
+         FROM agent_state.projection_replay_certificate_store_entries
+        WHERE tenant_id = $1
+        ORDER BY sequence DESC
+        LIMIT 1`,
+      [tenant],
+    );
+    const row = result.rows[0];
+    return row === undefined
+      ? null
+      : rowToProjectionReplayCertificateStoreEntry(row);
+  }
+
+  async #recordStoreEntry(
+    entry: ProjectionReplayCertificateStoreEntry,
+  ): Promise<void> {
+    await this.db.query(
+      `INSERT INTO agent_state.projection_replay_certificate_store_entries (
+         tenant_id,
+         sequence,
+         certificate_id,
+         certificate_hash,
+         projection_name,
+         projection_version,
+         replayed_to_position,
+         transition_history_hash,
+         projection_hash,
+         previous_entry_hash,
+         entry_hash,
+         recorded_at
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6,
+         $7, $8, $9, $10, $11, $12::timestamptz
+       )
+       ON CONFLICT (tenant_id, certificate_id) DO NOTHING`,
+      [
+        entry.tenantId,
+        entry.sequence,
+        entry.certificateId,
+        entry.certificateHash,
+        entry.projectionName,
+        entry.projectionVersion,
+        entry.replayedToPosition,
+        entry.transitionHistoryHash,
+        entry.projectionHash,
+        entry.previousEntryHash ?? null,
+        entry.entryHash,
+        entry.recordedAt,
+      ],
+    );
+  }
+}
+
+interface ProjectionReplayCertificateRow {
+  readonly tenant_id: string;
+  readonly certificate_id: string;
+  readonly certificate_hash: string;
+  readonly projection_name: string;
+  readonly subject_kind: StateRefKind;
+  readonly subject_id: string;
+  readonly subject_label: string | null;
+  readonly authority_scope: string;
+  readonly projection_version: number;
+  readonly replayed_to_position: number | string;
+  readonly transition_history_hash: string;
+  readonly projection_hash: string;
+  readonly certificate: ProjectionReplayCertificate;
+  readonly recorded_at: string | Date;
+  readonly store_sequence: number | string | null;
+  readonly store_previous_entry_hash: string | null;
+  readonly store_entry_hash: string | null;
+  readonly store_root_hash: string | null;
+  readonly store_recorded_at: string | Date | null;
+}
+
+const PROJECTION_REPLAY_CERTIFICATE_SELECT_COLUMNS = [
+  "tenant_id",
+  "certificate_id",
+  "certificate_hash",
+  "projection_name",
+  "subject_kind",
+  "subject_id",
+  "subject_label",
+  "authority_scope",
+  "projection_version",
+  "replayed_to_position",
+  "transition_history_hash",
+  "projection_hash",
+  "certificate",
+  "recorded_at",
+  "store_sequence",
+  "store_previous_entry_hash",
+  "store_entry_hash",
+  "store_root_hash",
+  "store_recorded_at",
+].join(", ");
+
+interface ProjectionReplayCertificateStoreEntryRow {
+  readonly tenant_id: string;
+  readonly sequence: number | string;
+  readonly certificate_id: string;
+  readonly certificate_hash: string;
+  readonly projection_name: string;
+  readonly projection_version: number;
+  readonly replayed_to_position: number | string;
+  readonly transition_history_hash: string;
+  readonly projection_hash: string;
+  readonly previous_entry_hash: string | null;
+  readonly entry_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+const PROJECTION_REPLAY_CERTIFICATE_STORE_ENTRY_SELECT_COLUMNS = [
+  "tenant_id",
+  "sequence",
+  "certificate_id",
+  "certificate_hash",
+  "projection_name",
+  "projection_version",
+  "replayed_to_position",
+  "transition_history_hash",
+  "projection_hash",
+  "previous_entry_hash",
+  "entry_hash",
+  "recorded_at",
+].join(", ");
+
+interface ProjectionReplayCertificateStoreRootWitnessRecordRow {
+  readonly tenant_id: string;
+  readonly witness_sequence: number | string;
+  readonly observer_id: string;
+  readonly observed_at: string | Date;
+  readonly root_sequence: number | string;
+  readonly root_hash: string;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+  readonly consistency_proof: ProjectionReplayCertificateStoreConsistencyProof | null;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessDecision;
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessStatus;
+  readonly previous_observation_hash: string | null;
+  readonly observation_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionRow {
+  readonly tenant_id: string;
+  readonly authority_sequence: number | string;
+  readonly transition_id: string;
+  readonly transition_kind: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionKind;
+  readonly recorded_at: string | Date;
+  readonly recorded_by: string;
+  readonly effective_from_root_sequence: number | string;
+  readonly witness_id: string | null;
+  readonly required_witnesses: number | string | null;
+  readonly minimum_witnesses: number | string | null;
+  readonly sealed_through_settlement_sequence: number | string | null;
+  readonly sealed_authority_topology_hash: string | null;
+  readonly sealed_quorum_certificate_hash: string | null;
+  readonly reason: string | null;
+  readonly previous_authority_hash: string | null;
+  readonly authority_hash: string;
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessAuthorityTransition;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementRecordRow {
+  readonly tenant_id: string;
+  readonly settlement_sequence: number | string;
+  readonly root_sequence: number | string;
+  readonly root_hash: string;
+  readonly root: ProjectionReplayCertificateStoreRoot;
+  readonly settlement: ProjectionReplayCertificateStoreRootWitnessSettlement;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStatus;
+  readonly settlement_hash: string;
+  readonly authority_topology_hash: string | null;
+  readonly previous_settlement_record_hash: string | null;
+  readonly settlement_record_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordRow {
+  readonly tenant_id: string;
+  readonly witness_sequence: number | string;
+  readonly observer_id: string;
+  readonly observed_at: string | Date;
+  readonly settlement_sequence: number | string;
+  readonly settlement_record_hash: string;
+  readonly settlement_store_head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHead;
+  readonly consistency_proof: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadConsistencyProof | null;
+  readonly signature: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature | null;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessDecision;
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessStatus;
+  readonly previous_observation_hash: string | null;
+  readonly observation_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionRow {
+  readonly tenant_id: string;
+  readonly authority_sequence: number | string;
+  readonly transition_id: string;
+  readonly transition_kind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionKind;
+  readonly recorded_at: string | Date;
+  readonly recorded_by: string;
+  readonly effective_from_settlement_sequence: number | string;
+  readonly witness_id: string | null;
+  readonly required_witnesses: number | string | null;
+  readonly minimum_witnesses: number | string | null;
+  readonly sealed_through_settlement_sequence: number | string | null;
+  readonly sealed_authority_topology_hash: string | null;
+  readonly sealed_quorum_certificate_hash: string | null;
+  readonly signature_key_id: string | null;
+  readonly signature_algorithm: string | null;
+  readonly signature_public_key_fingerprint: string | null;
+  readonly signature: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature | null;
+  readonly reason: string | null;
+  readonly previous_authority_hash: string | null;
+  readonly authority_hash: string;
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordRow {
+  readonly tenant_id: string;
+  readonly quorum_certificate_sequence: number | string;
+  readonly settlement_sequence: number | string;
+  readonly settlement_record_hash: string;
+  readonly quorum_certificate_hash: string;
+  readonly authority_topology_hash: string | null;
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate;
+  readonly accepted_witness_evidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateWitnessEvidence[];
+  readonly authority_epoch_seal: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition | null;
+  readonly previous_quorum_certificate_record_hash: string | null;
+  readonly quorum_certificate_record_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordRow {
+  readonly tenant_id: string;
+  readonly checkpoint_admission_sequence: number | string;
+  readonly checkpoint_id: string;
+  readonly checkpoint_hash: string;
+  readonly checkpoint_admission_hash: string;
+  readonly authority_topology_hash: string | null;
+  readonly checkpoint: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint;
+  readonly admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionCertificate;
+  readonly previous_checkpoint_admission_record_hash: string | null;
+  readonly checkpoint_admission_record_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordRow {
+  readonly tenant_id: string;
+  readonly pruning_tombstone_sequence: number | string;
+  readonly checkpoint_id: string;
+  readonly checkpoint_hash: string;
+  readonly checkpoint_admission_record_hash: string;
+  readonly pruning_admission_hash: string;
+  readonly checkpoint_admission_record: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord;
+  readonly pruning_admission: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission;
+  readonly pruned_frontiers: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneLaneFrontier[];
+  readonly previous_pruning_tombstone_record_hash: string | null;
+  readonly pruning_tombstone_record_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordRow {
+  readonly tenant_id: string;
+  readonly witness_sequence: number | string;
+  readonly observer_id: string;
+  readonly observed_at: string | Date;
+  readonly pruning_tombstone_sequence: number | string;
+  readonly pruning_tombstone_record_hash: string;
+  readonly pruning_tombstone_store_head: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead;
+  readonly consistency_proof: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadConsistencyProof | null;
+  readonly signature: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature | null;
+  readonly decision: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessDecision;
+  readonly accepted: boolean;
+  readonly status: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessStatus;
+  readonly previous_observation_hash: string | null;
+  readonly observation_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionRow {
+  readonly tenant_id: string;
+  readonly authority_sequence: number | string;
+  readonly transition_id: string;
+  readonly transition_kind: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionKind;
+  readonly recorded_at: string | Date;
+  readonly recorded_by: string;
+  readonly effective_from_pruning_tombstone_sequence: number | string;
+  readonly witness_id: string | null;
+  readonly required_witnesses: number | string | null;
+  readonly minimum_witnesses: number | string | null;
+  readonly sealed_through_pruning_tombstone_sequence: number | string | null;
+  readonly sealed_authority_topology_hash: string | null;
+  readonly sealed_quorum_certificate_hash: string | null;
+  readonly signature_key_id: string | null;
+  readonly signature_algorithm: string | null;
+  readonly signature_public_key_fingerprint: string | null;
+  readonly signature: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessPrincipalSignature | null;
+  readonly reason: string | null;
+  readonly previous_authority_hash: string | null;
+  readonly authority_hash: string;
+  readonly transition: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition;
+}
+
+interface ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordRow {
+  readonly tenant_id: string;
+  readonly quorum_certificate_sequence: number | string;
+  readonly pruning_tombstone_sequence: number | string;
+  readonly pruning_tombstone_record_hash: string;
+  readonly quorum_certificate_hash: string;
+  readonly authority_topology_hash: string | null;
+  readonly certificate: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate;
+  readonly accepted_witness_evidence: readonly ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateWitnessEvidence[];
+  readonly authority_epoch_seal: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition | null;
+  readonly previous_quorum_certificate_record_hash: string | null;
+  readonly quorum_certificate_record_hash: string;
+  readonly recorded_at: string | Date;
+}
+
+const PROJECTION_REPLAY_CERTIFICATE_ROOT_WITNESS_RECORD_SELECT_COLUMNS = [
+  "tenant_id",
+  "witness_sequence",
+  "observer_id",
+  "observed_at",
+  "root_sequence",
+  "root_hash",
+  "root",
+  "consistency_proof",
+  "decision",
+  "accepted",
+  "status",
+  "previous_observation_hash",
+  "observation_hash",
+  "recorded_at",
+].join(", ");
+
+const PROJECTION_REPLAY_ROOT_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS = [
+  "tenant_id",
+  "authority_sequence",
+  "transition_id",
+  "transition_kind",
+  "recorded_at",
+  "recorded_by",
+  "effective_from_root_sequence",
+  "witness_id",
+  "required_witnesses",
+  "minimum_witnesses",
+  "reason",
+  "previous_authority_hash",
+  "authority_hash",
+  "transition",
+].join(", ");
+
+const PROJECTION_REPLAY_ROOT_WITNESS_SETTLEMENT_RECORD_SELECT_COLUMNS = [
+  "tenant_id",
+  "settlement_sequence",
+  "root_sequence",
+  "root_hash",
+  "root",
+  "settlement",
+  "status",
+  "settlement_hash",
+  "authority_topology_hash",
+  "previous_settlement_record_hash",
+  "settlement_record_hash",
+  "recorded_at",
+].join(", ");
+
+const PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_RECORD_SELECT_COLUMNS = [
+  "tenant_id",
+  "witness_sequence",
+  "observer_id",
+  "observed_at",
+  "settlement_sequence",
+  "settlement_record_hash",
+  "settlement_store_head",
+  "consistency_proof",
+  "signature",
+  "decision",
+  "accepted",
+  "status",
+  "previous_observation_hash",
+  "observation_hash",
+  "recorded_at",
+].join(", ");
+
+const PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS =
+  [
+    "tenant_id",
+    "authority_sequence",
+    "transition_id",
+    "transition_kind",
+    "recorded_at",
+    "recorded_by",
+    "effective_from_settlement_sequence",
+    "witness_id",
+    "required_witnesses",
+    "minimum_witnesses",
+    "sealed_through_settlement_sequence",
+    "sealed_authority_topology_hash",
+    "sealed_quorum_certificate_hash",
+    "signature_key_id",
+    "signature_algorithm",
+    "signature_public_key_fingerprint",
+    "signature",
+    "reason",
+    "previous_authority_hash",
+    "authority_hash",
+    "transition",
+  ].join(", ");
+
+const PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS =
+  [
+    "tenant_id",
+    "quorum_certificate_sequence",
+    "settlement_sequence",
+    "settlement_record_hash",
+    "quorum_certificate_hash",
+    "authority_topology_hash",
+    "certificate",
+    "accepted_witness_evidence",
+    "authority_epoch_seal",
+    "previous_quorum_certificate_record_hash",
+    "quorum_certificate_record_hash",
+    "recorded_at",
+  ].join(", ");
+
+const PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_CHECKPOINT_ADMISSION_RECORD_SELECT_COLUMNS =
+  [
+    "tenant_id",
+    "checkpoint_admission_sequence",
+    "checkpoint_id",
+    "checkpoint_hash",
+    "checkpoint_admission_hash",
+    "authority_topology_hash",
+    "checkpoint",
+    "admission",
+    "previous_checkpoint_admission_record_hash",
+    "checkpoint_admission_record_hash",
+    "recorded_at",
+  ].join(", ");
+
+const PROJECTION_REPLAY_SETTLEMENT_HEAD_WITNESS_PRUNING_TOMBSTONE_RECORD_SELECT_COLUMNS =
+  [
+    "tenant_id",
+    "pruning_tombstone_sequence",
+    "checkpoint_id",
+    "checkpoint_hash",
+    "checkpoint_admission_record_hash",
+    "pruning_admission_hash",
+    "checkpoint_admission_record",
+    "pruning_admission",
+    "pruned_frontiers",
+    "previous_pruning_tombstone_record_hash",
+    "pruning_tombstone_record_hash",
+    "recorded_at",
+  ].join(", ");
+
+const PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_RECORD_SELECT_COLUMNS =
+  [
+    "tenant_id",
+    "witness_sequence",
+    "observer_id",
+    "observed_at",
+    "pruning_tombstone_sequence",
+    "pruning_tombstone_record_hash",
+    "pruning_tombstone_store_head",
+    "consistency_proof",
+    "signature",
+    "decision",
+    "accepted",
+    "status",
+    "previous_observation_hash",
+    "observation_hash",
+    "recorded_at",
+  ].join(", ");
+
+const PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_AUTHORITY_TRANSITION_SELECT_COLUMNS =
+  [
+    "tenant_id",
+    "authority_sequence",
+    "transition_id",
+    "transition_kind",
+    "recorded_at",
+    "recorded_by",
+    "effective_from_pruning_tombstone_sequence",
+    "witness_id",
+    "required_witnesses",
+    "minimum_witnesses",
+    "sealed_through_pruning_tombstone_sequence",
+    "sealed_authority_topology_hash",
+    "sealed_quorum_certificate_hash",
+    "signature_key_id",
+    "signature_algorithm",
+    "signature_public_key_fingerprint",
+    "signature",
+    "reason",
+    "previous_authority_hash",
+    "authority_hash",
+    "transition",
+  ].join(", ");
+
+const PROJECTION_REPLAY_PRUNING_TOMBSTONE_HEAD_WITNESS_QUORUM_CERTIFICATE_RECORD_SELECT_COLUMNS =
+  [
+    "tenant_id",
+    "quorum_certificate_sequence",
+    "pruning_tombstone_sequence",
+    "pruning_tombstone_record_hash",
+    "quorum_certificate_hash",
+    "authority_topology_hash",
+    "certificate",
+    "accepted_witness_evidence",
+    "authority_epoch_seal",
+    "previous_quorum_certificate_record_hash",
+    "quorum_certificate_record_hash",
+    "recorded_at",
+  ].join(", ");
+
+function rowToProjectionReplayCertificateRecord(
+  row: ProjectionReplayCertificateRow,
+): ProjectionReplayCertificateRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    certificateId: row.certificate_id,
+    certificateHash: row.certificate_hash,
+    projectionName: row.projection_name,
+    subject: {
+      kind: row.subject_kind,
+      id: row.subject_id,
+      ...(row.subject_label !== null ? { label: row.subject_label } : {}),
+    },
+    authorityScope: row.authority_scope,
+    projectionVersion: row.projection_version,
+    replayedToPosition: Number(row.replayed_to_position),
+    transitionHistoryHash: row.transition_history_hash,
+    projectionHash: row.projection_hash,
+    certificate: row.certificate,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+    ...(row.store_sequence !== null
+      ? { storeSequence: Number(row.store_sequence) }
+      : {}),
+    ...(row.store_previous_entry_hash !== null
+      ? { storePreviousEntryHash: row.store_previous_entry_hash }
+      : {}),
+    ...(row.store_entry_hash !== null
+      ? { storeEntryHash: row.store_entry_hash }
+      : {}),
+    ...(row.store_root_hash !== null
+      ? { storeRootHash: row.store_root_hash }
+      : {}),
+    ...(row.store_recorded_at !== null
+      ? {
+          storeRecordedAt:
+            row.store_recorded_at instanceof Date
+              ? row.store_recorded_at.toISOString()
+              : row.store_recorded_at,
+        }
+      : {}),
+  };
+}
+
+function rowToProjectionReplayCertificateStoreEntry(
+  row: ProjectionReplayCertificateStoreEntryRow,
+): ProjectionReplayCertificateStoreEntry {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    sequence: Number(row.sequence),
+    certificateId: row.certificate_id,
+    certificateHash: row.certificate_hash,
+    projectionName: row.projection_name,
+    projectionVersion: row.projection_version,
+    replayedToPosition: Number(row.replayed_to_position),
+    transitionHistoryHash: row.transition_history_hash,
+    projectionHash: row.projection_hash,
+    ...(row.previous_entry_hash !== null
+      ? { previousEntryHash: row.previous_entry_hash }
+      : {}),
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+    entryHash: row.entry_hash,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    witnessSequence: Number(row.witness_sequence),
+    observerId: row.observer_id,
+    observedAt:
+      row.observed_at instanceof Date
+        ? row.observed_at.toISOString()
+        : row.observed_at,
+    root: row.root,
+    ...(row.consistency_proof !== null
+      ? { consistencyProof: row.consistency_proof }
+      : {}),
+    decision: row.decision,
+    accepted: row.accepted,
+    status: row.status,
+    ...(row.previous_observation_hash !== null
+      ? { previousObservationHash: row.previous_observation_hash }
+      : {}),
+    observationHash: row.observation_hash,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+      : row.recorded_at,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessAuthorityTransition(
+  row: ProjectionReplayCertificateStoreRootWitnessAuthorityTransitionRow,
+): ProjectionReplayCertificateStoreRootWitnessAuthorityTransition {
+  return {
+    ...row.transition,
+    tenantId: tenantId(String(row.transition.tenantId)),
+    authoritySequence: Number(row.transition.authoritySequence),
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    settlementSequence: Number(row.settlement_sequence),
+    root: row.root,
+    settlement: row.settlement,
+    ...(row.previous_settlement_record_hash !== null
+      ? { previousSettlementRecordHash: row.previous_settlement_record_hash }
+      : {}),
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+    settlementRecordHash: row.settlement_record_hash,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    witnessSequence: Number(row.witness_sequence),
+    observerId: row.observer_id,
+    observedAt:
+      row.observed_at instanceof Date
+        ? row.observed_at.toISOString()
+        : row.observed_at,
+    head: row.settlement_store_head,
+    ...(row.consistency_proof !== null
+      ? { consistencyProof: row.consistency_proof }
+      : {}),
+    ...(row.signature !== null ? { signature: row.signature } : {}),
+    decision: row.decision,
+    accepted: row.accepted,
+    status: row.status,
+    ...(row.previous_observation_hash !== null
+      ? { previousObservationHash: row.previous_observation_hash }
+      : {}),
+    observationHash: row.observation_hash,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransition {
+  return {
+    ...row.transition,
+    tenantId: tenantId(String(row.transition.tenantId)),
+    authoritySequence: Number(row.transition.authoritySequence),
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    quorumCertificateSequence: Number(row.quorum_certificate_sequence),
+    certificate: row.certificate,
+    acceptedWitnessEvidence: row.accepted_witness_evidence,
+    ...(row.authority_epoch_seal !== null
+      ? { authorityEpochSeal: row.authority_epoch_seal }
+      : {}),
+    ...(row.previous_quorum_certificate_record_hash !== null
+      ? {
+          previousQuorumCertificateRecordHash:
+            row.previous_quorum_certificate_record_hash,
+        }
+      : {}),
+    quorumCertificateRecordHash: row.quorum_certificate_record_hash,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    checkpointAdmissionSequence: Number(row.checkpoint_admission_sequence),
+    checkpoint: row.checkpoint,
+    admission: row.admission,
+    ...(row.previous_checkpoint_admission_record_hash !== null
+      ? {
+          previousCheckpointAdmissionRecordHash:
+            row.previous_checkpoint_admission_record_hash,
+        }
+      : {}),
+    checkpointAdmissionRecordHash: row.checkpoint_admission_record_hash,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    pruningTombstoneSequence: Number(row.pruning_tombstone_sequence),
+    checkpointAdmissionRecord: row.checkpoint_admission_record,
+    pruningAdmission: row.pruning_admission,
+    prunedFrontiers: row.pruned_frontiers,
+    ...(row.previous_pruning_tombstone_record_hash !== null
+      ? {
+          previousPruningTombstoneRecordHash:
+            row.previous_pruning_tombstone_record_hash,
+        }
+      : {}),
+    pruningTombstoneRecordHash: row.pruning_tombstone_record_hash,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    witnessSequence: Number(row.witness_sequence),
+    observerId: row.observer_id,
+    observedAt:
+      row.observed_at instanceof Date
+        ? row.observed_at.toISOString()
+        : row.observed_at,
+    head: row.pruning_tombstone_store_head,
+    ...(row.consistency_proof !== null
+      ? { consistencyProof: row.consistency_proof }
+      : {}),
+    ...(row.signature !== null ? { signature: row.signature } : {}),
+    decision: row.decision,
+    accepted: row.accepted,
+    status: row.status,
+    ...(row.previous_observation_hash !== null
+      ? { previousObservationHash: row.previous_observation_hash }
+      : {}),
+    observationHash: row.observation_hash,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+      : row.recorded_at,
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition {
+  return {
+    ...row.transition,
+    tenantId: tenantId(String(row.transition.tenantId)),
+    authoritySequence: Number(row.transition.authoritySequence),
+  };
+}
+
+function rowToProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+  row: ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordRow,
+): ProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord {
+  return {
+    tenantId: tenantId(row.tenant_id),
+    quorumCertificateSequence: Number(row.quorum_certificate_sequence),
+    certificate: row.certificate,
+    acceptedWitnessEvidence: row.accepted_witness_evidence,
+    ...(row.authority_epoch_seal !== null
+      ? { authorityEpochSeal: row.authority_epoch_seal }
+      : {}),
+    ...(row.previous_quorum_certificate_record_hash !== null
+      ? {
+          previousQuorumCertificateRecordHash:
+            row.previous_quorum_certificate_record_hash,
+        }
+      : {}),
+    quorumCertificateRecordHash: row.quorum_certificate_record_hash,
+    recordedAt:
+      row.recorded_at instanceof Date
+        ? row.recorded_at.toISOString()
+        : row.recorded_at,
+  };
+}
+
+function projectionReplayCertificateStoreKey(
+  tenant: TenantId | string,
+  certificateId: string,
+): string {
+  return `${tenant}:${certificateId}`;
+}
+
+function missingProjectionReplayCertificateRecord(
+  ref: ProjectionReplayCertificateRef,
+): ProjectionReplayCertificateRefVerification {
+  return {
+    valid: false,
+    certificateId: ref.certificateId,
+    issues: [
+      {
+        code: "projection_replay_certificate_record_missing",
+        path: "/projectionReplayRef/certificateId",
+        message:
+          "projection replay certificate ref does not resolve to a durable certificate record",
+        expected: ref.certificateId,
+      },
+    ],
+  };
+}
+
+function verifyProjectionReplayCertificateStoreCommitment(input: {
+  readonly issues: ProjectionReplayCertificateStoreIssue[];
+  readonly ref: ProjectionReplayCertificateRef;
+  readonly record: ProjectionReplayCertificateRecord;
+  readonly requireStoreCommitment: boolean;
+}): void {
+  const { issues, ref, record } = input;
+  if (
+    record.storeSequence === undefined ||
+    record.storeEntryHash === undefined ||
+    record.storeRootHash === undefined
+  ) {
+    issues.push({
+      code: "projection_replay_certificate_store_commitment_missing",
+      path: "/certificateStore",
+      message:
+        "stored projection replay certificate has no append-only store commitment",
+    });
+    return;
+  }
+
+  if (
+    ref.certificateStoreSequence === undefined ||
+    ref.certificateStoreEntryHash === undefined ||
+    ref.certificateStoreRootHash === undefined
+  ) {
+    if (input.requireStoreCommitment) {
+      issues.push({
+        code: "projection_replay_certificate_store_commitment_missing",
+        path: "/projectionReplayRef/certificateStore",
+        message:
+          "projection replay ref must cite certificate-store sequence, entry hash, and root hash",
+      });
+    }
+    return;
+  }
+
+  pushStoreCommitmentMismatchIfDifferent(issues, {
+    path: "/projectionReplayRef/certificateStoreSequence",
+    message:
+      "projection replay ref certificate-store sequence does not match the durable store entry",
+    expected: record.storeSequence,
+    actual: ref.certificateStoreSequence,
+  });
+  pushStoreCommitmentMismatchIfDifferent(issues, {
+    path: "/projectionReplayRef/certificateStoreEntryHash",
+    message:
+      "projection replay ref certificate-store entry hash does not match the durable store entry",
+    expected: record.storeEntryHash,
+    actual: ref.certificateStoreEntryHash,
+  });
+  pushStoreCommitmentMismatchIfDifferent(issues, {
+    path: "/projectionReplayRef/certificateStoreRootHash",
+    message:
+      "projection replay ref certificate-store root hash does not match the durable store root",
+    expected: record.storeRootHash,
+    actual: ref.certificateStoreRootHash,
+  });
+
+  const entry = projectionReplayCertificateStoreEntryFromRecord(record);
+  if (entry === undefined) {
+    return;
+  }
+  const { entryHash: actualEntryHash, ...entryPayload } = entry;
+  const expectedEntryHash =
+    computeProjectionReplayCertificateStoreEntryHash(entryPayload);
+  pushStoreCommitmentMismatchIfDifferent(issues, {
+    path: "/certificateStore/entryHash",
+    message:
+      "stored projection replay certificate store entry hash does not match its body",
+    expected: expectedEntryHash,
+    actual: actualEntryHash,
+  });
+}
+
+function pushStoreMismatchIfDifferent(
+  issues: ProjectionReplayCertificateStoreIssue[],
+  input: {
+    readonly path: string;
+    readonly message: string;
+    readonly expected: string | number;
+    readonly actual: string | number;
+  },
+): void {
+  if (input.expected === input.actual) return;
+  issues.push({
+    code: "projection_replay_certificate_ref_mismatch",
+    path: input.path,
+    message: input.message,
+    expected: input.expected,
+    actual: input.actual,
+  });
+}
+
+function pushStoreCommitmentMismatchIfDifferent(
+  issues: ProjectionReplayCertificateStoreIssue[],
+  input: {
+    readonly path: string;
+    readonly message: string;
+    readonly expected: string | number;
+    readonly actual: string | number;
+  },
+): void {
+  if (input.expected === input.actual) return;
+  issues.push({
+    code: "projection_replay_certificate_store_commitment_mismatch",
+    path: input.path,
+    message: input.message,
+    expected: input.expected,
+    actual: input.actual,
+  });
+}
+
 export function evaluateLocalStateSections(
   sections: readonly LocalStateSection[],
   options: LocalViewEvaluationOptions,
@@ -1294,6 +16456,15 @@ export function projectActionOutcomeEnvelopeForRole(
       ...(envelope.providerCertificateStatusRef !== undefined
         ? { providerCertificateStatusRef: envelope.providerCertificateStatusRef }
         : {}),
+      ...(envelope.projectionReplayRef !== undefined
+        ? { projectionReplayRef: envelope.projectionReplayRef }
+        : {}),
+      ...(envelope.projectionReplayRootSettlementRef !== undefined
+        ? {
+            projectionReplayRootSettlementRef:
+              envelope.projectionReplayRootSettlementRef,
+          }
+        : {}),
       evidenceAdmissionReviewIds: envelope.evidenceAdmissionReviewIds,
       statusCheckRefs: envelope.statusCheckRefs,
       blockingCauseCodes: envelope.blockingCauses.map((cause) => cause.code),
@@ -1335,6 +16506,18 @@ export function validateActionOutcomeRoleProjection(
     canonicalStringify(envelope.providerCertificateStatusRef)
   ) {
     issues.push("providerCertificateStatusRef changed");
+  }
+  if (
+    canonicalStringify(core.projectionReplayRef) !==
+    canonicalStringify(envelope.projectionReplayRef)
+  ) {
+    issues.push("projectionReplayRef changed");
+  }
+  if (
+    canonicalStringify(core.projectionReplayRootSettlementRef) !==
+    canonicalStringify(envelope.projectionReplayRootSettlementRef)
+  ) {
+    issues.push("projectionReplayRootSettlementRef changed");
   }
   if (!sameStringSet(core.evidenceAdmissionReviewIds, envelope.evidenceAdmissionReviewIds)) {
     issues.push("evidenceAdmissionReviewIds changed");
@@ -1648,6 +16831,31 @@ export function reviewProposedActionAgainstCurrentState(
     observationContract,
     action,
   );
+  const replayEvaluation =
+    options.requireReplayCertificate === true
+      ? evaluateProjectionReplayCertificate(view, {
+          ...(options.expectedReplayAuthorityScope !== undefined
+            ? { expectedAuthorityScope: options.expectedReplayAuthorityScope }
+            : {}),
+          ...(options.minimumReplayPosition !== undefined
+            ? { minimumReplayPosition: options.minimumReplayPosition }
+            : {}),
+          ...(options.requireReplayTransitionContentHash !== undefined
+            ? {
+                requireTransitionContentHash:
+                  options.requireReplayTransitionContentHash,
+              }
+            : {}),
+        })
+      : undefined;
+  const replayWarnings =
+    replayEvaluation?.issues.map((issue): ActionProposalWarning => ({
+      source: "projection_replay",
+      code: issue.code,
+      severity: "fail",
+      message: issue.message,
+      refs: issue.ref ? [issue.ref] : [view.subject],
+    })) ?? [];
   const warnings = [
     ...readSetValidation.issues.map((issue): ActionProposalWarning => ({
       source: "read_set",
@@ -1666,12 +16874,14 @@ export function reviewProposedActionAgainstCurrentState(
         refs: assertion.refs,
     })),
     ...contractBindingWarnings,
+    ...replayWarnings,
   ] as const;
   const blocking =
     enforcementMode === "blocking" &&
     (!readSetValidation.valid ||
       !observationEvaluation.valid ||
-      contractBindingWarnings.length > 0);
+      contractBindingWarnings.length > 0 ||
+      replayWarnings.length > 0);
 
   return {
     tenantId: action.tenantId,
@@ -1680,7 +16890,8 @@ export function reviewProposedActionAgainstCurrentState(
     valid:
       readSetValidation.valid &&
       observationEvaluation.valid &&
-      contractBindingWarnings.length === 0,
+      contractBindingWarnings.length === 0 &&
+      replayWarnings.length === 0,
     proposedAction: action,
     currentStateView: view,
     observationContract,
@@ -2362,6 +17573,20 @@ function invariantClassesForWarningCode(
     case "projection_version_mismatch":
     case "projection_version_matches":
       return ["projection_version"];
+    case "projection_replay_certificate_missing":
+    case "projection_replay_certificate_hash_mismatch":
+    case "projection_replay_tenant_mismatch":
+    case "projection_replay_subject_mismatch":
+    case "projection_replay_version_mismatch":
+    case "projection_replay_authority_scope_mismatch":
+    case "projection_replay_source_refs_mismatch":
+    case "projection_replay_projection_hash_mismatch":
+    case "projection_replay_transition_history_hash_mismatch":
+    case "projection_replay_transition_history_empty":
+    case "projection_replay_transition_kind_invalid":
+    case "projection_replay_transition_hash_missing":
+    case "projection_replay_position_regression":
+      return ["projection_replay"];
     case "workflow_position_mismatch":
     case "workflow_position_matches":
       return ["workflow_position"];
@@ -2849,11 +18074,13 @@ function validateActionProposalWarningArray(
     if (
       warning["source"] !== "read_set" &&
       warning["source"] !== "observation_contract" &&
-      warning["source"] !== "contract_binding"
+      warning["source"] !== "contract_binding" &&
+      warning["source"] !== "projection_replay"
     ) {
       issues.push({
         path: `${itemPath}/source`,
-        message: "expected read_set|observation_contract|contract_binding",
+        message:
+          "expected read_set|observation_contract|contract_binding|projection_replay",
       });
     }
     validateNonEmptyStringField(warning, "code", `${itemPath}/code`, issues);
@@ -2978,10 +18205,17 @@ function isStateReviewInvariantClass(
     value === "freshness_window" ||
     value === "source_authority" ||
     value === "projection_version" ||
+    value === "projection_replay" ||
     value === "workflow_position" ||
     value === "state_conflict" ||
     value === "capability_contract"
   );
+}
+
+function isProjectionReplayTransitionRefKind(
+  value: StateRefKind,
+): value is ProjectionReplayTransitionRefKind {
+  return value === "event" || value === "action_outcome_envelope";
 }
 
 function isObservedReadSetIssueCode(

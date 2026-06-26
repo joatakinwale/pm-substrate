@@ -1,5 +1,319 @@
 # Changelog
 
+## 2026-06-26 - Durable tombstone-head quorum-certificate record
+
+- Added `research/daily-arrowsmith-agent-state/v93-durable-tombstone-head-quorum-certificate-record-2026-06-26.md`, closing SQ40 with durable tombstone-head quorum-certificate proof records and replacing it with SQ41.
+- Added tombstone-head quorum-certificate witness-evidence, record, replay, issue, and store interfaces in `@pm/agent-state`.
+- Added deterministic tombstone-head quorum-certificate record hashing and replay.
+- Tombstone-head QC record replay now rejects provisional certificates, bad record chains, certificate hash mismatches, record hash mismatches, malformed witness evidence, unsigned evidence under strict policy, current-key mismatches, verifier failures, and authority seal mismatches.
+- Added in-memory and Postgres-backed tombstone-head quorum-certificate record stores.
+- Added migration `0038_agent_state_projection_replay_pruning_tombstone_head_witness_quorum_certificates.sql`.
+- Added focused tests proving signed tombstone-head QC proof recovery plus bad witness evidence, bad seal binding, and unsigned-evidence rejection.
+- Claim boundary: durable tombstone-head QC proof records now exist, but tombstone-head key-status rotation, QC-record compaction, runtime/Axis adoption, live Postgres pruning recovery, and production crypto adapters remain open.
+
+## 2026-06-26 - Signature-bound tombstone-head witness identity
+
+- Added `research/daily-arrowsmith-agent-state/v92-signature-bound-tombstone-head-witness-identity-2026-06-26.md`, closing SQ39 with strict tombstone-head witness identity and replacing it with SQ40.
+- Added tombstone-head witness observation signature payload hashing and tombstone-head authority-transition signature payload hashing in `@pm/agent-state`.
+- Tombstone-head witness records now preserve observer signatures through record building, in-memory ledgers, Postgres persistence, and row mapping.
+- Tombstone-head witness authority transitions now carry signature key metadata and optional finalizer signatures.
+- Strict tombstone-head witness replay now validates signer principal, payload hash, active replayed tombstone-head authority topology, admitted key id, admitted algorithm, and verifier acceptance.
+- Tombstone-head authority epoch seal replay can now require finalizer signatures from admitted tombstone-head witness principals.
+- Store-backed tombstone-head certification now fails closed when strict policy sees unsigned, unauthorized, wrong-key, wrong-payload, or verifier-rejected tombstone-head evidence.
+- Added migration `0037_agent_state_projection_replay_pruning_tombstone_head_witness_signatures.sql`.
+- Added focused tests proving signed tombstone-head quorum/seal success, unsigned witness replay failure, store-backed unsigned obstruction, and wrong-key seal rejection.
+- Claim boundary: signature-bound tombstone-head identity now exists, but durable tombstone-head quorum-certificate records, key-status rotation, runtime adoption, Axis validation, and production crypto adapters remain open.
+
+## 2026-06-26 - Tombstone-head authority epoch seal
+
+- Added `research/daily-arrowsmith-agent-state/v91-tombstone-head-authority-epoch-seal-2026-06-26.md`, closing SQ38 with non-retroactive tombstone-head authority epochs and replacing it with SQ39.
+- Added `seal_authority_epoch` support to pruning tombstone-head witness authority transitions in `@pm/agent-state`.
+- Added sealed pruning tombstone sequence, sealed authority topology hash, and sealed quorum certificate hash fields to tombstone-head authority replay and Postgres persistence.
+- Tombstone-head authority replay now projects `effectiveAuthorityHash` and `authorityEpochSeals`, validates seal bindings, and rejects tampered post-seal retroactive transitions.
+- In-memory and Postgres tombstone-head authority stores now reject non-seal transitions that try to modify a sealed tombstone epoch.
+- Store-backed tombstone-head certification now preserves the historical effective authority hash when future topology transitions are present.
+- Added migration `0036_agent_state_projection_replay_pruning_tombstone_head_authority_epoch_seal.sql`.
+- Added focused tests proving seal finality, allowed future-effective topology change, stable recertification, and tampered retroactive-history obstruction.
+- Claim boundary: non-retroactive tombstone-head authority finality now exists, but signature-bound tombstone-head identity, durable tombstone-head quorum-certificate records, runtime adoption, and Axis validation remain open.
+
+## 2026-06-26 - Durable tombstone-head witness authority store
+
+- Added `research/daily-arrowsmith-agent-state/v90-durable-tombstone-head-witness-authority-store-2026-06-26.md`, closing SQ37 with durable tombstone-head witness authority-transition stores and replacing it with SQ38.
+- Added pruning tombstone-head witness authority store contracts in `@pm/agent-state`.
+- Added in-memory and Postgres-backed pruning tombstone-head witness authority-transition stores.
+- Added `StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier`, which derives tombstone-head topology from stored authority transitions before evaluating witness records.
+- Added migration `0035_agent_state_projection_replay_pruning_tombstone_head_witness_authority.sql`.
+- Added focused tests proving stored transition sequence/hash chaining, store-backed certification, and incomplete-store non-certification even when the witness ledger contains two accepted observations.
+- Claim boundary: durable tombstone-head topology storage now exists, but non-retroactive authority epoch seals, signature-bound tombstone-head witness identity, durable quorum-certificate records, runtime adoption, and Axis validation remain open.
+
+## 2026-06-26 - Tombstone-head witness quorum topology
+
+- Added `research/daily-arrowsmith-agent-state/v89-tombstone-head-witness-quorum-topology-2026-06-26.md`, closing SQ36 with tombstone-head witness authority topology and replacing it with SQ37.
+- Added pruning tombstone-head witness authority transition, topology, principal, issue, policy, and quorum certificate types in `@pm/agent-state`.
+- Added topology replay for pruning tombstone-head witness authority transitions, including sequence, previous-hash, transition-hash, quorum, and witness eligibility checks.
+- Added tombstone-head witness quorum certificate evaluation over replayed tombstone-head witness records and replayed authority topology.
+- Added focused tests proving two eligible observers can certify a pruning tombstone head, while a topology admitting only one observer leaves the same head witnessed but uncertified.
+- Claim boundary: tombstone-head quorum topology now exists as pure substrate logic, but durable tombstone-head witness authority stores, store-backed quorum certification, signature-bound identity, quorum-certificate records, runtime adoption, and Axis validation remain open.
+
+## 2026-06-26 - Durable pruning tombstone-head witness ledger
+
+- Added `research/daily-arrowsmith-agent-state/v88-durable-tombstone-head-witness-ledger-2026-06-26.md`, closing SQ35 with durable tombstone-head witness ledgers and replacing it with SQ36.
+- Added pruning tombstone-store head observation, decision, obstruction, record, replay, and ledger types in `@pm/agent-state`.
+- Added tombstone-head consistency proof verification over replay-valid pruning tombstone records.
+- Added in-memory and Postgres-backed pruning tombstone-head witness ledgers plus migration `0034_agent_state_projection_replay_pruning_tombstone_head_witness.sql`.
+- Added a ledger-backed tombstone-head witness that replays prior observations before admitting a new observed head.
+- Pruned-store continuity can now receive `requiredTombstoneStoreHead` from replayed witness history instead of memory or adapter input.
+- Added focused tests proving replay-derived required-head continuity, unproved advance obstruction, same-sequence fork obstruction, and tampered witness-record rejection.
+- Claim boundary: durable tombstone-head witness recovery now exists, but tombstone-head witness quorum topology, signature-bound identity, quorum-certificate records, compact consistency proofs, runtime adoption, and Axis validation remain open.
+
+## 2026-06-26 - Pruning tombstone-head currentness
+
+- Added `research/daily-arrowsmith-agent-state/v87-pruning-tombstone-head-currentness-2026-06-26.md`, closing SQ34 with tombstone-store head currentness and replacing it with SQ35.
+- Added settlement-head replay compaction pruning tombstone-store head identity in `@pm/agent-state`.
+- Added deterministic tombstone-store head hashing and head-from-record derivation.
+- Pruned-store continuity verification can now require an exact `requiredTombstoneStoreHead`.
+- Continuity now rejects stale local tombstone replay, same-sequence tombstone forks, unwitnessed local advances beyond the required head, and tampered required-head hashes.
+- Added focused tests proving exact required-head acceptance plus stale, forked, and hash-invalid required-head obstruction.
+- Claim boundary: tombstone-head currentness is now pure substrate logic, but durable tombstone-head witness ledgers, quorum topology, consistency-proof compression, Postgres pruning/head-currentness integration, and Axis adoption remain open.
+
+## 2026-06-26 - Settlement-head pruning tombstone store API
+
+- Added `research/daily-arrowsmith-agent-state/v86-pruning-tombstone-store-api-2026-06-26.md`, closing SQ33 with tombstone-backed physical pruning and replacing it with SQ34.
+- Added settlement-head replay compaction pruning tombstone record, lane-frontier, issue, replay, and continuity types in `@pm/agent-state`.
+- Added in-memory and Postgres pruning tombstone record stores plus migration `0033_agent_state_projection_replay_pruning_tombstones.sql`.
+- Witness-ledger, authority-transition, and quorum-certificate-record stores now expose tombstone-gated prune APIs instead of raw sequence deletion.
+- Pruned-store continuity verification now replays retained suffixes from the latest tombstone frontier and detects silent retained-suffix truncation.
+- Added tests proving tombstone append/replay, tamper rejection, tombstone-gated physical pruning, recovery after pruning, and retained-suffix truncation detection.
+- Claim boundary: physical pruning is now replayable through tombstone records, but tombstone-head witnessing, direct SQL-delete hardening, Postgres pruning integration tests, and Axis A/B/C pruned-store adoption remain open.
+
+## 2026-06-26 - Settlement-head compaction pruning admission
+
+- Added `research/daily-arrowsmith-agent-state/v85-compaction-pruning-admission-2026-06-26.md`, closing SQ32 with pruning admission and replacing it with SQ33.
+- Added settlement-head replay compaction pruning lane, issue, admission, and hash types in `@pm/agent-state`.
+- Pruning admission now requires the selected checkpoint-admission record to be present in replay-valid durable checkpoint-admission history.
+- Pruning admission validates retained witness-ledger, authority-history, and quorum-certificate-record suffixes by replaying them from the admitted checkpoint frontier.
+- Added tests proving pruning is admitted only with durable checkpoint-admission history plus valid suffix continuity, and is obstructed when the durable record is missing or the retained suffix starts at the wrong frontier.
+- Claim boundary: pruning admission now exists as pure substrate logic, but tombstone-backed store pruning APIs, direct SQL-delete hardening, store-head witnessing after pruning, and Axis A/B/C pruned-store adoption remain open.
+
+## 2026-06-26 - Durable settlement-head checkpoint-admission store
+
+- Added `research/daily-arrowsmith-agent-state/v84-durable-checkpoint-admission-store-2026-06-26.md`, closing SQ31 with durable checkpoint-admission storage and replacing it with SQ32.
+- Added settlement-head replay compaction checkpoint-admission record types, record hashing, replay issues, and replay result types in `@pm/agent-state`.
+- Checkpoint-admission record replay now verifies sequence, previous-record hash, checkpoint body hash, admission certificate hash, strict admission re-evaluation, record hash, and conflicting checkpoint ids/frontiers.
+- Added in-memory and Postgres checkpoint-admission record stores.
+- Added migration `0032_agent_state_projection_replay_checkpoint_admissions.sql`.
+- Extended compaction tests so recovered stored checkpoint-admission records seed replay, while under-quorum and tampered admission records fail before replay can consume them.
+- Claim boundary: durable checkpoint-admission history now exists, but actual pruning APIs, suffix-continuity deletion gates, checkpoint-admission store witnessing, production crypto adapters, and Axis A/B/C pruned-store adoption remain open.
+
+## 2026-06-26 - Settlement-head compaction checkpoint admission authority
+
+- Added `research/daily-arrowsmith-agent-state/v83-compaction-checkpoint-admission-authority-2026-06-26.md`, closing SQ30 with checkpoint-admission authority and replacing it with SQ31.
+- Added settlement-head witness replay compaction checkpoint admission certificate types in `@pm/agent-state`.
+- Added checkpoint-admission witness evidence, issue codes, signature payload hashing, and certificate hashing.
+- Checkpoint admission now replays authority topology, active witness eligibility, current key metadata, quorum thresholds, payload hashes, and verifier results.
+- Settlement-head witness-ledger, authority/key-history, and quorum-certificate-record replay now require an admitted checkpoint certificate plus strict witness signature policy before a compaction checkpoint can seed replay.
+- Added tests proving hash-valid checkpoints fail without admission, under-quorum admission fails, admitted checkpoint replay succeeds, and tampered checkpoint bodies fail even when accompanied by the original admission certificate.
+- Claim boundary: checkpoint admission now exists as pure replay authority, but durable checkpoint-admission stores, consistency proofs, actual pruning, production crypto adapters, and Axis A/B/C pruned-store adoption remain open.
+
+## 2026-06-26 - Proof-preserving settlement-head replay compaction
+
+- Added `research/daily-arrowsmith-agent-state/v82-proof-preserving-replay-compaction-2026-06-26.md`, closing SQ29 with replay compaction checkpoints and replacing it with SQ30.
+- Added settlement-head witness replay compaction checkpoint types in `@pm/agent-state`.
+- Added checkpoint hashing and a builder that normalizes tenant and sorted projection fields.
+- Settlement-head witness ledger replay can now resume from a hash-checked compacted witness sequence/observation-hash frontier.
+- Settlement-head witness authority/key-history replay can now resume from checkpointed principal state, quorum settings, epoch seals, and authority sequence/hash frontier.
+- Durable quorum-certificate record replay can now resume from checkpointed certificate-record sequence/hash frontier and latest certified record.
+- Added tests proving pruned suffixes fail without checkpoints, checkpoint-plus-suffix replay succeeds, rotated key state survives authority compaction, latest certified record recovery survives certificate-record compaction, and tampered checkpoints invalidate replay.
+- Claim boundary: pure replay compaction now exists, but checkpoint authority admission, durable checkpoint stores, actual pruning, checkpoint-chain consistency, and runner adoption remain open.
+
+## 2026-06-26 - Settlement-head witness signature key status
+
+- Added `research/daily-arrowsmith-agent-state/v81-settlement-head-witness-key-status-2026-06-26.md`, closing SQ28 with replayed key-status currentness and replacing it with SQ29.
+- Added `rotate_signature_key` and `revoke_signature_key` settlement-head witness authority transitions in `@pm/agent-state`.
+- Replayed settlement-head witness principal state now projects `signatureKeyStatus` and key-change metadata.
+- Strict settlement-head witness observation replay now rejects signatures from revoked, missing, or rotated-away admitted keys.
+- Strict authority-epoch seal replay now rejects finalizer signatures whose admitted key is no longer current.
+- Durable quorum-certificate record replay now checks accepted witness evidence and seal signatures against replayed current key status.
+- Quorum-certificate record stores can enforce strict signature policy during append, so stale signed evidence fails before persistence.
+- Added tests proving revoked witness keys obstruct certification and invalidate certificate-record replay under the current topology.
+- Claim boundary: current-key replay now exists for settlement-head witnesses, but production crypto adapters, multi-authority rotation, concurrent append isolation, monitor coverage, and proof-preserving compaction remain open.
+
+## 2026-06-26 - Durable settlement-head quorum-certificate records
+
+- Added `research/daily-arrowsmith-agent-state/v80-durable-head-quorum-certificate-record-2026-06-26.md`, closing SQ27 with durable quorum-certificate proof records and replacing it with SQ28.
+- Added settlement-head quorum-certificate witness evidence, record types, record hashing, and record-chain replay in `@pm/agent-state`.
+- Added in-memory and Postgres-backed settlement-head quorum-certificate record stores.
+- Added migration `0031_agent_state_projection_replay_head_witness_quorum_certificates.sql`.
+- Durable certificate records now bind accepted witness ids to witness ledger sequence, observation hash, and signature evidence.
+- Durable certificate records can bind an optional `seal_authority_epoch` transition and reject mismatched certificate hash, topology hash, settlement sequence, or seal transition hash.
+- Fixed Postgres settlement-head witness row mapping so persisted observation signatures are restored into witness records.
+- Added tests proving signed proof-record replay and tampered witness-evidence/seal obstruction.
+- Claim boundary: durable quorum-certificate records now exist, but key-status/rotation currentness, production crypto adapters, concurrent append isolation, monitor coverage, and runner adoption remain open.
+
+## 2026-06-26 - Signature-bound settlement-head witness identity
+
+- Added `research/daily-arrowsmith-agent-state/v79-signature-bound-head-witness-identity-2026-06-26.md`, closing SQ26 with strict principal signatures and replacing it with SQ27.
+- Added settlement-head witness principal signatures, signature payload hash helpers, and strict signature-policy replay in `@pm/agent-state`.
+- Settlement-head observation replay can now require observer signatures bound to admitted active principals, payload hashes, admitted key ids, and verifier acceptance.
+- Authority-epoch seals can now require finalizer signatures from admitted active principals.
+- Added admitted key metadata to settlement-head witness authority transitions and replayed principal state.
+- Added migration `0030_agent_state_projection_replay_head_witness_signatures.sql` for durable observation signatures and authority-transition signature fields.
+- Store-backed settlement-head quorum certification can now fail closed when strict identity policy sees unsigned, wrong-principal, wrong-payload, unauthorized, wrong-key, or verifier-rejected rows.
+- Added tests proving signed quorum/seal acceptance and unsigned/wrong-key obstruction.
+- Claim boundary: signature-bound witness identity now exists under strict policy, but durable quorum-certificate records, production crypto/key-status adapters, concurrent append isolation, monitor coverage, and runner adoption remain open.
+
+## 2026-06-26 - Projection replay settlement-head authority epoch seal
+
+- Added `research/daily-arrowsmith-agent-state/v78-settlement-head-authority-epoch-seal-2026-06-26.md`, closing SQ25 with a non-retroactive settlement-head authority epoch seal and replacing it with SQ26.
+- Added `seal_authority_epoch` as a settlement-head witness authority transition in `@pm/agent-state`.
+- Added seal fields to settlement-head witness authority transitions and migration `0029_agent_state_projection_replay_settlement_head_witness_authority.sql`.
+- Added replayed `effectiveAuthorityHash`, `sealedThroughSettlementSequence`, and `authorityEpochSeals` to settlement-head witness authority topology.
+- Store-backed head-quorum certificates now bind to the effective authority topology hash for the target head rather than a later chain tip.
+- In-memory and Postgres authority-transition stores now reject post-seal retroactive topology transitions under normal append admission.
+- Added tests proving a sealed head remains stable after future-effective topology changes and that tampered post-seal retroactive history obstructs certification.
+- Claim boundary: non-retroactive authority epochs now exist, but signature-bearing witness/finalizer identity, durable quorum-certificate records, concurrent append isolation, monitor coverage, and runner adoption remain open.
+
+## 2026-06-26 - Durable projection replay settlement-head witness authority store
+
+- Added `research/daily-arrowsmith-agent-state/v77-durable-settlement-head-witness-authority-store-2026-06-26.md`, closing SQ24 with durable head-witness authority-transition storage and replacing it with SQ25.
+- Added settlement-head witness authority transition store contracts to `@pm/agent-state`.
+- Added in-memory and Postgres-backed settlement-head witness authority transition stores plus migration `0029_agent_state_projection_replay_settlement_head_witness_authority.sql`.
+- Added `StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertifier`, which derives topology from stored authority transitions and replayed head-witness records rather than resolver-supplied topology.
+- Added a first-class `certified` boolean on settlement-head witness quorum certificates so strict capability hooks can consume the pure certificate directly.
+- Added restart and tampered-topology tests for store-backed head-quorum certification.
+- Claim boundary: durable topology storage and store-backed certification now exist, but non-retroactive authority epochs, durable quorum-certificate finality, signed witness identity, monitor coverage, and runner adoption remain open.
+
+## 2026-06-26 - Projection replay settlement-head witness quorum topology
+
+- Added `research/daily-arrowsmith-agent-state/v76-settlement-head-witness-quorum-topology-2026-06-26.md`, closing SQ23 with settlement-head witness quorum topology and replacing it with SQ24.
+- Added settlement-sequence-scoped head-witness authority transitions and topology replay to `@pm/agent-state`.
+- Added settlement-head witness quorum certificate evaluation over replayed head-witness records.
+- Capability-kit workflow authority resolution can now require a certified settlement-head witness quorum before settled-root verification.
+- Added falsification tests for certified quorum, non-member exclusion, equivocated witness exclusion, invalid topology obstruction, and capability-kit quorum rejection.
+- Claim boundary: quorum topology exists as replayable substrate logic, but durable topology/quorum-certificate storage, cryptographic witness identities, and runner adoption remain open.
+
+## 2026-06-26 - Durable projection replay settlement-head witness store
+
+- Added `research/daily-arrowsmith-agent-state/v75-durable-settlement-head-witness-store-2026-06-26.md`, closing SQ22 with durable settlement-head witness storage and replacing it with SQ23.
+- Added `PostgresProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger` to `@pm/agent-state`.
+- Added migration `0028_agent_state_projection_replay_settlement_head_witness.sql` for durable, hash-linked settlement-head witness observations.
+- Added a cross-agent shared-ledger test proving a fresh agent rejects an old settlement head after another agent has witnessed a newer head.
+- Claim boundary: durable shared head-witness storage exists, but decentralized gossip, head-witness quorum/topology, cryptographic signatures, and runner adoption remain open.
+
+## 2026-06-26 - Projection replay settlement-store head witness
+
+- Added `research/daily-arrowsmith-agent-state/v74-settlement-store-head-witness-2026-06-26.md`, closing SQ21 with settlement-store head witnessing and replacing it with SQ22.
+- Added settlement-store head hashing and replay-derived heads to `@pm/agent-state`.
+- Settlement currentness can now require a witnessed settlement-store head, preventing a truncated valid prefix from satisfying currentness policy.
+- Added settlement-head consistency proofs, replayable head-witness records, in-memory and ledger-backed head witnesses, and tamper-replay tests.
+- Capability-kit workflow authority resolution can now witness settlement-store heads and bind the accepted head into settled-root verification before returning graph authority.
+- Claim boundary: settlement-head witnessing exists, but durable cross-agent head witness storage/gossip remains open.
+
+## 2026-06-26 - Projection replay settlement currentness
+
+- Added `research/daily-arrowsmith-agent-state/v73-settlement-currentness-2026-06-26.md`, closing SQ20 with settlement-currentness policy and replacing it with SQ21.
+- Added `ProjectionReplayCertificateStoreRootWitnessSettlementCurrentnessPolicy` to `@pm/agent-state`.
+- Settlement ref verification can now reject historically valid refs as stale, conflicted, below a caller-known frontier, or admitted under the wrong authority topology.
+- In-memory and Postgres settlement stores accept currentness policy during ref verification.
+- Capability-kit workflow authority resolution can now pass settled-root currentness policy to the settlement store before returning graph write authority.
+- Claim boundary: visible settlement-history currentness is enforced, but hidden settlement-store truncation/fork detection still needs store-head transparency or witnessing.
+
+## 2026-06-26 - Projection replay settled-root write gate
+
+- Added `research/daily-arrowsmith-agent-state/v72-settled-root-write-gate-2026-06-26.md`, closing SQ19 with strict settled-root write admission and replacing it with SQ20.
+- Added `GraphWriteProjectionReplayRootSettlementRef` and `requireProjectionReplayRootSettlementRef` to graph write-authority policy.
+- Graph writes can now reject missing, malformed, non-settled, root-mismatched, or substrate-record-mismatched settled-root refs before SQL.
+- Added settlement-ref creation and durable settlement-store verification helpers to `@pm/agent-state`.
+- Capability-kit workflow authority resolution can now verify settled-root refs against a settlement store before returning graph write authority.
+- Canonical action outcome envelopes and eval packet recovery now preserve `projectionReplayRootSettlementRef`.
+- Claim boundary: strict settled-root gating now exists, but settlement-currentness/status and end-to-end Axis A/C runner adoption remain open.
+
+## 2026-06-26 - Durable projection replay witness authority and settlement stores
+
+- Added `research/daily-arrowsmith-agent-state/v71-durable-witness-authority-settlement-store-2026-06-26.md`, closing SQ18 with durable authority-transition and settlement-certificate stores and replacing it with SQ19.
+- Added in-memory and Postgres witness-authority transition stores to `@pm/agent-state`, with store-assigned authority sequence and previous-hash chaining.
+- Added settlement record hashing, settlement-record replay, and in-memory/Postgres settlement stores so settled roots can be recovered after restart and tampered settlement records cannot replay as settled.
+- Added migration `0027_agent_state_projection_replay_witness_authority_settlement.sql` for durable authority transitions and settlement records.
+- Added focused tests for durable topology/settlement replay after restart, tampered authority-transition rejection, and tampered settlement-record rejection.
+- Claim boundary: durable stores now exist, but strict graph/capability write gates still need to require durable settled-root certificates before mutation.
+
+## 2026-06-26 - Projection replay witness-authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v70-witness-authority-topology-2026-06-26.md`, closing SQ17 with replayed witness-principal authority topology and replacing it with SQ18.
+- Added hash-linked witness-authority transitions to `@pm/agent-state` for quorum, witness admission, suspension, revocation, and equivocation.
+- Added `replayProjectionReplayCertificateStoreRootWitnessAuthorityTransitions()` to derive active settlement-eligible witness principals for a certificate-store root sequence.
+- Extended root-witness settlement to count only topology-eligible witness ledgers when an authority topology is supplied.
+- Added tests proving topology-bound settlement, non-member refusal, equivocated-principal refusal, and invalid-topology obstruction.
+- Claim boundary: topology replay is pure substrate logic; durable authority-transition storage, durable settlement certificates, cryptographic principals, and strict write-gate adoption remain open.
+
+## 2026-06-26 - Projection replay root-witness settlement
+
+- Added `research/daily-arrowsmith-agent-state/v69-root-witness-settlement-2026-06-26.md`, closing SQ16 with replayed root-witness settlement and replacing it with SQ17.
+- Added `ProjectionReplayCertificateStoreRootWitnessSettlement` policy/result/issue types to `@pm/agent-state`.
+- Added `evaluateProjectionReplayCertificateStoreRootWitnessSettlement()` to classify replay roots as `provisional`, `witnessed`, `settled`, or `obstructed` from replayed witness ledgers.
+- Settlement now refuses tampered witness ledgers, duplicate witness ids, and valid same-sequence conflicting roots as quorum evidence.
+- Added tests for one-witness quorum shortfall, two-witness settlement, conflicting-ledger obstruction, and invalid-ledger non-counting.
+- Claim boundary: settlement now exists as a pure substrate primitive; witness-principal authority topology, durable settlement storage, and strict write-gate adoption remain open.
+
+## 2026-06-26 - Projection replay root-witness ledger
+
+- Added `research/daily-arrowsmith-agent-state/v68-root-witness-ledger-2026-06-26.md`, closing SQ15 with a replayable witness ledger and replacing it with SQ16.
+- Added hash-linked projection replay root-witness observation records, deterministic record hashing, and ledger replay with decision recomputation to `@pm/agent-state`.
+- Added `LedgerBackedProjectionReplayCertificateStoreRootWitness`, `InMemoryProjectionReplayCertificateStoreRootWitnessLedger`, and `PostgresProjectionReplayCertificateStoreRootWitnessLedger`.
+- Added migration `0026_agent_state_projection_replay_root_witness.sql` for durable witness observations.
+- Added tests proving a restarted witness recovers roots from the ledger, obstructs unproved advances after restart, accepts valid proof advances, and rejects tampered witness records.
+- Claim boundary: witness state is replayable, but witness quorum/finality and real runtime adoption remain open.
+
+## 2026-06-26 - Projection replay certificate-store root witness
+
+- Added `research/daily-arrowsmith-agent-state/v67-certificate-store-root-witness-2026-06-26.md`, closing SQ14 with a root witness primitive and replacing it with SQ15.
+- Added `ProjectionReplayCertificateStoreRootWitness`, pure root observation evaluation, in-memory witnessing, and replayable root obstruction artifacts to `@pm/agent-state`.
+- Root advances now require a consistency proof from the latest witnessed root; same-sequence divergent roots, tenant mismatches, regressions, missing proofs, and invalid proofs obstruct.
+- Added workflow authority envelope support for root consistency proofs and a capability-kit root witness gate before returning workflow-derived graph write authority.
+- Claim boundary: root witnessing now blocks forked replay roots when configured; durable witness persistence/quorum and automatic cross-agent gossip remain open.
+
+## 2026-06-26 - Projection replay certificate-store root
+
+- Added `research/daily-arrowsmith-agent-state/v66-certificate-store-root-2026-06-26.md`, closing SQ13 with append-only replay-certificate store roots and replacing it with SQ14.
+- Added `ProjectionReplayCertificateStoreEntry`, `ProjectionReplayCertificateStoreRoot`, and hash-chain consistency proof verification to `@pm/agent-state`.
+- Extended replay refs with optional certificate-store sequence, entry hash, and root hash; strict store verification can now require those commitments.
+- Added migration `0025_agent_state_projection_replay_certificate_store_root.sql` for append-only certificate-store entries.
+- Added `requireProjectionReplayStoreCommitment` to capability-kit workflow authority resolution, and preserved store-root fields in graph replay refs.
+- Claim boundary: store roots make forks detectable through root comparison/proofs; witness/root-gossip protocol remains open.
+
+## 2026-06-26 - Projection replay certificate store
+
+- Added `research/daily-arrowsmith-agent-state/v65-projection-replay-certificate-store-2026-06-26.md`, closing SQ12 with a durable replay-certificate store and replacing it with SQ13.
+- Added `ProjectionReplayCertificateRef`, durable certificate records, `InMemoryProjectionReplayCertificateStore`, and `PostgresProjectionReplayCertificateStore` to `@pm/agent-state`.
+- Added migration `0024_agent_state_projection_replay_certificates.sql` for `agent_state.projection_replay_certificates`.
+- Preserved `projectionReplayRef` through `ActionOutcomeEnvelope`, workflow promotion, role projections, and eval packet recovery.
+- Added certificate-store verification to capability-kit workflow authority resolution, blocking before capability `apply()` when a replay ref lacks a matching durable certificate.
+- Claim boundary: replay refs now resolve to full stored certificates before write authority is returned; tamper-evident store roots and non-equivocation proofs remain open.
+
+## 2026-06-26 - Projection replay write gate
+
+- Added `research/daily-arrowsmith-agent-state/v64-projection-replay-write-gate-2026-06-26.md`, closing SQ11 with a replay-proof write gate and replacing it with SQ12.
+- Added `GraphWriteProjectionReplayRef` and `GraphWriteAuthorityPolicy.requireProjectionReplayRef` to `@pm/graph`, with obstruction codes for missing, invalid, mismatched, stale, or substrate-record-divergent replay proof.
+- Propagated `projectionReplayRef` through capability-kit workflow authority envelopes and substrate records.
+- Proved strict capability-kit graph writes reject before `apply()` and before graph SQL when replay proof is absent or stale.
+- Claim boundary: structural replay refs are now gated at graph/capability mutation boundaries; full `ProjectionReplayCertificate` persistence and durable certificate-hash verification remain open.
+
+## 2026-06-26 - Projection replay frontier
+
+- Added `research/daily-arrowsmith-agent-state/v63-projection-replay-frontier-2026-06-26.md`, closing SQ01 with a sequence-backed durable projection frontier and replacing it with SQ11.
+- Added `ProjectionReplayFrontier`, `ProjectionReplayFrontierEvent`, and `ProjectionRunner.getReplayFrontier()` to `@pm/projections`.
+- Changed `PostgresProjectionRunner.catchUp()` to advance by `events.events.seq` and added migration `0023_projection_replay_frontier.sql` for `projections.cursors.last_event_seq`.
+- Added `buildProjectionReplayCertificateFromFrontier()` to `@pm/agent-state`, so replay certificates can be minted from projection-owned durable event refs while rejecting tenant/projection-version mismatch.
+- Claim boundary: DB-backed projection tests are present but skip without `PM_DATABASE_URL`; no real write-capable runtime path requires replay-frontier certificates yet.
+
+## 2026-06-26 - State identity kernel
+
+- Added `research/daily-arrowsmith-agent-state/v62-state-identity-kernel-2026-06-26.md`, closing the first discovery-lane question with existing/missing substrate maps, an exact 10-question backlog, primitive proposal ledger, falsification criteria, implementation frontier, and proof status.
+- Added `ProjectionReplayCertificate` to `@pm/agent-state` as a pure state identity kernel binding a `CurrentStateView` to authority scope, ordered admitted transition refs, transition-history hash, projection hash, source refs, and replay frontier.
+- Added opt-in `requireReplayCertificate` action-review enforcement, `projection_replay` warning/invariant classification, certificate hashing, verification, and replay evaluation helpers.
+- Added focused tests proving missing replay proof blocks, valid event-backed proof passes, tampered views fail, hash-valid projection-version omissions fail, private summary refs cannot count as transitions, and stale replay frontiers fail.
+- Claim boundary: this is a substrate primitive and blocking review gate; durable event/projection-store certificate generation and runtime enforcement at real write-capable boundaries remain open.
+
 ## 2026-06-26 - Representation-loss packet gate research
 
 - Added `research/daily-arrowsmith-agent-state/v61-representation-loss-packet-gate-2026-06-26.md`, answering RQ71 as an implementation sequence rather than another proof-harness change.

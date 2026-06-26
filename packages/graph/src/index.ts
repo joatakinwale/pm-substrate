@@ -48,5 +48,7 @@ export {
   type GraphWriteAuthorityPolicy,
   type GraphWriteAuthorityRef,
   type GraphWriteAuthoritySubstrateRecord,
+  type GraphWriteProjectionReplayRef,
+  type GraphWriteProjectionReplayRootSettlementRef,
   type GraphWriteProviderCertificateStatusRef,
 } from "./write-authority.js";

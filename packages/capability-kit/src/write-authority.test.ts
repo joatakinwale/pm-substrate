@@ -3,6 +3,7 @@ import {
   GraphWriteAuthorityError,
   type GraphWriteAuthorityPolicy,
   type GraphWriteAuthorityRef,
+  type GraphWriteProjectionReplayRef,
   type GraphWriteAuthoritySubstrateRecord,
 } from "@pm/graph";
 import type { EntityId, TenantId, Timestamp } from "@pm/types";
@@ -11,6 +12,10 @@ import {
   type CapabilityRuntimeDeps,
   type CapabilitySpec,
 } from "./define.js";
+import {
+  graphWriteAuthorityResolverFromWorkflowEnvelopeStore,
+  GraphWriteAuthorityResolutionError,
+} from "./workflow-authority.js";
 
 interface Payload {
   readonly key: string;
@@ -47,6 +52,18 @@ const validAuthority = (): GraphWriteAuthorityRef => ({
   },
 });
 
+const validProjectionReplayRef = (): GraphWriteProjectionReplayRef => ({
+  certificateId: "projection_replay_capability_authority",
+  certificateHash: "sha256:projection_replay_certificate",
+  projectionName: "capability/current-state",
+  projectionVersion: 1,
+  authorityScope: "capability.graph-write",
+  replayedToPosition: 9,
+  transitionHistoryHash: "sha256:projection_transition_history",
+  projectionHash: "sha256:projection_hash",
+  checkedAt,
+});
+
 const validSubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
   authorityKind: "workflow_action_outcome_envelope",
   envelopeId: "env_capability_authority",
@@ -65,6 +82,11 @@ const validSubstrateRecord = (): GraphWriteAuthoritySubstrateRecord => ({
   },
 });
 
+const validReplayAuthority = (): GraphWriteAuthorityRef => ({
+  ...validAuthority(),
+  projectionReplayRef: validProjectionReplayRef(),
+});
+
 const strictPolicy: GraphWriteAuthorityPolicy = {
   requireAuthorityRef: true,
   requireProviderCertificateStatusRef: true,
@@ -73,6 +95,15 @@ const strictPolicy: GraphWriteAuthorityPolicy = {
 const strictStorePolicy: GraphWriteAuthorityPolicy = {
   ...strictPolicy,
   requireSubstrateRecord: true,
+};
+
+const strictReplayPolicy: GraphWriteAuthorityPolicy = {
+  ...strictPolicy,
+  requireProjectionReplayRef: true,
+  expectedProjectionName: "capability/current-state",
+  expectedProjectionVersion: 1,
+  expectedProjectionReplayAuthorityScope: "capability.graph-write",
+  minimumProjectionReplayPosition: 9,
 };
 
 const makeClient = (): FakeClient => {
@@ -226,6 +257,134 @@ describe("defineCapability graph write authority", () => {
       "SELECT_FOR_UPDATE",
       "UPDATE_GRAPH_NODES",
       "COMMIT",
+      "RELEASE",
+    ]);
+  });
+
+  it("rejects before apply when strict policy requires projection replay proof", async () => {
+    const client = makeClient();
+    let applyCalled = false;
+
+    const handler = defineCapability(
+      makeSpec({
+        graphWriteAuthority: async () => validAuthority(),
+        apply: async () => {
+          applyCalled = true;
+          return {
+            nextIdentity: { targetScore: 1 },
+            applyResult: { newScore: 1 },
+          };
+        },
+      }),
+      makeDeps(client, strictReplayPolicy),
+    );
+
+    await expect(handler.handle(tenantId, { key: "payload-replay-1" })).rejects.toThrow(
+      GraphWriteAuthorityError,
+    );
+
+    expect(applyCalled).toBe(false);
+    expect(client.calls).toEqual([
+      "BEGIN",
+      "INSERT_IDEMPOTENCY",
+      "SELECT_FOR_UPDATE",
+      "ROLLBACK",
+      "RELEASE",
+    ]);
+  });
+
+  it("accepts replay-certified authority before graph update", async () => {
+    const client = makeClient();
+    const authorityRef = validReplayAuthority();
+    let applyAuthorityRef: GraphWriteAuthorityRef | undefined;
+
+    const handler = defineCapability(
+      makeSpec({
+        graphWriteAuthority: async () => authorityRef,
+        apply: async ({ writeAuthorityRef }) => {
+          applyAuthorityRef = writeAuthorityRef;
+          return {
+            nextIdentity: { targetScore: 1 },
+            applyResult: { newScore: 1 },
+          };
+        },
+      }),
+      makeDeps(client, strictReplayPolicy),
+    );
+
+    await handler.handle(tenantId, { key: "payload-replay-2" });
+
+    expect(applyAuthorityRef).toBe(authorityRef);
+    expect(client.calls).toEqual([
+      "BEGIN",
+      "INSERT_IDEMPOTENCY",
+      "SELECT_FOR_UPDATE",
+      "UPDATE_GRAPH_NODES",
+      "COMMIT",
+      "RELEASE",
+    ]);
+  });
+
+  it("rejects before apply when the replay certificate store rejects the ref", async () => {
+    const client = makeClient();
+    const authorityRef = validReplayAuthority();
+    let applyCalled = false;
+
+    const handler = defineCapability(
+      makeSpec({
+        graphWriteAuthority: graphWriteAuthorityResolverFromWorkflowEnvelopeStore({
+          store: {
+            async getWorkflowActionOutcomeEnvelope() {
+              return {
+                envelopeId: authorityRef.envelopeId,
+                actionId: authorityRef.actionId,
+                terminalOutcome: "accepted",
+                providerCertificateId: authorityRef.providerCertificateId,
+                providerCertificateDigest: authorityRef.providerCertificateDigest,
+                providerCertificateStatusRef:
+                  authorityRef.providerCertificateStatusRef,
+                projectionReplayRef: authorityRef.projectionReplayRef,
+              };
+            },
+          },
+          projectionReplayCertificateStore: {
+            async verifyProjectionReplayCertificateRef(input) {
+              return {
+                valid: false,
+                certificateId: input.ref.certificateId,
+                issues: [
+                  {
+                    code: "projection_replay_certificate_record_missing",
+                    message: "missing durable certificate record",
+                  },
+                ],
+              };
+            },
+          },
+          envelopeId: () => authorityRef.envelopeId,
+          expectedActionId: () => authorityRef.actionId,
+        }),
+        apply: async () => {
+          applyCalled = true;
+          return {
+            nextIdentity: { targetScore: 1 },
+            applyResult: { newScore: 1 },
+          };
+        },
+      }),
+      makeDeps(client, strictReplayPolicy),
+    );
+
+    await expect(
+      handler.handle(tenantId, { key: "payload-replay-store-1" }),
+    ).rejects.toThrow(GraphWriteAuthorityResolutionError);
+
+    expect(applyCalled).toBe(false);
+    expect(client.calls).toEqual([
+      "BEGIN",
+      "INSERT_IDEMPOTENCY",
+      "SELECT_FOR_UPDATE",
+      "ROLLBACK",
       "RELEASE",
     ]);
   });

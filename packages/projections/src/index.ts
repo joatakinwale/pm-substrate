@@ -7,5 +7,10 @@
  *   position in the event log.
  */
 
-export type { Projection, ProjectionRunner } from "./interfaces.js";
+export type {
+  Projection,
+  ProjectionReplayFrontier,
+  ProjectionReplayFrontierEvent,
+  ProjectionRunner,
+} from "./interfaces.js";
 export { PostgresProjectionRunner } from "./postgres.js";

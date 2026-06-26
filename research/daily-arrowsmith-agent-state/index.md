@@ -51,6 +51,70 @@ v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source
 
 v61 update: The prompt's observation-report / action-proposal / JSON-artifact implementation frontier is corrected as already closed on the current branch. RQ71 is narrowed into an implementation sequence: build `representation_loss` next as a projection-admission packet family using invariant-field preservation and local-view obstruction semantics, then continue to `workflow_invalidation`, `capability_contract_violation`, and `parallel_write_conflict`. Recent LLM framing and human-AI mental-model work downgraded summary/shared-context stability as state proof, while abstract interpretation and handoff literature sharpened the falsification test for lossy projections.
 
+v62 update: The discovery lane resets the next move from Axis A packet expansion to substrate identity. `@pm/agent-state` now has a pure `ProjectionReplayCertificate` state identity kernel: current-state views can carry a hash-verifiable replay certificate binding tenant, subject, authority scope, source refs, projection version, ordered admitted transition refs, transition-history hash, projection hash, and replay frontier. Blocking action review can require replay proof through `requireReplayCertificate`; the remaining frontier is durable event/projection-store certificate generation and enforcement at real write-capable runtime boundaries.
+
+v63 update: SQ01 is closed by adding a sequence-backed projection replay frontier. `@pm/projections` now exposes `ProjectionReplayFrontier`, `ProjectionRunner.getReplayFrontier()`, and a `last_event_seq` cursor over `events.events.seq`; `@pm/agent-state` can mint `ProjectionReplayCertificate`s from that frontier while rejecting tenant/projection-version mismatch. The next substrate question is SQ11: which real write-capable runtime boundary should require replay-frontier certificates, and what obstruction should it emit when frontier proof is absent or stale?
+
+v64 update: SQ11 is closed by adding a projection replay write gate to graph write authority. `@pm/graph` now has `GraphWriteProjectionReplayRef`, replay-proof policy options, and obstruction codes for missing, invalid, mismatched, or stale replay proof; `@pm/capability-kit` inherits the gate before capability `apply()` and graph SQL. The next substrate question is SQ12: persist full projection replay certificates so write gates can verify durable certificate hashes rather than structural refs alone.
+
+v65 update: SQ12 is closed by adding a substrate-owned projection replay certificate store. `@pm/agent-state` now has durable certificate record/store semantics plus in-memory/Postgres implementations, action-outcome envelopes preserve `projectionReplayRef`, eval packet recovery returns replay refs, and `@pm/capability-kit` can verify a replay ref against the certificate store before capability `apply()`. The next substrate question is SQ13: what tamper-evident certificate-store root proves the store is append-only and non-equivocating across agents, resumes, and write gates?
+
+v66 update: SQ13 is closed by adding a projection replay certificate-store root. `@pm/agent-state` now models append-only certificate-store entries and roots, verifies hash-chain consistency proofs, and can require replay refs to cite store sequence, entry hash, and root hash. `@pm/capability-kit` can require store commitments before `apply()`, while `@pm/graph` preserves those fields structurally. The next substrate question is SQ14: what witness or root-gossip protocol forces divergent store roots to become obstructions across agents and resumes?
+
+v67 update: SQ14 is closed by adding a projection replay certificate-store root witness. `@pm/agent-state` now has a pure witness evaluator, in-memory witness, and replayable root obstruction artifact; root advances require consistency proofs from the latest witnessed root and same-sequence forks obstruct. `@pm/capability-kit` can require witness acceptance before returning workflow-derived graph write authority. The next substrate question is SQ15: what durable witness ledger or quorum rule makes root-witness observations themselves replayable across restarts, agents, and independent monitors?
+
+v68 update: SQ15 is closed by adding a projection replay root-witness ledger. `@pm/agent-state` now has hash-linked witness observation records, deterministic witness record hashing, ledger replay with decision recomputation, in-memory/Postgres witness ledgers, and a ledger-backed witness that recovers accepted roots from replay instead of process memory. The next substrate question is SQ16: what quorum or finality policy decides when one or more witnessed roots become settled operational authority rather than provisional authority?
+
+v69 update: SQ16 is closed by adding projection replay root-witness settlement. `@pm/agent-state` can now classify replayed certificate-store roots as `provisional`, `witnessed`, `settled`, or `obstructed` from valid witness-ledger replays plus an explicit quorum policy; tampered ledgers and duplicate witness ids cannot count, and valid same-sequence conflicting roots obstruct settlement. The next substrate question is SQ17: what witness-principal authority topology decides which replayed witness ledgers are eligible to count toward settlement, and how are equivocation, revocation, and membership epochs admitted?
+
+v70 update: SQ17 is closed by adding projection replay root-witness authority topology. `@pm/agent-state` now has hash-linked witness-authority transitions for quorum, admission, suspension, revocation, and equivocation; topology replay derives eligible witness principals for a root sequence, and settlement can count only topology-eligible witness ledgers. The next substrate question is SQ18: what durable authority-transition and settlement-certificate store prevents callers from supplying synthetic witness topology or settlement objects?
+
+v71 update: SQ18 is closed by adding durable projection replay root-witness authority and settlement stores. `@pm/agent-state` now has in-memory/Postgres stores for authority transitions, store-assigned authority sequence/previous-hash admission, settlement-record hashing and replay, in-memory/Postgres settlement stores, and migration `0027_agent_state_projection_replay_witness_authority_settlement.sql`. The next substrate question is SQ19: what strict write-gate admission rule requires durable settled-root certificates before graph/capability mutation, so replayed topology and settlement stores cannot remain advisory?
+
+v72 update: SQ19 is closed by adding a strict projection replay settled-root write gate. `@pm/graph` can require `projectionReplayRootSettlementRef` before SQL, `@pm/capability-kit` can verify that ref against a durable settlement store before constructing graph authority, and canonical action-outcome/eval packet recovery preserves the settled-root proof. The next substrate question is SQ20: what settlement-currentness model prevents an old durable settled-root certificate from authorizing writes after later obstruction, topology change, policy supersession, or settlement-store fork?
+
+v73 update: SQ20 is closed by adding projection replay settlement currentness policy. `@pm/agent-state` now verifies settled-root refs against replayed settlement history under explicit latest-root, latest-same-root, no-later-conflict, no-later-obstruction, minimum-frontier, and topology-hash checks; `@pm/capability-kit` can pass that policy to the settlement store before constructing graph authority. The next substrate question is SQ21: what settlement-store head transparency or witness primitive prevents hidden truncation or forked settlement history when the caller lacks a minimum frontier?
+
+v74 update: SQ21 is closed by adding projection replay settlement-store head witnessing. `@pm/agent-state` now derives settlement-store heads from replayed settlement records, can require a witnessed head during currentness verification, and has replayable head-witness records that reject unproved advances, stale duplicate heads, forked heads, and tampered decisions. `@pm/capability-kit` can observe a settlement-store head and bind it into verification before returning graph authority. The next substrate question is SQ22: what durable cross-agent settlement-head witness store or gossip protocol makes head observations survive process restart and independent agent comparison?
+
+v75 update: SQ22 is closed by adding durable projection replay settlement-head witness storage. `@pm/agent-state` now has a Postgres-backed settlement-head witness ledger and migration `0028_agent_state_projection_replay_settlement_head_witness.sql`; a fresh ledger-backed agent can replay another agent's witnessed settlement heads and reject an old head as a regression. The next substrate question is SQ23: what quorum/topology policy decides which settlement-head witnesses are eligible and how many independent head observations are required before a head can authorize writes?
+
+v76 update: SQ23 is closed by adding settlement-head witness quorum topology. `@pm/agent-state` now has settlement-sequence-scoped head-witness authority transitions, topology replay, and quorum-certificate evaluation over replayed head-witness records; `@pm/capability-kit` can require a certified head quorum before settled-root verification. The next substrate question is SQ24: what durable store and admission boundary persists settlement-head witness authority transitions or quorum certificates so adapters cannot supply synthetic topology?
+
+v77 update: SQ24 is closed by adding a durable settlement-head witness authority-transition store and store-backed quorum certifier. `@pm/agent-state` now has in-memory/Postgres stores for head-witness authority transitions, migration `0029_agent_state_projection_replay_settlement_head_witness_authority.sql`, and a certifier that derives topology from stored transitions plus replayed head-witness records instead of adapter-supplied topology. The next substrate question is SQ25: what non-retroactive authority-epoch or quorum-certificate finality rule prevents later topology transitions from rewriting the eligibility basis of an already certified settlement-store head?
+
+v78 update: SQ25 is closed by adding a settlement-head witness authority epoch seal. `@pm/agent-state` now models `seal_authority_epoch` as a replayed authority transition, binds quorum certificates to the effective authority topology hash, rejects post-seal retroactive transition appends, and obstructs tampered retroactive history during store-backed certification. The next substrate question is SQ26: what signature-bearing witness identity model binds observations, quorum certificates, and authority-epoch seals to principals so durable rows cannot impersonate witnesses or finalizers?
+
+v79 update: SQ26 is closed by adding signature-bound settlement-head witness identity. `@pm/agent-state` now models principal signatures for settlement-head observations and authority-epoch seals, replays payload hashes against admitted head-witness authority topology, checks admitted key metadata, and lets store-backed quorum certification fail closed under a strict identity policy. The next substrate question is SQ27: what durable quorum-certificate record store binds certified settlement-head quorum certificates, witness signatures, and epoch seals into recoverable proof objects?
+
+v80 update: SQ27 is closed by adding durable settlement-head quorum-certificate proof records. `@pm/agent-state` now records certified head quorum certificates with accepted witness observation hashes/signatures and optional epoch-seal linkage, replays the record chain, and rejects tampered evidence or seal mismatches. The next substrate question is SQ28: what key-status and rotation system makes witness signatures decision-time current so revoked or rotated keys cannot authorize new observations, seals, or quorum-certificate records?
+
+v81 update: SQ28 is closed by adding settlement-head witness signature key status. `@pm/agent-state` now models `rotate_signature_key` and `revoke_signature_key` as replayed head-witness authority transitions, projects current key status into principal state, and refuses witness records, authority-epoch seals, and quorum-certificate records whose signatures are no longer current under strict policy. The next substrate question is SQ29: what proof-preserving compaction rule lets witness ledgers and key histories be pruned without losing replay of quorum-certificate records and key-currentness decisions?
+
+v82 update: SQ29 is closed by adding settlement-head witness replay compaction checkpoints. `@pm/agent-state` can now resume witness-ledger, authority/key-history, and quorum-certificate-record replay from a hash-checked checkpoint carrying compacted sequence/hash frontiers plus derived projections; pruned suffixes still fail without the checkpoint, and tampered checkpoints invalidate replay. The next substrate question is SQ30: what checkpoint-admission authority makes replay compaction checkpoints themselves admissible, so arbitrary hash-valid snapshots cannot replace transition-derived state?
+
+v83 update: SQ30 is closed by adding settlement-head witness replay compaction checkpoint admission certificates. `@pm/agent-state` now refuses checkpoint-seeded witness-ledger, authority/key-history, or quorum-certificate-record replay unless a replayed admission certificate proves enough current admitted witnesses signed the exact checkpoint hash under a strict signature policy. The next substrate question is SQ31: what durable checkpoint-admission store and consistency proof make compaction checkpoint certificates recoverable, non-equivocating, and prunable without trusting process memory?
+
+v84 update: SQ31 is closed by adding a durable settlement-head witness replay compaction checkpoint-admission record store. `@pm/agent-state` now records checkpoint bodies and their admitted certificates together in a hash-linked admission history, replays sequence/previous-hash/checkpoint/admission/conflict checks, and exposes in-memory plus Postgres stores. The next substrate question is SQ32: what pruning admission rule makes physical prefix deletion impossible unless a durable admitted checkpoint record and verified suffix continuity already exist?
+
+v85 update: SQ32 is closed by adding a settlement-head witness replay compaction pruning admission. `@pm/agent-state` now requires durable checkpoint-admission record replay plus witness-ledger, authority-history, and quorum-certificate-record suffix replay before pruning can be admitted. The next substrate question is SQ33: what pruning tombstone and store API make actual row deletion replayable and detectable, so out-of-band truncation cannot hide erased conflicting history?
+
+v86 update: SQ33 is closed by adding settlement-head witness replay compaction pruning tombstones and tombstone-gated store pruning APIs. `@pm/agent-state` now records physical pruning as a hash-linked tombstone record, replays tombstones against admitted checkpoint/pruning material, prunes witness-ledger, authority-history, and quorum-certificate-record stores only through tombstone records, and verifies retained suffix continuity after actual pruning. The next substrate question is SQ34: what pruning-head witness or tombstone consistency proof makes stale or forked tombstone histories unable to authorize a pruned store projection?
+
+v87 update: SQ34 is closed by adding pruning tombstone-store head currentness. `@pm/agent-state` now derives a tombstone-store head from replayed tombstone records and lets pruned-store continuity require an exact witnessed tombstone head; stale, forked, unwitnessed-advance, and hash-invalid heads obstruct the projection. The next substrate question is SQ35: what durable tombstone-head witness ledger makes `requiredTombstoneStoreHead` recoverable after amnesia instead of supplied by local memory or adapter input?
+
+v88 update: SQ35 is closed by adding a durable pruning tombstone-head witness ledger. `@pm/agent-state` now records tombstone-head observations in a hash-linked replay ledger, recomputes witness decisions from prior accepted heads, exposes a replayed `latestHead` for pruned-store continuity, and persists observations through migration `0034`. The next substrate question is SQ36: what tombstone-head witness authority topology and quorum rule prevents a single observer from unilaterally defining tombstone currentness?
+
+v89 update: SQ36 is closed by adding pruning tombstone-head witness authority topology and quorum certificates. `@pm/agent-state` now replays tombstone-head witness authority transitions, projects eligible observers and quorum thresholds, and certifies a tombstone head only when enough replay-eligible observers accepted the exact same head. The next substrate question is SQ37: what durable tombstone-head witness authority-transition store makes quorum topology recoverable after restart instead of supplied by adapters?
+
+v90 update: SQ37 is closed by adding durable pruning tombstone-head witness authority-transition stores. `@pm/agent-state` now has in-memory and Postgres-backed tombstone-head authority stores plus a store-backed quorum certifier that derives topology from stored transitions before evaluating tombstone-head witness records. The next substrate question is SQ38: what tombstone-head authority epoch seal prevents later authority transitions from retroactively changing historical tombstone-head certifications?
+
+v91 update: SQ38 is closed by adding pruning tombstone-head authority epoch seals. `@pm/agent-state` now treats `seal_authority_epoch` as a replayed tombstone-head witness authority transition that binds a pruning tombstone sequence to the effective topology hash and quorum certificate hash, rejects later retroactive authority transitions at append time, and obstructs tampered retroactive history during replay/store-backed certification. The next substrate question is SQ39: what signature-bound tombstone-head witness identity makes observations, authority epoch seals, and future certificate records attributable to admitted principals?
+
+v92 update: SQ39 is closed by adding signature-bound pruning tombstone-head witness identity. `@pm/agent-state` now preserves tombstone-head observation signatures, replays observer signatures against tombstone-head authority topology and admitted key metadata, validates authority epoch-seal finalizer signatures under strict policy, and fails store-backed certification closed when witness rows are unsigned or signed by non-admitted keys. The next substrate question is SQ40: what durable tombstone-head quorum-certificate record store binds accepted witness signatures and authority epoch seals into recoverable proof objects?
+
+v93 update: SQ40 is closed by adding durable pruning tombstone-head quorum-certificate records. `@pm/agent-state` now stores tombstone-head certificate proof records that bind the certified head, accepted witness evidence, witness signatures, optional authority epoch seal, previous record hash, and record hash; replay rejects provisional certificates, bad evidence, mismatched seals, and unsigned evidence under strict tombstone-head authority policy. The next substrate question is SQ41: what tombstone-head witness key-status and rotation semantics keep durable certificate-record replay from accepting revoked or superseded keys?
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -118,6 +182,38 @@ v61 update: The prompt's observation-report / action-proposal / JSON-artifact im
 | v59 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md` | Axis A continuity packet families | Answered RQ60, added RQ61-RQ70, extracted reusable continuity-chain verification, and added paired packet-backed `memory_drift` / `continuity_break` Axis A families. |
 | v60 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v60-axis-a-source-authority-packet-family-2026-06-26.md` | Axis A source-authority packet family | Answered RQ61, added RQ71, tightened ArrowHedge source-authority conflict classification, and added a paired packet-backed `source_authority_conflict` Axis A family. |
 | v61 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v61-representation-loss-packet-gate-2026-06-26.md` | Representation-loss packet gate research | Corrected the stale implementation frontier, answered RQ71 as a sequencing decision, and selected `representation_loss` as the next Axis A packet family using projection-fidelity checks. |
+| v62 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v62-state-identity-kernel-2026-06-26.md` | State identity kernel research and implementation | Added existing/missing substrate maps, an exact 10-question discovery backlog, and implemented `ProjectionReplayCertificate` plus opt-in replay-proof action review. |
+| v63 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v63-projection-replay-frontier-2026-06-26.md` | Projection replay frontier research and implementation | Closed SQ01 by adding sequence-backed projection replay frontiers, `last_event_seq`, and frontier-to-certificate generation. |
+| v64 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v64-projection-replay-write-gate-2026-06-26.md` | Projection replay write gate research and implementation | Closed SQ11 by adding replay-proof graph write authority policy, obstruction codes, and capability-kit enforcement before `apply()` / SQL. |
+| v65 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v65-projection-replay-certificate-store-2026-06-26.md` | Projection replay certificate store research and implementation | Closed SQ12 by adding durable replay-certificate record/store semantics, Postgres migration, replay-ref packet recovery, and capability-kit certificate-store verification before `apply()`. |
+| v66 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v66-certificate-store-root-2026-06-26.md` | Certificate store root research and implementation | Closed SQ13 by adding append-only certificate-store roots, hash-chain consistency proof verification, and strict store-root replay-ref verification. |
+| v67 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v67-certificate-store-root-witness-2026-06-26.md` | Certificate store root witness research and implementation | Closed SQ14 by adding root witness admission, root obstruction artifacts, consistency-proof-required advances, fork obstruction, and capability-kit witness gating before graph write authority. |
+| v68 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v68-root-witness-ledger-2026-06-26.md` | Root witness ledger research and implementation | Closed SQ15 by adding hash-linked witness observation records, ledger replay with decision recomputation, in-memory/Postgres witness ledgers, and ledger-backed witness recovery after restart. |
+| v69 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v69-root-witness-settlement-2026-06-26.md` | Root witness settlement research and implementation | Closed SQ16 by adding replayed witness-ledger settlement classification, quorum-not-met, invalid-ledger, duplicate-witness, and conflicting-root settlement issues. |
+| v70 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v70-witness-authority-topology-2026-06-26.md` | Witness authority topology research and implementation | Closed SQ17 by adding hash-linked witness-authority transitions, topology replay, eligible witness-principal projection, and topology-bound settlement counting. |
+| v71 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v71-durable-witness-authority-settlement-store-2026-06-26.md` | Durable witness authority and settlement store research and implementation | Closed SQ18 by adding durable authority-transition stores, durable settlement-record stores, settlement-record replay, migration `0027`, and tamper-rejection tests. |
+| v72 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v72-settled-root-write-gate-2026-06-26.md` | Settled-root write-gate research and implementation | Closed SQ19 by adding graph settled-root policy, capability-kit settlement-store verification, action-envelope/eval preservation, and falsification tests. |
+| v73 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v73-settlement-currentness-2026-06-26.md` | Settlement-currentness research and implementation | Closed SQ20 by adding settlement currentness policy, stale/conflict/frontier/topology issue codes, settlement-store verification, capability-kit propagation, and falsification tests. |
+| v74 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v74-settlement-store-head-witness-2026-06-26.md` | Settlement-store head witness research and implementation | Closed SQ21 by adding settlement-store heads, required-head currentness checks, replayable head-witness decisions, and capability-kit head-witness gating. |
+| v75 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v75-durable-settlement-head-witness-store-2026-06-26.md` | Durable settlement-head witness store research and implementation | Closed SQ22 by adding a Postgres-backed settlement-head witness ledger, migration `0028`, and cross-agent shared-ledger regression proof. |
+| v76 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v76-settlement-head-witness-quorum-topology-2026-06-26.md` | Settlement-head witness quorum topology research and implementation | Closed SQ23 by adding settlement-head witness authority topology, quorum certificate evaluation, and capability-kit quorum gating before settled-root verification. |
+| v77 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v77-durable-settlement-head-witness-authority-store-2026-06-26.md` | Durable settlement-head witness authority store research and implementation | Closed SQ24 by adding durable head-witness authority-transition stores, migration `0029`, and store-backed quorum certification. |
+| v78 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v78-settlement-head-authority-epoch-seal-2026-06-26.md` | Settlement-head authority epoch seal research and implementation | Closed SQ25 by adding replayed authority-epoch seals, effective topology hashes, post-seal retroactive-transition refusal, and tamper-obstruction tests. |
+| v79 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v79-signature-bound-head-witness-identity-2026-06-26.md` | Signature-bound settlement-head witness identity research and implementation | Closed SQ26 by adding strict principal signatures for settlement-head observations and authority-epoch seals, admitted key replay, migration `0030`, and signature-obstruction tests. |
+| v80 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v80-durable-head-quorum-certificate-record-2026-06-26.md` | Durable settlement-head quorum-certificate record research and implementation | Closed SQ27 by adding durable signed quorum-certificate proof records, migration `0031`, and tampered evidence/seal replay tests. |
+| v81 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v81-settlement-head-witness-key-status-2026-06-26.md` | Settlement-head witness signature key-status research and implementation | Closed SQ28 by adding replayed key rotation/revocation, current-key replay checks, and revoked-key certification/record replay tests. |
+| v82 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v82-proof-preserving-replay-compaction-2026-06-26.md` | Proof-preserving replay compaction research and implementation | Closed SQ29 by adding replay compaction checkpoints for witness ledgers, authority/key histories, and quorum-certificate records. |
+| v83 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v83-compaction-checkpoint-admission-authority-2026-06-26.md` | Compaction checkpoint admission authority research and implementation | Closed SQ30 by adding witness-signed admission certificates required before compaction checkpoints can seed replay. |
+| v84 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v84-durable-checkpoint-admission-store-2026-06-26.md` | Durable checkpoint admission store research and implementation | Closed SQ31 by adding hash-linked checkpoint-admission record replay and in-memory/Postgres stores. |
+| v85 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v85-compaction-pruning-admission-2026-06-26.md` | Compaction pruning admission research and implementation | Closed SQ32 by adding durable-checkpoint plus suffix-continuity admission before pruning. |
+| v86 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v86-pruning-tombstone-store-api-2026-06-26.md` | Pruning tombstone store API research and implementation | Closed SQ33 by adding hash-linked pruning tombstones, tombstone-gated prune APIs, migration `0033`, and pruned-store continuity verification. |
+| v87 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v87-pruning-tombstone-head-currentness-2026-06-26.md` | Pruning tombstone head currentness research and implementation | Closed SQ34 by requiring pruned-store continuity to match an exact tombstone-store head. |
+| v88 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v88-durable-tombstone-head-witness-ledger-2026-06-26.md` | Durable tombstone-head witness ledger research and implementation | Closed SQ35 by making required tombstone heads recoverable from replayed witness history. |
+| v89 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v89-tombstone-head-witness-quorum-topology-2026-06-26.md` | Tombstone-head witness quorum topology research and implementation | Closed SQ36 by requiring replayed tombstone-head witness authority topology before head certification. |
+| v90 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v90-durable-tombstone-head-witness-authority-store-2026-06-26.md` | Durable tombstone-head witness authority store research and implementation | Closed SQ37 by making tombstone-head witness quorum topology recoverable from stored authority transitions. |
+| v91 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v91-tombstone-head-authority-epoch-seal-2026-06-26.md` | Tombstone-head authority epoch seal research and implementation | Closed SQ38 by sealing historical tombstone-head authority epochs against retroactive topology changes. |
+| v92 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v92-signature-bound-tombstone-head-witness-identity-2026-06-26.md` | Signature-bound tombstone-head witness identity research and implementation | Closed SQ39 by requiring strict principal/key signatures for tombstone-head observations and authority epoch seals. |
+| v93 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v93-durable-tombstone-head-quorum-certificate-record-2026-06-26.md` | Durable tombstone-head quorum-certificate record research and implementation | Closed SQ40 by making certified tombstone-head quorum proof recoverable from durable record history. |
 
 ## Top Findings
 
@@ -196,8 +292,274 @@ v61 update: The prompt's observation-report / action-proposal / JSON-artifact im
 73. **ArrowHedge now consumes terminal admission before verifier accounting.** v32 adds finance-domain helpers that convert proposal-review artifacts into canonical envelopes and run them through the core terminal index, so same-action accepted/blocked conflict is caught at the Axis A code boundary.
 74. **Workflow terminal admission is now a dependency-light port.** v33 lets `@pm/workflow` require admission for accepted/blocked invocation outcome envelopes before dispatch or dead-letter, while leaving canonical `@pm/agent-state` admission to adapters outside the workflow package.
 75. **Agency publication terminal admission now has a profile adapter.** v34 lets `@pm/profile-agency` convert authoritative publication fixture snapshots into canonical terminal envelopes, block revoked approvals or content-hash drift, and report same-action publish conflicts through the core terminal index.
+76. **Projection identity now has a replay certificate primitive.** v62 adds `ProjectionReplayCertificate`, so blocking action review can require hash-verified transition history and projection identity before a `CurrentStateView` authorizes action; durable store generation and runtime enforcement remain open.
+77. **Projection replay certificates now have a durable frontier source.** v63 adds a projection-owned replay frontier over `events.events.seq`, so certificates can be generated from consumed event rows instead of caller-supplied transition lists; runtime enforcement remains open.
+78. **Replay-certified projection state now gates a real mutation boundary.** v64 extends graph write authority so graph/capability writes can block missing, stale, mismatched, or store-divergent replay proof before mutation logic executes.
+79. **Replay refs now require durable full-certificate lookup.** v65 adds a substrate-owned projection replay certificate store so capability write-authority resolution can reject missing or mismatched certificate records before mutation logic executes.
+80. **Replay certificate stores now have append-only roots.** v66 adds certificate-store entry/root commitments and consistency proof verification so replay refs can be tied to a tamper-evident admission history.
+81. **Replay certificate-store roots now have a witness gate.** v67 adds root witness admission so forked, regressed, tenant-mismatched, unproved, or invalidly proved roots can obstruct workflow-derived graph write authority before capability mutation.
+82. **Root witness state now has a replayable ledger.** v68 adds hash-linked witness observation records and decision replay, so an amnesiac witness can recover accepted roots and reject tampered witness history instead of trusting process memory.
+83. **Witnessed roots are not settled roots.** v69 adds root-witness settlement over replayed witness ledgers, so one valid witness can be only `witnessed`, an explicit quorum can be `settled`, and valid same-sequence conflicts become `obstructed`.
+84. **Settlement witnesses now need replayed principal eligibility.** v70 adds witness-authority topology replay, so non-members, revoked/suspended principals, and equivocated witnesses cannot count toward topology-bound root settlement.
+85. **Topology and settlement must be stored before they can be operational authority.** v71 adds durable authority-transition and settlement-record stores, so an amnesiac agent can replay witness eligibility and settled roots rather than accepting synthetic topology or settlement objects.
+86. **Settled roots must be required at the mutation boundary.** v72 adds graph/capability settled-root write gating, so durable settlement cannot remain advisory when strict mutation policy is enabled.
+87. **Settled roots still need decision-time currentness.** v73 adds settlement-currentness policy, so historically valid settled-root refs can fail as stale, conflicted, obstructed, below a known frontier, or topology-superseded before capability mutation authority is returned.
+88. **Settlement currentness needs a witnessed store head.** v74 adds settlement-store head witnessing so a valid old settlement prefix cannot satisfy strict authority once a newer head has been witnessed.
+89. **Settlement-head witness state now survives fresh agents.** v75 adds a Postgres-backed settlement-head witness ledger, so independent agents can replay prior head observations and reject stale heads without trusting conversation memory.
+90. **Settlement-head observations need quorum topology.** v76 adds settlement-head witness authority topology and quorum certificates, so single, non-member, or equivocated observers cannot certify strict write authority.
+91. **Head-witness topology must come from stored authority history.** v77 adds durable settlement-head witness authority stores and a store-backed quorum certifier, so adapters cannot certify head authority from synthetic eligible-witness lists.
+92. **Certified head authority needs a sealed epoch.** v78 adds `seal_authority_epoch` transitions and effective topology hashes so later topology changes cannot rewrite an already certified settlement-head authority basis.
+93. **Settlement-head witness rows need admitted signatures.** v79 adds strict signature-bound witness identity so stored observations and authority-epoch seals cannot count as operational authority unless replay proves the signing principal, key, and payload are admitted.
+94. **Quorum certificates need their own proof records.** v80 adds durable settlement-head quorum-certificate records so signed witness evidence and epoch-seal linkage can be recovered without transient recertification.
+95. **Signature currentness is replayed authority state.** v81 adds settlement-head witness key status so revoked or rotated keys cannot authorize observations, seals, or certificate records merely because their signatures still verify.
+96. **Compaction is a replay object, not deletion.** v82 adds settlement-head witness replay compaction checkpoints so pruned prefixes can be replaced only by hash-checked frontiers plus derived replay projections.
+97. **Checkpoint hashes are not checkpoint authority.** v83 adds settlement-head replay compaction checkpoint admission certificates so hash-valid snapshots cannot seed replay unless current admitted witnesses sign the exact checkpoint hash under replayed authority topology.
+98. **Checkpoint admission must itself be durable replay history.** v84 stores checkpoint bodies and admission certificates together in a hash-linked record chain so fresh agents can recover checkpoint authority without process memory.
+99. **Pruning is an admitted transition, not a storage side effect.** v85 adds compaction pruning admission so prefix deletion requires durable checkpoint-admission history plus retained suffix replay continuity.
+100. **Physical deletion needs a tombstone transition.** v86 adds pruning tombstone records and tombstone-gated store prune APIs so row absence can be replayed as admitted substrate state rather than inferred from storage.
+101. **Tombstone replay validity is not tombstone currentness.** v87 adds tombstone-store head currentness so a locally valid but stale or forked tombstone history cannot authorize a pruned projection.
+102. **Required tombstone heads must survive amnesia.** v88 adds durable tombstone-head witness records so pruned-store continuity can derive its required head from replayed substrate history rather than memory or adapter input.
+103. **Tombstone currentness certification needs witness topology.** v89 adds tombstone-head witness authority topology and quorum certificates so one observer or an unauthorized observer cannot unilaterally certify the current pruning tombstone head.
+104. **Tombstone-head topology must come from stored authority history.** v90 adds durable tombstone-head witness authority stores and a store-backed certifier so adapter-supplied witness lists cannot define pruning tombstone currentness.
+105. **Certified tombstone-head authority needs a sealed epoch.** v91 adds tombstone-head authority epoch seals so later topology changes cannot retroactively rewrite the authority basis or certificate hash of a historical pruning tombstone-head certification.
+106. **Tombstone-head witness rows need admitted signatures.** v92 adds strict tombstone-head witness identity so observations and authority epoch seals cannot count as operational authority unless replay proves signer, payload, key, and tombstone-head authority topology.
+107. **Tombstone-head quorum certificates need durable proof identity.** v93 adds hash-chained tombstone-head QC records so accepted witness signatures and epoch seals survive amnesiac recovery as replayable proof objects.
 
 ## Source Changes
+
+### Added on 2026-06-26 v93
+
+- PBFT supplied the durable signed protocol/checkpoint evidence bridge: recovery depends on retained proof material, not replica memory.
+- HotStuff supplied the quorum-certificate bridge: later safety decisions build on explicit vote certificates.
+- CHAINIAC supplied the collectively signed transparency-log bridge: clients catch up by validating stored witness-approved updates.
+
+### Added on 2026-06-26 v92
+
+- in-toto supplied the authenticated-functionary bridge that operational statements should be signed by authorized actors and checked against expected parties and payloads.
+- PBFT supplied the authenticated-message bridge that recovery and certificate evidence only counts when attributable to protocol participants.
+- Tamper-evident logging reinforced that hash-linked history proves integrity but not authorship.
+- CONIKS supplied the key-transparency bridge that public-key bindings and signed views need auditable currentness rather than private lookup trust.
+
+### Added on 2026-06-26 v91
+
+- Viewstamped Replication supplied the view-change/recovery bridge that later configurations must preserve quorum-known historical operations.
+- Vertical Paxos supplied the configuration-activation bridge that reconfiguration authority needs an explicit boundary rather than local inference by later leaders.
+- Raft supplied the committed-log safety bridge that historical commitments are not reinterpreted by later leaders or membership changes.
+- Dynamic Byzantine quorum systems reinforced that topology changes are admissible only when quorum safety survives reconfiguration.
+
+### Added on 2026-06-26 v90
+
+- Raft supplied the replicated-log bridge that membership/topology changes belong in a log before they can drive state-machine decisions.
+- ARIES supplied the recovery bridge that durable transition records, not volatile process state, reconstruct current authority after restart.
+- Tamper-evident logging supplied the append-only hash-chain bridge for detecting hidden edits to authority history.
+- Dynamic Byzantine quorum systems supplied the bridge that quorum topology can change only through a correctness-preserving reconfiguration path.
+
+### Added on 2026-06-26 v89
+
+- Practical Byzantine Fault Tolerance supplied the bridge that currentness certificates need quorum evidence rather than one process' local state.
+- Byzantine quorum systems supplied the bridge that eligible witness sets and intersection assumptions are topology, not merely counts.
+- Certificate-log gossip supplied the bridge that head observations become useful only when compared across clients/monitors.
+- Collective signing supplied the bridge that a configured witness group can compact agreement into a public certificate.
+
+### Added on 2026-06-26 v88
+
+- Certificate-log gossip supplied the bridge that clients need shared observed heads to detect inconsistent log views.
+- CONIKS supplied the bridge that clients can monitor provider-maintained state and collectively audit non-equivocation.
+- Secure logging / Certificate Transparency supplied the monitor/auditor distinction for append-only log behavior across parties and time.
+- OPTIKS supplied the bridge that transparency systems should detect incorrect behavior despite restart and machine-failure pressure.
+- Tamper-evident logging supplied the bridge that witness observations themselves must be hash-linked replay history.
+
+### Added on 2026-06-26 v87
+
+- Tamper-evident incremental auditing supplied the bridge that local commitment validity is not enough; commitments need currentness/consistency checks.
+- CONIKS supplied the non-equivocation bridge for users checking provider-maintained state across observations.
+- Certificate-log gossip supplied the bridge that local views need shared-head comparison to detect split views.
+- Append-only authenticated dictionaries supplied the bridge that lookup validity and append-only currentness are separate proofs.
+- Secure logging / Certificate Transparency supplied the distinction between inclusion/audit proofs and append-only consistency proofs.
+
+### Added on 2026-06-26 v86
+
+- LSM-tree delete-node mechanics supplied the bridge that physical deletion should trail a replay-visible delete marker.
+- Timely persistent LSM deletion supplied the bridge that tombstones and compaction progress are distinct from actual deletion completion.
+- Tamper-evident safe deletion supplied the bridge that deletion needs proof that no inappropriate history was removed.
+- ARIES reinforced that recovery must depend on logged history rather than current storage absence.
+
+### Added on 2026-06-26 v85
+
+- Raft 2014 supplied the snapshot-suffix continuity bridge: snapshots preserve last included metadata so the first retained log entry can be checked.
+- PBFT 1999 supplied the low-watermark bridge: garbage collection is allowed below stable checkpoints, not because a local snapshot exists.
+- ARIES 1992 supplied the recovery-start bridge: truncation is safe only after determining the earliest log point recovery may need.
+- Instant-recovery checkpointing supplied the checkpoint-plus-log-replay bridge for treating checkpoints and retained logs as one recovery system.
+- Tamper-evident logging reinforced that pruning decisions need auditable artifacts rather than invisible deletion.
+
+### Added on 2026-06-26 v84
+
+- Crosby and Wallach 2009 supplied the tamper-evident logging bridge: inclusion and consistency both need proof against prior log states.
+- Append-only authenticated dictionaries supplied the lookup-plus-append-only bridge for checkpoint-admission histories.
+- CONIKS supplied the non-equivocation monitoring bridge: clients should compare provider-maintained bindings across time.
+- Secure logging / Certificate Transparency analysis supplied the distinction between audit proof and consistency proof.
+- PBFT 1999 reinforced that stable-checkpoint proof material must survive recovery and view changes.
+
+### Added on 2026-06-26 v83
+
+- PBFT 1999 supplied the stable-checkpoint certificate bridge: matching signed checkpoint statements, not local snapshot hashes, make a checkpoint stable.
+- Distler 2021 supplied the BFT-SMR recovery bridge: checkpoint certificates must let a recovering replica verify checkpoint contents from another source.
+- Zyzzyva 2007 supplied the signed-checkpoint recovery bridge for treating checkpoint evidence as independently attributable participant statements.
+- Eischer and Distler 2019 supplied the efficient-verifiable-checkpointing bridge: checkpoint optimization must preserve recovery verifiability.
+- Raft 2014 reinforced that snapshot installation is replicated-log recovery state, not private process memory.
+
+### Added on 2026-06-26 v82
+
+- Raft 2014 supplied the snapshot/log-compaction bridge: a discarded prefix must leave the last included frontier needed to continue the log.
+- PBFT 1999 supplied the stable-checkpoint bridge: old protocol messages can be garbage-collected only after a checkpoint proof fixes the sequence and state digest.
+- ARIES 1992 supplied the fuzzy-checkpoint bridge: recovery can start from a recorded recovery state instead of genesis without stopping ongoing work.
+- Authenticated data structures supplied the compact-verification bridge: clients can verify derived data from a digest rather than recomputing all history.
+- Append-only authenticated dictionaries supplied the compact transparency-log bridge for auditing state without downloading the full log.
+
+### Added on 2026-06-26 v81
+
+- AKI 2013 supplied the accountable key-status bridge: certificate/key validation needs logged issuance and revocation state, not only local key parsing.
+- ARPKI 2014 supplied the multi-authority logged-key bridge for treating key status as a protocol property.
+- CONIKS 2015 supplied the auditable key-directory bridge: binding currentness must be monitored and consistent across clients.
+- CRLite 2017 supplied the decision-time revocation bridge: stale credentials remain dangerous unless revocation status is cheap and available during validation.
+
+### Added on 2026-06-26 v80
+
+- HotStuff 2019 supplied the quorum-certificate-as-proof-object bridge: later safety decisions consume a certificate rather than re-inferring votes from local state.
+- PBFT 1999 supplied the recovery/view-change proof bridge: authenticated log/proof material must survive enough to justify prior decisions after disruption.
+- CHAINIAC 2017 supplied the collectively signed transparency-log bridge: out-of-date clients can validate a signed release from durable proof history.
+- SBFT 2019 supplied the collector/full-proof bridge: threshold witness shares become compact commit/execute proof objects that clients can verify.
+
+### Added on 2026-06-26 v79
+
+- in-toto 2019 supplied the authenticated-functionary bridge: operational steps should be recorded as signed statements by authorized actors, not trusted artifact fields.
+- PBFT 1999 supplied the authenticated-message bridge: quorum evidence only counts when attributable to protocol participants.
+- Crosby and Wallach 2009 supplied the tamper-evident-log boundary: hash-linked history detects mutation but still needs authenticated entry authorship.
+- CONIKS 2015 supplied the signed-directory-view bridge: accountable current views need signed, monitorable bindings rather than bare values.
+
+### Added on 2026-06-26 v78
+
+- Lamport/Malkhi/Zhou 2010 supplied the state-machine reconfiguration bridge: outputs are irrevocable and configuration changes take effect at defined command positions.
+- Vertical Paxos 2009 supplied the configuration-master bridge: reconfiguration choices are fixed for later leaders rather than inferred from local state.
+- Virtual synchrony 1987 supplied the membership-view boundary bridge: old-view requests and new-view requests are separated by installed membership changes.
+- HotStuff 2019 supplied the quorum-certificate finality bridge: proof objects guide safe later decisions rather than recomputing from private votes.
+
+### Added on 2026-06-26 v77
+
+- Raft 2014 supplied the configuration-as-log-entry bridge: membership/current configuration claims must be reconstructed from committed log history.
+- ARIES 1992 supplied the recovery-authority bridge: post-restart state is rebuilt by replaying logged history rather than trusting volatile process state.
+- Crosby and Wallach 2009 supplied the append-only tamper-evidence bridge: a stored log needs hash/proof structure so inconsistent history becomes detectable.
+
+### Added on 2026-06-26 v76
+
+- PBFT 1999 supplied the quorum-commitment bridge: one replica vote is not enough to commit fault-tolerant state.
+- HotStuff 2019 supplied the quorum-certificate bridge: enough votes form a proof object that later safety decisions can consume.
+- CHAINIAC 2017 supplied the independent-witness bridge: accepted updates require public, collective witness validation.
+- ByzCoin 2016 supplied the collective-signing bridge: distributed votes can become one compact commitment artifact.
+
+### Added on 2026-06-26 v75
+
+- Chuat et al. 2015 supplied the certificate-transparency gossip bridge: independent clients compare compact log-head consistency evidence to detect split views.
+- Attested Append-Only Memory 2007 supplied the minimal append-only accountability bridge: prior statements must constrain later accepted state.
+- CHAINIAC 2017 supplied the collectively witnessed history bridge: transparent, verifiable append histories are preconditions for distributed update authority.
+- Accountable Virtual Machines 2010 supplied the replay/audit bridge: enough durable log data lets a later auditor verify execution without trusting the original process.
+
+### Added on 2026-06-26 v74
+
+- SUNDR 2004 supplied the fork-consistency bridge: untrusted servers can be forced to expose divergent histories once clients compare observations.
+- CONIKS 2015 supplied the user-monitorable transparency bridge: clients can efficiently monitor consistency of provider-maintained bindings.
+- Crosby and Wallach 2009 supplied the log-head consistency bridge: a logger must prove the current view is consistent with prior views.
+- Perspectives 2008 supplied the notary bridge: independent observations can detect server views a single client would accept.
+- AKI 2013 reinforced accountable log heads, revocation, and checks-and-balances as authority-currentness machinery.
+
+### Added on 2026-06-26 v73
+
+- Gray and Cheriton 1989 supplied the lease/currentness bridge: cached authority must be revalidated after its term or conflicting writes.
+- CRLite 2017 supplied the revocation-status bridge: historical certificates require current status checks and fail-closed behavior.
+- AKI 2013 supplied the accountable key-update bridge: public logs, revocation, and hold periods prevent stale keys from remaining current authority.
+- ARPKI 2014 supplied the transparent certificate-operation bridge: issuance, update, revocation, and validation are accountable log operations.
+- Spanner 2012 supplied the external-consistency bridge: current authority is tied to system-defined order/frontier, not client memory.
+
+### Added on 2026-06-26 v72
+
+- Appel and Felten 1999 supplied the proof-carrying authorization bridge: write authority should carry a checkable proof object.
+- PCAL / proof-carrying authorization work supplied the automated access-check bridge for policy proof obligations.
+- Ligatti, Bauer, and Walker 2005 supplied the runtime enforcement bridge for suppressing policy-violating actions before mutation.
+- Clark-Wilson 1987 supplied the well-formed-transaction integrity bridge for constrained graph/capability writes.
+- Schneider 2000 supplied the execution-monitor safety bridge for preventing bad action prefixes.
+
+### Added on 2026-06-26 v71
+
+- Crosby and Wallach 2009 supplied the tamper-evident append-only log bridge for durable authority and settlement records.
+- Mohan et al. 1992 ARIES supplied the recovery-from-log bridge for reconstructing topology and settled roots after amnesia/restart.
+- Raft 2014 reinforced that configuration is logged state-machine history, not runtime caller configuration.
+- CONIKS 2015 and append-only authenticated dictionary work supplied the transparency bridge for monitorable principal eligibility and settlement lookup.
+
+### Added on 2026-06-26 v70
+
+- Raft 2014 supplied the logged membership-change bridge: membership is state-machine history, not caller configuration.
+- Vertical Paxos 2009 supplied the configuration-authority bridge for separating data replication from membership decisions.
+- RAMBO II supplied the dynamic-configuration bridge for long-lived systems whose quorum participants change.
+- CONIKS and AKI supplied the key/principal transparency bridge for revocation, non-equivocation, and accountable eligibility.
+
+### Added on 2026-06-26 v69
+
+- PBFT 1999 and HotStuff 2019 supplied the quorum/finality bridge that settlement should be a replayed certificate over eligible witnesses rather than a local latest-root choice.
+- CHAINIAC 2017 and ByzCoin 2016 sharpened the difference between a witnessed timeline and a collectively accepted commitment.
+- CoSi 2016 remains the witness-statement bridge; v69 adds the policy boundary that says how many replayed witnesses are enough for settlement.
+
+### Added on 2026-06-26 v68
+
+- Syta et al. 2016 CoSi witness cosigning: supplied the mechanism that authoritative statements should be witnessed before clients accept them.
+- CHAINIAC 2017: supplied the collectively signed timeline bridge for clients that are out of date but need to verify a release/history.
+- ByzCoin 2016: supplied the strong-consistency collective-signing bridge that separates durable commitment from probabilistic memory.
+- Crosby and Wallach 2009: supplied the hash-linked tamper-evident log mechanics for witness observation records.
+
+### Added on 2026-06-26 v67
+
+- SUNDR / fork consistency: supplied the detection bridge for making divergent replay-store histories obstruct once clients observe one another.
+- Chuat et al. 2015 Certificate Transparency gossip: supplied the root-exchange and consistency-proof mechanism for detecting split views.
+- CONIKS: reinforced self-monitoring of provider-maintained bindings rather than trusting a current lookup response.
+- Oxford, Parker, and Ryan 2020: sharpened the claim that gossip/witnessing must be an explicit protocol property, not an assumed side effect of having roots.
+
+### Added on 2026-06-26 v66
+
+- Crosby and Wallach 2009, "Efficient Data Structures for Tamper-Evident Logging": supplied the root/consistency-proof semantics for certificate-store commitments.
+- Li, Krohn, Mazières, and Shasha 2004, "SUNDR": supplied the fork-consistency bridge for detecting divergent store histories when agents compare roots.
+- Melara et al. 2015, "CONIKS": reinforced that users/agents must monitor provider-maintained bindings for consistency.
+- Certificate Transparency / RFC 6962: supplied the append-only consistency-proof shape, adapted here as a linear hash-chain proof rather than a Merkle proof.
+
+### Added on 2026-06-26 v65
+
+- Crosby and Wallach 2009, "Efficient Data Structures for Tamper-Evident Logging": supplied membership/consistency-proof semantics for why certificate-store lookup is the next step after structural refs.
+- Melara et al. 2015, "CONIKS": supplied the transparency-service bridge for making provider-maintained bindings monitorable rather than privately believed.
+- Tomescu et al. 2019, "Transparency Logs via Append-Only Authenticated Dictionaries": sharpened the next missing primitive as append-only lookup and consistency proof for certificate records.
+- Kim et al. 2013, "Accountable Key Infrastructure": supplied the accountable certificate-validation bridge for replay-certificate issuance.
+- No axis source was added; the implementation strengthens substrate replay authority before domain validation pressure.
+
+### Added on 2026-06-26 v64
+
+- Ligatti, Bauer, and Walker 2005, "Edit automata": supplied the runtime suppression/monitoring bridge for blocking unsafe writes before they enter the action stream.
+- Reference monitor literature: supplied the complete-mediation bridge for making graph write authority the small mutation gate.
+- Clark and Wilson 1987: strengthened the well-formed-transaction interpretation of capability graph writes.
+- Capobianco et al. 2024, "TALISMAN": sharpened why replay refs must be preserved in substrate records rather than trusted only as request input.
+- No axis source was added; the implementation strengthens substrate mutation admission before validation pressure.
+
+### Added on 2026-06-26 v63
+
+- Mohan et al. 1992, "ARIES: A Transaction Recovery Method...": reused the log-sequence/page-state mechanism to justify sequence-backed projection cursors.
+- Zhou, Larson, Goldstein, and Ding 2007, "Lazy Maintenance of Materialized Views": added the persistent maintenance-task / commit-sequence bridge for deferred projection proof.
+- Colby, Griffin, Libkin, Mumick, and Trickey 1996, "Algorithms for Deferred View Maintenance": added the auxiliary-history-since-refresh bridge for projection frontier certification.
+- No axis source was added; the implementation strengthened substrate replay identity before returning to validation pressure.
+
+### Added on 2026-06-26 v62
+
+- Schneider 1990, "Implementing Fault-Tolerant Services Using the State Machine Approach": extracted the deterministic ordered-transition reconstruction rule for projection identity.
+- Mohan et al. 1992, "ARIES: A Transaction Recovery Method...": strengthened the recovery-from-log bridge for amnesiac agent resume.
+- Chandy and Lamport 1985, "Distributed Snapshots": added the consistent-cut/frontier bridge for current projection claims.
+- Buneman, Khanna, and Tan 2001, "Why and Where: A Characterization of Data Provenance": sharpened why source refs need computable derivation proof.
+- Green, Karvounarakis, and Tannen 2007, "Provenance Semirings": strengthened the projection-derivation hash requirement.
+- No new axis source was used for the implementation slice; systems research drove the substrate primitive first, and axes remain later wind tunnels.
 
 ### Added on 2026-06-26 v61
 
@@ -663,6 +1025,18 @@ v61 update: The prompt's observation-report / action-proposal / JSON-artifact im
 24. Make dashboard metrics query-traceable and lifecycle-aware: stale blocks should be a gate-failure cause, not a separate double-counted KPI.
 25. Answer RQ42 by extending provider-certificate status-ref binding to non-workflow graph/capability write boundaries so direct writes cannot bypass workflow action-outcome currentness proof.
 26. Answer RQ72 by implementing `representation_loss` as projection-admission failure: define ArrowHedge invariant fields, produce an obstruction or representation-loss issue when a role/local projection drops them, and add paired baseline/substrate packets to the Axis A source-bundle path.
+27. Adopt the SQ15 ledger-backed root witness in real write paths so witnessed roots and obstructions survive amnesiac resume, process restart, and independent monitor comparison.
+28. Adopt the SQ16 root-witness settlement primitive at real write gates so merely witnessed roots cannot satisfy strict settled-root policies.
+29. Adopt the SQ17 witness-authority topology primitive at real write gates so raw witness ids cannot satisfy strict settlement policies.
+30. Adopt the SQ18 durable authority-transition and settlement-certificate stores in strict runtime paths so synthetic topology or settlement objects cannot satisfy settlement policy.
+31. Adopt the SQ19 settled-root write gate in real Axis A/C runner paths so durable settlement proof is required before graph/capability mutation.
+32. Adopt SQ35 tombstone-head witness ledgers in runtime recovery paths so pruned-store continuity never gets `requiredTombstoneStoreHead` from memory or adapters.
+33. Adopt SQ36 tombstone-head witness quorum topology in runtime recovery paths so one observer cannot unilaterally certify tombstone currentness.
+34. Adopt SQ37 tombstone-head witness authority-transition stores in runtime recovery paths so quorum topology is recovered from durable substrate history.
+35. Adopt SQ38 tombstone-head authority epoch seals in runtime recovery paths so later topology transitions cannot retroactively change historical tombstone-head certifications.
+36. Adopt SQ39 signature-bound tombstone-head witness identity in runtime recovery paths so unsigned or wrong-key tombstone-head observations and seals cannot authorize pruning currentness.
+37. Adopt SQ40 durable tombstone-head quorum-certificate records in runtime recovery paths so accepted witness signatures and authority epoch seals are recovered as proof objects rather than transient recertification results.
+38. Answer SQ41 by adding tombstone-head witness key-status and rotation semantics so durable certificate-record replay cannot accept revoked or superseded keys.
 
 ## Metrics Queue
 
@@ -865,3 +1239,5 @@ v61 update: The prompt's observation-report / action-proposal / JSON-artifact im
 15. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage, status checks, target receipt evidence, and terminal outcome partition tests.
 16. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
 17. Add the `representation_loss` packet family before the other RQ71 gaps: lossy risk/signal/decision projections should block with source-linked projection-fidelity evidence, while clean-current projections remain accepted.
+18. Adopt the durable root-witness ledger in runtime paths and add quorum rules so certificate-store root observations and obstructions are replayable across process restarts, agents, and independent monitors.
+19. Add witness quorum/finality semantics so a replay-certified root can be provisional, witnessed, settled, or obstructed rather than only accepted by one ledger.

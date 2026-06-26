@@ -223,18 +223,25 @@ describeIfDb("Projection-lag under demo-scale load (G5.6)", () => {
     await publishBatch(tenantId, 50, ["task.created", "task.updated"]);
     await runner.catchUp(tenantId, proj.name);
 
-    // Read the cursor directly. last_recorded_at should be >= the recordedAt
-    // of every event in events.events for this tenant. If the runner
-    // returned with events unconsumed, this assertion fails.
-    const cur = await pool.query<{ last_recorded_at: string | null }>(
-      `SELECT last_recorded_at::text
+    // Read the cursor directly. last_event_seq should be at or beyond every
+    // consumed event in events.events for this tenant. If the runner returned
+    // with events unconsumed, this assertion fails against the admitted log
+    // order instead of timestamp display order.
+    const cur = await pool.query<{
+      last_event_seq: string | null;
+      last_recorded_at: string | null;
+    }>(
+      `SELECT last_event_seq::text,
+              last_recorded_at::text
          FROM projections.cursors
         WHERE tenant_id = $1
           AND projection_name = $2
           AND projection_version = $3`,
       [tenantId, proj.name, proj.version],
     );
+    const sequenceWatermark = cur.rows[0]?.last_event_seq;
     const watermark = cur.rows[0]?.last_recorded_at;
+    expect(sequenceWatermark).toBeTruthy();
     expect(watermark).toBeTruthy();
 
     const remaining = await pool.query<{ c: string }>(
@@ -242,8 +249,8 @@ describeIfDb("Projection-lag under demo-scale load (G5.6)", () => {
          FROM events.events
         WHERE tenant_id = $1
           AND type LIKE 'task.%'
-          AND recorded_at > $2::timestamptz`,
-      [tenantId, watermark],
+          AND seq > $2::bigint`,
+      [tenantId, sequenceWatermark],
     );
     expect(Number(remaining.rows[0]!.c)).toBe(0);
 

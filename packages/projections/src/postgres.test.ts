@@ -111,6 +111,67 @@ describeIfDb("PostgresProjectionRunner", () => {
     });
   });
 
+  it("exposes a sequence-backed replay frontier for the materialized state", async () => {
+    const tenantId = await makeTenant();
+    const p = counterProjection(`counter_${randomUUID().slice(0, 6)}`, 1);
+    await runner.register(p);
+
+    const ignored = await events.publish({
+      tenantId,
+      type: "note.created",
+      entityId: "ent_note",
+      emittedBy: "cap.test",
+      payloadSchema: "note.created/v1",
+      payload: {},
+    });
+    const first = await events.publish({
+      tenantId,
+      type: "task.created",
+      entityId: "ent_frontier_1",
+      emittedBy: "cap.test",
+      payloadSchema: "task.created/v1",
+      payload: {},
+    });
+    const second = await events.publish({
+      tenantId,
+      type: "task.completed",
+      entityId: "ent_frontier_1",
+      emittedBy: "cap.test",
+      payloadSchema: "task.completed/v1",
+      payload: {},
+    });
+
+    await runner.catchUp(tenantId, p.name);
+    const frontier = await runner.getReplayFrontier(tenantId, p.name);
+
+    expect(frontier).toMatchObject({
+      tenantId,
+      projectionName: p.name,
+      projectionVersion: p.version,
+      replayedToEventId: second.id,
+      consumedEventCount: 2,
+    });
+    expect(frontier?.replayedToPosition).toBeGreaterThan(0);
+    expect(frontier?.transitionEvents.map((event) => event.eventId)).toEqual([
+      first.id,
+      second.id,
+    ]);
+    expect(frontier?.transitionEvents.map((event) => event.contentHash)).toEqual([
+      first.contentHash,
+      second.contentHash,
+    ]);
+    expect(frontier?.transitionEvents.map((event) => event.sequence)).toEqual(
+      [...(frontier?.transitionEvents ?? []).map((event) => event.sequence)].sort(
+        (a, b) => a - b,
+      ),
+    );
+    expect(frontier?.transitionEvents).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventId: ignored.id }),
+      ]),
+    );
+  });
+
   it("catchUp is idempotent: re-running with no new events is a no-op", async () => {
     const tenantId = await makeTenant();
     const p = counterProjection(`counter_${randomUUID().slice(0, 6)}`, 1);
