@@ -49,6 +49,8 @@ v59 update: `@pm/continuity` now exposes a reusable checkpoint-chain verifier, `
 
 v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source_authority_conflict` instead of generic `state_disagreement`, exports a source-authority packet fixture family, and maps it through Axis A terminal packet scenarios. Store-backed paired Axis A proof now covers six failure families, while `representation_loss`, `workflow_invalidation`, `capability_contract_violation`, `parallel_write_conflict`, and Axis B remain open.
 
+v61 update: The prompt's observation-report / action-proposal / JSON-artifact implementation frontier is corrected as already closed on the current branch. RQ71 is narrowed into an implementation sequence: build `representation_loss` next as a projection-admission packet family using invariant-field preservation and local-view obstruction semantics, then continue to `workflow_invalidation`, `capability_contract_violation`, and `parallel_write_conflict`. Recent LLM framing and human-AI mental-model work downgraded summary/shared-context stability as state proof, while abstract interpretation and handoff literature sharpened the falsification test for lossy projections.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -115,6 +117,7 @@ v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source
 | v58 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md` | ArrowHedge packet-store source bundle | Answered RQ59, added RQ60, and moved paired temporal packet recovery through `PostgresEvalEventStore` plus a reusable strict Axis A source-bundle helper. |
 | v59 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md` | Axis A continuity packet families | Answered RQ60, added RQ61-RQ70, extracted reusable continuity-chain verification, and added paired packet-backed `memory_drift` / `continuity_break` Axis A families. |
 | v60 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v60-axis-a-source-authority-packet-family-2026-06-26.md` | Axis A source-authority packet family | Answered RQ61, added RQ71, tightened ArrowHedge source-authority conflict classification, and added a paired packet-backed `source_authority_conflict` Axis A family. |
+| v61 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v61-representation-loss-packet-gate-2026-06-26.md` | Representation-loss packet gate research | Corrected the stale implementation frontier, answered RQ71 as a sequencing decision, and selected `representation_loss` as the next Axis A packet family using projection-fidelity checks. |
 
 ## Top Findings
 
@@ -195,6 +198,16 @@ v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source
 75. **Agency publication terminal admission now has a profile adapter.** v34 lets `@pm/profile-agency` convert authoritative publication fixture snapshots into canonical terminal envelopes, block revoked approvals or content-hash drift, and report same-action publish conflicts through the core terminal index.
 
 ## Source Changes
+
+### Added on 2026-06-26 v61
+
+- Han et al. 2026-06-23, "Measuring User's Mental Models of Speech Translation in Human-AI Collaboration": useful PM/human-AI mental-model evidence, but not operational-state authority.
+- Bedoui et al. 2026-06-25, "Auditing Framing-Sensitive Behavioral Instability in Large Language Models for Mental Health Interactions": downgraded prompt framing and summary stability as state proof.
+- Liu et al. 2026-06-18, "Agentic Electronic Design Automation: A Handoff Perspective": strengthened the handoff-as-acceptance-condition bridge for later `workflow_invalidation` work.
+- Mylonas et al. 2026-06-17, "PowerAgentBench-SS": strengthened capability-contract and evidence-log testing implications.
+- Wang et al. 2026-06-16 revision, "From Agent Traces to Trust": reinforced typed provenance/evidence tracing for replayable agent-state artifacts.
+- Cousot and Cousot 1977 plus Campion et al. 2023: added the abstract-interpretation / incompleteness bridge for treating `representation_loss` as projection-fidelity failure.
+- AHRQ TeamSTEPPS handoff guidance: added daily PM evidence that handoffs transfer authority/responsibility and require uncertainty, changes, contingencies, and receiver acknowledgement.
 
 ### Added on 2026-06-05
 
@@ -509,6 +522,7 @@ v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source
 
 ## Corrected Claims
 
+- v61 corrects the automation prompt's next-code frontier: executable observation reports, typed proposal reviews, replayable JSON/JSONL state-review artifacts, ArrowHedge fixture families, assertion metrics, mutation-claim boundaries, and DB/fixture equivalence helpers already exist on the current branch. The next code slice is not to rebuild them; it is to add a packet-backed `representation_loss` Axis A family.
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
 - `StateReviewArtifact` is no longer future work: pure construction, ArrowHedge generation, related objects, PROV-style links, trace context, canonical hash verification, tamper detection, and artifact metrics exist.
 - Persisted/golden JSON artifacts remain open: current tests build artifacts in memory, and no stable artifact export/import path was found.
@@ -547,6 +561,7 @@ v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source
 
 ## Downgraded Claims
 
+- v61 downgrades fluent summaries, shared context, and user/team mental-model calibration as state proof. They can improve coordination or diagnosis, but they do not prove that invariant source fields survived projection into `CurrentStateView`, `StateReviewArtifact`, and `ActionOutcomeEnvelope`.
 - RAG-only state claims are downgraded: retrieval helps access but does not supply authority, invalidation, workflow validity, or mutation safety.
 - Continuous memory consolidation is rejected as a safe default until gated by raw evidence and regression tests.
 - Synthetic eval pass claims are downgraded to scaffold/provisional until outcomes are derived from executable assertions or observed behavior.
@@ -647,6 +662,7 @@ v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source
 23. Use `analyzeThreeAxisCoverage()` as the current matrix gate: fill Axis A missing classes and terminal proof refs, keep Axis B blocked until PluggedInSocial or accepted fixtures exist, and do not treat Axis C completeness as full verification.
 24. Make dashboard metrics query-traceable and lifecycle-aware: stale blocks should be a gate-failure cause, not a separate double-counted KPI.
 25. Answer RQ42 by extending provider-certificate status-ref binding to non-workflow graph/capability write boundaries so direct writes cannot bypass workflow action-outcome currentness proof.
+26. Answer RQ72 by implementing `representation_loss` as projection-admission failure: define ArrowHedge invariant fields, produce an obstruction or representation-loss issue when a role/local projection drops them, and add paired baseline/substrate packets to the Axis A source-bundle path.
 
 ## Metrics Queue
 
@@ -848,3 +864,4 @@ v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source
 14. Run PM handoff agreement and protocol-burden metrics on real multi-agent ArrowHedge or automation runs.
 15. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage, status checks, target receipt evidence, and terminal outcome partition tests.
 16. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
+17. Add the `representation_loss` packet family before the other RQ71 gaps: lossy risk/signal/decision projections should block with source-linked projection-fidelity evidence, while clean-current projections remain accepted.

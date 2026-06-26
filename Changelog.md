@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-26 - Representation-loss packet gate research
+
+- Added `research/daily-arrowsmith-agent-state/v61-representation-loss-packet-gate-2026-06-26.md`, answering RQ71 as an implementation sequence rather than another proof-harness change.
+- Corrected the automation prompt's stale implementation frontier: executable observation reports, typed proposal reviews, replayable JSON/JSONL artifacts, fixture coverage, assertion metrics, and DB/fixture equivalence are already present on the current branch.
+- Selected `representation_loss` as the next Axis A packet-backed family, using projection-fidelity and invariant-field preservation before continuing to `workflow_invalidation`, `capability_contract_violation`, and `parallel_write_conflict`.
+- Updated the daily Arrowsmith index and top-level research ledger with new sources, corrected claims, downgraded summary/shared-context claims, C109, and L071.
+- Claim boundary: research-only update; no code changed and Axis A remains packet-backed for six families until the representation-loss fixture/scenario pair is implemented.
+
 ## 2026-06-26 - Axis A source-authority packet family
 
 - Added `research/daily-arrowsmith-agent-state/v60-axis-a-source-authority-packet-family-2026-06-26.md`, answering RQ61 and replacing it with RQ71.
