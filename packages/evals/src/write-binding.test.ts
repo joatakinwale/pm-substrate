@@ -269,7 +269,7 @@ describe("write-binding replay corpus", () => {
         sourceId: "axis-a-arrowhedge-write-binding-replay",
         axis: "finance",
         eventCount: 14,
-        obligationCount: 2,
+        obligationCount: 1,
         recoveryStatus: "provided",
         recoveryCount: 2,
         validRecoveries: 2,

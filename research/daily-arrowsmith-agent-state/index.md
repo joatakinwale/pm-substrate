@@ -39,6 +39,8 @@ v54 update: `@pm/capability-finance-research-ingest` now exposes a domain-owned 
 
 v55 update: `@pm/evals` now accepts opt-in ArrowHedge scenario specs, and exports canonical temporal packet scenarios for mapping real finance-domain packets into Axis A EvalEvents. The finance adapter test builds the real canonical packet corpus, maps three blocked temporal packets into Axis A, and proves those cells become covered but not verified because baseline terminal proof and authority recoveries are still missing.
 
+v56 update: `@pm/evals` now distinguishes failed baseline terminal observations from substrate authority recovery obligations. A baseline failed comparator event can remain replay evidence without requiring `accepted_authority_recovered`, while substrate accepted/protective outcomes still need the expected store-derived recovery before strict proof can pass. The next proof is persisted baseline-side terminal observation packets plus substrate-side recovery suites for mapped ArrowHedge finance families.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -100,6 +102,7 @@ v55 update: `@pm/evals` now accepts opt-in ArrowHedge scenario specs, and export
 | v53 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md` | ArrowHedge finance source bundle | Answered RQ54, added RQ55, and made the current ArrowHedge write-binding replay corpus available as a strict finance proof source bundle. |
 | v54 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v54-arrowhedge-terminal-packet-corpus-2026-06-25.md` | ArrowHedge terminal packet corpus | Answered RQ55, added RQ56, and made the finance adapter produce hash/index-validated terminal packets from canonical state-review inputs without adding finance logic to substrate packages. |
 | v55 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v55-arrowhedge-packet-eval-mapping-2026-06-25.md` | ArrowHedge packet eval mapping | Answered RQ56, added RQ57, and mapped real finance-domain temporal packets into Axis A EvalEvents while keeping cells unverified until paired terminal proof/recovery exists. |
+| v56 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v56-axis-a-baseline-recovery-obligations-2026-06-25.md` | Axis A baseline recovery obligations | Answered RQ57 for strict proof semantics, added RQ58, and made baseline failed terminal observations replay evidence rather than accepted authority-recovery obligations. |
 
 ## Top Findings
 

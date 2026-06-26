@@ -201,7 +201,7 @@ describe("three-axis proof packet", () => {
     expect(missingRecoveryPacket.authorityRecoveryGate).toMatchObject({
       required: true,
       passed: false,
-      obligationCount: 60,
+      obligationCount: 30,
       validObligations: 0,
     });
     expect(
@@ -224,10 +224,44 @@ describe("three-axis proof packet", () => {
     expect(recoveredPacket.authorityRecoveryGate).toMatchObject({
       required: true,
       passed: true,
-      obligationCount: 60,
-      validObligations: 60,
+      obligationCount: 30,
+      validObligations: 30,
       invalidObligations: [],
     });
+  });
+
+  it("treats baseline failure terminal packets as observations, not recovered authority writes", () => {
+    const events = pairedEvents({
+      axis: "finance",
+      failureClass: "stale_observation",
+      scenarioId: "finance-baseline-failure-observation",
+      substrateResult: "pass",
+      evidenceStage: "paired_behavioral_improvement",
+    });
+
+    const packet = buildThreeAxisProofPacket({
+      packetId: "three_axis_proof_baseline_failure_not_authority",
+      generatedAt: observedAt,
+      events,
+      sources: [
+        {
+          sourceId: "axis-a-baseline-observation",
+          axis: "finance",
+          eventCount: events.length,
+        },
+      ],
+      authorityRecoveries: [authorityRecoveryForEvent(events[1]!)],
+      requireAuthorityRecovery: true,
+    });
+
+    expect(packet.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: true,
+      obligationCount: 1,
+      validObligations: 1,
+      invalidObligations: [],
+    });
+    expect(packet.report.byCell.finance.stale_observation.verified).toBe(true);
   });
 
   it("does not let blocked terminal outcomes masquerade as accepted authority", () => {
@@ -258,8 +292,8 @@ describe("three-axis proof packet", () => {
     expect(packet.authorityRecoveryGate).toMatchObject({
       required: true,
       passed: false,
-      obligationCount: 2,
-      validObligations: 1,
+      obligationCount: 1,
+      validObligations: 0,
     });
     expect(packet.authorityRecoveryGate.invalidObligations).toEqual([
       expect.objectContaining({
@@ -316,8 +350,8 @@ describe("three-axis proof packet", () => {
     expect(packet.authorityRecoveryGate).toMatchObject({
       required: true,
       passed: true,
-      obligationCount: recoveries.length,
-      validObligations: recoveries.length,
+      obligationCount: 30,
+      validObligations: 30,
       invalidObligations: [],
     });
   });
@@ -368,7 +402,7 @@ describe("three-axis proof packet", () => {
         axis: "finance",
         recoveryStatus: "provided",
         eventCount: 20,
-        obligationCount: 20,
+        obligationCount: 10,
         recoveryCount: 20,
         invalidRecoveries: 0,
       }),
@@ -377,7 +411,7 @@ describe("three-axis proof packet", () => {
         axis: "marketing",
         recoveryStatus: "provided",
         eventCount: 20,
-        obligationCount: 20,
+        obligationCount: 10,
         recoveryCount: 20,
         invalidRecoveries: 0,
       }),
@@ -386,7 +420,7 @@ describe("three-axis proof packet", () => {
         axis: "local_lab",
         recoveryStatus: "provided",
         eventCount: 20,
-        obligationCount: 20,
+        obligationCount: 10,
         recoveryCount: 20,
         invalidRecoveries: 0,
       }),
@@ -425,7 +459,7 @@ describe("three-axis proof packet", () => {
         sourceId: "axis-c-local-lab-no-db",
         axis: "local_lab",
         eventCount: 20,
-        obligationCount: 20,
+        obligationCount: 10,
         recoveryStatus: "missing_required",
       },
     ]);

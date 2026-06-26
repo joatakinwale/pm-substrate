@@ -309,6 +309,7 @@ function authorityRecoveryObligations(
     }
     const scenarioResult = event.scenarioResult ?? event.result;
     if (scenarioResult === "blocked") return [];
+    if (event.runArm === "baseline" && scenarioResult === "fail") return [];
 
     return [
       {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-06-25 - Axis A baseline recovery obligations
+
+- Added `research/daily-arrowsmith-agent-state/v56-axis-a-baseline-recovery-obligations-2026-06-25.md`, answering RQ57 for strict proof semantics and replacing it with RQ58: persisted baseline terminal observation packets plus substrate recovery suites for mapped finance families.
+- Updated strict proof-packet authority obligations so failed baseline terminal observations do not require `accepted_authority_recovered`.
+- Added a finance regression test proving a baseline failed terminal observation can remain comparator evidence while the substrate arm supplies the required recovery.
+- Updated proof-packet/source-recovery expectations so paired recovery suites may audit extra baseline observations without inflating strict authority obligations.
+- Claim boundary: Axis A proof semantics improved, but finance still lacks persisted baseline-side terminal observation packets, store-derived recovery suites for mapped families, and real `memory_drift` / `continuity_break` packet-backed scenarios; Axis B remains blocked.
+
 ## 2026-06-25 - ArrowHedge packet eval mapping
 
 - Added `research/daily-arrowsmith-agent-state/v55-arrowhedge-packet-eval-mapping-2026-06-25.md`, answering RQ56 and replacing it with RQ57: baseline-side terminal failure packets and store-derived recoveries for mapped finance scenario families.
