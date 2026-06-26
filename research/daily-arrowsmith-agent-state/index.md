@@ -35,6 +35,8 @@ v52 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacketAssembly()`,
 
 v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundle()`, which builds a finance source bundle from the committed ArrowHedge write-binding replay corpus and can consume strict authority recoveries from replay packets. The terminal-outcome partition cell is now recovery-backed, while finance remains incomplete for failure classes that still lack packet-backed pairs.
 
+v54 update: `@pm/capability-finance-research-ingest` now exposes a domain-owned ArrowHedge terminal packet corpus over the canonical state-review inputs. It emits one accepted clean/current packet with provider-status authority metadata and three blocked temporal packets, validates packet hashes, and runs the core terminal index. The default ArrowHedge action-id derivation now distinguishes `refreshId`, `feedbackId`, and missing-observation refreshes so adjacent finance actions do not collapse into one terminal action id. The next proof is mapping these domain packets into Axis A EvalEvents/source bundles with store-derived recoveries.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -94,6 +96,7 @@ v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundl
 | v51 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v51-strict-runner-proof-packet-consumption-2026-06-25.md` | Strict runner proof-packet consumption | Answered RQ52, added RQ53, and made runner proof summaries consume authority recovery suites or expose missing recovery obligations. |
 | v52 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v52-all-axis-proof-packet-assembler-2026-06-25.md` | All-axis proof-packet assembler | Answered RQ53, added RQ54, and added per-source recovery provenance for strict all-axis proof-packet assembly. |
 | v53 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md` | ArrowHedge finance source bundle | Answered RQ54, added RQ55, and made the current ArrowHedge write-binding replay corpus available as a strict finance proof source bundle. |
+| v54 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v54-arrowhedge-terminal-packet-corpus-2026-06-25.md` | ArrowHedge terminal packet corpus | Answered RQ55, added RQ56, and made the finance adapter produce hash/index-validated terminal packets from canonical state-review inputs without adding finance logic to substrate packages. |
 
 ## Top Findings
 

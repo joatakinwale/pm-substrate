@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-25 - ArrowHedge terminal packet corpus
+
+- Added `research/daily-arrowsmith-agent-state/v54-arrowhedge-terminal-packet-corpus-2026-06-25.md`, answering RQ55 and replacing it with RQ56: mapping domain-owned ArrowHedge terminal packets into Axis A source bundles with store-derived recovery.
+- Added `buildArrowHedgeActionOutcomeEnvelopeCorpus()` and `buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus()` to `@pm/capability-finance-research-ingest`.
+- Added provider-status authority metadata to accepted canonical ArrowHedge terminal packets while leaving blocked packets without accepted write authority.
+- Fixed default ArrowHedge action-id derivation so distinct `risk.refresh` operations with `refreshId`, `feedbackId`, or missing-observation semantics do not collapse into one terminal action id.
+- Exported the manifest-advertised `buildArrowHedgeActionOutcomeEnvelope()` provider from the package index and aligned the finance provider evidence refs with `state_review_artifact`.
+- Claim boundary: Axis A now has domain-owned terminal packets from canonical state-review inputs, but those packets still need EvalEvent/source-bundle mapping and store-derived recoveries; Axis B remains blocked.
+
 ## 2026-06-25 - ArrowHedge finance source bundle
 
 - Added `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md`, answering RQ54 and replacing it with RQ55: terminal packets for remaining ArrowHedge finance failure classes.

@@ -7,6 +7,11 @@ export {
 } from "./capability.js";
 export {
   ARROWHEDGE_ENTITY_MAPPING,
+  buildArrowHedgeActionOutcomeEnvelope,
+  buildArrowHedgeActionOutcomeEnvelopeCorpus,
+  buildArrowHedgeActionOutcomeProviderAuthority,
+  buildArrowHedgeActionOutcomeTerminalIndex,
+  buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus,
   buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCanonicalStateReviewArtifactCorpus,
   buildArrowHedgeCurrentStateView,
@@ -23,6 +28,9 @@ export {
   parseArrowHedgeSnapshot,
   validateArrowHedgeTypedEventPayload,
   type ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
+  type ArrowHedgeActionOutcomeEnvelopeInput,
+  type ArrowHedgeActionOutcomeEnvelopeCorpus,
+  type ArrowHedgeActionOutcomeEnvelopeCorpusPacket,
   type ArrowHedgeCleanCurrentFixtureCaseInput,
   type ArrowHedgeCommonOperatingPictureState,
   type ArrowHedgeCurrentStateViewInput,

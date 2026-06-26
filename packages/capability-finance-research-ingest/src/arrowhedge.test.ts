@@ -14,6 +14,7 @@ import { tenantId, timestamp } from "@pm/types";
 import {
   buildArrowHedgeIngestionPlan,
   buildArrowHedgeActionOutcomeEnvelope,
+  buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus,
   buildArrowHedgeActionOutcomeTerminalIndex,
   buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCanonicalStateReviewArtifactCorpus,
@@ -1013,6 +1014,74 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       "artifact_arrowhedge_action_to_feedback_authority_001",
       "artifact_arrowhedge_feedback_to_observation_missing_risk_001",
     ]);
+  });
+
+  it("builds a canonical ArrowHedge terminal packet corpus from state-review inputs", async () => {
+    const tenant = tenantId("tnt_arrowhedge_terminal_packet_corpus");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_packet_corpus",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const corpus = buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+
+    expect(corpus.valid).toBe(true);
+    expect(corpus.hashValid).toBe(true);
+    expect(corpus.terminalIndex.valid).toBe(true);
+    expect(corpus.terminalIndex.entries).toHaveLength(4);
+    expect(corpus.packets.map((packet) => packet.scenarioId)).toEqual([
+      "arrowhedge-clean-current-accepted",
+      "arrowhedge-observation-to-action-stale-risk",
+      "arrowhedge-action-to-feedback-authority-drift",
+      "arrowhedge-feedback-to-observation-missing-risk",
+    ]);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      accepted: 1,
+      blocked: 3,
+    });
+    expect(new Set(corpus.packets.map((packet) => packet.actionId)).size).toBe(4);
+    expect(corpus.packets.every((packet) => packet.ref.kind === "action_outcome_envelope")).toBe(
+      true,
+    );
+    expect(
+      corpus.packets.every(
+        (packet) => verifyActionOutcomeEnvelopeHash(packet.envelope).valid,
+      ),
+    ).toBe(true);
+
+    const accepted = corpus.packets.find(
+      (packet) => packet.terminalOutcome === "accepted",
+    );
+    expect(accepted?.envelope.providerCertificateId).toBe(
+      "tapc_arrowhedge_terminal_provider_v1",
+    );
+    expect(accepted?.envelope.providerCertificateStatusRef).toMatchObject({
+      certificateId: "tapc_arrowhedge_terminal_provider_v1",
+      certificateDigest: "sha256:arrowhedge_terminal_provider_v1",
+      status: "valid",
+      checkedAt: "2026-06-03T14:05:00.000Z",
+    });
+    expect(
+      corpus.packets
+        .filter((packet) => packet.terminalOutcome === "blocked")
+        .every((packet) => packet.envelope.providerCertificateId === undefined),
+    ).toBe(true);
   });
 
   it("emits a clean accepted/current artifact fixture as a positive metrics baseline", async () => {

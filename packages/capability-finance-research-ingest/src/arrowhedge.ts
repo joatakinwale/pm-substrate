@@ -12,6 +12,7 @@ import {
 } from "@pm/entity-mapping";
 import {
   buildActionOutcomeEnvelope,
+  buildActionOutcomeProviderAuthority,
   buildActionOutcomeTerminalIndex,
   buildObservationContractFromCurrentStateView,
   buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
@@ -23,6 +24,7 @@ import {
   serializeStateReviewArtifactsJsonl,
   stateRef,
   type ActionOutcomeEnvelope,
+  type ActionOutcomeProviderAuthority,
   type ActionOutcomeTerminalIndex,
   type ActionProposalReviewEnforcementMode,
   type ActionProposalReview,
@@ -38,6 +40,7 @@ import {
   type StateConflict,
   type StateRef,
   verifyStateReviewArtifactHash,
+  verifyActionOutcomeEnvelopeHash,
 } from "@pm/agent-state";
 import type {
   EntityId,
@@ -772,6 +775,7 @@ export interface ArrowHedgeActionOutcomeEnvelopeInput
   readonly requestedTerminalOutcome?: ActionTerminalOutcome;
   readonly decidedAt?: Timestamp;
   readonly decidedBy?: string;
+  readonly providerAuthority?: ActionOutcomeProviderAuthority;
   readonly statusCheckRefs?: readonly StateRef[];
   readonly substrateRefs?: readonly StateRef[];
 }
@@ -797,6 +801,24 @@ export interface ArrowHedgeStateReviewArtifactCorpus {
   readonly artifacts: readonly StateReviewArtifact[];
   readonly jsonl: string;
   readonly continuityPayloads: readonly StateReviewArtifactContinuityPayload[];
+}
+
+export interface ArrowHedgeActionOutcomeEnvelopeCorpusPacket {
+  readonly scenarioId: string;
+  readonly actionId: string;
+  readonly ref: StateRef;
+  readonly envelope: ActionOutcomeEnvelope;
+  readonly terminalOutcome: ActionTerminalOutcome;
+  readonly outcomeHash: string;
+  readonly hashValid: boolean;
+}
+
+export interface ArrowHedgeActionOutcomeEnvelopeCorpus {
+  readonly packets: readonly ArrowHedgeActionOutcomeEnvelopeCorpusPacket[];
+  readonly terminalIndex: ActionOutcomeTerminalIndex;
+  readonly hashValid: boolean;
+  readonly valid: boolean;
+  readonly terminalOutcomeCounts: Readonly<Record<ActionTerminalOutcome, number>>;
 }
 
 export interface ArrowHedgeStateReviewArtifactCorpusEquivalenceSource {
@@ -1018,6 +1040,16 @@ export function buildArrowHedgeActionOutcomeEnvelope(
     arrowHedgeActionOutcomeRefId(actionId),
     "ArrowHedge ActionOutcomeEnvelope",
   );
+  const requestedTerminalOutcome =
+    input.requestedTerminalOutcome ??
+    (artifact.review.execution.allowed ? "accepted" : "blocked");
+  const providerAuthority =
+    input.providerAuthority ??
+    (requestedTerminalOutcome === "accepted" && artifact.review.execution.allowed
+      ? buildArrowHedgeActionOutcomeProviderAuthority(
+          input.decidedAt ?? artifact.generatedAt,
+        )
+      : undefined);
 
   return buildActionOutcomeEnvelope({
     tenantId: input.tenantId,
@@ -1029,9 +1061,15 @@ export function buildArrowHedgeActionOutcomeEnvelope(
     ...(input.statusCheckRefs !== undefined
       ? { statusCheckRefs: input.statusCheckRefs }
       : {}),
-    requestedTerminalOutcome:
-      input.requestedTerminalOutcome ??
-      (artifact.review.execution.allowed ? "accepted" : "blocked"),
+    ...(providerAuthority !== undefined
+      ? {
+          providerCertificateId: providerAuthority.providerCertificateId,
+          providerCertificateDigest: providerAuthority.providerCertificateDigest,
+          providerCertificateStatusRef:
+            providerAuthority.providerCertificateStatusRef,
+        }
+      : {}),
+    requestedTerminalOutcome,
     decidedAt: input.decidedAt ?? artifact.generatedAt,
     decidedBy: input.decidedBy ?? "arrowhedge:proposal-review-gate",
     evidenceRefs: artifact.provenance.used,
@@ -1054,6 +1092,68 @@ export function buildArrowHedgeActionOutcomeTerminalIndex(
       return envelope === null ? [] : [envelope];
     }),
   );
+}
+
+export function buildArrowHedgeActionOutcomeEnvelopeCorpus(
+  inputs: readonly ArrowHedgeActionOutcomeEnvelopeInput[],
+): ArrowHedgeActionOutcomeEnvelopeCorpus {
+  const packets = inputs.flatMap((input) => {
+    const envelope = buildArrowHedgeActionOutcomeEnvelope(input);
+    if (envelope === null) return [];
+    const ref = actionOutcomeEnvelopeRef(envelope);
+    const hash = verifyActionOutcomeEnvelopeHash(envelope);
+    return [
+      {
+        scenarioId: input.scenarioId ?? "arrowhedge-unscoped-action",
+        actionId: envelope.actionId,
+        ref,
+        envelope,
+        terminalOutcome: envelope.terminalOutcome,
+        outcomeHash: envelope.outcomeHash,
+        hashValid: hash.valid,
+      } satisfies ArrowHedgeActionOutcomeEnvelopeCorpusPacket,
+    ];
+  });
+  const terminalIndex = buildActionOutcomeTerminalIndex(
+    packets.map((packet) => packet.envelope),
+  );
+  const terminalOutcomeCounts = emptyTerminalOutcomeCounts();
+  for (const packet of packets) {
+    terminalOutcomeCounts[packet.terminalOutcome] += 1;
+  }
+  const hashValid = packets.every((packet) => packet.hashValid);
+
+  return {
+    packets,
+    terminalIndex,
+    hashValid,
+    valid: hashValid && terminalIndex.valid,
+    terminalOutcomeCounts,
+  };
+}
+
+export function buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus(
+  input: ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
+): ArrowHedgeActionOutcomeEnvelopeCorpus {
+  const cleanCase = buildArrowHedgeCleanCurrentFixtureCase(input);
+  const temporalCases = buildArrowHedgeTemporalMisalignmentFixtureCases(input);
+
+  return buildArrowHedgeActionOutcomeEnvelopeCorpus([
+    ...(cleanCase ? [cleanCase] : []),
+    ...temporalCases,
+  ]);
+}
+
+export function buildArrowHedgeActionOutcomeProviderAuthority(
+  checkedAt: Timestamp,
+): ActionOutcomeProviderAuthority {
+  return buildActionOutcomeProviderAuthority({
+    certificateId: "tapc_arrowhedge_terminal_provider_v1",
+    certificateDigest: "sha256:arrowhedge_terminal_provider_v1",
+    statusEventHash: "sha256:arrowhedge_terminal_provider_status_v1",
+    statusUpdatedAt: "2026-06-03T13:59:30.000Z" as Timestamp,
+    checkedAt,
+  });
 }
 
 export function buildArrowHedgeStateReviewArtifactCorpus(
@@ -1924,16 +2024,18 @@ function arrowHedgeActionId(
   input: ArrowHedgeActionOutcomeEnvelopeInput,
   artifact: StateReviewArtifact,
 ): string {
-  const decisionId =
-    typeof input.payload["decisionId"] === "string"
-      ? input.payload["decisionId"]
-      : artifact.review.reviewId;
+  const actionDiscriminator =
+    payloadString(input.payload, "refreshId") ??
+    payloadString(input.payload, "feedbackId") ??
+    missingObservationActionDiscriminator(input.payload) ??
+    payloadString(input.payload, "decisionId") ??
+    artifact.review.reviewId;
   return [
     input.tenantId,
     input.projectionName,
     input.symbol,
     input.actionType,
-    decisionId,
+    actionDiscriminator,
   ].join(":");
 }
 
@@ -1942,6 +2044,48 @@ function arrowHedgeActionOutcomeRefId(actionId: string): string {
     .update(actionId)
     .digest("hex")
     .slice(0, 32)}`;
+}
+
+function actionOutcomeEnvelopeRef(envelope: ActionOutcomeEnvelope): StateRef {
+  const ref = envelope.substrateRefs.find(
+    (candidate) => candidate.kind === "action_outcome_envelope",
+  );
+  if (ref === undefined) {
+    throw new Error(
+      `ArrowHedge ActionOutcomeEnvelope ${envelope.actionId} has no action_outcome_envelope substrate ref`,
+    );
+  }
+  return ref;
+}
+
+function emptyTerminalOutcomeCounts(): Record<ActionTerminalOutcome, number> {
+  return {
+    accepted: 0,
+    blocked: 0,
+    rejected: 0,
+    held: 0,
+    superseded: 0,
+    escalated: 0,
+  };
+}
+
+function missingObservationActionDiscriminator(
+  payload: Readonly<Record<string, unknown>>,
+): string | undefined {
+  const decisionId = payloadString(payload, "decisionId");
+  const missingObservation = payloadString(payload, "missingObservation");
+  if (decisionId === undefined || missingObservation === undefined) {
+    return undefined;
+  }
+  return `${decisionId}:missing:${missingObservation}`;
+}
+
+function payloadString(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+): string | undefined {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 function uniqueStateRefs(refs: readonly (StateRef | null)[]): readonly StateRef[] {

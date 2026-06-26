@@ -27,7 +27,7 @@ export const FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER = {
     "workflow.block",
     "risk.refresh",
   ],
-  evidenceRefKinds: ["source_record", "document"],
+  evidenceRefKinds: ["source_record", "document", "state_review_artifact"],
   substrateRefKinds: [
     "action_outcome_envelope",
     "state_review_artifact",
