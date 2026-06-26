@@ -121,12 +121,19 @@ export {
   type AdapterStateProofSummary,
 } from "./adapter-proof.js";
 export {
+  ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS,
+  ARROWHEDGE_CANONICAL_AUTHORITY_PACKET_SCENARIOS,
+  ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS,
+  ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
   buildArrowHedgeStateEvalSuite,
+  buildArrowHedgeTerminalPacketProofSourceBundle,
   type ArrowHedgeActionOutcomeEnvelopeEvalRef,
   type ArrowHedgeScenarioSummary,
+  type ArrowHedgeScenarioSpec,
   type ArrowHedgeStateReviewArtifactEvalRef,
   type ArrowHedgeStateEvalInput,
   type ArrowHedgeStateEvalSuite,
+  type ArrowHedgeTerminalPacketProofSourceBundleInput,
 } from "./arrowhedge.js";
 export {
   buildMarketingAxisBBlockedEval,

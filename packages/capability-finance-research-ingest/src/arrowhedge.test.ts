@@ -1,28 +1,45 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS,
+  ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+  PostgresEvalEventStore,
+  analyzeThreeAxisCoverage,
+  auditEvalEventsGraphWriteAuthority,
+  buildStrictThreeAxisProofPacketAssembly,
+  buildArrowHedgeStateEvalSuite,
+  buildArrowHedgeTerminalPacketProofSourceBundle,
+  type EvalGraphWriteAuthorityResolver,
+} from "@pm/evals";
+import {
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
   importStateReviewArtifactsJsonl,
   validateProposedActionReadSet,
   verifyActionOutcomeEnvelopeHash,
   verifyStateReviewArtifactHash,
+  type ActionOutcomeEnvelope,
 } from "@pm/agent-state";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgeIngestionPlan,
+  buildArrowHedgeActionOutcomeEnvelopeCorpus,
   buildArrowHedgeActionOutcomeEnvelope,
+  buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus,
+  buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus,
   buildArrowHedgeActionOutcomeTerminalIndex,
   buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCanonicalStateReviewArtifactCorpus,
   buildArrowHedgeCurrentStateView,
+  buildArrowHedgeContinuityFixtureCases,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
   compareArrowHedgeStateReviewArtifactCorpusEquivalence,
   buildArrowHedgeStateReviewArtifactCorpus,
   buildArrowHedgeStateReviewArtifact,
+  buildArrowHedgeSourceAuthorityConflictFixtureCases,
   buildArrowHedgeTemporalMisalignmentFixtureCases,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
@@ -475,8 +492,8 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(view.workflowPosition).toBe("blocked_stale_state");
     expect(state.tickers["AAPL"]?.stateDisagreements).toBe(1);
     expect(view.conflicts.map((conflict) => conflict.conflictType)).toEqual([
-      "state_disagreement",
-      "state_disagreement",
+      "source_authority_conflict",
+      "source_authority_conflict",
       "stale_observation",
     ]);
     expect(decision.mode).toBe("warn");
@@ -1015,6 +1032,451 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     ]);
   });
 
+  it("builds a canonical ArrowHedge terminal packet corpus from state-review inputs", async () => {
+    const tenant = tenantId("tnt_arrowhedge_terminal_packet_corpus");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_packet_corpus",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const corpus = buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+
+    expect(corpus.valid).toBe(true);
+    expect(corpus.hashValid).toBe(true);
+    expect(corpus.terminalIndex.valid).toBe(true);
+    expect(corpus.terminalIndex.entries).toHaveLength(4);
+    expect(corpus.packets.map((packet) => packet.scenarioId)).toEqual([
+      "arrowhedge-clean-current-accepted",
+      "arrowhedge-observation-to-action-stale-risk",
+      "arrowhedge-action-to-feedback-authority-drift",
+      "arrowhedge-feedback-to-observation-missing-risk",
+    ]);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      accepted: 1,
+      blocked: 3,
+    });
+    expect(new Set(corpus.packets.map((packet) => packet.actionId)).size).toBe(4);
+    expect(corpus.packets.every((packet) => packet.ref.kind === "action_outcome_envelope")).toBe(
+      true,
+    );
+    expect(
+      corpus.packets.every(
+        (packet) => verifyActionOutcomeEnvelopeHash(packet.envelope).valid,
+      ),
+    ).toBe(true);
+
+    const accepted = corpus.packets.find(
+      (packet) => packet.terminalOutcome === "accepted",
+    );
+    expect(accepted?.envelope.providerCertificateId).toBe(
+      "tapc_arrowhedge_terminal_provider_v1",
+    );
+    expect(accepted?.envelope.providerCertificateStatusRef).toMatchObject({
+      certificateId: "tapc_arrowhedge_terminal_provider_v1",
+      certificateDigest: "sha256:arrowhedge_terminal_provider_v1",
+      status: "valid",
+      checkedAt: "2026-06-03T14:05:00.000Z",
+    });
+    expect(
+      corpus.packets
+        .filter((packet) => packet.terminalOutcome === "blocked")
+        .every((packet) => packet.envelope.providerCertificateId === undefined),
+    ).toBe(true);
+  });
+
+  it("turns ArrowHedge continuity drift and missing terminal history into substrate blockers", async () => {
+    const tenant = tenantId("tnt_arrowhedge_continuity_packets");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_continuity_packets",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const cases = buildArrowHedgeContinuityFixtureCases({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const corpus = buildArrowHedgeActionOutcomeEnvelopeCorpus(cases);
+
+    expect(cases.map((fixtureCase) => fixtureCase.scenarioId)).toEqual([
+      "arrowhedge-memory-drift-conflicting-position",
+      "arrowhedge-continuity-break-missing-terminal-history",
+    ]);
+    expect(corpus.valid).toBe(true);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      blocked: 2,
+    });
+    expect(
+      corpus.packets.every((packet) =>
+        packet.envelope.substrateRefs.some(
+          (ref) => ref.kind === "continuity_checkpoint",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      corpus.packets.find(
+        (packet) =>
+          packet.scenarioId === "arrowhedge-memory-drift-conflicting-position",
+      )?.envelope.blockingCauses.map((cause) => cause.code),
+    ).toContain("continuity_memory_drift_conflict");
+    expect(
+      corpus.packets.find(
+        (packet) =>
+          packet.scenarioId ===
+          "arrowhedge-continuity-break-missing-terminal-history",
+      )?.envelope.blockingCauses.map((cause) => cause.code),
+    ).toContain("continuity_terminal_history_missing");
+  });
+
+  it("turns ArrowHedge source-authority conflicts into substrate terminal blockers", async () => {
+    const tenant = tenantId("tnt_arrowhedge_source_authority_packets");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_source_authority_packets",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const cases = buildArrowHedgeSourceAuthorityConflictFixtureCases({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const artifact = buildArrowHedgeStateReviewArtifact(cases[0]!);
+    const corpus = buildArrowHedgeActionOutcomeEnvelopeCorpus(cases);
+
+    expect(cases.map((fixtureCase) => fixtureCase.scenarioId)).toEqual([
+      "arrowhedge-source-authority-risk-snapshot-conflict",
+    ]);
+    expect(artifact?.review.currentStateView.conflicts.map((conflict) => conflict.conflictType)).toEqual([
+      "source_authority_conflict",
+    ]);
+    expect(artifact?.review.execution).toMatchObject({
+      allowed: false,
+      blocking: true,
+    });
+    expect(corpus.valid).toBe(true);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      blocked: 1,
+    });
+    expect(corpus.packets[0]?.envelope.blockingCauses.map((cause) => cause.code)).toContain(
+      "proposal_review_blocking_policy",
+    );
+  });
+
+  it("maps canonical terminal packets into Axis A eval events without verified overclaim", async () => {
+    const tenant = tenantId("tnt_arrowhedge_terminal_packet_eval_mapping");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_packet_eval",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+    const corpus = buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const packetsByScenario = new Map(
+      corpus.packets.map((packet) => [packet.scenarioId, packet]),
+    );
+    const mappedActionOutcomeRefs =
+      ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS.map((scenario) => {
+        const packet = packetsByScenario.get(scenario.scenarioId);
+        if (packet === undefined) {
+          throw new Error(`missing packet for ${scenario.scenarioId}`);
+        }
+        return {
+          scenarioId: scenario.scenarioId,
+          envelopeId: packet.ref.id,
+          runArm: "substrate" as const,
+          terminalOutcome: packet.terminalOutcome,
+        };
+      });
+
+    const suite = buildArrowHedgeStateEvalSuite({
+      tenantId: tenant,
+      observedAt: timestamp("2026-06-03T14:13:00.000Z"),
+      runIdPrefix: "run_arrowhedge_packet_mapping",
+      source: "packages/capability-finance-research-ingest/src/arrowhedge.test.ts",
+      sourceRecordIds: [
+        "ticker:AAPL",
+        "risk:risk_aapl_1400",
+        "decision:dec_aapl_buy_120",
+      ],
+      substrateRefs: {
+        graphNodeIds: [],
+        eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+        projectionIds: [projection.name],
+      },
+      scenarioSpecs: ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+      actionOutcomeEnvelopes: mappedActionOutcomeRefs,
+      operationalSamples: [],
+    });
+    const mappedScenarioIds = new Set(
+      ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS.map(
+        (scenario) => scenario.scenarioId,
+      ),
+    );
+    const mappedEvents = suite.events.filter((event) =>
+      mappedScenarioIds.has(event.scenarioId),
+    );
+    const mappedSubstrateEvents = mappedEvents.filter(
+      (event) => event.runArm === "substrate",
+    );
+    const report = analyzeThreeAxisCoverage(suite.events);
+
+    expect(suite.events).toHaveLength(20);
+    expect(mappedEvents).toHaveLength(6);
+    expect(
+      mappedSubstrateEvents.every(
+        (event) =>
+          event.operationalTerminalOutcome === "blocked" &&
+          event.substrateRefs.some(
+            (ref) => ref.kind === "action_outcome_envelope",
+          ),
+      ),
+    ).toBe(true);
+    expect(report.byCell.finance.partial_observation).toMatchObject({
+      covered: true,
+      verified: false,
+      terminalProofBackedPairs: 0,
+    });
+    expect(report.byCell.finance.partial_observation.reasons).toContain(
+      "missing_terminal_proof_refs",
+    );
+    expect(report.byCell.finance.feedback_disconnection).toMatchObject({
+      covered: true,
+      verified: false,
+      terminalProofBackedPairs: 0,
+    });
+    expect(report.byAxis.finance.verified).toBe(false);
+  });
+
+  it("builds paired baseline/substrate Axis A packets for strict source recovery", async () => {
+    const tenant = tenantId("tnt_arrowhedge_paired_terminal_packets");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_paired_packets",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+    const corpus = buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+
+    expect(corpus.valid).toBe(true);
+    expect(corpus.packets).toHaveLength(12);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      accepted: 6,
+      blocked: 6,
+    });
+    expect(
+      corpus.packets.filter((packet) => packet.runArm === "baseline"),
+    ).toHaveLength(6);
+    expect(
+      corpus.packets.filter((packet) => packet.runArm === "substrate"),
+    ).toHaveLength(6);
+    expect(
+      corpus.packets
+        .filter((packet) => packet.runArm === "baseline")
+        .every(
+          (packet) =>
+            packet.authorityRole === "comparator_observation" &&
+            packet.terminalOutcome === "accepted" &&
+            packet.envelope.providerCertificateId === undefined,
+        ),
+    ).toBe(true);
+    expect(
+      corpus.packets
+        .filter((packet) => packet.runArm === "substrate")
+        .every(
+          (packet) =>
+            packet.authorityRole === "substrate_authority" &&
+            packet.terminalOutcome === "blocked",
+        ),
+    ).toBe(true);
+
+    const mappedActionOutcomeRefs = corpus.packets.map((packet) => ({
+      scenarioId: packet.scenarioId,
+      envelopeId: packet.ref.id,
+      runArm: packet.runArm,
+      terminalOutcome: packet.terminalOutcome,
+    }));
+    const sourceBundleInput = {
+      sourceId: "axis-a-arrowhedge-paired-packets",
+      tenantId: tenant,
+      observedAt: timestamp("2026-06-03T14:13:00.000Z"),
+      runIdPrefix: "run_arrowhedge_paired_packets",
+      source: "packages/capability-finance-research-ingest/src/arrowhedge.test.ts",
+      sourceRecordIds: [
+        "ticker:AAPL",
+        "risk:risk_aapl_1400",
+        "decision:dec_aapl_buy_120",
+      ],
+      substrateRefs: {
+        graphNodeIds: [],
+        eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+        projectionIds: [projection.name],
+      },
+      scenarioSpecs: ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS,
+      actionOutcomeEnvelopes: mappedActionOutcomeRefs,
+      operationalSamples: [],
+    } as const;
+    const sourceBundleWithoutRecovery =
+      buildArrowHedgeTerminalPacketProofSourceBundle(sourceBundleInput);
+    const report = analyzeThreeAxisCoverage(sourceBundleWithoutRecovery.events);
+
+    expect(report.byCell.finance.stale_observation.verified).toBe(true);
+    expect(report.byCell.finance.feedback_disconnection).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byCell.finance.partial_observation).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byCell.finance.source_authority_conflict).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byCell.finance.memory_drift).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byCell.finance.continuity_break).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byAxis.finance.verified).toBe(false);
+    expect(report.byAxis.finance.missingFailureClasses).toEqual(
+      expect.arrayContaining([
+        "representation_loss",
+        "workflow_invalidation",
+      ]),
+    );
+    expect(report.byAxis.finance.missingFailureClasses).not.toContain(
+      "source_authority_conflict",
+    );
+
+    const substrateMappedEvents = sourceBundleWithoutRecovery.events.filter(
+      (event) =>
+        event.runArm === "substrate" &&
+        ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS.some(
+          (scenario) => scenario.scenarioId === event.scenarioId,
+        ),
+    );
+    const packetStore = new PostgresEvalEventStore(inMemoryEvalPacketDb());
+    await packetStore.recordActionOutcomeEnvelopes(
+      corpus.packets.map((packet) => packet.envelope),
+    );
+    const recoverySuite = await auditEvalEventsGraphWriteAuthority({
+      events: substrateMappedEvents,
+      store: packetStore,
+      resolveAcceptedAuthority: refusedAuthorityResolver,
+      policy: strictGraphAuthorityPolicy,
+    });
+    const sourceBundle = buildArrowHedgeTerminalPacketProofSourceBundle({
+      ...sourceBundleInput,
+      authorityRecoverySuite: recoverySuite,
+    });
+    const assembly = buildStrictThreeAxisProofPacketAssembly({
+      packetId: "three_axis_proof_arrowhedge_paired_packets",
+      generatedAt: timestamp("2026-06-03T14:13:30.000Z"),
+      sourceBundles: [sourceBundle],
+    });
+
+    expect(recoverySuite.summary).toMatchObject({
+      totalEvents: 6,
+      auditedEvents: 6,
+      validRecoveries: 6,
+      invalidRecoveries: 0,
+      byStatus: {
+        terminal_outcome_refused_authority: 6,
+      },
+    });
+    expect(assembly.sourceRecoveries).toEqual([
+      expect.objectContaining({
+        sourceId: "axis-a-arrowhedge-paired-packets",
+        axis: "finance",
+        eventCount: 26,
+        obligationCount: 6,
+        recoveryStatus: "provided",
+        recoveryCount: 6,
+        validRecoveries: 6,
+        invalidRecoveries: 0,
+      }),
+    ]);
+    expect(assembly.packet.authorityRecoveryGate).toMatchObject({
+      required: true,
+      passed: true,
+      obligationCount: 6,
+      validObligations: 6,
+      invalidObligations: [],
+    });
+    expect(assembly.packet.report.byAxis.finance.verified).toBe(false);
+  });
+
   it("emits a clean accepted/current artifact fixture as a positive metrics baseline", async () => {
     const tenant = tenantId("tnt_arrowhedge_clean_current");
     const plan = buildArrowHedgeIngestionPlan(snapshot, {
@@ -1405,3 +1867,44 @@ async function foldPlanIntoCop(
 
   return state;
 }
+
+function inMemoryEvalPacketDb() {
+  const envelopes = new Map<string, ActionOutcomeEnvelope>();
+  return {
+    query: async (sql: string, values?: readonly unknown[]) => {
+      if (sql.includes("INSERT INTO evals.action_outcome_envelope_packets")) {
+        const tenantId = String(values?.[0]);
+        const envelopeRefId = String(values?.[1]);
+        const outcomeHash = String(values?.[4]);
+        const envelope = values?.[5] as ActionOutcomeEnvelope;
+        const key = `${tenantId}:${envelopeRefId}`;
+        const existing = envelopes.get(key);
+        if (existing !== undefined && existing.outcomeHash !== outcomeHash) {
+          return { rows: [] };
+        }
+        envelopes.set(key, envelope);
+        return { rows: [{ envelope_ref_id: envelopeRefId }] };
+      }
+
+      if (sql.includes("SELECT envelope")) {
+        const key = `${String(values?.[0])}:${String(values?.[1])}`;
+        const envelope = envelopes.get(key);
+        return {
+          rows: envelope === undefined ? [] : [{ envelope }],
+        };
+      }
+
+      throw new Error(`unexpected in-memory eval packet query: ${sql}`);
+    },
+  };
+}
+
+const refusedAuthorityResolver: EvalGraphWriteAuthorityResolver = async () => {
+  throw new Error("terminal outcome refused accepted graph authority");
+};
+
+const strictGraphAuthorityPolicy = {
+  requireAuthorityRef: true,
+  requireProviderCertificateStatusRef: true,
+  requireSubstrateRecord: true,
+} as const;

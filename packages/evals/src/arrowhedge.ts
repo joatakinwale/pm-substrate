@@ -11,6 +11,8 @@ import {
   type RunArm,
 } from "./schema.js";
 import type { AdapterOperationalSample } from "./metrics.js";
+import type { EvalGraphWriteAuthorityRecoverySuite } from "./authority-recovery.js";
+import type { StrictThreeAxisProofPacketSourceBundle } from "./three-axis-proof-packet.js";
 
 export interface ArrowHedgeStateEvalInput {
   readonly tenantId: TenantId;
@@ -27,6 +29,7 @@ export interface ArrowHedgeStateEvalInput {
     readonly mode: "warn";
     readonly issueCodes: readonly string[];
   };
+  readonly scenarioSpecs?: readonly ArrowHedgeScenarioSpec[];
   readonly stateReviewArtifacts?: readonly ArrowHedgeStateReviewArtifactEvalRef[];
   readonly actionOutcomeEnvelopes?: readonly ArrowHedgeActionOutcomeEnvelopeEvalRef[];
   readonly operationalSamples: readonly AdapterOperationalSample[];
@@ -63,7 +66,13 @@ export interface ArrowHedgeStateEvalSuite {
   readonly operationalSamples: readonly AdapterOperationalSample[];
 }
 
-interface ScenarioSpec {
+export interface ArrowHedgeTerminalPacketProofSourceBundleInput
+  extends ArrowHedgeStateEvalInput {
+  readonly sourceId: string;
+  readonly authorityRecoverySuite?: EvalGraphWriteAuthorityRecoverySuite;
+}
+
+export interface ArrowHedgeScenarioSpec {
   readonly scenarioId: string;
   readonly failureClass: FailureClass;
   readonly coordinationClass: CoordinationClass;
@@ -75,7 +84,7 @@ interface ScenarioSpec {
   readonly substrateNotes: string;
 }
 
-const SCENARIOS: readonly ScenarioSpec[] = [
+const SCENARIOS: readonly ArrowHedgeScenarioSpec[] = [
   {
     scenarioId: "arrowhedge-representation-loss",
     failureClass: "representation_loss",
@@ -157,6 +166,93 @@ const SCENARIOS: readonly ScenarioSpec[] = [
   },
 ];
 
+export const ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS = [
+  {
+    scenarioId: "arrowhedge-observation-to-action-stale-risk",
+    failureClass: "stale_observation",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline portfolio decision accepts from an observation captured before the risk freshness window expired.",
+    substrateNotes:
+      "Substrate terminal packet blocks the stale observation-to-action transition.",
+  },
+  {
+    scenarioId: "arrowhedge-action-to-feedback-authority-drift",
+    failureClass: "feedback_disconnection",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline feedback loop treats post-action authority drift as if it were current risk state.",
+    substrateNotes:
+      "Substrate terminal packet blocks feedback that cannot be reconciled to the authoritative risk view.",
+  },
+  {
+    scenarioId: "arrowhedge-feedback-to-observation-missing-risk",
+    failureClass: "partial_observation",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline refresh proceeds from a local view that is missing the current risk state.",
+    substrateNotes:
+      "Substrate terminal packet blocks because required risk evidence/read refs are missing.",
+  },
+] as const satisfies readonly ArrowHedgeScenarioSpec[];
+
+export const ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS = [
+  {
+    scenarioId: "arrowhedge-memory-drift-conflicting-position",
+    failureClass: "memory_drift",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline amnesiac resume accepts a portfolio decision from private memory even though substrate continuity checkpoints disagree.",
+    substrateNotes:
+      "Substrate terminal packet blocks because conflicting continuity checkpoints create a local-view obstruction.",
+  },
+  {
+    scenarioId: "arrowhedge-continuity-break-missing-terminal-history",
+    failureClass: "continuity_break",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline resume continues with source evidence while losing the prior terminal outcome history.",
+    substrateNotes:
+      "Substrate terminal packet blocks because required terminal decision refs are absent from continuity checkpoints.",
+  },
+] as const satisfies readonly ArrowHedgeScenarioSpec[];
+
+export const ARROWHEDGE_CANONICAL_AUTHORITY_PACKET_SCENARIOS = [
+  {
+    scenarioId: "arrowhedge-source-authority-risk-snapshot-conflict",
+    failureClass: "source_authority_conflict",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline decision accepts from an older risk snapshot even though the current authoritative risk source has moved.",
+    substrateNotes:
+      "Substrate terminal packet blocks because the current state view exposes a source-authority conflict before admission.",
+  },
+] as const satisfies readonly ArrowHedgeScenarioSpec[];
+
+export const ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS = [
+  ...ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+  ...ARROWHEDGE_CANONICAL_AUTHORITY_PACKET_SCENARIOS,
+  ...ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS,
+] as const satisfies readonly ArrowHedgeScenarioSpec[];
+
 export function buildArrowHedgeStateEvalSuite(
   input: ArrowHedgeStateEvalInput,
 ): ArrowHedgeStateEvalSuite {
@@ -182,7 +278,8 @@ export function buildArrowHedgeStateEvalSuite(
     evalEvidenceRef("source_record", id),
   );
 
-  const pairs = SCENARIOS.map((scenario) => {
+  const scenarioSpecs = [...SCENARIOS, ...(input.scenarioSpecs ?? [])];
+  const pairs = scenarioSpecs.map((scenario) => {
     const pairedRunGroup = `pair_${scenario.scenarioId}`;
     const baselineOutcomeRefs = actionOutcomeEnvelopeRefsForScenario(
       scenario.scenarioId,
@@ -295,6 +392,29 @@ export function buildArrowHedgeStateEvalSuite(
   };
 }
 
+export function buildArrowHedgeTerminalPacketProofSourceBundle(
+  input: ArrowHedgeTerminalPacketProofSourceBundleInput,
+): StrictThreeAxisProofPacketSourceBundle {
+  const {
+    sourceId,
+    authorityRecoverySuite,
+    ...suiteInput
+  } = input;
+  const suite = buildArrowHedgeStateEvalSuite(suiteInput);
+
+  return {
+    source: {
+      sourceId,
+      axis: "finance",
+      eventCount: suite.events.length,
+    },
+    events: suite.events,
+    ...(authorityRecoverySuite !== undefined
+      ? { authorityRecoverySuite }
+      : {}),
+  };
+}
+
 function stateReviewArtifactRefsForScenario(
   scenarioId: string,
   input: ArrowHedgeStateEvalInput,
@@ -357,7 +477,7 @@ function score(result: EvalResult): number {
 }
 
 function substrateResultForScenario(
-  scenario: ScenarioSpec,
+  scenario: ArrowHedgeScenarioSpec,
   input: ArrowHedgeStateEvalInput,
 ): EvalResult {
   if (
@@ -376,7 +496,7 @@ function substrateResultForScenario(
 }
 
 function substrateNotesForScenario(
-  scenario: ScenarioSpec,
+  scenario: ArrowHedgeScenarioSpec,
   input: ArrowHedgeStateEvalInput,
 ): string {
   if (!scenario.requiredReadSetWarningCodes || !input.readSetValidation) {

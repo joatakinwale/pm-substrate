@@ -1,5 +1,73 @@
 # Changelog
 
+## 2026-06-26 - Representation-loss packet gate research
+
+- Added `research/daily-arrowsmith-agent-state/v61-representation-loss-packet-gate-2026-06-26.md`, answering RQ71 as an implementation sequence rather than another proof-harness change.
+- Corrected the automation prompt's stale implementation frontier: executable observation reports, typed proposal reviews, replayable JSON/JSONL artifacts, fixture coverage, assertion metrics, and DB/fixture equivalence are already present on the current branch.
+- Selected `representation_loss` as the next Axis A packet-backed family, using projection-fidelity and invariant-field preservation before continuing to `workflow_invalidation`, `capability_contract_violation`, and `parallel_write_conflict`.
+- Updated the daily Arrowsmith index and top-level research ledger with new sources, corrected claims, downgraded summary/shared-context claims, C109, and L071.
+- Claim boundary: research-only update; no code changed and Axis A remains packet-backed for six families until the representation-loss fixture/scenario pair is implemented.
+
+## 2026-06-26 - Axis A source-authority packet family
+
+- Added `research/daily-arrowsmith-agent-state/v60-axis-a-source-authority-packet-family-2026-06-26.md`, answering RQ61 and replacing it with RQ71.
+- Changed ArrowHedge risk/signal snapshot mismatch conflicts from generic `state_disagreement` to `source_authority_conflict`.
+- Added `buildArrowHedgeSourceAuthorityConflictFixtureCases()` to the finance adapter.
+- Added `ARROWHEDGE_CANONICAL_AUTHORITY_PACKET_SCENARIOS` and included it in `ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS`.
+- Expanded paired Axis A packet recovery from five to six source-recovered substrate refusals.
+- Claim boundary: Axis A improves, but `representation_loss`, `workflow_invalidation`, `capability_contract_violation`, `parallel_write_conflict`, and Axis B remain open.
+
+## 2026-06-26 - Axis A continuity packet families
+
+- Added `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md`, answering RQ60 and replacing it with RQ61-RQ70.
+- Added `verifyContinuityCheckpointChain()` to `@pm/continuity` and wired `PostgresContinuityLedger.verify()` through it.
+- Added ArrowHedge `continuityCheck` inputs that turn conflicting continuity checkpoints, broken checkpoint chains, missing terminal history, or missing evidence history into `ActionOutcomeEnvelope` blocking causes.
+- Added paired baseline/substrate Axis A packet families for `memory_drift` and `continuity_break`.
+- Exported `ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS` and `ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS` from `@pm/evals`.
+- Claim boundary: Axis A now has store-backed paired packet proof for five failure families, but the finance axis is still incomplete and Axis B remains blocked.
+
+## 2026-06-25 - ArrowHedge packet-store source bundle
+
+- Added `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md`, answering RQ59 and replacing it with RQ60: packet-backed Axis A scenario families for `memory_drift`, `continuity_break`, and the remaining finance gaps.
+- Added `buildArrowHedgeTerminalPacketProofSourceBundle()` and `ArrowHedgeTerminalPacketProofSourceBundleInput` to `@pm/evals`.
+- Updated the ArrowHedge paired temporal packet proof to persist packets through `PostgresEvalEventStore.recordActionOutcomeEnvelopes()` before strict authority recovery.
+- Replaced hand-built packet lookup in the paired temporal test with the shared eval packet-store path.
+- Claim boundary: Axis A now has a reusable store-backed proof path for the canonical temporal packet families, but the finance axis still lacks packet-backed coverage for all ten failure classes and Axis B remains blocked.
+
+## 2026-06-25 - ArrowHedge paired temporal packet corpus
+
+- Added `research/daily-arrowsmith-agent-state/v57-arrowhedge-paired-temporal-packet-corpus-2026-06-25.md`, answering RQ58 for canonical paired packet generation and replacing it with RQ59: durable packet-store persistence plus a reusable strict Axis A source bundle.
+- Added `buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus()` to `@pm/capability-finance-research-ingest`.
+- Added packet-level `runArm` and `authorityRole` metadata so ArrowHedge terminal packets can distinguish baseline comparator observations from substrate authority packets.
+- Added `providerAuthority: null` support for ArrowHedge baseline comparator packets, preventing accepted baseline observations from carrying provider certificate authority.
+- Added a finance test that maps paired temporal packets into Axis A, verifies the three temporal cells, generates a substrate-only recovery suite, and assembles a strict proof packet while keeping finance incomplete for missing classes.
+- Claim boundary: Axis A temporal packet coverage improved, but durable packet-store persistence, a reusable strict source bundle, remaining finance failure classes, and Axis B remain open.
+
+## 2026-06-25 - Axis A baseline recovery obligations
+
+- Added `research/daily-arrowsmith-agent-state/v56-axis-a-baseline-recovery-obligations-2026-06-25.md`, answering RQ57 for strict proof semantics and replacing it with RQ58: persisted baseline terminal observation packets plus substrate recovery suites for mapped finance families.
+- Updated strict proof-packet authority obligations so failed baseline terminal observations do not require `accepted_authority_recovered`.
+- Added a finance regression test proving a baseline failed terminal observation can remain comparator evidence while the substrate arm supplies the required recovery.
+- Updated proof-packet/source-recovery expectations so paired recovery suites may audit extra baseline observations without inflating strict authority obligations.
+- Claim boundary: Axis A proof semantics improved, but finance still lacks persisted baseline-side terminal observation packets, store-derived recovery suites for mapped families, and real `memory_drift` / `continuity_break` packet-backed scenarios; Axis B remains blocked.
+
+## 2026-06-25 - ArrowHedge packet eval mapping
+
+- Added `research/daily-arrowsmith-agent-state/v55-arrowhedge-packet-eval-mapping-2026-06-25.md`, answering RQ56 and replacing it with RQ57: baseline-side terminal failure packets and store-derived recoveries for mapped finance scenario families.
+- Added opt-in `scenarioSpecs` to `buildArrowHedgeStateEvalSuite()`.
+- Exported `ArrowHedgeScenarioSpec` and `ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS` from `@pm/evals`.
+- Added a finance-domain test that builds the real canonical ArrowHedge terminal packet corpus, maps the blocked temporal packets into Axis A EvalEvents, and proves mapped cells are covered but not verified without baseline terminal proof.
+- Claim boundary: Axis A packet mapping improved, but finance still lacks baseline terminal packets, strict recovery suites for these mapped families, `memory_drift` / `continuity_break` packet families, and Axis B remains blocked.
+
+## 2026-06-25 - ArrowHedge terminal packet corpus
+
+- Added `research/daily-arrowsmith-agent-state/v54-arrowhedge-terminal-packet-corpus-2026-06-25.md`, answering RQ55 and replacing it with RQ56: mapping domain-owned ArrowHedge terminal packets into Axis A source bundles with store-derived recovery.
+- Added `buildArrowHedgeActionOutcomeEnvelopeCorpus()` and `buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus()` to `@pm/capability-finance-research-ingest`.
+- Added provider-status authority metadata to accepted canonical ArrowHedge terminal packets while leaving blocked packets without accepted write authority.
+- Fixed default ArrowHedge action-id derivation so distinct `risk.refresh` operations with `refreshId`, `feedbackId`, or missing-observation semantics do not collapse into one terminal action id.
+- Exported the manifest-advertised `buildArrowHedgeActionOutcomeEnvelope()` provider from the package index and aligned the finance provider evidence refs with `state_review_artifact`.
+- Claim boundary: Axis A now has domain-owned terminal packets from canonical state-review inputs, but those packets still need EvalEvent/source-bundle mapping and store-derived recoveries; Axis B remains blocked.
+
 ## 2026-06-25 - ArrowHedge finance source bundle
 
 - Added `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md`, answering RQ54 and replacing it with RQ55: terminal packets for remaining ArrowHedge finance failure classes.

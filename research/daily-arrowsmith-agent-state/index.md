@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-25
+Last updated: 2026-06-26
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -34,6 +34,22 @@ v51 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacket()`, and loc
 v52 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacketAssembly()`, which accepts source bundles, validates declared event counts, builds one strict proof packet, and returns per-source recovery provenance (`provided`, `missing_required`, or `not_required`). Axis B blocker sources remain blocked without synthetic recovery obligations. The remaining proof boundary is producing real Axis A ArrowHedge finance source bundles with persisted packets and recovery suites.
 
 v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundle()`, which builds a finance source bundle from the committed ArrowHedge write-binding replay corpus and can consume strict authority recoveries from replay packets. The terminal-outcome partition cell is now recovery-backed, while finance remains incomplete for failure classes that still lack packet-backed pairs.
+
+v54 update: `@pm/capability-finance-research-ingest` now exposes a domain-owned ArrowHedge terminal packet corpus over the canonical state-review inputs. It emits one accepted clean/current packet with provider-status authority metadata and three blocked temporal packets, validates packet hashes, and runs the core terminal index. The default ArrowHedge action-id derivation now distinguishes `refreshId`, `feedbackId`, and missing-observation refreshes so adjacent finance actions do not collapse into one terminal action id. The next proof is mapping these domain packets into Axis A EvalEvents/source bundles with store-derived recoveries.
+
+v55 update: `@pm/evals` now accepts opt-in ArrowHedge scenario specs, and exports canonical temporal packet scenarios for mapping real finance-domain packets into Axis A EvalEvents. The finance adapter test builds the real canonical packet corpus, maps three blocked temporal packets into Axis A, and proves those cells become covered but not verified because baseline terminal proof and authority recoveries are still missing.
+
+v56 update: `@pm/evals` now distinguishes failed baseline terminal observations from substrate authority recovery obligations. A baseline failed comparator event can remain replay evidence without requiring `accepted_authority_recovered`, while substrate accepted/protective outcomes still need the expected store-derived recovery before strict proof can pass. The next proof is persisted baseline-side terminal observation packets plus substrate-side recovery suites for mapped ArrowHedge finance families.
+
+v57 update: `@pm/capability-finance-research-ingest` now exposes `buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus()`. The paired corpus emits baseline advisory comparator packets with no provider authority and substrate protective packets for the canonical temporal ArrowHedge scenarios, allowing Axis A to verify those three temporal cells with substrate-only recovery while keeping the finance axis incomplete for missing packet-backed failure classes.
+
+v58 update: `@pm/evals` now exposes `buildArrowHedgeTerminalPacketProofSourceBundle()`, and the finance paired-packet test persists paired packets through `PostgresEvalEventStore` before recovering substrate terminal refusals. The current Axis A temporal proof path is now reusable and store-backed, but still incomplete until additional packet-backed failure families cover `memory_drift`, `continuity_break`, and the remaining finance gaps.
+
+v59 update: `@pm/continuity` now exposes a reusable checkpoint-chain verifier, `PostgresContinuityLedger.verify()` consumes it, and ArrowHedge terminal packets can carry continuity checks that block private-memory drift or missing terminal history. Axis A now has store-backed paired packet proof for five failure families, including `memory_drift` and `continuity_break`, while the finance axis and three-axis solution remain unverified until the remaining Axis A gaps and Axis B blocker are resolved.
+
+v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source_authority_conflict` instead of generic `state_disagreement`, exports a source-authority packet fixture family, and maps it through Axis A terminal packet scenarios. Store-backed paired Axis A proof now covers six failure families, while `representation_loss`, `workflow_invalidation`, `capability_contract_violation`, `parallel_write_conflict`, and Axis B remain open.
+
+v61 update: The prompt's observation-report / action-proposal / JSON-artifact implementation frontier is corrected as already closed on the current branch. RQ71 is narrowed into an implementation sequence: build `representation_loss` next as a projection-admission packet family using invariant-field preservation and local-view obstruction semantics, then continue to `workflow_invalidation`, `capability_contract_violation`, and `parallel_write_conflict`. Recent LLM framing and human-AI mental-model work downgraded summary/shared-context stability as state proof, while abstract interpretation and handoff literature sharpened the falsification test for lossy projections.
 
 ## Versions
 
@@ -94,6 +110,14 @@ v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundl
 | v51 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v51-strict-runner-proof-packet-consumption-2026-06-25.md` | Strict runner proof-packet consumption | Answered RQ52, added RQ53, and made runner proof summaries consume authority recovery suites or expose missing recovery obligations. |
 | v52 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v52-all-axis-proof-packet-assembler-2026-06-25.md` | All-axis proof-packet assembler | Answered RQ53, added RQ54, and added per-source recovery provenance for strict all-axis proof-packet assembly. |
 | v53 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md` | ArrowHedge finance source bundle | Answered RQ54, added RQ55, and made the current ArrowHedge write-binding replay corpus available as a strict finance proof source bundle. |
+| v54 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v54-arrowhedge-terminal-packet-corpus-2026-06-25.md` | ArrowHedge terminal packet corpus | Answered RQ55, added RQ56, and made the finance adapter produce hash/index-validated terminal packets from canonical state-review inputs without adding finance logic to substrate packages. |
+| v55 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v55-arrowhedge-packet-eval-mapping-2026-06-25.md` | ArrowHedge packet eval mapping | Answered RQ56, added RQ57, and mapped real finance-domain temporal packets into Axis A EvalEvents while keeping cells unverified until paired terminal proof/recovery exists. |
+| v56 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v56-axis-a-baseline-recovery-obligations-2026-06-25.md` | Axis A baseline recovery obligations | Answered RQ57 for strict proof semantics, added RQ58, and made baseline failed terminal observations replay evidence rather than accepted authority-recovery obligations. |
+| v57 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v57-arrowhedge-paired-temporal-packet-corpus-2026-06-25.md` | ArrowHedge paired temporal packet corpus | Answered RQ58 for canonical paired packet generation, added RQ59, and generated baseline/substrate temporal packet pairs with substrate-only strict recovery. |
+| v58 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md` | ArrowHedge packet-store source bundle | Answered RQ59, added RQ60, and moved paired temporal packet recovery through `PostgresEvalEventStore` plus a reusable strict Axis A source-bundle helper. |
+| v59 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md` | Axis A continuity packet families | Answered RQ60, added RQ61-RQ70, extracted reusable continuity-chain verification, and added paired packet-backed `memory_drift` / `continuity_break` Axis A families. |
+| v60 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v60-axis-a-source-authority-packet-family-2026-06-26.md` | Axis A source-authority packet family | Answered RQ61, added RQ71, tightened ArrowHedge source-authority conflict classification, and added a paired packet-backed `source_authority_conflict` Axis A family. |
+| v61 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v61-representation-loss-packet-gate-2026-06-26.md` | Representation-loss packet gate research | Corrected the stale implementation frontier, answered RQ71 as a sequencing decision, and selected `representation_loss` as the next Axis A packet family using projection-fidelity checks. |
 
 ## Top Findings
 
@@ -174,6 +198,16 @@ v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundl
 75. **Agency publication terminal admission now has a profile adapter.** v34 lets `@pm/profile-agency` convert authoritative publication fixture snapshots into canonical terminal envelopes, block revoked approvals or content-hash drift, and report same-action publish conflicts through the core terminal index.
 
 ## Source Changes
+
+### Added on 2026-06-26 v61
+
+- Han et al. 2026-06-23, "Measuring User's Mental Models of Speech Translation in Human-AI Collaboration": useful PM/human-AI mental-model evidence, but not operational-state authority.
+- Bedoui et al. 2026-06-25, "Auditing Framing-Sensitive Behavioral Instability in Large Language Models for Mental Health Interactions": downgraded prompt framing and summary stability as state proof.
+- Liu et al. 2026-06-18, "Agentic Electronic Design Automation: A Handoff Perspective": strengthened the handoff-as-acceptance-condition bridge for later `workflow_invalidation` work.
+- Mylonas et al. 2026-06-17, "PowerAgentBench-SS": strengthened capability-contract and evidence-log testing implications.
+- Wang et al. 2026-06-16 revision, "From Agent Traces to Trust": reinforced typed provenance/evidence tracing for replayable agent-state artifacts.
+- Cousot and Cousot 1977 plus Campion et al. 2023: added the abstract-interpretation / incompleteness bridge for treating `representation_loss` as projection-fidelity failure.
+- AHRQ TeamSTEPPS handoff guidance: added daily PM evidence that handoffs transfer authority/responsibility and require uncertainty, changes, contingencies, and receiver acknowledgement.
 
 ### Added on 2026-06-05
 
@@ -488,6 +522,7 @@ v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundl
 
 ## Corrected Claims
 
+- v61 corrects the automation prompt's next-code frontier: executable observation reports, typed proposal reviews, replayable JSON/JSONL state-review artifacts, ArrowHedge fixture families, assertion metrics, mutation-claim boundaries, and DB/fixture equivalence helpers already exist on the current branch. The next code slice is not to rebuild them; it is to add a packet-backed `representation_loss` Axis A family.
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
 - `StateReviewArtifact` is no longer future work: pure construction, ArrowHedge generation, related objects, PROV-style links, trace context, canonical hash verification, tamper detection, and artifact metrics exist.
 - Persisted/golden JSON artifacts remain open: current tests build artifacts in memory, and no stable artifact export/import path was found.
@@ -526,6 +561,7 @@ v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundl
 
 ## Downgraded Claims
 
+- v61 downgrades fluent summaries, shared context, and user/team mental-model calibration as state proof. They can improve coordination or diagnosis, but they do not prove that invariant source fields survived projection into `CurrentStateView`, `StateReviewArtifact`, and `ActionOutcomeEnvelope`.
 - RAG-only state claims are downgraded: retrieval helps access but does not supply authority, invalidation, workflow validity, or mutation safety.
 - Continuous memory consolidation is rejected as a safe default until gated by raw evidence and regression tests.
 - Synthetic eval pass claims are downgraded to scaffold/provisional until outcomes are derived from executable assertions or observed behavior.
@@ -626,6 +662,7 @@ v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundl
 23. Use `analyzeThreeAxisCoverage()` as the current matrix gate: fill Axis A missing classes and terminal proof refs, keep Axis B blocked until PluggedInSocial or accepted fixtures exist, and do not treat Axis C completeness as full verification.
 24. Make dashboard metrics query-traceable and lifecycle-aware: stale blocks should be a gate-failure cause, not a separate double-counted KPI.
 25. Answer RQ42 by extending provider-certificate status-ref binding to non-workflow graph/capability write boundaries so direct writes cannot bypass workflow action-outcome currentness proof.
+26. Answer RQ72 by implementing `representation_loss` as projection-admission failure: define ArrowHedge invariant fields, produce an obstruction or representation-loss issue when a role/local projection drops them, and add paired baseline/substrate packets to the Axis A source-bundle path.
 
 ## Metrics Queue
 
@@ -827,3 +864,4 @@ v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundl
 14. Run PM handoff agreement and protocol-burden metrics on real multi-agent ArrowHedge or automation runs.
 15. Keep broad mutation governance unclaimed until every external write path has durable verified binding coverage, status checks, target receipt evidence, and terminal outcome partition tests.
 16. Run every daily research automation through fetch or remote-SHA verification -> inspect -> integrate -> ledger -> commit -> push and record any conflict handling as substrate evidence.
+17. Add the `representation_loss` packet family before the other RQ71 gaps: lossy risk/signal/decision projections should block with source-linked projection-fidelity evidence, while clean-current projections remain accepted.
