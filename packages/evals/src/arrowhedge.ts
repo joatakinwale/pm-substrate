@@ -232,8 +232,24 @@ export const ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS = [
   },
 ] as const satisfies readonly ArrowHedgeScenarioSpec[];
 
+export const ARROWHEDGE_CANONICAL_AUTHORITY_PACKET_SCENARIOS = [
+  {
+    scenarioId: "arrowhedge-source-authority-risk-snapshot-conflict",
+    failureClass: "source_authority_conflict",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline decision accepts from an older risk snapshot even though the current authoritative risk source has moved.",
+    substrateNotes:
+      "Substrate terminal packet blocks because the current state view exposes a source-authority conflict before admission.",
+  },
+] as const satisfies readonly ArrowHedgeScenarioSpec[];
+
 export const ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS = [
   ...ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+  ...ARROWHEDGE_CANONICAL_AUTHORITY_PACKET_SCENARIOS,
   ...ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS,
 ] as const satisfies readonly ArrowHedgeScenarioSpec[];
 

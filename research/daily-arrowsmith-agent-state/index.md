@@ -47,6 +47,8 @@ v58 update: `@pm/evals` now exposes `buildArrowHedgeTerminalPacketProofSourceBun
 
 v59 update: `@pm/continuity` now exposes a reusable checkpoint-chain verifier, `PostgresContinuityLedger.verify()` consumes it, and ArrowHedge terminal packets can carry continuity checks that block private-memory drift or missing terminal history. Axis A now has store-backed paired packet proof for five failure families, including `memory_drift` and `continuity_break`, while the finance axis and three-axis solution remain unverified until the remaining Axis A gaps and Axis B blocker are resolved.
 
+v60 update: ArrowHedge now classifies risk/signal snapshot mismatches as `source_authority_conflict` instead of generic `state_disagreement`, exports a source-authority packet fixture family, and maps it through Axis A terminal packet scenarios. Store-backed paired Axis A proof now covers six failure families, while `representation_loss`, `workflow_invalidation`, `capability_contract_violation`, `parallel_write_conflict`, and Axis B remain open.
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -112,6 +114,7 @@ v59 update: `@pm/continuity` now exposes a reusable checkpoint-chain verifier, `
 | v57 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v57-arrowhedge-paired-temporal-packet-corpus-2026-06-25.md` | ArrowHedge paired temporal packet corpus | Answered RQ58 for canonical paired packet generation, added RQ59, and generated baseline/substrate temporal packet pairs with substrate-only strict recovery. |
 | v58 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md` | ArrowHedge packet-store source bundle | Answered RQ59, added RQ60, and moved paired temporal packet recovery through `PostgresEvalEventStore` plus a reusable strict Axis A source-bundle helper. |
 | v59 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md` | Axis A continuity packet families | Answered RQ60, added RQ61-RQ70, extracted reusable continuity-chain verification, and added paired packet-backed `memory_drift` / `continuity_break` Axis A families. |
+| v60 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v60-axis-a-source-authority-packet-family-2026-06-26.md` | Axis A source-authority packet family | Answered RQ61, added RQ71, tightened ArrowHedge source-authority conflict classification, and added a paired packet-backed `source_authority_conflict` Axis A family. |
 
 ## Top Findings
 

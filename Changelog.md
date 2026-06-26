@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-26 - Axis A source-authority packet family
+
+- Added `research/daily-arrowsmith-agent-state/v60-axis-a-source-authority-packet-family-2026-06-26.md`, answering RQ61 and replacing it with RQ71.
+- Changed ArrowHedge risk/signal snapshot mismatch conflicts from generic `state_disagreement` to `source_authority_conflict`.
+- Added `buildArrowHedgeSourceAuthorityConflictFixtureCases()` to the finance adapter.
+- Added `ARROWHEDGE_CANONICAL_AUTHORITY_PACKET_SCENARIOS` and included it in `ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS`.
+- Expanded paired Axis A packet recovery from five to six source-recovered substrate refusals.
+- Claim boundary: Axis A improves, but `representation_loss`, `workflow_invalidation`, `capability_contract_violation`, `parallel_write_conflict`, and Axis B remain open.
+
 ## 2026-06-26 - Axis A continuity packet families
 
 - Added `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md`, answering RQ60 and replacing it with RQ61-RQ70.

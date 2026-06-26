@@ -39,6 +39,7 @@ import {
   compareArrowHedgeStateReviewArtifactCorpusEquivalence,
   buildArrowHedgeStateReviewArtifactCorpus,
   buildArrowHedgeStateReviewArtifact,
+  buildArrowHedgeSourceAuthorityConflictFixtureCases,
   buildArrowHedgeTemporalMisalignmentFixtureCases,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,
@@ -491,8 +492,8 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(view.workflowPosition).toBe("blocked_stale_state");
     expect(state.tickers["AAPL"]?.stateDisagreements).toBe(1);
     expect(view.conflicts.map((conflict) => conflict.conflictType)).toEqual([
-      "state_disagreement",
-      "state_disagreement",
+      "source_authority_conflict",
+      "source_authority_conflict",
       "stale_observation",
     ]);
     expect(decision.mode).toBe("warn");
@@ -1155,6 +1156,52 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     ).toContain("continuity_terminal_history_missing");
   });
 
+  it("turns ArrowHedge source-authority conflicts into substrate terminal blockers", async () => {
+    const tenant = tenantId("tnt_arrowhedge_source_authority_packets");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_source_authority_packets",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const cases = buildArrowHedgeSourceAuthorityConflictFixtureCases({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const artifact = buildArrowHedgeStateReviewArtifact(cases[0]!);
+    const corpus = buildArrowHedgeActionOutcomeEnvelopeCorpus(cases);
+
+    expect(cases.map((fixtureCase) => fixtureCase.scenarioId)).toEqual([
+      "arrowhedge-source-authority-risk-snapshot-conflict",
+    ]);
+    expect(artifact?.review.currentStateView.conflicts.map((conflict) => conflict.conflictType)).toEqual([
+      "source_authority_conflict",
+    ]);
+    expect(artifact?.review.execution).toMatchObject({
+      allowed: false,
+      blocking: true,
+    });
+    expect(corpus.valid).toBe(true);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      blocked: 1,
+    });
+    expect(corpus.packets[0]?.envelope.blockingCauses.map((cause) => cause.code)).toContain(
+      "proposal_review_blocking_policy",
+    );
+  });
+
   it("maps canonical terminal packets into Axis A eval events without verified overclaim", async () => {
     const tenant = tenantId("tnt_arrowhedge_terminal_packet_eval_mapping");
     const plan = buildArrowHedgeIngestionPlan(snapshot, {
@@ -1279,17 +1326,17 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     });
 
     expect(corpus.valid).toBe(true);
-    expect(corpus.packets).toHaveLength(10);
+    expect(corpus.packets).toHaveLength(12);
     expect(corpus.terminalOutcomeCounts).toMatchObject({
-      accepted: 5,
-      blocked: 5,
+      accepted: 6,
+      blocked: 6,
     });
     expect(
       corpus.packets.filter((packet) => packet.runArm === "baseline"),
-    ).toHaveLength(5);
+    ).toHaveLength(6);
     expect(
       corpus.packets.filter((packet) => packet.runArm === "substrate"),
-    ).toHaveLength(5);
+    ).toHaveLength(6);
     expect(
       corpus.packets
         .filter((packet) => packet.runArm === "baseline")
@@ -1349,6 +1396,10 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       verified: true,
       terminalProofBackedPairs: 1,
     });
+    expect(report.byCell.finance.source_authority_conflict).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
     expect(report.byCell.finance.memory_drift).toMatchObject({
       verified: true,
       terminalProofBackedPairs: 1,
@@ -1361,8 +1412,11 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(report.byAxis.finance.missingFailureClasses).toEqual(
       expect.arrayContaining([
         "representation_loss",
-        "source_authority_conflict",
+        "workflow_invalidation",
       ]),
+    );
+    expect(report.byAxis.finance.missingFailureClasses).not.toContain(
+      "source_authority_conflict",
     );
 
     const substrateMappedEvents = sourceBundleWithoutRecovery.events.filter(
@@ -1393,31 +1447,31 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     });
 
     expect(recoverySuite.summary).toMatchObject({
-      totalEvents: 5,
-      auditedEvents: 5,
-      validRecoveries: 5,
+      totalEvents: 6,
+      auditedEvents: 6,
+      validRecoveries: 6,
       invalidRecoveries: 0,
       byStatus: {
-        terminal_outcome_refused_authority: 5,
+        terminal_outcome_refused_authority: 6,
       },
     });
     expect(assembly.sourceRecoveries).toEqual([
       expect.objectContaining({
         sourceId: "axis-a-arrowhedge-paired-packets",
         axis: "finance",
-        eventCount: 24,
-        obligationCount: 5,
+        eventCount: 26,
+        obligationCount: 6,
         recoveryStatus: "provided",
-        recoveryCount: 5,
-        validRecoveries: 5,
+        recoveryCount: 6,
+        validRecoveries: 6,
         invalidRecoveries: 0,
       }),
     ]);
     expect(assembly.packet.authorityRecoveryGate).toMatchObject({
       required: true,
       passed: true,
-      obligationCount: 5,
-      validObligations: 5,
+      obligationCount: 6,
+      validObligations: 6,
       invalidObligations: [],
     });
     expect(assembly.packet.report.byAxis.finance.verified).toBe(false);

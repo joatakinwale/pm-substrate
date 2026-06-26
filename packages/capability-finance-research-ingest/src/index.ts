@@ -24,6 +24,7 @@ export {
   compareArrowHedgeStateReviewArtifactCorpusEquivalence,
   buildArrowHedgeStateReviewArtifactCorpus,
   buildArrowHedgeStateReviewArtifact,
+  buildArrowHedgeSourceAuthorityConflictFixtureCases,
   buildArrowHedgeTemporalMisalignmentFixtureCases,
   createArrowHedgeCommonOperatingPictureProjection,
   executeArrowHedgeIngestionPlan,

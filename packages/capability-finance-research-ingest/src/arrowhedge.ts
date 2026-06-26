@@ -1188,6 +1188,7 @@ export function buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus(
 ): ArrowHedgeActionOutcomeEnvelopeCorpus {
   const packetCases = [
     ...buildArrowHedgeTemporalMisalignmentFixtureCases(input),
+    ...buildArrowHedgeSourceAuthorityConflictFixtureCases(input),
     ...buildArrowHedgeContinuityFixtureCases(input),
   ];
   const pairedInputs = packetCases.flatMap((fixtureCase) => [
@@ -1417,6 +1418,59 @@ export function buildArrowHedgeTemporalMisalignmentFixtureCases(
           sessionId: "arrowhedge-temporal-fixture-feedback-observation",
           workflowRunId: "arrowhedge-temporal-workflow-feedback-observation",
           evalEventIds: ["eval_arrowhedge_feedback_to_observation"],
+        },
+      },
+    },
+  ];
+}
+
+export function buildArrowHedgeSourceAuthorityConflictFixtureCases(
+  input: ArrowHedgeTemporalMisalignmentFixtureCasesInput,
+): readonly ArrowHedgeStateReviewArtifactCorpusInput[] {
+  const conflictState = arrowHedgeSourceAuthorityConflictState(
+    input.state,
+    input.symbol,
+  );
+  const view = buildArrowHedgeCurrentStateView({
+    ...input,
+    state: conflictState,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = conflictState.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!view || !ticker?.latestRiskState || !decisionId) return [];
+
+  return [
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: conflictState,
+      scenarioId: "arrowhedge-source-authority-risk-snapshot-conflict",
+      actionType: "portfolio.decision.accept",
+      payload: {
+        decisionId,
+        authorityConflictId: `risk:${ticker.latestRiskState.sourceSnapshotId}`,
+      },
+      proposedBy: input.proposedBy ?? "agent:portfolio-manager",
+      proposedAt: input.observationCapturedAt,
+      readSet: buildReadSetFromCurrentStateView(view, view.authorityRule),
+      observationContract: buildObservationContractFromCurrentStateView(view),
+      artifact: {
+        artifactId: "artifact_arrowhedge_source_authority_conflict_001",
+        metadata: {
+          temporalMisalignmentPhase: "none",
+          invariantClasses: ["source_authority", "state_conflict"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/source-authority-risk-snapshot-conflict.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-authority-fixture-risk-snapshot",
+          workflowRunId: "arrowhedge-authority-workflow-risk-snapshot",
+          evalEventIds: ["eval_arrowhedge_source_authority_conflict"],
         },
       },
     },
@@ -2104,7 +2158,7 @@ function tickerConflicts(
     ticker.latestDecision.riskSourceSnapshotId !== ticker.latestRiskState.sourceSnapshotId
   ) {
     conflicts.push({
-      conflictType: "state_disagreement",
+      conflictType: "source_authority_conflict",
       refs: presentStateRefs([
         ticker.latestDecision
           ? stateRef(
@@ -2127,7 +2181,7 @@ function tickerConflicts(
     ticker.latestDecision.signalSourceSnapshotId !== ticker.latestSignal.sourceSnapshotId
   ) {
     conflicts.push({
-      conflictType: "state_disagreement",
+      conflictType: "source_authority_conflict",
       refs: presentStateRefs([
         ticker.latestDecision
           ? stateRef(
@@ -2227,6 +2281,7 @@ function arrowHedgeActionId(
   const actionDiscriminator =
     payloadString(input.payload, "refreshId") ??
     payloadString(input.payload, "feedbackId") ??
+    payloadString(input.payload, "authorityConflictId") ??
     payloadString(input.payload, "memoryCheckpointId") ??
     missingObservationActionDiscriminator(input.payload) ??
     payloadString(input.payload, "decisionId") ??
@@ -2480,6 +2535,33 @@ function arrowHedgeContinuityCheckpoint(
   return {
     ...input,
     contentHash: checkpointHash(input),
+  };
+}
+
+function arrowHedgeSourceAuthorityConflictState(
+  state: ArrowHedgeCommonOperatingPictureState,
+  symbol: string,
+): ArrowHedgeCommonOperatingPictureState {
+  const ticker = state.tickers[symbol];
+  if (!ticker?.latestRiskState || !ticker.latestDecision) return state;
+
+  const tickers = {
+    ...state.tickers,
+    [symbol]: {
+      ...ticker,
+      latestRiskState: {
+        ...ticker.latestRiskState,
+        eventId: `${ticker.latestRiskState.eventId}:authority_conflict`,
+        riskStateId: `${ticker.latestRiskState.riskStateId}:authority_conflict`,
+        sourceSnapshotId: `${ticker.latestRiskState.sourceSnapshotId}:revalidated`,
+        authority: `${ticker.latestRiskState.authority}:risk_revalidated`,
+      },
+    },
+  };
+
+  return {
+    tickers,
+    summary: summarizeCop(tickers),
   };
 }
 
