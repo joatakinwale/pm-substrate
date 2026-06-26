@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-19
+Last updated: 2026-06-25
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -15,7 +15,25 @@ LLM agents are statistical predictors promoted into actors. The state problem ap
 
 The immediate primitive now exists as a pure review and artifact boundary: `CurrentStateView + original ObservationContract + ObservationContractEvaluation + ReadSetValidation + ActionProposalReview + StateReviewArtifact`. The durable artifact lifecycle and first external-evidence frontier are now implemented in code: deterministic JSON/JSONL export/import, replay hash validation, ArrowHedge corpus generation, continuity payload linkage, `state_review_artifact` eval refs, artifact-derived metrics, DB/fixture equivalence helpers, observed read-set comparison, all three temporal misalignment fixture phases, an invariant-class `wouldBlock` policy matrix, and committed replayable corpora for external-evidence admission, ArrowHedge state-review artifacts, and write-binding attempts.
 
-The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closed the memory-write/read taxonomy seam. v14 partly closed the target-receipt seam as a pure replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. v15 identifies status-currentness as the next authority boundary: certificates, receipts, MCP handles, task ids, and PM acknowledgements need decision-time status checks for revocation, suspension, refresh, staleness, status authority, and privacy/correlation risk. v16 adds a stricter enforcement correction from the local June 18 ArrowHedge live-bridge audit: a block event is not proof of mutation prevention unless the action lifecycle has a mutually exclusive terminal outcome. The remaining proof boundary is terminal outcome partitioning, durable certificate/status verification, durable live receipt/status stores, memory-store/runtime enforcement beyond replay fixtures, policy-transition checks, final-state verification, and PM protocol-burden measurement.
+The current frontier is now broader and more precise: selected write-capable workflow dispatch can block missing, incomplete, policy-blocked, catalog-unverified, or certificate-invalid evidence bindings when `evidenceBindingMode: "require_for_writes"` is enabled, but broad mutation governance remains unclaimed. The replay/catalog lane now includes deterministic admission certificate ids/digests, validity windows, policy version, revocation epoch, execution identity, and strict tenant/workflow replay checks. v13 closed the memory-write/read taxonomy seam. v14 partly closed the target-receipt seam as a pure replay primitive: `target_receipt` is a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as delivery proof, and replay metrics distinguish dispatch-only from applied receipts. v15 identifies status-currentness as the next authority boundary: certificates, receipts, MCP handles, task ids, and PM acknowledgements need decision-time status checks for revocation, suspension, refresh, staleness, status authority, and privacy/correlation risk. v16 adds a stricter enforcement correction from the local June 18 ArrowHedge live-bridge audit: a block event is not proof of mutation prevention unless the action lifecycle has a mutually exclusive terminal outcome. v17 reviews the strongest "reality qualities" papers and converts them into executable bridge concepts. v18 starts the closed research loop with ten peer-reviewed-paper-backed questions and converts the first candidate into pure `ActionOutcomeEnvelope` tests. v19 answers RQ11, adds RQ21, and wires `action_outcome_envelope` refs into Axis A/C eval events while recording Axis B as blocked by missing PluggedInSocial/fixtures. v20 answers RQ21 by adding write-transport outcome-envelope coverage metrics. v21 answers RQ22 by putting runtime outcome-envelope creation at the existing workflow evidence-binding gate; the fixture inventory now reports 4/4 workflow-routed write transports have an outcome-envelope provider. v22 answers RQ23 by promoting runtime workflow envelopes into canonical `@pm/agent-state` envelopes without duplicating terminal claims; ArrowHedge write-binding replay rows now carry accepted/blocked proof packets. v23 answers RQ24 by adding a replay index that resolves EvalEvent `action_outcome_envelope` refs back to committed promoted packets and recovered terminal outcomes. v24 answers RQ25 by adding a Postgres-backed packet table/store for hash-verified terminal envelopes. v25 answers RQ26 by generating canonical Axis C packets in both the deterministic eval scaffold and dynamic local-agent-lab engine, with the DB runner persisting packets before EvalEvents. v26 answers RQ27 by converting dynamic `ScenarioRun` records into packet-backed `live_run` EvalEvents and verifying one stale-observation run end-to-end against local Postgres/Ollama. v27 answers RQ28 by requiring one protective packet-backed live pair per taxonomy class and registering all ten dynamic Axis C scenarios; a local Postgres/Ollama run produced 20 EvalEvents, 20 packets, 10 baseline failures, 0 substrate failures, and complete Axis C live coverage. v28 answers RQ29 by adding a three-axis coverage analyzer over all 30 `(axis, failureClass)` cells, separating protective coverage from stricter verification and preserving Axis B blockers. v29 answers RQ30 by splitting scenario oracle verdict from operational terminal outcome, so terminally blocked protective refusals can verify scenario passes when backed by `ActionOutcomeEnvelope` refs. v30 answers RQ31 by adding a traceable three-axis proof packet and arm-scoped ArrowHedge terminal refs, making the current Axis A incomplete / Axis B blocked / Axis C verified state explicit. v31 corrects the implementation frontier: terminal-ref validity belongs in the substrate codebase first, so `@pm/agent-state` now has a hash-gated terminal outcome index and stronger admission primitive. v32 makes ArrowHedge the first domain consumer of that terminal index at its proposal-review write boundary. v33 adds a dependency-light workflow terminal admission port so `@pm/workflow` can admit accepted/blocked invocation envelopes before dispatch/dead-letter without importing `@pm/agent-state`. v34 adds an agency publication terminal adapter in `@pm/profile-agency`, so accepted authoritative agency fixtures can become canonical terminal envelopes without substrate-package edits. v35 exposes terminal-admission provider refs through typed capability write contracts and registry discovery, so provider coverage can be derived from codebase descriptors rather than hand-edited eval inventories. v36 adds provider-side manifests plus registry verification, so missing, unavailable, deprecated, version-incompatible, package/export-drifted, or narrower provider implementations cannot count as verified coverage. v37 promotes verified manifests into status-bearing provider certificates and adds an opt-in workflow runtime certificate gate before write-capable dispatch. v38 adds a substrate-owned Postgres certificate status store and wires workflow to consume it directly. v39 turns certificate status changes into append-only replayable events and historical lookup. v40 binds exact certificate status-event refs into workflow `ActionOutcomeEnvelope`s. v41 adds an opt-in graph write-authority policy so graph mutations can require accepted workflow authority and provider-certificate status refs before SQL. v42 propagates that authority policy into capability-kit raw graph updates before `apply` or SQL. v43 adds store-backed substrate-record matching so strict policies can reject forged valid-looking refs. v44 adds a structural workflow-to-capability authority connector plus a real lead-scoring adapter hook. The remaining proof boundary is enabling strict policies in Axis A/B/C runners with store-sourced authority resolutions, filling Axis A, and keeping Axis B blocked until PluggedInSocial or accepted authoritative fixture runs exist.
+
+v45 update: `@pm/capability-kit` now has a store-backed resolver factory that loads workflow envelopes by tenant/envelope id before returning graph authority. The remaining proof boundary is preserving/recovering provider-status authority metadata from canonical packet stores, filling Axis A, and keeping Axis B blocked until PluggedInSocial or accepted authoritative fixture runs exist.
+
+v46 update: canonical `ActionOutcomeEnvelope` packets now preserve provider certificate id/digest/status refs, and `PostgresEvalEventStore` can recover the structural workflow-authority envelope shape by tenant/envelope id. The remaining proof boundary is composing that recovery with strict graph/capability policy inside Axis A/C runners while Axis B remains explicitly blocked.
+
+v47 update: `@pm/evals` now has `auditEvalEventGraphWriteAuthority()`, a structural runner/audit primitive that recovers an EvalEvent's outcome packet, composes with a store-backed authority resolver such as `graphWriteAuthorityResolverFromWorkflowEnvelopeStore()`, validates strict graph authority policy, and distinguishes accepted recovered authority from blocked terminal outcomes that correctly refuse authority. The accepted ArrowHedge write-binding replay packet now carries provider-status metadata. The remaining proof boundary is making Axis A/C live/scenario runners require this audit as a gate and feed the result into proof packets; Axis B remains blocked until PluggedInSocial or accepted authoritative fixtures exist.
+
+v48 update: `ThreeAxisProofPacket` now has an opt-in authority-recovery gate. When `requireAuthorityRecovery` is enabled, terminal-proof-backed events need valid authority recoveries with expected statuses before the proof packet can remain `verified`. Missing, invalid, or wrong-status recoveries make the packet unverified. The remaining proof boundary is making Axis A/C runner scripts generate those recoveries from real packet stores and store-backed resolvers.
+
+v49 update: local-lab runner scripts now generate store-derived authority recovery summaries after packet persistence by composing `PostgresEvalEventStore` with `graphWriteAuthorityResolverFromWorkflowEnvelopeStore()` under strict graph policy. `@pm/evals` now has batch authority auditing. The remaining proof boundary is making accepted Axis A/C runner-produced packets carry real provider-status-bearing authority metadata so those store-derived recoveries can pass the strict proof-packet gate.
+
+v50 update: `@pm/agent-state` now has a reusable `buildActionOutcomeProviderAuthority()` helper, dynamic local-agent-lab accepted packets carry local provider certificate/status metadata, deterministic local-lab accepted packets do the same, and strict local-lab authority recovery now passes over generated packets. The remaining proof boundary is feeding runner-generated `authorityRecoveries` into `buildThreeAxisProofPacket({ requireAuthorityRecovery: true })` without hiding Axis B blockers or no-DB runner gaps.
+
+v51 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacket()`, and local-lab runner scripts print strict proof-packet summaries before and after persisted authority recovery. No-DB deterministic output now remains explicitly unverified with missing authority-recovery obligations instead of implying strict proof. The remaining proof boundary is an all-axis proof-packet assembler that combines Axis A, Axis C, and Axis B blocker/fixture sources with per-source recovery provenance.
+
+v52 update: `@pm/evals` now exposes `buildStrictThreeAxisProofPacketAssembly()`, which accepts source bundles, validates declared event counts, builds one strict proof packet, and returns per-source recovery provenance (`provided`, `missing_required`, or `not_required`). Axis B blocker sources remain blocked without synthetic recovery obligations. The remaining proof boundary is producing real Axis A ArrowHedge finance source bundles with persisted packets and recovery suites.
+
+v53 update: `@pm/evals` now exposes `buildArrowHedgeWriteBindingProofSourceBundle()`, which builds a finance source bundle from the committed ArrowHedge write-binding replay corpus and can consume strict authority recoveries from replay packets. The terminal-outcome partition cell is now recovery-backed, while finance remains incomplete for failure classes that still lack packet-backed pairs.
 
 ## Versions
 
@@ -39,6 +57,43 @@ The current frontier is now broader and more precise: selected write-capable wor
 | v14 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v14-agent-state-arrowsmith-2026-06-16.md` | Target-receipt evidence closure and telemetry-gap correction | Converted the next open v12 frontier into code: `target_receipt` is now a first-class evidence kind, dispatch-only pseudo-receipts warn instead of reading as admitted confirmation, and replay fixtures/metrics distinguish dispatch-only from applied target receipts. |
 | v15 | 2026-06-16 | `research/daily-arrowsmith-agent-state/v15-agent-state-arrowsmith-2026-06-16.md` | Status-currentness bridge and durable status-store frontier | Continued from same-day v14 and shifted the next implementation frontier to decision-time status checks for replay certificates, target receipts, MCP task handles, and PM handoff acknowledgements. |
 | v16 | 2026-06-19 | `research/daily-arrowsmith-agent-state/v16-agent-state-arrowsmith-2026-06-19.md` | Terminal enforcement correction and live-bridge audit bridge | Added the correction that stale-state detection or block-event emission is not enough; action lifecycles need mutually exclusive terminal outcomes, dashboard metric provenance, and status checks wired into the action gate. |
+| v17 | 2026-06-24 | `research/daily-arrowsmith-agent-state/v17-reality-quality-arrowsmith-2026-06-24.md` | Reality-quality cross-paper review and Arrowsmith bridge map | Reviewed the strongest peer-reviewed/scholarly systems papers across quotienting, sheaf gluing, transition semantics, consensus, transactions, content identity, feedback control, boundary objects, transactive memory, and provenance; converted them into new substrate concepts: equivalence classes, obstruction artifacts, terminal action normal forms, admission kernels, evidence leases, conflict algebra, receding-horizon execution, and projection-drift checks. |
+| v18 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v18-action-outcome-loop-2026-06-25.md` | Closed-loop question ledger and pure `ActionOutcomeEnvelope` slice | Asked ten agent-state questions, answered them with peer-reviewed papers, added replacement questions RQ11-RQ20, and implemented the first pure terminal normal-form primitive with falsification tests. |
+| v19 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v19-action-outcome-eval-wiring-2026-06-25.md` | Outcome-envelope eval wiring and Axis B blocker record | Answered RQ11 with enforcement-boundary papers, added RQ21, added first-class `action_outcome_envelope` eval refs, wired Axis A/C outcome evidence, and added a machine-checkable Axis B blocked eval. |
+| v20 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v20-write-transport-outcome-envelope-coverage-2026-06-25.md` | Write-transport outcome-envelope coverage audit | Answered RQ21, added RQ22, extended write-transport coverage metrics with outcome-envelope provider coverage, and made the current 0/4 runtime coverage gap explicit. |
+| v21 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v21-workflow-outcome-envelope-boundary-2026-06-25.md` | Workflow runtime outcome-envelope boundary | Answered RQ22, added RQ23, generated accepted/blocked workflow outcome envelopes at the evidence-binding gate, and moved fixture outcome-envelope coverage to 4/4. |
+| v22 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v22-workflow-envelope-promotion-2026-06-25.md` | Workflow envelope promotion into proof packets | Answered RQ23, added RQ24, promoted workflow runtime envelopes into canonical `ActionOutcomeEnvelope` proof packets, and added those packets to ArrowHedge write-binding replay records. |
+| v23 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v23-outcome-envelope-replay-index-2026-06-25.md` | Outcome-envelope replay index | Answered RQ24, added RQ25, indexed promoted envelope proof packets, and proved Axis A EvalEvents can recover blocked terminal outcomes from replay refs. |
+| v24 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v24-live-outcome-envelope-store-2026-06-25.md` | Live outcome-envelope packet store | Answered RQ25, added RQ26, added Postgres packet persistence for hash-verified action outcome envelopes, and kept Axis C runtime packet generation open. |
+| v25 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v25-axis-c-outcome-packet-generation-2026-06-25.md` | Axis C outcome packet generation | Answered RQ26, added RQ27, generated packet-backed Axis C scaffold events, and exposed dynamic local-agent-lab outcome packets. |
+| v26 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v26-dynamic-axis-c-evalevents-2026-06-25.md` | Dynamic Axis C EvalEvents | Answered RQ27, added RQ28, converted dynamic local-agent-lab runs into packet-backed `live_run` EvalEvents, and verified one live stale-observation run against local Postgres/Ollama. |
+| v27 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v27-axis-c-ten-class-live-coverage-2026-06-25.md` | Axis C ten-class live coverage | Answered RQ28, added RQ29, registered all ten dynamic Axis C scenarios, and made live coverage complete only for protective packet-backed pairs. |
+| v28 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v28-three-axis-coverage-gate-2026-06-25.md` | Three-axis coverage gate | Answered RQ29, added RQ30, and added a 30-cell coverage/verification analyzer that cannot hide Axis B blockers behind Axis C completeness. |
+| v29 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v29-eval-verdict-terminal-outcome-split-2026-06-25.md` | Eval verdict / terminal outcome split | Answered RQ30, added RQ31, and split scenario oracle verdicts from operational terminal outcomes so protective refusals can verify scenario passes without hiding blocked axes. |
+| v30 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v30-three-axis-proof-packet-2026-06-25.md` | Three-axis proof packet | Answered RQ31, added RQ32, and added a proof packet that preserves verified, missing, blocked, and terminal-proof-backed cells across the three-axis matrix. |
+| v31 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v31-terminal-index-codebase-correction-2026-06-25.md` | Terminal index codebase correction | Answered RQ32, added RQ33, and moved terminal-ref/hash validity back into `@pm/agent-state` via a hash-gated terminal outcome index instead of expanding verifier-only machinery. |
+| v32 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v32-arrowhedge-terminal-index-adoption-2026-06-25.md` | ArrowHedge terminal index adoption | Answered RQ33, added RQ34, and made ArrowHedge proposal-review artifacts emit canonical terminal envelopes admitted through the core terminal index. |
+| v33 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v33-workflow-terminal-admission-port-2026-06-25.md` | Workflow terminal admission port | Answered RQ34, added RQ35, and added a dependency-light workflow admission port that can reject terminal conflicts before dispatch without making `@pm/workflow` depend on `@pm/agent-state`. |
+| v34 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v34-agency-publication-terminal-adapter-2026-06-25.md` | Agency publication terminal adapter | Answered RQ35, added RQ36, and added a profile-owned publication terminal adapter that blocks revoked approvals and indexes same-action publish conflicts through `@pm/agent-state`. |
+| v35 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v35-terminal-admission-provider-metadata-2026-06-25.md` | Terminal admission provider metadata | Answered RQ36, added RQ37, and made terminal-admission providers discoverable through typed write-contract metadata and registry helpers. |
+| v36 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v36-terminal-provider-manifest-verification-2026-06-25.md` | Terminal provider manifest verification | Answered RQ37, added RQ38, and added live manifest verification so stale provider metadata cannot prove coverage by itself. |
+| v37 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v37-terminal-provider-certificates-2026-06-25.md` | Terminal provider certificates | Answered RQ38, added RQ39, and added status-bearing provider certificates plus an opt-in workflow runtime certificate gate before write-capable dispatch. |
+| v38 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v38-provider-certificate-status-store-2026-06-25.md` | Provider certificate status store | Answered RQ39, added RQ40, and added a substrate-owned Postgres certificate status store wired into workflow runtime lookup. |
+| v39 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v39-provider-certificate-status-event-replay-2026-06-25.md` | Provider certificate status event replay | Answered RQ40, added RQ41, and added append-only hash-linked status events plus historical certificate-status replay. |
+| v40 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v40-workflow-status-ref-binding-2026-06-25.md` | Workflow status ref binding | Answered RQ41, added RQ42, and bound exact provider-certificate status event refs into workflow action outcome envelopes. |
+| v41 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v41-graph-write-authority-ref-2026-06-25.md` | Graph write authority ref | Answered RQ42, added RQ43, and added an opt-in graph write-authority policy requiring accepted workflow authority plus provider-certificate status refs before graph SQL. |
+| v42 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v42-capability-kit-write-authority-2026-06-25.md` | Capability kit write authority | Answered RQ43, added RQ44, and propagated graph write-authority policy into capability-kit raw graph updates before `apply` or SQL. |
+| v43 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v43-store-backed-write-authority-2026-06-25.md` | Store backed write authority | Answered RQ44, added RQ45, and added substrate-record matching so strict graph/capability authority cannot rely on forged valid-looking refs. |
+| v44 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v44-workflow-authority-injection-2026-06-25.md` | Workflow authority injection | Answered RQ45, added RQ46, added a structural workflow-envelope authority connector, and injected graph write authority into the real lead-scoring capability adapter. |
+| v45 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v45-store-backed-authority-resolver-2026-06-25.md` | Store backed authority resolver | Answered RQ46, added RQ47, and added a resolver factory that loads workflow envelopes from a store before returning graph authority. |
+| v46 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v46-authority-metadata-packet-recovery-2026-06-25.md` | Authority metadata packet recovery | Answered RQ47, added RQ48, and preserved provider-status authority metadata through canonical packets and eval-store recovery. |
+| v47 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v47-strict-authority-recovery-audit-2026-06-25.md` | Strict authority recovery audit | Answered RQ48, added RQ49, added a strict authority recovery audit primitive, and gave ArrowHedge accepted replay packets provider-status metadata. |
+| v48 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v48-proof-packet-authority-gate-2026-06-25.md` | Proof packet authority gate | Answered RQ49, added RQ50, and made proof packets optionally require strict authority recoveries before verified status. |
+| v49 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v49-runner-authority-recovery-generation-2026-06-25.md` | Runner authority recovery generation | Answered RQ50, added RQ51, and wired local-lab runners to generate store-derived strict authority recovery summaries. |
+| v50 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v50-local-lab-provider-authority-metadata-2026-06-25.md` | Local-lab provider authority metadata | Answered RQ51, added RQ52, and made accepted Axis C packets carry provider-status authority metadata that strict recovery can validate. |
+| v51 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v51-strict-runner-proof-packet-consumption-2026-06-25.md` | Strict runner proof-packet consumption | Answered RQ52, added RQ53, and made runner proof summaries consume authority recovery suites or expose missing recovery obligations. |
+| v52 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v52-all-axis-proof-packet-assembler-2026-06-25.md` | All-axis proof-packet assembler | Answered RQ53, added RQ54, and added per-source recovery provenance for strict all-axis proof-packet assembly. |
+| v53 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v53-arrowhedge-finance-source-bundle-2026-06-25.md` | ArrowHedge finance source bundle | Answered RQ54, added RQ55, and made the current ArrowHedge write-binding replay corpus available as a strict finance proof source bundle. |
 
 ## Top Findings
 
@@ -101,6 +156,22 @@ The current frontier is now broader and more precise: selected write-capable wor
 57. **Target receipt is now a pure tested primitive.** v14 adds a distinct `target_receipt` evidence kind, explicit receipt metadata, dispatch-only downgrade warnings, and replay metrics for dispatch-only versus applied target receipts.
 58. **Status-currentness is the next authority boundary.** v15 separates a certificate or receipt from its current status: revocation, suspension, refresh, checked-at time, status authority, and privacy/correlation risk must be checked before evidence supports valid action.
 59. **Block events are not enforcement unless terminal outcomes partition.** v16 corrects the live ArrowHedge bridge boundary: detected stale state, emitted block records, and suppressed actions are separate claims until one stable action id has exactly one terminal outcome.
+60. **Terminal outcome normal form is now a pure tested primitive.** v18 adds `ActionOutcomeEnvelope` with outcome hashing, same-action terminal partition checks, stale-evidence demotion from requested `accepted` to `blocked`, local-view obstruction artifacts, role projection preservation, and substrate-ref recovery. This is pure proof only; workflow/runtime adoption and three-axis evals remain open.
+61. **Outcome-envelope evidence is now visible in eval events.** v19 adds `action_outcome_envelope` as an eval ref kind and wires Axis A/C substrate events to cite outcome-envelope proof. This improves measurement, but runtime write transports still need required envelope generation before mutation.
+62. **Write-transport outcome-envelope coverage is now measurable.** v20 extends the existing write-transport coverage report with outcome-envelope provider coverage; v21 moves the fixture inventory to 4/4 for workflow-routed write transports by generating envelopes inside `@pm/workflow`.
+63. **Workflow runtime envelopes can now be promoted without a second terminal claim.** v22 adds a canonical promotion helper and ArrowHedge replay proof packets that cite the workflow envelope as substrate evidence; durable persistence into EvalEvents and amnesiac resume remains open.
+64. **EvalEvents can now replay action-outcome refs against promoted proof packets.** v23 adds a replay index and metrics that resolve Axis A `action_outcome_envelope` refs back to valid terminal envelopes; Axis C still needs live packet persistence.
+65. **Eval persistence now has a hash-gated terminal packet table.** v24 adds `evals.action_outcome_envelope_packets` and store methods that only accept hash-valid packets and reject same-ref/different-hash overwrites; Axis C still needs to generate those packets live.
+66. **Axis C now generates canonical outcome packets before eval persistence.** v25 makes deterministic local-lab EvalEvents packet-backed and exposes packets from the dynamic local-agent-lab engine; full dynamic run-to-EvalEvent conversion remains open.
+67. **Dynamic Axis C stale-observation now has packet-backed live EvalEvents.** v26 adds a dynamic local-agent-lab EvalEvent adapter, `live_run` evidence stage, packet-before-event persistence helper, retained live event rows, and a local Postgres/Ollama run whose packet refs resolve from the DB. This is one live failure class, not full Axis C coverage.
+68. **Dynamic Axis C now has ten-class live coverage, but not three-axis verification.** v27 adds explicit live coverage reporting, registers all ten failure classes as dynamic `ScenarioSpec`s, and requires a protective packet-backed pair for coverage. The proof boundary shifts to lifting that gate across Axis A/B/C without hiding Axis B's blocked status.
+69. **The repo now has a 30-cell three-axis coverage gate.** v28 adds `analyzeThreeAxisCoverage()` so each `(axis, failureClass)` cell is visible, blocked cells stay blocked, and stricter verification requires terminal-proof-backed pass pairs by default.
+70. **Scenario verdicts are separate from operational terminal outcomes.** v29 adds `scenarioResult` and `operationalTerminalOutcome` to EvalEvents, so a substrate refusal can be both operationally `blocked` and a scenario `pass` when an `ActionOutcomeEnvelope` proves the terminal outcome.
+71. **Three-axis status is now a traceable proof packet.** v30 adds `buildThreeAxisProofPacket()`, which records sources, verified axes, blocked axes, unverified axes, and cell-level proof status instead of allowing scattered event counts to imply completion.
+72. **Terminal proof validity is a substrate primitive, not a verifier feature.** v31 hardens `admitActionOutcomeEnvelope()` and adds `buildActionOutcomeTerminalIndex()` so only hash-valid envelopes can become terminal incumbents, exact replays are idempotent, and same-action conflicts are state-plane issues before they are eval claims.
+73. **ArrowHedge now consumes terminal admission before verifier accounting.** v32 adds finance-domain helpers that convert proposal-review artifacts into canonical envelopes and run them through the core terminal index, so same-action accepted/blocked conflict is caught at the Axis A code boundary.
+74. **Workflow terminal admission is now a dependency-light port.** v33 lets `@pm/workflow` require admission for accepted/blocked invocation outcome envelopes before dispatch or dead-letter, while leaving canonical `@pm/agent-state` admission to adapters outside the workflow package.
+75. **Agency publication terminal admission now has a profile adapter.** v34 lets `@pm/profile-agency` convert authoritative publication fixture snapshots into canonical terminal envelopes, block revoked approvals or content-hash drift, and report same-action publish conflicts through the core terminal index.
 
 ## Source Changes
 
@@ -246,6 +317,175 @@ The current frontier is now broader and more precise: selected write-capable wor
 - ToolGate strengthened the contract-gated execution bridge: preconditions and postconditions should gate tool invocation and state commits, which maps to terminal outcome partitioning for ArrowHedge decisions.
 - Local June 18 ArrowHedge bridge and dashboard audits added repo-grounded evidence: seeded stale actions were detected, but pre-fix events could emit both accepted and blocked outcomes for the same decision. This corrects the claim boundary from "block observed" to "block is terminal."
 
+### Added on 2026-06-25 v18
+
+- Peer-reviewed terminal-normal-form sources: Herlihy/Wing linearizability, Winskel event structures, Schneider state-machine replication, Clark-Wilson integrity policy, Kung/Robinson OCC, Cahill/Rohm/Fekete SSI, and Ongaro/Ousterhout Raft.
+- Peer-reviewed obstruction/currentness/projection sources: Abramsky/Brandenburger sheaf gluing, Shapiro CRDTs, Dynamo version conflicts, Gray/Cheriton leases, Spanner uncertainty/currentness, Buneman/Khanna/Tan provenance, event-sourced observability, Star/Griesemer boundary objects, Lewis transactive memory, Garcia/Prett/Morari MPC, and ACL LoCoMo.
+- Repo-grounded code slice: `@pm/agent-state` now exposes pure `ActionOutcomeEnvelope`, local-view obstruction evaluation, action outcome role projections, terminal partition validation, and substrate-ref recovery helpers.
+
+### Added on 2026-06-25 v19
+
+- RQ11 answered from Schneider state-machine replication, Clark-Wilson integrity policy, Herlihy/Wing linearizability, and Kung/Robinson OCC: terminal partitioning generalizes beyond pure arrays only when operational writes are downstream of a single well-formed admission boundary.
+- Repo-grounded eval wiring: `@pm/evals` now recognizes `action_outcome_envelope`, Axis A has a terminal-partition paired scenario requiring that ref, Axis C substrate scaffold events cite outcome envelopes, and Axis B can emit an explicit blocked eval for the missing PluggedInSocial/fixture blocker.
+
+### Added on 2026-06-25 v20
+
+- RQ21 answered from the same enforcement-boundary papers plus repo inventory: every write-capable transport in the fixture coverage set still lacks a pre-side-effect `ActionOutcomeEnvelope` provider.
+- Repo-grounded coverage update: `@pm/evals` now tracks outcome-envelope required, covered, missing, coverage rate, and missing transport ids in `analyzeWriteTransportBindingCoverage()`.
+- Replay-corpus correction: write-binding replay artifact hashes now match the committed ArrowHedge state-review artifact corpus again, restoring catalog replay consistency.
+
+### Added on 2026-06-25 v21
+
+- RQ22 answered from Schneider state-machine replication, Clark-Wilson integrity policy, Herlihy/Wing linearizability, and Kung/Robinson OCC: the smallest repo boundary is the workflow evidence-binding gate immediately before write-capable dispatch.
+- Repo-grounded runtime update: `@pm/workflow` now builds accepted/blocked `InvocationActionOutcomeEnvelope` records at that gate and passes accepted envelopes into dispatcher contexts.
+- Repo-grounded coverage update: `@pm/evals` fixture write transports now report 4/4 outcome-envelope provider coverage, while still keeping evidence-binding/provider/verifier coverage separate.
+
+### Added on 2026-06-25 v22
+
+- RQ23 answered from Schneider state-machine replication, Clark-Wilson integrity policy, Herlihy/Wing linearizability, and Kung/Robinson OCC: the workflow runtime envelope remains the terminal source of truth; agent-state promotion wraps and cites it rather than recomputing a second terminal claim.
+- Repo-grounded promotion update: `@pm/agent-state` now exposes `promoteWorkflowInvocationOutcomeEnvelope()`, and `action_outcome_envelope` is also a `StateRefKind`.
+- Repo-grounded replay update: ArrowHedge write-binding replay records now carry canonical promoted `ActionOutcomeEnvelope` proof packets and metrics count accepted vs blocked envelopes.
+
+### Added on 2026-06-25 v23
+
+- RQ24 answered from ARIES, Buneman/Khanna/Tan provenance, Chandy/Lamport snapshots, and Garcia-Molina/Salem sagas: EvalEvents should carry stable refs while replay recovers and verifies terminal envelopes from durable proof packets.
+- Repo-grounded replay update: `@pm/evals` now exposes `ActionOutcomeEnvelopeReplayIndex`, `recoverActionOutcomeEnvelopeFromReplayIndex()`, and `analyzeEvalEventActionOutcomeReplay()`.
+- Axis A update: the ArrowHedge terminal-partition EvalEvent ref is now derived from the write-binding replay corpus and resolves to a hash-valid blocked terminal envelope.
+
+### Added on 2026-06-25 v24
+
+- RQ25 answered from ARIES, Buneman/Khanna/Tan provenance, Chandy/Lamport snapshots, and Garcia-Molina/Salem sagas: promoted terminal packets need a live hash-gated store keyed by the same `action_outcome_envelope` refs that EvalEvents cite.
+- Repo-grounded persistence update: `evals.action_outcome_envelope_packets` now exists in root and package-local migrations.
+- Repo-grounded store update: `PostgresEvalEventStore` can persist hash-valid action outcome envelope packets, reject conflicting packet hashes, and recover terminal packets by EvalEvent substrate ref.
+
+### Added on 2026-06-25 v25
+
+- RQ26 answered from Paxos Made Live, ARIES, Chandy/Lamport snapshots, and Garcia-Molina/Salem sagas: Axis C should generate terminal packets at the runtime admission/refusal boundary and persist them before EvalEvents cite those refs.
+- Repo-grounded scaffold update: `runLocalLabPairedEvals()` now returns canonical hash-valid `ActionOutcomeEnvelope` packets aligned with local-lab substrate EvalEvent refs.
+- Repo-grounded dynamic-engine update: `@pm/local-agent-lab` now builds `ActionOutcomeEnvelope` packets for admitted/refused arm runs and exposes them on run results.
+
+### Added on 2026-06-25 v26
+
+- RQ27 answered from PASS, workflow provenance views, Provenance-To-Use repeatability, and Distributed Time-aware Provenance: dynamic arm runs should become queryable EvalEvent views over runtime provenance while terminal packets remain the proof objects and are persisted before events.
+- Repo-grounded dynamic eval update: `@pm/evals` now exposes `buildDynamicLocalAgentLabEvalSuite()` and `recordDynamicLocalAgentLabEvalSuite()`, with `live_run` evidence-stage metrics and missing-packet rejection.
+- Repo-grounded live-run update: `pnpm evals:local-agent-lab:live` ran stale-observation against local Postgres/Ollama and persisted two packets plus two live EvalEvents whose packet refs resolved from the DB.
+
+### Added on 2026-06-25 v27
+
+- RQ28 answered from Ostrand/Balcer category-partition testing, Zhu/Hall/May coverage adequacy, Kuhn/Kacker/Lei/Hunter combinatorial testing, and Jia/Harman mutation testing: each failure class is a coverage obligation, and Axis C coverage requires a live pair that can expose the targeted fault.
+- Repo-grounded coverage update: `@pm/evals` now reports `DynamicLocalAgentLabLiveCoverageReport`; a class is covered only by a protective packet-backed pair (`baseline=fail`, `substrate!=fail`) with generated `action_outcome_envelope` refs on both arms.
+- Repo-grounded dynamic scenario update: `@pm/local-agent-lab` now registers all ten state-failure classes as dynamic scenarios and the registry test fails if any class is dropped.
+- Repo-grounded live-run update: `pnpm evals:local-agent-lab:live` ran all ten scenarios against local Postgres/Ollama, persisted 20 packets plus 20 EvalEvents, reduced baseline failures from 10 to 0 substrate failures, and recovered all latest 20 packet refs from Postgres.
+
+### Added on 2026-06-25 v28
+
+- RQ29 answered from Weyuker test adequacy, Basili/Selby/Hutchens experimentation, Shull/Carver/Vegas/Juristo replication, and Santos/Vegas/Oivo/Juristo grouped-replication analysis: the full verifier must be stratified by axis and failure class, and blocked/missing strata cannot be aggregated away.
+- Repo-grounded coverage update: `@pm/evals` now exports `analyzeThreeAxisCoverage()`, which reports all 30 required `(axis, failureClass)` cells with covered, verified, missing, blocked, and reason fields.
+- Repo-grounded proof-boundary update: coverage means a protective paired baseline/substrate result with refs; stricter verification means a non-blocked substrate `pass` with terminal `action_outcome_envelope` refs by default.
+- Repo-grounded blocked-axis test: a complete Axis C local-lab matrix no longer makes the full report complete when the Axis B marketing fixture remains blocked.
+
+### Added on 2026-06-25 v29
+
+- RQ30 answered from Barr/Harman/McMinn/Shahbaz/Yoo's oracle-problem survey, Leucker/Schallhart and Bauer/Leucker/Schallhart runtime-verification papers, and Utting/Pretschner/Legeard's model-based-testing taxonomy: the observed runtime outcome and the test/monitor verdict should be separate fields.
+- Repo-grounded schema update: `EvalEvent` now has optional `scenarioResult` and `operationalTerminalOutcome`; terminal outcomes require `action_outcome_envelope` refs, and blocked operational results with scenario passes must name the terminal outcome.
+- Repo-grounded coverage update: Axis C protective refusals now emit `result: "blocked"`, `scenarioResult: "pass"`, and `operationalTerminalOutcome: "blocked"`, and `analyzeThreeAxisCoverage()` verifies those cells through `scenarioPassPairs`.
+
+### Added on 2026-06-25 v30
+
+- RQ31 answered from Gotel/Finkelstein and Ramesh/Jarke traceability, Torkar/Gorschek/Feldt/Svahnberg/Raja/Kamran traceability practice evidence, and Li/Offutt model-based test oracle strategies: three-axis proof needs explicit trace links from requirements/cells to EvalEvents, oracle verdicts, and terminal proof refs.
+- Repo-grounded proof-packet update: `@pm/evals` now exports `buildThreeAxisProofPacket()`, with status, source, verified-axis, blocked-axis, missing-cell, unverified-cell, blocked-cell, and terminal-proof-backed scenario-pass-cell lists.
+- Repo-grounded Axis A update: ArrowHedge `actionOutcomeEnvelopes` can be arm-scoped and carry `operationalTerminalOutcome`, so paired finance events can cite terminal refs for both baseline and substrate arms when proof packets exist.
+
+### Added on 2026-06-25 v31
+
+- RQ32 answered from Herlihy/Wing linearizability, Clark-Wilson integrity, ARIES recovery, Buneman/Khanna/Tan provenance, and Davidson/Freire workflow provenance: verifier refs are evidence links, while the codebase primitive must admit one hash-valid terminal envelope per stable action id.
+- Repo-grounded correction: `@pm/agent-state` now exports `actionOutcomeTerminalKey()` and `buildActionOutcomeTerminalIndex()`, and `admitActionOutcomeEnvelope()` rejects hash-invalid candidate envelopes before admission.
+- Verifier-boundary correction: a half-built proof-packet terminal-ref validator was removed from the implementation slice; three-axis artifacts should consume substrate terminal admission rather than define it.
+
+### Added on 2026-06-25 v32
+
+- RQ33 answered from Clark-Wilson integrity, Kung/Robinson optimistic validation, Schneider state-machine services, and Garcia-Molina/Salem sagas: the first terminal-index consumer should be the high-consequence ArrowHedge proposal-review boundary, not the eval reporter.
+- Repo-grounded finance update: `@pm/capability-finance-research-ingest` now exports `buildArrowHedgeActionOutcomeEnvelope()` and `buildArrowHedgeActionOutcomeTerminalIndex()`.
+- Proof update: ArrowHedge tests now show accepted fresh action, blocked stale action, idempotent replay, and same-action terminal conflict behavior through canonical `ActionOutcomeEnvelope`s.
+
+### Added on 2026-06-25 v33
+
+- RQ34 answered from Parnas modular decomposition, Clark-Wilson integrity, Schneider state-machine services, and Garcia-Molina/Salem sagas: workflow should expose a narrow terminal-admission port instead of importing the canonical terminal store.
+- Repo-grounded workflow update: `@pm/workflow` now exposes `InvocationActionOutcomeAdmissionPort` and related decision/request types, and `PostgresWorkflowRuntime` can fail closed on terminal admission rejection before write-capable dispatch.
+- Boundary update: blocked evidence-gate envelopes are offered to admission before dead-lettering, accepted envelopes are offered before dispatch, and admission adapter failure becomes `action_outcome_admission_rejected` rather than a bypass.
+
+### Added on 2026-06-25 v34
+
+- RQ35 answered from Wiederhold mediation, Rahm/Bernstein schema matching, Nigam/Caswell business artifacts, Hull semantic heterogeneity, Clark-Wilson integrity, and Schneider state-machine services: Axis B should consume terminal admission through a profile-owned agency publication adapter contract, not through substrate edits or eval placeholders.
+- Repo-grounded agency update: `@pm/profile-agency` now exports `AgencyPublicationAuthoritySnapshot`, `buildAgencyPublicationActionOutcomeEnvelope()`, and `buildAgencyPublicationActionOutcomeTerminalIndex()`.
+- Boundary update: approved matching publication content can become an accepted terminal envelope, while revoked approvals, stale approvals, content-hash drift, or lifecycle mismatch demote requested accepted writes to blocked terminal outcomes.
+
+### Added on 2026-06-25 v35
+
+- RQ36 answered from component-contract, interface-automata, specification-matching, semantic-capability-matching, and runtime-verification papers: terminal-admission coverage should be discoverable from typed capability write contracts, but provider metadata is not runtime authority.
+- Repo-grounded contract update: `@pm/types` now has `TerminalAdmissionProviderRef` and `WriteContract.terminalAdmissionProviders`, while `@pm/registry` exposes `listTerminalAdmissionProviderBindings()`.
+- Boundary update: `@pm/capability-finance-research-ingest` advertises the real ArrowHedge action-outcome provider on its Event write contract, `@pm/profile-agency` exposes the publication provider ref, and `@pm/evals` can derive provider coverage from capability descriptors.
+
+### Added on 2026-06-25 v36
+
+- RQ37 answered from semantic-versioning, runtime-contract, behavioral-contract, web-service runtime-verification, and interface-automata papers: terminal-admission refs must be checked against live provider manifests before they can prove coverage.
+- Repo-grounded verifier update: `@pm/registry` now exposes `verifyTerminalAdmissionProviderRef()` and `verifyTerminalAdmissionProviderBindings()`, with explicit issue codes for missing, unavailable, deprecated, version-incompatible, export-drifted, and narrower manifests.
+- Boundary update: finance and agency provider manifests verify locally, while `@pm/evals` can require verified manifests before counting provider coverage.
+
+### Added on 2026-06-25 v37
+
+- RQ38 answered from distributed authentication, decentralized trust management, lease consistency, and certificate revocation/status papers: verified manifests should become explicit status-bearing certificates checked at dispatch time, not ambient runtime belief.
+- Repo-grounded certificate update: `@pm/types` now defines `TerminalAdmissionProviderCertificate`, while `@pm/registry` can issue, digest, and validate provider certificates against subject, manifest, validity window, status, and capability/provider binding.
+- Boundary update: `@pm/workflow` can now require a terminal-admission provider certificate before write-capable dispatch, pass valid certificates through admission/dispatcher context, and block missing/invalid certificates with distinct terminal envelopes and metrics.
+
+### Added on 2026-06-25 v38
+
+- RQ39 answered from certificate revocation/update, empirical revocation failure, scalable revocation, and key-transparency papers: immutable provider certificates need a separate, substrate-owned current-status store that dispatch code queries at decision time.
+- Repo-grounded status-store update: `@pm/registry` now exports `TerminalAdmissionProviderCertificateStatusStore`, pure integrity/status-record validators, and `PostgresTerminalAdmissionProviderCertificateStore`.
+- Boundary update: `@pm/workflow` can consume `actionOutcomeProviderCertificateStore` directly and passes `checkedAt` into certificate lookup, so runtime dispatch no longer requires a private in-memory certificate provider.
+
+### Added on 2026-06-25 v39
+
+- RQ40 answered from transaction-time database, tamper-detecting audit log, tamper-evident logging, and append-only authenticated dictionary papers: current status rows are projections, while decision-time replay needs an append-only status-event stream.
+- Repo-grounded replay update: `@pm/registry` now exports `TerminalAdmissionProviderCertificateStatusEvent`, deterministic status-event hashing, replay issue/decision types, and `replayTerminalAdmissionProviderCertificateStatusAt()`.
+- Boundary update: `PostgresTerminalAdmissionProviderCertificateStore` appends status events transactionally with projection updates and reconstructs `checkedAt` lookups from replay rather than trusting the latest current row.
+
+### Added on 2026-06-25 v40
+
+- RQ41 answered from provenance, lineage, and secure-provenance papers: workflow outputs must cite the exact source/version/proof event that justified them, not only the current object identity.
+- Repo-grounded workflow update: `@pm/workflow` now defines `InvocationActionOutcomeProviderCertificateStatusRef` and carries it in provider lookup results, action outcome envelopes, admission requests, and dispatcher context.
+- Boundary update: the registry-backed workflow certificate adapter derives status refs from certificate status events at `checkedAt`, and the runtime rejects status refs that do not match certificate id, digest, or decision time.
+
+### Added on 2026-06-25 v41
+
+- RQ42 answered from protection-system, proof-carrying authentication, decentralized information-flow, and Laminar enforcement papers: workflow status binding is bypassable unless graph mutations themselves can require checkable write-authority evidence.
+- Repo-grounded graph update: `@pm/graph` now exports `GraphWriteAuthorityRef`, `GraphWriteProviderCertificateStatusRef`, `GraphWriteAuthorityPolicy`, `validateGraphWriteAuthority()`, `assertGraphWriteAuthority()`, and `GraphWriteAuthorityError`.
+- Boundary update: `PostgresGraph` now has an opt-in `writeAuthorityPolicy` that rejects create/update/tombstone mutations before SQL when authority refs are missing, not accepted, missing provider status refs, revoked, or certificate-mismatched.
+
+### Added on 2026-06-25 v42
+
+- RQ43 answered from Clark-Wilson integrity, runtime enforcement, sagas, and edit-automata papers: capability-kit raw graph updates are transformation procedures and must check graph write authority before capability `apply` or SQL side effects.
+- Repo-grounded capability-kit update: `@pm/capability-kit` now exports `GraphWriteAuthorityContext`, supports `CapabilitySpec.graphWriteAuthority`, supports `CapabilityRuntimeDeps.graphWriteAuthorityPolicy`, and carries optional `writeAuthorityRef` through apply/emit contexts.
+- Boundary update: `defineCapability()` now resolves and checks graph write authority after target-row lock and before `apply`; strict authority rejection rolls back idempotency and prevents raw `UPDATE graph.nodes`.
+
+### Added on 2026-06-25 v43
+
+- RQ44 answered from proof-carrying authentication, secure provenance, tamper-evident logging, and transparency-log papers: graph write authority must resolve to a substrate record, not only a self-asserted ref shape.
+
+### Added on 2026-06-25 v44
+
+- RQ45 answered from modularity, architectural mismatch, connector, and software-aging papers: store-backed authority injection should be a structural connector plus capability runtime hook, not a new substrate/domain dependency edge.
+- Repo-grounded store-binding update: `@pm/graph` now defines `GraphWriteAuthoritySubstrateRecord` and `GraphWriteAuthorityPolicy.requireSubstrateRecord`, while graph mutation inputs and capability-kit authority resolutions can carry matched substrate records.
+- Boundary update: strict graph/capability policies can reject missing or mismatched substrate records before SQL/apply; real workflow/runtime adapters still need to source those records from substrate stores.
+
+### Added on 2026-06-25 v45
+
+- RQ46 answered from runtime-model and runtime-verification papers: scenario runners should use a store-backed monitor/resolver that rejects missing, blocked, or mismatched workflow envelopes before graph mutation.
+
+### Added on 2026-06-25 v46
+
+- RQ47 answered from data-provenance, lineage, and secure-provenance papers: provider certificate status refs are part of the canonical terminal packet lineage and must be recoverable after amnesiac resume.
+
 ## Corrected Claims
 
 - v02's open items for `subject_mismatch`, original-observation review, `evaluatedAt`, explicit advisory/blocking mode, and evidence maturity stages are now treated as closed pure primitives after local code/changelog inspection.
@@ -383,8 +623,9 @@ The current frontier is now broader and more precise: selected write-capable wor
 20. Promote replay certificates into a durable status source with issuer, proof, revocation, status checked-at, policy version, validity window, tenant/workflow, and execution identity.
 21. Preserve participant, role, modality, source artifact, conflict, and unresolved-risk fields in PM handoff memory rather than flattening into summaries.
 22. Add small deterministic policy-transition specs before broad formal workflow verification.
-23. Add terminal outcome partitioning before broad live-governance claims: one decision/action id should emit exactly one terminal state, and block-class outcomes must suppress accepted/write outcomes unless explicitly advisory.
+23. Use `analyzeThreeAxisCoverage()` as the current matrix gate: fill Axis A missing classes and terminal proof refs, keep Axis B blocked until PluggedInSocial or accepted fixtures exist, and do not treat Axis C completeness as full verification.
 24. Make dashboard metrics query-traceable and lifecycle-aware: stale blocks should be a gate-failure cause, not a separate double-counted KPI.
+25. Answer RQ42 by extending provider-certificate status-ref binding to non-workflow graph/capability write boundaries so direct writes cannot bypass workflow action-outcome currentness proof.
 
 ## Metrics Queue
 
@@ -499,6 +740,8 @@ The current frontier is now broader and more precise: selected write-capable wor
 - `time_to_valid_action_after_handoff`
 - `write_binding_catalog_verification_rate`
 - `write_transport_binding_coverage`
+- `action_outcome_envelope_provider_coverage`
+- `missing_action_outcome_envelope_transport_count`
 - `unverified_binding_block_rate`
 - `subtool_read_set_coverage`
 - `hidden_subcall_dependency_rate`

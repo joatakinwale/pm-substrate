@@ -5,9 +5,19 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import type { CapabilityId, TenantId } from "@pm/types";
-import type { Capability } from "./interfaces.js";
-import { PostgresRegistry } from "./postgres.js";
+import {
+  timestamp,
+  type CapabilityId,
+  type TenantId,
+} from "@pm/types";
+import {
+  issueTerminalAdmissionProviderCertificates,
+  type Capability,
+} from "./interfaces.js";
+import {
+  PostgresRegistry,
+  PostgresTerminalAdmissionProviderCertificateStore,
+} from "./postgres.js";
 
 const DATABASE_URL = process.env["PM_DATABASE_URL"];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
@@ -48,6 +58,14 @@ describeIfDb("PostgresRegistry", () => {
   });
 
   afterAll(async () => {
+    await pool.query(
+      `DELETE FROM registry.terminal_admission_provider_certificate_status_events WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    await pool.query(
+      `DELETE FROM registry.terminal_admission_provider_certificates WHERE tenant_id = $1`,
+      [tenantId],
+    );
     await pool.query(`DELETE FROM registry.capabilities WHERE tenant_id = $1`, [tenantId]);
     await pool.query(`DELETE FROM substrate.tenants WHERE id = $1`, [tenantId]);
     await pool.end();
@@ -141,5 +159,126 @@ describeIfDb("PostgresRegistry", () => {
     await registry.register(tenantId, cap("agency/temp", 2));
     await registry.unregister(tenantId, "agency/temp");
     expect(await registry.get(tenantId, "agency/temp")).toBeNull();
+  });
+
+  it("persists terminal provider certificate status outside runtime memory", async () => {
+    const provider = {
+      providerId: "test.postgres-provider-cert.v1",
+      kind: "action_outcome_envelope",
+      contractVersion: { major: 1, minor: 0, patch: 0 },
+      packageName: "@pm/test-capability",
+      exportName: "buildPostgresProviderEnvelope",
+      actionTypes: ["event.accept"],
+    } as const;
+    const capability = cap("test/provider-cert-store", 1, {
+      writesInterfaces: [
+        {
+          interface: "Event",
+          fields: ["kind"],
+          ownership: "contributor",
+          terminalAdmissionProviders: [provider],
+        },
+      ],
+    });
+    const [certificate] = issueTerminalAdmissionProviderCertificates(
+      [capability],
+      [
+        {
+          ...provider,
+          availability: "available",
+        },
+      ],
+      {
+        issuer: "registry.install",
+        issuedAt: timestamp("2026-06-25T10:00:00.000Z"),
+        validUntil: timestamp("2026-06-25T11:00:00.000Z"),
+      },
+    ).issuedCertificates;
+    const store = new PostgresTerminalAdmissionProviderCertificateStore(pool);
+
+    await store.recordCertificate({
+      tenantId,
+      certificate: certificate!,
+      statusUpdatedAt: timestamp("2026-06-25T10:00:00.000Z"),
+    });
+
+    const restartedStore =
+      new PostgresTerminalAdmissionProviderCertificateStore(pool);
+    await expect(
+      restartedStore.findCurrentCertificate({
+        tenantId,
+        capabilityName: "test/provider-cert-store",
+        checkedAt: timestamp("2026-06-25T10:30:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      certificate: {
+        certificateId: certificate!.certificateId,
+      },
+      currentStatus: "valid",
+    });
+
+    await store.setCertificateStatus({
+      tenantId,
+      certificateId: certificate!.certificateId,
+      status: "revoked",
+      statusUpdatedAt: timestamp("2026-06-25T10:45:00.000Z"),
+      statusReason: "provider implementation key rotated",
+    });
+
+    await expect(
+      restartedStore.findCurrentCertificate({
+        tenantId,
+        capabilityName: "test/provider-cert-store",
+        checkedAt: timestamp("2026-06-25T10:50:00.000Z"),
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      restartedStore.getCertificateRecord({
+        tenantId,
+        certificateId: certificate!.certificateId,
+      }),
+    ).resolves.toMatchObject({
+      currentStatus: "revoked",
+      statusReason: "provider implementation key rotated",
+    });
+
+    await expect(
+      restartedStore.findCurrentCertificate({
+        tenantId,
+        capabilityName: "test/provider-cert-store",
+        checkedAt: timestamp("2026-06-25T10:30:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      certificate: {
+        certificateId: certificate!.certificateId,
+      },
+      currentStatus: "valid",
+    });
+    await expect(
+      restartedStore.getCertificateRecordAt({
+        tenantId,
+        certificateId: certificate!.certificateId,
+        checkedAt: timestamp("2026-06-25T10:50:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      currentStatus: "revoked",
+      statusReason: "provider implementation key rotated",
+    });
+    await expect(
+      restartedStore.listCertificateStatusEvents({
+        tenantId,
+        certificateId: certificate!.certificateId,
+      }),
+    ).resolves.toMatchObject([
+      {
+        sequence: 1,
+        toStatus: "valid",
+      },
+      {
+        sequence: 2,
+        fromStatus: "valid",
+        toStatus: "revoked",
+      },
+    ]);
   });
 });

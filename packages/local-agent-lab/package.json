@@ -1,0 +1,32 @@
+{
+  "name": "@pm/local-agent-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Axis C live testbed: real local (Ollama) agents run two arms (no-substrate vs substrate) against the real event store; failures measured at the admission boundary. Dynamic ScenarioSpec registry — add a failure class without rebuilding the engine.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/agent-state": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -5,8 +5,10 @@ import {
   type CoordinationClass,
   type EvalEvidenceStage,
   type EvalEvent,
+  type EvalOperationalTerminalOutcome,
   type EvalResult,
   type FailureClass,
+  type RunArm,
 } from "./schema.js";
 import type { AdapterOperationalSample } from "./metrics.js";
 
@@ -26,6 +28,7 @@ export interface ArrowHedgeStateEvalInput {
     readonly issueCodes: readonly string[];
   };
   readonly stateReviewArtifacts?: readonly ArrowHedgeStateReviewArtifactEvalRef[];
+  readonly actionOutcomeEnvelopes?: readonly ArrowHedgeActionOutcomeEnvelopeEvalRef[];
   readonly operationalSamples: readonly AdapterOperationalSample[];
   readonly runIdPrefix?: string;
   readonly agentId?: string;
@@ -34,6 +37,14 @@ export interface ArrowHedgeStateEvalInput {
 export interface ArrowHedgeStateReviewArtifactEvalRef {
   readonly scenarioId: string;
   readonly artifactId: string;
+  readonly label?: string;
+}
+
+export interface ArrowHedgeActionOutcomeEnvelopeEvalRef {
+  readonly scenarioId: string;
+  readonly envelopeId: string;
+  readonly runArm?: RunArm;
+  readonly terminalOutcome?: EvalOperationalTerminalOutcome;
   readonly label?: string;
 }
 
@@ -59,6 +70,7 @@ interface ScenarioSpec {
   readonly substrateResult: EvalResult;
   readonly evidenceStage: EvalEvidenceStage;
   readonly requiredReadSetWarningCodes?: readonly string[];
+  readonly requiresActionOutcomeEnvelope?: boolean;
   readonly baselineNotes: string;
   readonly substrateNotes: string;
 }
@@ -131,6 +143,18 @@ const SCENARIOS: readonly ScenarioSpec[] = [
     substrateNotes:
       "Substrate runtime payload validation rejects malformed typed finance events before publication.",
   },
+  {
+    scenarioId: "arrowhedge-terminal-outcome-partition",
+    failureClass: "parallel_write_conflict",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline decision accounting can observe both accepted and blocked terminal claims for the same stable action id.",
+    substrateNotes:
+      "Substrate arm reduces the decision to one ActionOutcomeEnvelope normal form and rejects conflicting terminal outcomes.",
+  },
 ];
 
 export function buildArrowHedgeStateEvalSuite(
@@ -160,9 +184,25 @@ export function buildArrowHedgeStateEvalSuite(
 
   const pairs = SCENARIOS.map((scenario) => {
     const pairedRunGroup = `pair_${scenario.scenarioId}`;
+    const baselineOutcomeRefs = actionOutcomeEnvelopeRefsForScenario(
+      scenario.scenarioId,
+      input,
+      "baseline",
+    );
+    const substrateOutcomeRefs = actionOutcomeEnvelopeRefsForScenario(
+      scenario.scenarioId,
+      input,
+      "substrate",
+    );
+    const baselineTerminalOutcome = operationalTerminalOutcomeForScenario(
+      scenario.scenarioId,
+      input,
+      "baseline",
+    );
     const substrateRefs = [
       ...commonSubstrateRefs,
       ...stateReviewArtifactRefsForScenario(scenario.scenarioId, input),
+      ...substrateOutcomeRefs,
     ];
     const baseline = evalEvent({
       tenantId: input.tenantId,
@@ -174,7 +214,10 @@ export function buildArrowHedgeStateEvalSuite(
       observedAt: input.observedAt,
       source: input.source,
       evidenceRefs,
-      substrateRefs: [evalEvidenceRef("document", `${scenario.scenarioId}:baseline`)],
+      substrateRefs: [
+        evalEvidenceRef("document", `${scenario.scenarioId}:baseline`),
+        ...baselineOutcomeRefs,
+      ],
       runArm: "baseline",
       pairedRunGroup,
       stateBenchCategory: "stateful",
@@ -188,10 +231,19 @@ export function buildArrowHedgeStateEvalSuite(
           : "system_design",
       coordinationClass: scenario.coordinationClass,
       evidenceStage: scenario.evidenceStage,
+      scenarioResult: "fail",
+      ...(baselineTerminalOutcome === undefined
+        ? {}
+        : { operationalTerminalOutcome: baselineTerminalOutcome }),
       result: "fail",
       notes: scenario.baselineNotes,
     });
     const substrateResult = substrateResultForScenario(scenario, input);
+    const substrateTerminalOutcome = operationalTerminalOutcomeForScenario(
+      scenario.scenarioId,
+      input,
+      "substrate",
+    );
     const substrate = evalEvent({
       tenantId: input.tenantId,
       axis: "finance",
@@ -216,6 +268,10 @@ export function buildArrowHedgeStateEvalSuite(
           : "system_design",
       coordinationClass: scenario.coordinationClass,
       evidenceStage: scenario.evidenceStage,
+      scenarioResult: substrateResult,
+      ...(substrateTerminalOutcome === undefined
+        ? {}
+        : { operationalTerminalOutcome: substrateTerminalOutcome }),
       result: substrateResult,
       notes: substrateNotesForScenario(scenario, input),
     });
@@ -254,6 +310,48 @@ function stateReviewArtifactRefsForScenario(
     );
 }
 
+function actionOutcomeEnvelopeRefsForScenario(
+  scenarioId: string,
+  input: ArrowHedgeStateEvalInput,
+  runArm: RunArm = "substrate",
+) {
+  return (input.actionOutcomeEnvelopes ?? [])
+    .filter(
+      (envelope) =>
+        envelope.scenarioId === scenarioId &&
+        (envelope.runArm ?? "substrate") === runArm,
+    )
+    .map((envelope) =>
+      evalEvidenceRef(
+        "action_outcome_envelope",
+        envelope.envelopeId,
+        envelope.label ?? "ArrowHedge ActionOutcomeEnvelope",
+      ),
+    );
+}
+
+function operationalTerminalOutcomeForScenario(
+  scenarioId: string,
+  input: ArrowHedgeStateEvalInput,
+  runArm: RunArm,
+): EvalOperationalTerminalOutcome | undefined {
+  const outcomes = (input.actionOutcomeEnvelopes ?? [])
+    .filter(
+      (envelope) =>
+        envelope.scenarioId === scenarioId &&
+        (envelope.runArm ?? "substrate") === runArm &&
+        envelope.terminalOutcome !== undefined,
+    )
+    .map((envelope) => envelope.terminalOutcome!);
+
+  if (outcomes.length > 1) {
+    throw new Error(
+      `ArrowHedge scenario ${scenarioId}/${runArm} has multiple terminal outcomes`,
+    );
+  }
+  return outcomes[0];
+}
+
 function score(result: EvalResult): number {
   return result === "fail" ? 1 : 0;
 }
@@ -262,6 +360,12 @@ function substrateResultForScenario(
   scenario: ScenarioSpec,
   input: ArrowHedgeStateEvalInput,
 ): EvalResult {
+  if (
+    scenario.requiresActionOutcomeEnvelope === true &&
+    actionOutcomeEnvelopeRefsForScenario(scenario.scenarioId, input).length === 0
+  ) {
+    return "fail";
+  }
   if (!scenario.requiredReadSetWarningCodes) return scenario.substrateResult;
   const validation = input.readSetValidation;
   if (!validation || validation.mode !== "warn") return "fail";

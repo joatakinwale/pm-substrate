@@ -281,6 +281,43 @@ describe("eval event metrics", () => {
     });
   });
 
+  it("counts live-run pairs toward the evidence-adjusted failure-reduction metric", () => {
+    const metrics = analyzeEvalEvents([
+      event({
+        scenarioId: "live-run",
+        runArm: "baseline",
+        pairedRunGroup: "pair_live_run",
+        result: "fail",
+        evidenceStage: "live_run",
+      }),
+      event({
+        scenarioId: "live-run",
+        runArm: "substrate",
+        pairedRunGroup: "pair_live_run",
+        result: "blocked",
+        evidenceStage: "live_run",
+      }),
+    ]);
+
+    expect(metrics).toMatchObject({
+      baselineFailures: 1,
+      substrateFailures: 0,
+      failureReduction: 1,
+      allStageFailureReduction: 1,
+      evidenceStages: ["live_run"],
+    });
+    expect(metrics.byEvidenceStage.live_run).toMatchObject({
+      events: 2,
+      failureReduction: 1,
+      substrateBlocked: 1,
+    });
+    expect(metrics.byFailureClass.parallel_write_conflict).toMatchObject({
+      failureReduction: 1,
+      allStageFailureReduction: 1,
+      substrateBlocked: 1,
+    });
+  });
+
   it("reports incomplete paired groups without counting them as complete", () => {
     const metrics = analyzeEvalEvents([
       event({

@@ -23,11 +23,24 @@ export const EVAL_RESULTS = ["pass", "fail", "blocked"] as const;
 
 export type EvalResult = (typeof EVAL_RESULTS)[number];
 
+export const EVAL_OPERATIONAL_TERMINAL_OUTCOMES = [
+  "accepted",
+  "blocked",
+  "rejected",
+  "held",
+  "superseded",
+  "escalated",
+] as const;
+
+export type EvalOperationalTerminalOutcome =
+  (typeof EVAL_OPERATIONAL_TERMINAL_OUTCOMES)[number];
+
 export const EVAL_EVIDENCE_STAGES = [
   "scaffolded_scenario",
   "detected_warning",
   "blocked_mutation",
   "paired_behavioral_improvement",
+  "live_run",
 ] as const;
 
 export type EvalEvidenceStage = (typeof EVAL_EVIDENCE_STAGES)[number];
@@ -95,6 +108,7 @@ export const EVAL_REF_KINDS = [
   "projection",
   "source_record",
   "state_review_artifact",
+  "action_outcome_envelope",
   "external_fixture",
   "document",
 ] as const;
@@ -126,6 +140,8 @@ export interface EvalEvent {
   readonly coordinationClass?: CoordinationClass;
   readonly evidenceStage?: EvalEvidenceStage;
   readonly confidenceBand?: ConfidenceBand;
+  readonly scenarioResult?: EvalResult;
+  readonly operationalTerminalOutcome?: EvalOperationalTerminalOutcome;
   readonly result: EvalResult;
   readonly notes: string;
 }
@@ -150,6 +166,9 @@ export class EvalEventValidationError extends Error {
 const AXES = new Set<string>(EVAL_AXES);
 const FAILURE_CLASS_SET = new Set<string>(FAILURE_CLASSES);
 const RESULT_SET = new Set<string>(EVAL_RESULTS);
+const OPERATIONAL_TERMINAL_OUTCOME_SET = new Set<string>(
+  EVAL_OPERATIONAL_TERMINAL_OUTCOMES,
+);
 const EVIDENCE_STAGE_SET = new Set<string>(EVAL_EVIDENCE_STAGES);
 const RUN_ARM_SET = new Set<string>(RUN_ARMS);
 const STATE_BENCH_CATEGORY_SET = new Set<string>(STATE_BENCH_CATEGORIES);
@@ -246,6 +265,20 @@ export function validateEvalEvent(input: unknown): ValidationResult {
     issues,
   );
   validateOptionalConfidenceBand(input["confidenceBand"], issues);
+  validateOptionalEnum(
+    input["scenarioResult"],
+    "/scenarioResult",
+    RESULT_SET,
+    EVAL_RESULTS,
+    issues,
+  );
+  validateOptionalEnum(
+    input["operationalTerminalOutcome"],
+    "/operationalTerminalOutcome",
+    OPERATIONAL_TERMINAL_OUTCOME_SET,
+    EVAL_OPERATIONAL_TERMINAL_OUTCOMES,
+    issues,
+  );
   validateEnum(input, "result", RESULT_SET, EVAL_RESULTS, issues);
   validateRequiredString(input, "notes", issues);
 
@@ -263,21 +296,57 @@ export function validateEvalEvent(input: unknown): ValidationResult {
   }
 
   const result = input["result"];
-  if (result === "pass" || result === "fail") {
+  const scenarioResult =
+    typeof input["scenarioResult"] === "string" &&
+    RESULT_SET.has(input["scenarioResult"])
+      ? input["scenarioResult"]
+      : result;
+  if (scenarioResult === "pass" || scenarioResult === "fail") {
     if (Array.isArray(input["evidenceRefs"]) && input["evidenceRefs"].length === 0) {
       push(
         issues,
         "/evidenceRefs",
-        "pass/fail eval events require at least one evidence reference",
+        "pass/fail scenario results require at least one evidence reference",
       );
     }
     if (Array.isArray(input["substrateRefs"]) && input["substrateRefs"].length === 0) {
       push(
         issues,
         "/substrateRefs",
-        "pass/fail eval events require at least one substrate reference",
+        "pass/fail scenario results require at least one substrate reference",
       );
     }
+  }
+
+  if (input["operationalTerminalOutcome"] !== undefined) {
+    const substrateRefs = input["substrateRefs"];
+    const hasOutcomeRef =
+      Array.isArray(substrateRefs) &&
+      substrateRefs.some(
+        (ref) =>
+          isObj(ref) &&
+          ref["kind"] === "action_outcome_envelope" &&
+          isNonEmptyString(ref["id"]),
+      );
+    if (!hasOutcomeRef) {
+      push(
+        issues,
+        "/substrateRefs",
+        "operationalTerminalOutcome requires an action_outcome_envelope substrate ref",
+      );
+    }
+  }
+
+  if (
+    result === "blocked" &&
+    scenarioResult === "pass" &&
+    input["operationalTerminalOutcome"] === undefined
+  ) {
+    push(
+      issues,
+      "/operationalTerminalOutcome",
+      "blocked operational result with scenario pass requires operationalTerminalOutcome",
+    );
   }
 
   return { valid: issues.length === 0, issues };

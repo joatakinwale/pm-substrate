@@ -228,6 +228,12 @@ importers:
       '@pm/agent-state':
         specifier: workspace:*
         version: link:../agent-state
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
       '@pm/types':
         specifier: workspace:*
         version: link:../types
@@ -235,6 +241,9 @@ importers:
         specifier: workspace:*
         version: link:../workflow
     devDependencies:
+      '@pm/capability-kit':
+        specifier: workspace:*
+        version: link:../capability-kit
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -289,8 +298,36 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/local-agent-lab:
+    dependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/profile-agency:
     dependencies:
+      '@pm/agent-state':
+        specifier: workspace:*
+        version: link:../agent-state
       '@pm/types':
         specifier: workspace:*
         version: link:../types

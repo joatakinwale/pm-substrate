@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  capabilityId,
+  timestamp,
+  type TerminalAdmissionProviderCertificate,
+} from "@pm/types";
+import {
+  buildInvocationActionOutcomeEnvelope,
   validateInvocationEvidenceBinding,
   verifyInvocationEvidenceBindingAgainstCatalog,
+  type EvidenceBindingRequest,
   type InvocationEvidenceBinding,
 } from "./evidence-binding.js";
 
@@ -18,6 +25,58 @@ const binding = (
     mode: "advisory",
   },
   ...overrides,
+});
+
+const request = (
+  overrides: Partial<EvidenceBindingRequest> = {},
+): EvidenceBindingRequest => ({
+  tenantId: "tnt_arrowhedge",
+  workflowId: "wf_arrowhedge",
+  workflowName: "arrowhedge-terminal-write",
+  workflowVersion: 1,
+  nodeId: "accept-decision",
+  capability: "portfolio/accept",
+  inputs: {},
+  capabilityWrites: true,
+  triggerEventId: "evt_decision_ready",
+  ...overrides,
+});
+
+const providerCertificate = (): TerminalAdmissionProviderCertificate => ({
+  schemaVersion: "pm.terminal_admission_provider_certificate.v1",
+  certificateId: "tapc_arrowhedge_accept_001",
+  certificateDigest: "c".repeat(64),
+  issuer: "registry.install",
+  issuedAt: timestamp("2026-06-25T04:00:00.000Z"),
+  validUntil: timestamp("2026-06-25T06:00:00.000Z"),
+  status: "valid",
+  subject: {
+    capabilityId: capabilityId("cap_portfolio_accept"),
+    capabilityName: "portfolio/accept",
+    capabilityVersion: 1,
+    writeInterface: "PortfolioDecision",
+    writeFields: ["status"],
+    writeOwnership: "owner",
+    providerId: "finance.action_outcome_provider.v1",
+  },
+  provider: {
+    providerId: "finance.action_outcome_provider.v1",
+    kind: "action_outcome_envelope",
+    contractVersion: { major: 1, minor: 0, patch: 0 },
+    packageName: "@pm/finance",
+    exportName: "financeActionOutcomeProvider",
+    actionTypes: ["portfolio/accept"],
+  },
+  manifest: {
+    providerId: "finance.action_outcome_provider.v1",
+    kind: "action_outcome_envelope",
+    contractVersion: { major: 1, minor: 0, patch: 0 },
+    packageName: "@pm/finance",
+    exportName: "financeActionOutcomeProvider",
+    actionTypes: ["portfolio/accept"],
+    availability: "available",
+  },
+  manifestDigest: "d".repeat(64),
 });
 
 describe("workflow evidence-action binding", () => {
@@ -102,6 +161,81 @@ describe("workflow evidence-action binding", () => {
         evidenceBindingRequired: true,
       }),
     ).toEqual({ valid: true });
+  });
+
+  it("builds an accepted action outcome envelope from a valid write binding", () => {
+    const evidenceBinding = binding();
+    const envelope = buildInvocationActionOutcomeEnvelope({
+      request: request(),
+      evidenceBinding,
+      evidenceDecision: { valid: true },
+      generatedAt: "2026-06-25T05:00:00.000Z",
+    });
+
+    expect(envelope).toMatchObject({
+      schemaVersion: "pm.workflow.action_outcome_envelope.v1",
+      actionId: "tnt_arrowhedge:wf_arrowhedge:1:accept-decision:evt_decision_ready",
+      terminalOutcome: "accepted",
+      generatedAt: "2026-06-25T05:00:00.000Z",
+      stateReviewArtifactId: "artifact_nvda_001",
+      stateReviewArtifactHash: "a".repeat(64),
+      evidenceAdmissionReviewIds: ["ev_security:admission_review"],
+      evidenceDecision: { valid: true },
+    });
+    expect(envelope.envelopeId).toMatch(/^outcome_[a-f0-9]{32}$/);
+  });
+
+  it("carries provider certificate identity in action outcome envelopes", () => {
+    const certificate = providerCertificate();
+    const statusRef = {
+      certificateId: certificate.certificateId,
+      certificateDigest: certificate.certificateDigest,
+      status: "valid" as const,
+      statusSequence: 1,
+      statusEventHash: "e".repeat(64),
+      statusUpdatedAt: "2026-06-25T04:00:00.000Z",
+      checkedAt: "2026-06-25T05:00:00.000Z",
+    };
+    const envelope = buildInvocationActionOutcomeEnvelope({
+      request: request(),
+      evidenceBinding: binding(),
+      evidenceDecision: { valid: true },
+      generatedAt: "2026-06-25T05:00:00.000Z",
+      providerCertificate: certificate,
+      providerCertificateStatusRef: statusRef,
+    });
+
+    expect(envelope).toMatchObject({
+      terminalOutcome: "accepted",
+      providerCertificateId: certificate.certificateId,
+      providerCertificateDigest: certificate.certificateDigest,
+      providerCertificateStatusRef: statusRef,
+    });
+  });
+
+  it("builds a blocked action outcome envelope for a missing write binding", () => {
+    const evidenceDecision = validateInvocationEvidenceBinding({
+      capabilityWrites: true,
+      evidenceBindingRequired: true,
+      evidenceBinding: null,
+    });
+    expect(evidenceDecision.valid).toBe(false);
+
+    const envelope = buildInvocationActionOutcomeEnvelope({
+      request: request(),
+      evidenceBinding: null,
+      evidenceDecision,
+      generatedAt: "2026-06-25T05:01:00.000Z",
+    });
+
+    expect(envelope).toMatchObject({
+      terminalOutcome: "blocked",
+      evidenceAdmissionReviewIds: [],
+      evidenceDecision: {
+        valid: false,
+        reason: "evidence_binding_missing",
+      },
+    });
   });
 
   it("blocks write-capable dispatch when the provided policy disposition is explicitly blocking", () => {

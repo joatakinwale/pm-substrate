@@ -3,14 +3,32 @@ import { createHash } from "node:crypto";
 import {
   evaluateStateReviewInvariantPolicy,
   importStateReviewArtifactsJsonl,
+  promoteWorkflowInvocationOutcomeEnvelope,
+  stateRef,
+  verifyActionOutcomeEnvelopeHash,
+  type ActionOutcomeEnvelope,
   type EvidenceAdmissionReview,
   type StateRef,
   type StateReviewActionConsequence,
   type StateReviewInvariantClass,
   type StateReviewTemporalMisalignmentPhase,
 } from "@pm/agent-state";
-import type { TenantId, Timestamp } from "@pm/types";
 import {
+  listTerminalAdmissionProviderBindings,
+  normalizeCapability,
+  verifyTerminalAdmissionProviderBindings,
+  type Capability,
+} from "@pm/registry";
+import type {
+  CapabilityId,
+  TenantId,
+  TerminalAdmissionProviderCertificate,
+  TerminalAdmissionProviderManifest,
+  Timestamp,
+  WriteContract,
+} from "@pm/types";
+import {
+  buildInvocationActionOutcomeEnvelope,
   validateInvocationEvidenceBinding,
   verifyInvocationEvidenceBindingAgainstCatalog,
   type EvidenceBindingAdmissionCertificateRef,
@@ -18,6 +36,7 @@ import {
   type EvidenceBindingStateReviewArtifactRef,
   type EvidenceBindingMode,
   type EvidenceBindingVerificationDecision,
+  type InvocationActionOutcomeProviderCertificateStatusRef,
   type InvocationEvidenceBinding,
 } from "@pm/workflow";
 
@@ -25,13 +44,19 @@ import {
   buildEvidenceAdmissionReviewCorpus,
   importEvidenceAdmissionReviewsJsonl,
 } from "./evidence-admission.js";
+import type { EvalEvent, EvalEvidenceRef } from "./schema.js";
+import { buildArrowHedgeStateEvalSuite } from "./arrowhedge.js";
+import type { EvalGraphWriteAuthorityRecoverySuite } from "./authority-recovery.js";
+import type { StrictThreeAxisProofPacketSourceBundle } from "./three-axis-proof-packet.js";
 
 export type WriteBindingReplayDecision =
   | "allowed"
   | "blocked_missing_binding"
   | "blocked_incomplete_binding"
   | "blocked_policy"
-  | "blocked_unverified_binding";
+  | "blocked_unverified_binding"
+  | "blocked_provider_certificate_missing"
+  | "blocked_provider_certificate_invalid";
 
 export interface WriteBindingReplayArtifactRef {
   readonly artifactId: string;
@@ -72,6 +97,7 @@ export interface WriteBindingReplayRecord {
   readonly evidenceAdmissionReviews: readonly WriteBindingReplayAdmissionRef[];
   readonly invocationEvidenceBinding: InvocationEvidenceBinding | null;
   readonly validation: EvidenceBindingVerificationDecision;
+  readonly actionOutcomeEnvelope: ActionOutcomeEnvelope;
   readonly decision: WriteBindingReplayDecision;
   readonly warningCodes: readonly string[];
   readonly invariantClasses: readonly StateReviewInvariantClass[];
@@ -84,6 +110,10 @@ export interface WriteBindingReplayCorpus {
   readonly metrics: WriteBindingReplayMetrics;
 }
 
+export interface ArrowHedgeWriteBindingProofSourceBundleInput {
+  readonly authorityRecoverySuite?: EvalGraphWriteAuthorityRecoverySuite;
+}
+
 export interface WriteBindingReplayMetrics {
   readonly totalRecords: number;
   readonly allowed: number;
@@ -93,10 +123,57 @@ export interface WriteBindingReplayMetrics {
   readonly incompleteBindings: number;
   readonly policyBlocked: number;
   readonly unverifiedBindings: number;
+  readonly providerCertificateMissing: number;
+  readonly providerCertificateInvalid: number;
   readonly rejectedEvidenceReferences: number;
+  readonly actionOutcomeEnvelopeCount: number;
+  readonly acceptedActionOutcomeEnvelopes: number;
+  readonly blockedActionOutcomeEnvelopes: number;
   readonly replayHashCoverage: number;
   readonly highConsequenceRecords: number;
   readonly byDecision: Readonly<Record<WriteBindingReplayDecision, number>>;
+}
+
+export interface ActionOutcomeEnvelopeReplayIndexedRef {
+  readonly ref: EvalEvidenceRef;
+  readonly recordId: string;
+  readonly envelope: ActionOutcomeEnvelope;
+  readonly outcomeHash: string;
+  readonly terminalOutcome: ActionOutcomeEnvelope["terminalOutcome"];
+  readonly validHash: boolean;
+}
+
+export interface ActionOutcomeEnvelopeReplayIndex {
+  readonly envelopeCount: number;
+  readonly indexedRefCount: number;
+  readonly acceptedTerminalOutcomes: number;
+  readonly blockedTerminalOutcomes: number;
+  readonly invalidEnvelopeHashes: readonly ActionOutcomeEnvelopeReplayIndexedRef[];
+  readonly refs: readonly ActionOutcomeEnvelopeReplayIndexedRef[];
+}
+
+export interface EvalEventActionOutcomeReplayRecovery {
+  readonly runId: string;
+  readonly scenarioId: string;
+  readonly ref: EvalEvidenceRef;
+  readonly resolved: boolean;
+  readonly recordId?: string;
+  readonly outcomeHash?: string;
+  readonly terminalOutcome?: ActionOutcomeEnvelope["terminalOutcome"];
+  readonly validHash?: boolean;
+  readonly reason?: "missing_replay_packet" | "invalid_outcome_hash";
+}
+
+export interface EvalEventActionOutcomeReplayMetrics {
+  readonly eventCount: number;
+  readonly eventsWithActionOutcomeRefs: number;
+  readonly actionOutcomeRefCount: number;
+  readonly resolvedActionOutcomeRefs: number;
+  readonly unresolvedActionOutcomeRefs: number;
+  readonly invalidResolvedActionOutcomeRefs: number;
+  readonly acceptedTerminalOutcomes: number;
+  readonly blockedTerminalOutcomes: number;
+  readonly recoveries: readonly EvalEventActionOutcomeReplayRecovery[];
 }
 
 export interface EvidenceBindingReferenceCatalogMetrics {
@@ -130,6 +207,24 @@ export interface WriteTransportBindingCoverageSample {
   readonly bindingMode: EvidenceBindingMode;
   readonly hasBindingProvider: boolean;
   readonly hasBindingVerifier: boolean;
+  readonly requiresActionOutcomeEnvelope: boolean;
+  readonly hasActionOutcomeEnvelopeProvider: boolean;
+  readonly terminalAdmissionProviderIds?: readonly string[];
+}
+
+export interface CapabilityWriteTransportBindingCoverageInput {
+  readonly capability: Capability;
+  readonly profile: string;
+  readonly workflowName: string;
+  readonly bindingMode: EvidenceBindingMode;
+  readonly hasBindingProvider: boolean;
+  readonly hasBindingVerifier: boolean;
+  readonly requiresActionOutcomeEnvelope?: boolean;
+}
+
+export interface CapabilityWriteTransportBindingCoverageOptions {
+  readonly terminalAdmissionProviderManifests?: readonly TerminalAdmissionProviderManifest[];
+  readonly requireVerifiedTerminalAdmissionProviders?: boolean;
 }
 
 export interface WriteTransportBindingCoverageMetrics {
@@ -138,6 +233,11 @@ export interface WriteTransportBindingCoverageMetrics {
   readonly advisoryOnlyTransports: number;
   readonly missingProviderTransports: number;
   readonly coverageRate: number;
+  readonly outcomeEnvelopeRequiredTransports: number;
+  readonly outcomeEnvelopeCoveredTransports: number;
+  readonly outcomeEnvelopeMissingTransports: number;
+  readonly outcomeEnvelopeCoverageRate: number;
+  readonly missingActionOutcomeEnvelopeTransportIds: readonly string[];
   readonly byDisposition: Readonly<
     Record<WriteTransportBindingCoverageDisposition, number>
   >;
@@ -152,6 +252,7 @@ interface ArrowHedgeArtifactSeed {
   readonly generatedAt: Timestamp;
   readonly workflowRunId: string;
   readonly actionType: string;
+  readonly proposalReviewId: string;
   readonly currentStateViewId: string;
   readonly subject: StateRef;
   readonly warningCodes: readonly string[];
@@ -167,14 +268,65 @@ const ARROWHEDGE_SUBJECT: StateRef = {
   label: "ArrowHedge COP AAPL",
 };
 
+const ARROWHEDGE_TERMINAL_PROVIDER = {
+  providerId: "finance-research.arrowhedge.action-outcome-envelope.v1",
+  kind: "action_outcome_envelope",
+  contractVersion: { major: 1, minor: 0, patch: 0 },
+  packageName: "@pm/capability-finance-research-ingest",
+  exportName: "buildArrowHedgeActionOutcomeEnvelope",
+  actionTypes: ["risk.refresh", "portfolio.decision.accept"],
+  profiles: ["finance-research"],
+  evidenceRefKinds: ["state_review_artifact"],
+  substrateRefKinds: ["action_outcome_envelope", "workflow_run"],
+} as const;
+
+const ARROWHEDGE_TERMINAL_PROVIDER_MANIFEST = {
+  ...ARROWHEDGE_TERMINAL_PROVIDER,
+  availability: "available",
+} as const satisfies TerminalAdmissionProviderManifest;
+
+const ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE = {
+  schemaVersion: "pm.terminal_admission_provider_certificate.v1",
+  certificateId: "tapc_arrowhedge_write_binding_replay_001",
+  certificateDigest: "sha256:arrowhedge_write_binding_replay_001",
+  issuer: "registry.install",
+  issuedAt: "2026-06-11T15:59:00.000Z" as Timestamp,
+  validUntil: "2026-06-11T17:00:00.000Z" as Timestamp,
+  status: "valid",
+  subject: {
+    capabilityId: "cap_arrowhedge_write_binding_replay" as CapabilityId,
+    capabilityName: "risk/refresh",
+    capabilityVersion: 1,
+    writeInterface: "RiskRefresh",
+    writeFields: ["risk.currentPrice", "risk.maxShares"],
+    writeOwnership: "owner",
+    providerId: ARROWHEDGE_TERMINAL_PROVIDER.providerId,
+  },
+  provider: ARROWHEDGE_TERMINAL_PROVIDER,
+  manifest: ARROWHEDGE_TERMINAL_PROVIDER_MANIFEST,
+  manifestDigest: "sha256:arrowhedge_terminal_provider_manifest",
+} as const satisfies TerminalAdmissionProviderCertificate;
+
+const ARROWHEDGE_TERMINAL_PROVIDER_STATUS_REF = {
+  certificateId: ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE.certificateId,
+  certificateDigest: ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE.certificateDigest,
+  status: "valid",
+  statusSequence: 1,
+  statusEventHash: "sha256:arrowhedge_terminal_provider_status_event_001",
+  statusUpdatedAt: "2026-06-11T15:59:30.000Z",
+  checkedAt: "2026-06-11T16:00:00.000Z",
+} as const satisfies InvocationActionOutcomeProviderCertificateStatusRef;
+
 const ARROWHEDGE_ARTIFACTS = {
   clean: {
     artifactId: "artifact_arrowhedge_clean_current_accepted_001",
     artifactHash:
-      "9528f4f2f17b86db397364b8a48a4d0609b5705092c02f49bd76145ea3d6dc9c",
+      "97db735111b612cf5b5267925f6d9e5af0f29c222c0b548d05206e3306dca350",
     generatedAt: "2026-06-03T14:05:00.000Z" as Timestamp,
     workflowRunId: "arrowhedge-clean-current-workflow",
     actionType: "risk.refresh",
+    proposalReviewId:
+      "arrowhedge_cop_corpus:AAPL:current_state_view:risk.refresh:proposal_review",
     currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
     subject: ARROWHEDGE_SUBJECT,
     warningCodes: [],
@@ -184,10 +336,12 @@ const ARROWHEDGE_ARTIFACTS = {
   staleAccept: {
     artifactId: "artifact_arrowhedge_observation_to_action_stale_risk_001",
     artifactHash:
-      "8a897ce7167b9e82f391c7b6d45ba309747ad0e4d22a9394763c794695d0f07b",
+      "39f9182271244b1f560647823e97615ce8f52306138d677def764acebe68deaa",
     generatedAt: "2026-06-03T14:12:30.000Z" as Timestamp,
     workflowRunId: "arrowhedge-temporal-workflow-observation-action",
     actionType: "portfolio.decision.accept",
+    proposalReviewId:
+      "arrowhedge_cop_corpus:AAPL:current_state_view:portfolio.decision.accept:proposal_review",
     currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
     subject: ARROWHEDGE_SUBJECT,
     warningCodes: [
@@ -207,10 +361,12 @@ const ARROWHEDGE_ARTIFACTS = {
   authorityFeedback: {
     artifactId: "artifact_arrowhedge_action_to_feedback_authority_001",
     artifactHash:
-      "7de7770bdaf03201c5d87f58a4e08880d0034e38099337336fab6aa9bc7d72da",
+      "af7a501bf9f6e55e585824790e1236e347a6e2f16440a28c1424bf65c2e5f2f9",
     generatedAt: "2026-06-03T14:06:30.000Z" as Timestamp,
     workflowRunId: "arrowhedge-temporal-workflow-action-feedback",
     actionType: "risk.refresh",
+    proposalReviewId:
+      "arrowhedge_cop_corpus:AAPL:current_state_view:risk.refresh:proposal_review",
     currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
     subject: ARROWHEDGE_SUBJECT,
     warningCodes: ["authority_mismatch", "projection_version_mismatch"],
@@ -233,6 +389,121 @@ export function importWriteBindingReplayRecordsJsonl(
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .map((line) => JSON.parse(line) as WriteBindingReplayRecord);
+}
+
+export function buildActionOutcomeEnvelopeReplayIndex(
+  records: readonly WriteBindingReplayRecord[],
+): ActionOutcomeEnvelopeReplayIndex {
+  const refs: ActionOutcomeEnvelopeReplayIndexedRef[] = [];
+  let acceptedTerminalOutcomes = 0;
+  let blockedTerminalOutcomes = 0;
+
+  for (const record of records) {
+    const envelope = record.actionOutcomeEnvelope;
+    const hashValid = verifyActionOutcomeEnvelopeHash(envelope).valid;
+    if (envelope.terminalOutcome === "accepted") acceptedTerminalOutcomes += 1;
+    if (envelope.terminalOutcome === "blocked") blockedTerminalOutcomes += 1;
+
+    for (const ref of envelope.substrateRefs) {
+      if (ref.kind !== "action_outcome_envelope") continue;
+      refs.push({
+        ref: {
+          kind: "action_outcome_envelope",
+          id: ref.id,
+          ...(ref.label === undefined ? {} : { label: ref.label }),
+        },
+        recordId: record.recordId,
+        envelope,
+        outcomeHash: envelope.outcomeHash,
+        terminalOutcome: envelope.terminalOutcome,
+        validHash: hashValid,
+      });
+    }
+  }
+
+  return {
+    envelopeCount: records.length,
+    indexedRefCount: refs.length,
+    acceptedTerminalOutcomes,
+    blockedTerminalOutcomes,
+    invalidEnvelopeHashes: refs.filter((ref) => !ref.validHash),
+    refs,
+  };
+}
+
+export function recoverActionOutcomeEnvelopeFromReplayIndex(
+  index: ActionOutcomeEnvelopeReplayIndex,
+  ref: EvalEvidenceRef,
+): ActionOutcomeEnvelope | undefined {
+  if (ref.kind !== "action_outcome_envelope") return undefined;
+  return index.refs.find((indexed) => indexed.ref.id === ref.id)?.envelope;
+}
+
+export function analyzeEvalEventActionOutcomeReplay(
+  events: readonly EvalEvent[],
+  records: readonly WriteBindingReplayRecord[],
+): EvalEventActionOutcomeReplayMetrics {
+  const recoveries: EvalEventActionOutcomeReplayRecovery[] = [];
+  const indexedRefs = new Map(
+    buildActionOutcomeEnvelopeReplayIndex(records).refs.map((indexed) => [
+      indexed.ref.id,
+      indexed,
+    ]),
+  );
+  let eventsWithActionOutcomeRefs = 0;
+
+  for (const event of events) {
+    const refs = event.substrateRefs.filter(
+      (ref) => ref.kind === "action_outcome_envelope",
+    );
+    if (refs.length > 0) eventsWithActionOutcomeRefs += 1;
+
+    for (const ref of refs) {
+      const indexed = indexedRefs.get(ref.id);
+      if (indexed === undefined) {
+        recoveries.push({
+          runId: event.runId,
+          scenarioId: event.scenarioId,
+          ref,
+          resolved: false,
+          reason: "missing_replay_packet",
+        });
+        continue;
+      }
+
+      recoveries.push({
+        runId: event.runId,
+        scenarioId: event.scenarioId,
+        ref,
+        resolved: indexed.validHash,
+        recordId: indexed.recordId,
+        outcomeHash: indexed.outcomeHash,
+        terminalOutcome: indexed.terminalOutcome,
+        validHash: indexed.validHash,
+        ...(indexed.validHash ? {} : { reason: "invalid_outcome_hash" }),
+      });
+    }
+  }
+
+  const resolved = recoveries.filter((recovery) => recovery.resolved);
+
+  return {
+    eventCount: events.length,
+    eventsWithActionOutcomeRefs,
+    actionOutcomeRefCount: recoveries.length,
+    resolvedActionOutcomeRefs: resolved.length,
+    unresolvedActionOutcomeRefs: recoveries.length - resolved.length,
+    invalidResolvedActionOutcomeRefs: recoveries.filter(
+      (recovery) => recovery.validHash === false,
+    ).length,
+    acceptedTerminalOutcomes: resolved.filter(
+      (recovery) => recovery.terminalOutcome === "accepted",
+    ).length,
+    blockedTerminalOutcomes: resolved.filter(
+      (recovery) => recovery.terminalOutcome === "blocked",
+    ).length,
+    recoveries,
+  };
 }
 
 export function buildEvidenceBindingReferenceCatalogFromReplayCorpora(input: {
@@ -379,6 +650,11 @@ export function buildFixtureWriteTransportBindingCoverageSamples(): readonly Wri
       bindingMode: "require_for_writes",
       hasBindingProvider: true,
       hasBindingVerifier: true,
+      requiresActionOutcomeEnvelope: true,
+      hasActionOutcomeEnvelopeProvider: true,
+      terminalAdmissionProviderIds: [
+        "finance-research.arrowhedge.action-outcome-envelope.v1",
+      ],
     },
     {
       transportId: "agency.lead.promote",
@@ -389,6 +665,11 @@ export function buildFixtureWriteTransportBindingCoverageSamples(): readonly Wri
       bindingMode: "require_for_writes",
       hasBindingProvider: true,
       hasBindingVerifier: true,
+      requiresActionOutcomeEnvelope: true,
+      hasActionOutcomeEnvelopeProvider: true,
+      terminalAdmissionProviderIds: [
+        "agency.publication.action-outcome-envelope.v1",
+      ],
     },
     {
       transportId: "research.memo.publish",
@@ -399,6 +680,11 @@ export function buildFixtureWriteTransportBindingCoverageSamples(): readonly Wri
       bindingMode: "off",
       hasBindingProvider: true,
       hasBindingVerifier: false,
+      requiresActionOutcomeEnvelope: true,
+      hasActionOutcomeEnvelopeProvider: true,
+      terminalAdmissionProviderIds: [
+        "finance-research.arrowhedge.action-outcome-envelope.v1",
+      ],
     },
     {
       transportId: "crm.note.sync",
@@ -409,8 +695,63 @@ export function buildFixtureWriteTransportBindingCoverageSamples(): readonly Wri
       bindingMode: "require_for_writes",
       hasBindingProvider: false,
       hasBindingVerifier: false,
+      requiresActionOutcomeEnvelope: true,
+      hasActionOutcomeEnvelopeProvider: true,
+      terminalAdmissionProviderIds: ["shared.crm.action-outcome-envelope.v1"],
     },
   ];
+}
+
+export function buildWriteTransportBindingCoverageSamplesFromCapabilities(
+  inputs: readonly CapabilityWriteTransportBindingCoverageInput[],
+  options: CapabilityWriteTransportBindingCoverageOptions = {},
+): readonly WriteTransportBindingCoverageSample[] {
+  return inputs.flatMap((input) => {
+    const normalized = normalizeCapability(input.capability);
+    const providerBindings = listTerminalAdmissionProviderBindings(
+      input.capability,
+    );
+    const verifiedProviderIds = new Set(
+      options.requireVerifiedTerminalAdmissionProviders === true
+        ? verifyTerminalAdmissionProviderBindings(
+            [input.capability],
+            options.terminalAdmissionProviderManifests ?? [],
+          ).bindings.flatMap((binding) =>
+            binding.verified ? [binding.provider.providerId] : []
+          )
+        : providerBindings.map((binding) => binding.provider.providerId),
+    );
+    const providerIdsByWrite = new Map<string, string[]>();
+
+    for (const binding of providerBindings) {
+      if (!verifiedProviderIds.has(binding.provider.providerId)) continue;
+      const key = writeContractKey(binding.writeInterface, binding.writeFields);
+      const existing = providerIdsByWrite.get(key) ?? [];
+      existing.push(binding.provider.providerId);
+      providerIdsByWrite.set(key, existing);
+    }
+
+    return normalized.writes.map((write) => {
+      const terminalAdmissionProviderIds = providerIdsByWrite.get(
+        writeContractKey(write.interface, write.fields),
+      ) ?? [];
+      return {
+        transportId: capabilityWriteTransportId(normalized.name, write),
+        profile: input.profile,
+        workflowName: input.workflowName,
+        capability: normalized.name,
+        capabilityWrites: true,
+        bindingMode: input.bindingMode,
+        hasBindingProvider: input.hasBindingProvider,
+        hasBindingVerifier: input.hasBindingVerifier,
+        requiresActionOutcomeEnvelope:
+          input.requiresActionOutcomeEnvelope ?? true,
+        hasActionOutcomeEnvelopeProvider:
+          terminalAdmissionProviderIds.length > 0,
+        terminalAdmissionProviderIds,
+      };
+    });
+  });
 }
 
 export function analyzeWriteTransportBindingCoverage(
@@ -432,6 +773,15 @@ export function analyzeWriteTransportBindingCoverage(
         disposition,
       };
     });
+  const outcomeEnvelopeRequired = evaluated.filter(
+    (sample) => sample.requiresActionOutcomeEnvelope,
+  );
+  const outcomeEnvelopeCovered = outcomeEnvelopeRequired.filter(
+    (sample) => sample.hasActionOutcomeEnvelopeProvider,
+  );
+  const missingActionOutcomeEnvelopeTransportIds = outcomeEnvelopeRequired
+    .filter((sample) => !sample.hasActionOutcomeEnvelopeProvider)
+    .map((sample) => sample.transportId);
 
   return {
     totalWriteCapableTransports: evaluated.length,
@@ -442,6 +792,15 @@ export function analyzeWriteTransportBindingCoverage(
       evaluated.length === 0
         ? 1
         : byDisposition.required_verified / evaluated.length,
+    outcomeEnvelopeRequiredTransports: outcomeEnvelopeRequired.length,
+    outcomeEnvelopeCoveredTransports: outcomeEnvelopeCovered.length,
+    outcomeEnvelopeMissingTransports:
+      missingActionOutcomeEnvelopeTransportIds.length,
+    outcomeEnvelopeCoverageRate:
+      outcomeEnvelopeRequired.length === 0
+        ? 1
+        : outcomeEnvelopeCovered.length / outcomeEnvelopeRequired.length,
+    missingActionOutcomeEnvelopeTransportIds,
     byDisposition,
     samples: evaluated,
   };
@@ -536,6 +895,63 @@ export function buildArrowHedgeWriteBindingReplayCorpus(): WriteBindingReplayCor
   };
 }
 
+export function buildArrowHedgeWriteBindingProofSourceBundle(
+  input: ArrowHedgeWriteBindingProofSourceBundleInput = {},
+): StrictThreeAxisProofPacketSourceBundle {
+  const corpus = buildArrowHedgeWriteBindingReplayCorpus();
+  const acceptedRef = requiredActionOutcomeRef(
+    corpus.records,
+    "wb_arrowhedge_clean_refresh_allowed_001",
+  );
+  const blockedRef = requiredActionOutcomeRef(
+    corpus.records,
+    "wb_arrowhedge_stale_artifact_policy_blocked_001",
+  );
+  const suite = buildArrowHedgeStateEvalSuite({
+    tenantId: ARROWHEDGE_TENANT,
+    observedAt: "2026-06-11T16:05:00.000Z" as Timestamp,
+    source: "packages/evals/fixtures/write-binding-replay.v1.jsonl",
+    sourceRecordIds: ["ticker:AAPL"],
+    substrateRefs: {
+      graphNodeIds: [],
+      eventIds: ["evt_signal", "evt_risk", "evt_decision"],
+      projectionIds: ["arrowhedge_cop"],
+    },
+    readSetValidation: {
+      currentStateViewId: "arrowhedge_cop_corpus:AAPL:current_state_view",
+      mode: "warn",
+      issueCodes: ["stale_read_ref"],
+    },
+    actionOutcomeEnvelopes: [
+      {
+        scenarioId: "arrowhedge-terminal-outcome-partition",
+        envelopeId: acceptedRef.id,
+        runArm: "baseline",
+        terminalOutcome: "accepted",
+      },
+      {
+        scenarioId: "arrowhedge-terminal-outcome-partition",
+        envelopeId: blockedRef.id,
+        runArm: "substrate",
+        terminalOutcome: "blocked",
+      },
+    ],
+    operationalSamples: [],
+  });
+
+  return {
+    source: {
+      sourceId: "axis-a-arrowhedge-write-binding-replay",
+      axis: "finance",
+      eventCount: suite.events.length,
+    },
+    events: suite.events,
+    ...(input.authorityRecoverySuite !== undefined
+      ? { authorityRecoverySuite: input.authorityRecoverySuite }
+      : {}),
+  };
+}
+
 export function analyzeWriteBindingReplayRecords(
   records: readonly WriteBindingReplayRecord[],
 ): WriteBindingReplayMetrics {
@@ -545,10 +961,15 @@ export function analyzeWriteBindingReplayRecords(
     blocked_incomplete_binding: 0,
     blocked_policy: 0,
     blocked_unverified_binding: 0,
+    blocked_provider_certificate_missing: 0,
+    blocked_provider_certificate_invalid: 0,
   } satisfies Record<WriteBindingReplayDecision, number>;
 
   let completeBindings = 0;
   let rejectedEvidenceReferences = 0;
+  let actionOutcomeEnvelopeCount = 0;
+  let acceptedActionOutcomeEnvelopes = 0;
+  let blockedActionOutcomeEnvelopes = 0;
   let highConsequenceRecords = 0;
   let hashPresent = 0;
 
@@ -566,6 +987,13 @@ export function analyzeWriteBindingReplayRecords(
     }
     if (record.actionConsequence === "high") highConsequenceRecords += 1;
     if (record.stateReviewArtifact.artifactHash.length === 64) hashPresent += 1;
+    actionOutcomeEnvelopeCount += 1;
+    if (record.actionOutcomeEnvelope.terminalOutcome === "accepted") {
+      acceptedActionOutcomeEnvelopes += 1;
+    }
+    if (record.actionOutcomeEnvelope.terminalOutcome === "blocked") {
+      blockedActionOutcomeEnvelopes += 1;
+    }
   }
 
   return {
@@ -577,7 +1005,12 @@ export function analyzeWriteBindingReplayRecords(
     incompleteBindings: byDecision.blocked_incomplete_binding,
     policyBlocked: byDecision.blocked_policy,
     unverifiedBindings: byDecision.blocked_unverified_binding,
+    providerCertificateMissing: byDecision.blocked_provider_certificate_missing,
+    providerCertificateInvalid: byDecision.blocked_provider_certificate_invalid,
     rejectedEvidenceReferences,
+    actionOutcomeEnvelopeCount,
+    acceptedActionOutcomeEnvelopes,
+    blockedActionOutcomeEnvelopes,
     replayHashCoverage: records.length === 0 ? 1 : hashPresent / records.length,
     highConsequenceRecords,
     byDecision,
@@ -593,6 +1026,20 @@ function requiredAdmission(
     throw new Error(`missing evidence admission review ${reviewId}`);
   }
   return review;
+}
+
+function requiredActionOutcomeRef(
+  records: readonly WriteBindingReplayRecord[],
+  recordId: string,
+): StateRef {
+  const record = records.find((candidate) => candidate.recordId === recordId);
+  const ref = record?.actionOutcomeEnvelope.substrateRefs.find(
+    (candidate) => candidate.kind === "action_outcome_envelope",
+  );
+  if (ref === undefined) {
+    throw new Error(`write-binding replay record ${recordId} has no ActionOutcomeEnvelope ref`);
+  }
+  return ref;
 }
 
 function buildRecord(input: {
@@ -687,6 +1134,44 @@ function buildRecord(input: {
             })),
           },
         });
+  const providerCertificate =
+    validation.valid && input.bindingKind === "complete_advisory"
+      ? ARROWHEDGE_TERMINAL_PROVIDER_CERTIFICATE
+      : undefined;
+  const providerCertificateStatusRef =
+    providerCertificate === undefined
+      ? undefined
+      : ARROWHEDGE_TERMINAL_PROVIDER_STATUS_REF;
+  const workflowActionOutcomeEnvelope = buildInvocationActionOutcomeEnvelope({
+    request: {
+      tenantId: ARROWHEDGE_TENANT,
+      workflowId,
+      workflowName: "arrowhedge-write-binding-replay",
+      workflowVersion: 1,
+      nodeId: input.nodeId,
+      capability: input.capability,
+      inputs: {},
+      capabilityWrites: true,
+      triggerEventId: input.triggerEventId,
+    },
+    evidenceBinding: invocationEvidenceBinding,
+    evidenceDecision: validation,
+    generatedAt: input.generatedAt,
+    ...(providerCertificate !== undefined ? { providerCertificate } : {}),
+    ...(providerCertificateStatusRef !== undefined
+      ? { providerCertificateStatusRef }
+      : {}),
+  });
+  const actionOutcomeEnvelope = promoteWorkflowInvocationOutcomeEnvelope({
+    workflowEnvelope: workflowActionOutcomeEnvelope,
+    subject: input.artifact.subject,
+    proposalReviewId: input.artifact.proposalReviewId,
+    stateReviewArtifactHash: input.artifact.artifactHash,
+    decidedBy: "workflow:write-binding-replay",
+    substrateRefs: [
+      stateRef("state_review_artifact", input.artifact.artifactId),
+    ],
+  });
 
   return {
     recordId: input.recordId,
@@ -721,6 +1206,7 @@ function buildRecord(input: {
     })),
     invocationEvidenceBinding,
     validation,
+    actionOutcomeEnvelope,
     decision: decisionFromValidation(validation),
     warningCodes: input.artifact.warningCodes,
     invariantClasses: uniqueInvariantClasses([
@@ -791,6 +1277,10 @@ function decisionFromValidation(
       return "blocked_policy";
     case "evidence_binding_unverified":
       return "blocked_unverified_binding";
+    case "provider_certificate_missing":
+      return "blocked_provider_certificate_missing";
+    case "provider_certificate_invalid":
+      return "blocked_provider_certificate_invalid";
   }
 }
 
@@ -919,6 +1409,21 @@ function classifyWriteTransportBindingCoverage(
     return "required_verified";
   }
   return "advisory_only";
+}
+
+function capabilityWriteTransportId(
+  capabilityName: string,
+  write: WriteContract,
+): string {
+  const fields = write.fields.length === 0 ? "*" : write.fields.join(",");
+  return `${capabilityName}:${write.interface}:${fields}`;
+}
+
+function writeContractKey(
+  writeInterface: string,
+  writeFields: readonly string[],
+): string {
+  return `${writeInterface}:${writeFields.join("\u0000")}`;
 }
 
 function compactArtifactCatalogRef(

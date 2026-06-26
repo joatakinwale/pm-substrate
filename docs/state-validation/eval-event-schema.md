@@ -51,6 +51,12 @@ export interface EvalEvent {
     | "convergent_update"
     | "authority_gated_transition"
     | "derived_projection";
+  readonly evidenceStage?:
+    | "scaffolded_scenario"
+    | "detected_warning"
+    | "blocked_mutation"
+    | "paired_behavioral_improvement"
+    | "live_run";
   readonly confidenceBand?: {
     readonly low: number;
     readonly high: number;
@@ -61,6 +67,14 @@ export interface EvalEvent {
       | "bootstrap"
       | "none";
   };
+  readonly scenarioResult?: "pass" | "fail" | "blocked";
+  readonly operationalTerminalOutcome?:
+    | "accepted"
+    | "blocked"
+    | "rejected"
+    | "held"
+    | "superseded"
+    | "escalated";
   readonly result: "pass" | "fail" | "blocked";
   readonly notes: string;
 }
@@ -82,6 +96,7 @@ export interface EvalEvidenceRef {
     | "projection"
     | "source_record"
     | "state_review_artifact"
+    | "action_outcome_envelope"
     | "external_fixture"
     | "document";
   readonly id: string;
@@ -89,7 +104,7 @@ export interface EvalEvidenceRef {
 }
 ```
 
-Use `evidenceRefs` for the observations proving what happened. Use `substrateRefs` for substrate records involved in the run. A source fixture can appear in `evidenceRefs`; an event id, workflow run, graph node, projection, continuity checkpoint, or `state_review_artifact` should appear in `substrateRefs`.
+Use `evidenceRefs` for the observations proving what happened. Use `substrateRefs` for substrate records involved in the run. A source fixture can appear in `evidenceRefs`; an event id, workflow run, graph node, projection, continuity checkpoint, `state_review_artifact`, or `action_outcome_envelope` should appear in `substrateRefs`.
 
 ## Validation Rules
 
@@ -109,18 +124,28 @@ Rules:
 - `memoryBenchmarkBridge`, when present, must be a supported memory-benchmark bridge label.
 - `mastCategory`, when present, must be a supported MAST-style multi-agent failure category.
 - `coordinationClass`, when present, must be one of the cross-disciplinary coordination classes: append-only observation, convergent update, authority-gated transition, or derived projection.
+- `evidenceStage`, when present, must be one of `scaffolded_scenario`, `detected_warning`, `blocked_mutation`, `paired_behavioral_improvement`, or `live_run`.
 - Finance-axis events require both `runArm` and `pairedRunGroup` so paired baseline/substrate runs can be analyzed without changing marketing or local-lab compatibility.
 - `confidenceBand`, when present, must include finite `low` and `high` numbers plus one supported method.
-- `pass` and `fail` events require at least one `evidenceRef` and at least one `substrateRef`.
+- `scenarioResult`, when present, is the scenario oracle verdict. If omitted, analyzers treat `result` as the scenario verdict for older events.
+- `operationalTerminalOutcome`, when present, records the substrate terminal outcome and requires an `action_outcome_envelope` substrate ref.
+- `pass` and `fail` scenario results require at least one `evidenceRef` and at least one `substrateRef`.
+- A legacy `result: "blocked"` with `scenarioResult: "pass"` must include `operationalTerminalOutcome`, so protective refusals are not confused with unevaluable scenarios.
 - `blocked` events may omit refs only when the missing evidence or substrate record is the blocker and is explained in `notes`.
 
 ## Result Semantics
 
-| Result | Meaning | Reference requirement |
+`result` remains the legacy observed run outcome for compatibility. New
+producers should also set `scenarioResult` for the oracle verdict and
+`operationalTerminalOutcome` for the terminal action outcome proved by an
+`ActionOutcomeEnvelope`.
+
+| Field/value | Meaning | Reference requirement |
 | --- | --- | --- |
-| `pass` | The substrate-assisted run prevented or detected the targeted failure according to scenario criteria. | Requires evidence and substrate refs. |
-| `fail` | The targeted state failure occurred or was not detected. | Requires evidence and substrate refs. |
-| `blocked` | The scenario could not be evaluated. | Refs optional only if the missing ref is the blocker. |
+| `scenarioResult: "pass"` | The scenario oracle says the targeted failure was prevented or detected. This can pair with `result: "blocked"` when a substrate refusal is the correct protective behavior. | Requires evidence and substrate refs. |
+| `scenarioResult: "fail"` | The targeted state failure occurred or was not detected. | Requires evidence and substrate refs. |
+| `scenarioResult: "blocked"` | The scenario could not be evaluated. | Refs optional only if the missing ref is the blocker. |
+| `operationalTerminalOutcome` | The substrate terminal outcome for the action id, such as `accepted`, `blocked`, `rejected`, `held`, `superseded`, or `escalated`. | Requires an `action_outcome_envelope` substrate ref. |
 
 ## Axis Semantics
 
@@ -182,7 +207,7 @@ evalEvent({
 });
 ```
 
-### Local Lab Pass
+### Local Lab Protective Refusal
 
 ```ts
 evalEvent({
@@ -200,12 +225,15 @@ evalEvent({
   substrateRefs: [
     evalEvidenceRef("event", "evt_conflict_detected"),
     evalEvidenceRef("projection", "projection_entity_state"),
+    evalEvidenceRef("action_outcome_envelope", "outcome_conflict_blocked"),
   ],
   stateBenchCategory: "procedural_execution",
   memoryBenchmarkBridge: "workflow_rebase",
   mastCategory: "system_design",
   coordinationClass: "authority_gated_transition",
-  result: "pass",
+  result: "blocked",
+  scenarioResult: "pass",
+  operationalTerminalOutcome: "blocked",
   notes: "Substrate rejected the second write because its read snapshot was invalidated by the first accepted event.",
 });
 ```
@@ -220,6 +248,7 @@ The optional taxonomy fields keep benchmark and cross-disciplinary labels querya
 | `memoryBenchmarkBridge` | Preserves the agent-memory competency being tested. |
 | `mastCategory` | Maps multi-agent failures to MAST-style system design, inter-agent misalignment, or task-verification categories. |
 | `coordinationClass` | Implements the cross-disciplinary CRDT-vs-gate classification: append-only observation, convergent update, authority-gated transition, or derived projection. |
+| `evidenceStage` | Distinguishes scaffolds, warnings, mutation blockers, paired behavioral measurements, and live dynamic harness runs. |
 
 ## Metric Mapping
 
@@ -239,9 +268,61 @@ The optional taxonomy fields keep benchmark and cross-disciplinary labels querya
 
 ## Persistence
 
-`@pm/evals` owns harness persistence under `packages/evals/src/persistence/` with migrations under `packages/evals/migrations/`. The root runner also applies `db/migrations/0017_eval_events.sql` and `db/migrations/0018_eval_event_taxonomy.sql` for local integrated runs. Eval persistence records measurements, while source-of-truth authority stays in substrate graph/events/workflow/capability packages.
+`@pm/evals` owns harness persistence under `packages/evals/src/persistence/` with migrations under `packages/evals/migrations/`. The root runner also applies `db/migrations/0017_eval_events.sql`, `db/migrations/0018_eval_event_taxonomy.sql`, and `db/migrations/0020_eval_action_outcome_envelope_packets.sql` for local integrated runs. Eval persistence records measurements and hash-verified terminal proof packets, while source-of-truth authority stays in substrate graph/events/workflow/capability packages.
 
 The first table is `evals.eval_events`, indexed by tenant, axis, run, scenario, paired-run grouping, taxonomy labels, and coordination class.
+
+`evals.action_outcome_envelope_packets` stores canonical promoted `ActionOutcomeEnvelope` packets by `(tenant_id, envelope_ref_id)`. EvalEvents cite those packets with `action_outcome_envelope` substrate refs; replay resolves the ref, verifies the outcome hash, and recovers the accepted or blocked terminal outcome without relying on chat context.
+
+Dynamic Axis C live runs use `evidenceStage: "live_run"` and must persist generated `ActionOutcomeEnvelope` packets before recording the EvalEvents that cite them.
+
+## Three-Axis Coverage Gate
+
+`@pm/evals` also exposes `analyzeThreeAxisCoverage(events)`. This is the
+current matrix verifier for the state-validation program. It evaluates all 30
+required scenario families:
+
+```text
+3 axes x 10 failure classes = 30 cells
+```
+
+Each cell is keyed by `(axis, failureClass)` and reports:
+
+- whether non-scaffolded events exist;
+- whether a complete paired `baseline` / `substrate` group exists;
+- whether the pair is protective (`baseline scenarioResult=fail`,
+  `substrate scenarioResult!=fail`);
+- whether the pair has a scenario pass (`baseline scenarioResult=fail`,
+  `substrate scenarioResult=pass`);
+- whether terminal proof refs are present through `action_outcome_envelope`;
+- whether the cell is blocked because evaluation evidence or substrate refs are
+  missing.
+
+The report deliberately separates coverage from verification. Protective
+coverage can show that substrate discipline prevented a targeted failure, while
+verified coverage requires a substrate scenario pass with terminal proof refs by
+default. Operationally blocked refusals can therefore verify a cell when the
+oracle verdict is `scenarioResult: "pass"` and an outcome packet proves the
+terminal `blocked` result. A blocked Axis B marketing event remains a blocker
+for the whole report; complete Axis C coverage cannot hide it.
+
+## Three-Axis Proof Packet
+
+`buildThreeAxisProofPacket()` wraps the coverage report in a traceable proof
+snapshot. It records:
+
+- source groups used to build the packet;
+- `verified`, `blocked`, or `unverified` packet status;
+- verified, blocked, missing, and unverified axes;
+- cell refs for verified cells, missing cells, blocked cells, and
+  terminal-proof-backed scenario pass cells.
+
+This packet is intentionally evidence, not authority. A packet can show that the
+current verifier is blocked because Axis B lacks source evidence, or that Axis A
+is missing failure classes, without promoting those blockers into passes.
+Terminal validity belongs in `@pm/agent-state`: proof packets should consume
+hash-valid, admitted `ActionOutcomeEnvelope` records or a terminal outcome index
+rather than defining terminal truth inside the verifier layer.
 
 ## Design Boundary
 

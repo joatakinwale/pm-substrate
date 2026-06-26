@@ -1,5 +1,9 @@
 import type { Capability } from "@pm/registry";
-import type { CapabilityId } from "@pm/types";
+import type {
+  CapabilityId,
+  TerminalAdmissionProviderManifest,
+  TerminalAdmissionProviderRef,
+} from "@pm/types";
 
 export const FINANCE_RESEARCH_EVENT_TYPES = [
   "analyst.signal.created",
@@ -10,6 +14,31 @@ export const FINANCE_RESEARCH_EVENT_TYPES = [
 ] as const;
 
 export type FinanceResearchEventType = (typeof FINANCE_RESEARCH_EVENT_TYPES)[number];
+
+export const FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER = {
+  providerId: "finance-research.arrowhedge.action-outcome-envelope.v1",
+  kind: "action_outcome_envelope",
+  contractVersion: { major: 1, minor: 0, patch: 0 },
+  packageName: "@pm/capability-finance-research-ingest",
+  exportName: "buildArrowHedgeActionOutcomeEnvelope",
+  profiles: ["finance-research"],
+  actionTypes: [
+    "portfolio.decision.accept",
+    "workflow.block",
+    "risk.refresh",
+  ],
+  evidenceRefKinds: ["source_record", "document"],
+  substrateRefKinds: [
+    "action_outcome_envelope",
+    "state_review_artifact",
+    "projection",
+  ],
+} as const satisfies TerminalAdmissionProviderRef;
+
+export const FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER_MANIFEST = {
+  ...FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER,
+  availability: "available",
+} as const satisfies TerminalAdmissionProviderManifest;
 
 /**
  * Capability descriptor for finance-research.ingest.
@@ -53,6 +82,7 @@ export const FINANCE_RESEARCH_INGEST_CAPABILITY = {
       interface: "Event",
       fields: ["kind", "occurredAt"],
       ownership: "contributor",
+      terminalAdmissionProviders: [FINANCE_RESEARCH_TERMINAL_ADMISSION_PROVIDER],
     },
     {
       interface: "Resource",

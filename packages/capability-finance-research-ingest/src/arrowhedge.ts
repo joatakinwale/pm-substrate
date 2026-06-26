@@ -11,6 +11,8 @@ import {
   type SourceEntityRecord,
 } from "@pm/entity-mapping";
 import {
+  buildActionOutcomeEnvelope,
+  buildActionOutcomeTerminalIndex,
   buildObservationContractFromCurrentStateView,
   buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
   buildReadSetFromCurrentStateView,
@@ -20,8 +22,11 @@ import {
   reviewProposedActionAgainstCurrentState,
   serializeStateReviewArtifactsJsonl,
   stateRef,
+  type ActionOutcomeEnvelope,
+  type ActionOutcomeTerminalIndex,
   type ActionProposalReviewEnforcementMode,
   type ActionProposalReview,
+  type ActionTerminalOutcome,
   type AllowedAction,
   type CurrentStateView,
   type ObservationContract,
@@ -761,6 +766,16 @@ export interface ArrowHedgeStateReviewArtifactInput
   readonly scenarioId?: string;
 }
 
+export interface ArrowHedgeActionOutcomeEnvelopeInput
+  extends ArrowHedgeStateReviewArtifactInput {
+  readonly actionId?: string;
+  readonly requestedTerminalOutcome?: ActionTerminalOutcome;
+  readonly decidedAt?: Timestamp;
+  readonly decidedBy?: string;
+  readonly statusCheckRefs?: readonly StateRef[];
+  readonly substrateRefs?: readonly StateRef[];
+}
+
 export interface ArrowHedgeStateReviewArtifactCorpusInput
   extends ArrowHedgeStateReviewArtifactInput {
   readonly scenarioId: string;
@@ -989,6 +1004,56 @@ export function buildArrowHedgeStateReviewArtifact(
       ...(artifactOptions.relatedObjects ?? []),
     ],
   });
+}
+
+export function buildArrowHedgeActionOutcomeEnvelope(
+  input: ArrowHedgeActionOutcomeEnvelopeInput,
+): ActionOutcomeEnvelope | null {
+  const artifact = buildArrowHedgeStateReviewArtifact(input);
+  if (!artifact) return null;
+
+  const actionId = input.actionId ?? arrowHedgeActionId(input, artifact);
+  const outcomeRef = stateRef(
+    "action_outcome_envelope",
+    arrowHedgeActionOutcomeRefId(actionId),
+    "ArrowHedge ActionOutcomeEnvelope",
+  );
+
+  return buildActionOutcomeEnvelope({
+    tenantId: input.tenantId,
+    actionId,
+    subject: artifact.review.currentStateView.subject,
+    proposalReviewId: artifact.review.reviewId,
+    stateReviewArtifactHash: artifact.artifactHash,
+    evidenceAdmissionReviewIds: [],
+    ...(input.statusCheckRefs !== undefined
+      ? { statusCheckRefs: input.statusCheckRefs }
+      : {}),
+    requestedTerminalOutcome:
+      input.requestedTerminalOutcome ??
+      (artifact.review.execution.allowed ? "accepted" : "blocked"),
+    decidedAt: input.decidedAt ?? artifact.generatedAt,
+    decidedBy: input.decidedBy ?? "arrowhedge:proposal-review-gate",
+    evidenceRefs: artifact.provenance.used,
+    substrateRefs: uniqueStateRefs([
+      outcomeRef,
+      stateRef("state_review_artifact", artifact.artifactId),
+      artifact.review.currentStateView.subject,
+      ...(input.substrateRefs ?? []),
+    ]),
+    proposalReview: artifact.review,
+  });
+}
+
+export function buildArrowHedgeActionOutcomeTerminalIndex(
+  inputs: readonly ArrowHedgeActionOutcomeEnvelopeInput[],
+): ActionOutcomeTerminalIndex {
+  return buildActionOutcomeTerminalIndex(
+    inputs.flatMap((input) => {
+      const envelope = buildArrowHedgeActionOutcomeEnvelope(input);
+      return envelope === null ? [] : [envelope];
+    }),
+  );
 }
 
 export function buildArrowHedgeStateReviewArtifactCorpus(
@@ -1853,6 +1918,30 @@ function tickerRiskStateIsStale(
 ): boolean {
   const validUntil = ticker.latestRiskState?.freshnessExpiresAt;
   return typeof validUntil === "string" && Date.parse(validUntil) < Date.parse(observedAt);
+}
+
+function arrowHedgeActionId(
+  input: ArrowHedgeActionOutcomeEnvelopeInput,
+  artifact: StateReviewArtifact,
+): string {
+  const decisionId =
+    typeof input.payload["decisionId"] === "string"
+      ? input.payload["decisionId"]
+      : artifact.review.reviewId;
+  return [
+    input.tenantId,
+    input.projectionName,
+    input.symbol,
+    input.actionType,
+    decisionId,
+  ].join(":");
+}
+
+function arrowHedgeActionOutcomeRefId(actionId: string): string {
+  return `arrowhedge_outcome_${createHash("sha256")
+    .update(actionId)
+    .digest("hex")
+    .slice(0, 32)}`;
 }
 
 function uniqueStateRefs(refs: readonly (StateRef | null)[]): readonly StateRef[] {

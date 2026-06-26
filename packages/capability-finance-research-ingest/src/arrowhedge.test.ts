@@ -5,6 +5,7 @@ import {
   buildReadSetFromCurrentStateView,
   importStateReviewArtifactsJsonl,
   validateProposedActionReadSet,
+  verifyActionOutcomeEnvelopeHash,
   verifyStateReviewArtifactHash,
 } from "@pm/agent-state";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
@@ -12,6 +13,8 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgeIngestionPlan,
+  buildArrowHedgeActionOutcomeEnvelope,
+  buildArrowHedgeActionOutcomeTerminalIndex,
   buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCanonicalStateReviewArtifactCorpus,
   buildArrowHedgeCurrentStateView,
@@ -642,6 +645,99 @@ describe("ArrowHedge Common Operating Picture projection", () => {
         reason: "advisory_warn_first_v1",
       },
     });
+  });
+
+  it("indexes ArrowHedge terminal outcomes at the proposal-review write boundary", async () => {
+    const tenant = tenantId("tnt_arrowhedge_terminal_index");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_terminal",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+    const originalView = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      evaluatedAt: timestamp("2026-06-03T14:05:00.000Z"),
+    })!;
+    const originalObservation =
+      buildObservationContractFromCurrentStateView(originalView);
+    const actionId = "arrowhedge:AAPL:risk-refresh:dec_aapl_buy_120";
+
+    const acceptedInput = {
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      actionId,
+      actionType: "risk.refresh",
+      payload: {
+        decisionId: "dec_aapl_buy_120",
+        refreshId: "refresh:dec_aapl_buy_120:current",
+      },
+      proposedBy: "agent:portfolio-manager",
+      proposedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      readSet: buildReadSetFromCurrentStateView(
+        originalView,
+        originalView.authorityRule,
+      ),
+      observationContract: originalObservation,
+      artifact: {
+        artifactId: "artifact_arrowhedge_terminal_index_accepted",
+      },
+    } as const;
+    const blockedInput = {
+      ...acceptedInput,
+      proposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      artifact: {
+        artifactId: "artifact_arrowhedge_terminal_index_blocked",
+      },
+    } as const;
+
+    const acceptedEnvelope = buildArrowHedgeActionOutcomeEnvelope(acceptedInput)!;
+    const blockedEnvelope = buildArrowHedgeActionOutcomeEnvelope(blockedInput)!;
+    const index = buildArrowHedgeActionOutcomeTerminalIndex([
+      acceptedInput,
+      acceptedInput,
+      blockedInput,
+    ]);
+
+    expect(acceptedEnvelope.terminalOutcome).toBe("accepted");
+    expect(blockedEnvelope).toMatchObject({
+      terminalOutcome: "blocked",
+      blockingCauses: [
+        {
+          source: "proposal_review",
+          code: "proposal_review_blocking_policy",
+        },
+      ],
+    });
+    expect(verifyActionOutcomeEnvelopeHash(acceptedEnvelope).valid).toBe(true);
+    expect(verifyActionOutcomeEnvelopeHash(blockedEnvelope).valid).toBe(true);
+    expect(index.valid).toBe(false);
+    expect(index.entries).toHaveLength(1);
+    expect(index.entries[0]).toMatchObject({
+      actionId,
+      replayCount: 2,
+      envelope: {
+        terminalOutcome: "accepted",
+      },
+    });
+    expect(index.issues).toEqual([
+      expect.objectContaining({
+        code: "terminal_outcome_conflict",
+        actionId,
+        candidate: expect.objectContaining({ terminalOutcome: "blocked" }),
+        incumbent: expect.objectContaining({ terminalOutcome: "accepted" }),
+      }),
+    ]);
   });
 
   it("builds a replayable ArrowHedge state-review artifact with ticker provenance", async () => {

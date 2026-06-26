@@ -1,10 +1,15 @@
 import type {
   EventId,
   PMEvent,
+  TerminalAdmissionProviderCertificate,
   TenantId,
   WorkflowId,
 } from "@pm/types";
-import type { InvocationEvidenceBinding } from "./evidence-binding.js";
+import type {
+  InvocationActionOutcomeEnvelope,
+  InvocationActionOutcomeProviderCertificateStatusRef,
+  InvocationEvidenceBinding,
+} from "./evidence-binding.js";
 
 export type {
   EvidenceBindingMode,
@@ -13,6 +18,16 @@ export type {
   EvidenceBindingRequest,
   EvidenceBindingVerificationDecision,
   EvidenceBindingRuntimeVerificationRequest,
+  InvocationActionOutcomeAdmissionDecision,
+  InvocationActionOutcomeAdmissionPort,
+  InvocationActionOutcomeAdmissionRejectionReason,
+  InvocationActionOutcomeAdmissionRequest,
+  InvocationActionOutcomeEnvelope,
+  InvocationActionOutcomeProviderCertificateLookup,
+  InvocationActionOutcomeProviderCertificateLookupResult,
+  InvocationActionOutcomeProviderCertificateProvider,
+  InvocationActionOutcomeProviderCertificateStatusRef,
+  InvocationActionTerminalOutcome,
   InvocationEvidenceBinding,
   InvocationEvidenceConsequence,
   InvocationEvidencePolicyDisposition,
@@ -102,6 +117,14 @@ export interface InvocationContext {
    * dispatch is denied unless this binding is present and complete.
    */
   readonly evidenceBinding?: InvocationEvidenceBinding;
+  /**
+   * Runtime-generated terminal outcome for a write-capable invocation. Present
+   * before dispatch when `evidenceBindingMode: "require_for_writes"` admits the
+   * write, and mirrored in dead-letter errors when the gate blocks it.
+   */
+  readonly actionOutcomeEnvelope?: InvocationActionOutcomeEnvelope;
+  readonly actionOutcomeProviderCertificate?: TerminalAdmissionProviderCertificate;
+  readonly actionOutcomeProviderCertificateStatusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
   /** Event that triggered the run, for tracing/audit. */
   readonly triggerEvent: PMEvent;
   /** Workflow + node identification, for logs. */
