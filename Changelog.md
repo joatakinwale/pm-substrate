@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-26 - Axis A continuity packet families
+
+- Added `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md`, answering RQ60 and replacing it with RQ61-RQ70.
+- Added `verifyContinuityCheckpointChain()` to `@pm/continuity` and wired `PostgresContinuityLedger.verify()` through it.
+- Added ArrowHedge `continuityCheck` inputs that turn conflicting continuity checkpoints, broken checkpoint chains, missing terminal history, or missing evidence history into `ActionOutcomeEnvelope` blocking causes.
+- Added paired baseline/substrate Axis A packet families for `memory_drift` and `continuity_break`.
+- Exported `ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS` and `ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS` from `@pm/evals`.
+- Claim boundary: Axis A now has store-backed paired packet proof for five failure families, but the finance axis is still incomplete and Axis B remains blocked.
+
 ## 2026-06-25 - ArrowHedge packet-store source bundle
 
 - Added `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md`, answering RQ59 and replacing it with RQ60: packet-backed Axis A scenario families for `memory_drift`, `continuity_break`, and the remaining finance gaps.

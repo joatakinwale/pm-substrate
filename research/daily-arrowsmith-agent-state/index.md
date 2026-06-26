@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-25
+Last updated: 2026-06-26
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -44,6 +44,8 @@ v56 update: `@pm/evals` now distinguishes failed baseline terminal observations 
 v57 update: `@pm/capability-finance-research-ingest` now exposes `buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus()`. The paired corpus emits baseline advisory comparator packets with no provider authority and substrate protective packets for the canonical temporal ArrowHedge scenarios, allowing Axis A to verify those three temporal cells with substrate-only recovery while keeping the finance axis incomplete for missing packet-backed failure classes.
 
 v58 update: `@pm/evals` now exposes `buildArrowHedgeTerminalPacketProofSourceBundle()`, and the finance paired-packet test persists paired packets through `PostgresEvalEventStore` before recovering substrate terminal refusals. The current Axis A temporal proof path is now reusable and store-backed, but still incomplete until additional packet-backed failure families cover `memory_drift`, `continuity_break`, and the remaining finance gaps.
+
+v59 update: `@pm/continuity` now exposes a reusable checkpoint-chain verifier, `PostgresContinuityLedger.verify()` consumes it, and ArrowHedge terminal packets can carry continuity checks that block private-memory drift or missing terminal history. Axis A now has store-backed paired packet proof for five failure families, including `memory_drift` and `continuity_break`, while the finance axis and three-axis solution remain unverified until the remaining Axis A gaps and Axis B blocker are resolved.
 
 ## Versions
 
@@ -109,6 +111,7 @@ v58 update: `@pm/evals` now exposes `buildArrowHedgeTerminalPacketProofSourceBun
 | v56 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v56-axis-a-baseline-recovery-obligations-2026-06-25.md` | Axis A baseline recovery obligations | Answered RQ57 for strict proof semantics, added RQ58, and made baseline failed terminal observations replay evidence rather than accepted authority-recovery obligations. |
 | v57 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v57-arrowhedge-paired-temporal-packet-corpus-2026-06-25.md` | ArrowHedge paired temporal packet corpus | Answered RQ58 for canonical paired packet generation, added RQ59, and generated baseline/substrate temporal packet pairs with substrate-only strict recovery. |
 | v58 | 2026-06-25 | `research/daily-arrowsmith-agent-state/v58-arrowhedge-packet-store-source-bundle-2026-06-25.md` | ArrowHedge packet-store source bundle | Answered RQ59, added RQ60, and moved paired temporal packet recovery through `PostgresEvalEventStore` plus a reusable strict Axis A source-bundle helper. |
+| v59 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v59-axis-a-continuity-packet-families-2026-06-26.md` | Axis A continuity packet families | Answered RQ60, added RQ61-RQ70, extracted reusable continuity-chain verification, and added paired packet-backed `memory_drift` / `continuity_break` Axis A families. |
 
 ## Top Findings
 

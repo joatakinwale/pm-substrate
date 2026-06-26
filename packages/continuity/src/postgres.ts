@@ -10,6 +10,7 @@ import type {
   ContinuityVerificationReport,
   RecordCheckpointInput,
 } from "./interfaces.js";
+import { verifyContinuityCheckpointChain } from "./verify.js";
 
 interface Row {
   id: string;
@@ -163,30 +164,10 @@ export class PostgresContinuityLedger implements ContinuityLedger {
         ORDER BY created_at ASC, id ASC`,
       [tenantId, agentId],
     );
-    const broken: string[] = [];
-    const errors: string[] = [];
-    let prior: string | null = null;
-    for (const row of r.rows) {
-      const checkpoint = rowToCheckpoint(row);
-      const { contentHash: _contentHash, ...withoutHash } = checkpoint;
-      const expected = checkpointHash(withoutHash);
-      if (checkpoint.contentHash !== expected) {
-        broken.push(checkpoint.id);
-        errors.push(`${checkpoint.id}: contentHash mismatch`);
-      }
-      if (checkpoint.priorCheckpointHash !== prior) {
-        broken.push(checkpoint.id);
-        errors.push(`${checkpoint.id}: priorCheckpointHash mismatch expected=${prior ?? "null"} actual=${checkpoint.priorCheckpointHash ?? "null"}`);
-      }
-      prior = checkpoint.contentHash;
-    }
-    return {
+    return verifyContinuityCheckpointChain({
       tenantId,
       agentId,
-      valid: errors.length === 0,
-      checked: r.rows.length,
-      brokenCheckpointIds: [...new Set(broken)],
-      errors,
-    };
+      checkpoints: r.rows.map(rowToCheckpoint),
+    });
   }
 }

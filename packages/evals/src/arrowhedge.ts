@@ -205,6 +205,38 @@ export const ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS = [
   },
 ] as const satisfies readonly ArrowHedgeScenarioSpec[];
 
+export const ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS = [
+  {
+    scenarioId: "arrowhedge-memory-drift-conflicting-position",
+    failureClass: "memory_drift",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline amnesiac resume accepts a portfolio decision from private memory even though substrate continuity checkpoints disagree.",
+    substrateNotes:
+      "Substrate terminal packet blocks because conflicting continuity checkpoints create a local-view obstruction.",
+  },
+  {
+    scenarioId: "arrowhedge-continuity-break-missing-terminal-history",
+    failureClass: "continuity_break",
+    coordinationClass: "authority_gated_transition",
+    substrateResult: "pass",
+    evidenceStage: "blocked_mutation",
+    requiresActionOutcomeEnvelope: true,
+    baselineNotes:
+      "Baseline resume continues with source evidence while losing the prior terminal outcome history.",
+    substrateNotes:
+      "Substrate terminal packet blocks because required terminal decision refs are absent from continuity checkpoints.",
+  },
+] as const satisfies readonly ArrowHedgeScenarioSpec[];
+
+export const ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS = [
+  ...ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+  ...ARROWHEDGE_CANONICAL_CONTINUITY_PACKET_SCENARIOS,
+] as const satisfies readonly ArrowHedgeScenarioSpec[];
+
 export function buildArrowHedgeStateEvalSuite(
   input: ArrowHedgeStateEvalInput,
 ): ArrowHedgeStateEvalSuite {

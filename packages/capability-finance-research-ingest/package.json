@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@pm/agent-state": "workspace:*",
+    "@pm/continuity": "workspace:*",
     "@pm/entity-mapping": "workspace:*",
     "@pm/registry": "workspace:*",
     "@pm/types": "workspace:*"

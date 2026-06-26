@@ -24,6 +24,7 @@ import {
   serializeStateReviewArtifactsJsonl,
   stateRef,
   type ActionOutcomeEnvelope,
+  type ActionOutcomeBlockingCause,
   type ActionOutcomeProviderAuthority,
   type ActionOutcomeTerminalIndex,
   type ActionProposalReviewEnforcementMode,
@@ -42,8 +43,15 @@ import {
   verifyStateReviewArtifactHash,
   verifyActionOutcomeEnvelopeHash,
 } from "@pm/agent-state";
+import {
+  checkpointHash,
+  findContinuityContradictions,
+  verifyContinuityCheckpointChain,
+  type ContinuityCheckpoint,
+} from "@pm/continuity";
 import type {
   EntityId,
+  EventId,
   PMEvent,
   ProfileDefinition,
   TenantId,
@@ -767,6 +775,7 @@ export interface ArrowHedgeStateReviewArtifactInput
   extends ArrowHedgeProposalReviewInput {
   readonly artifact?: StateReviewArtifactOptions;
   readonly scenarioId?: string;
+  readonly continuityCheck?: ArrowHedgeContinuityCheck;
 }
 
 export interface ArrowHedgeActionOutcomeEnvelopeInput
@@ -780,6 +789,13 @@ export interface ArrowHedgeActionOutcomeEnvelopeInput
   readonly terminalPacketAuthorityRole?: ArrowHedgeActionOutcomeEnvelopeAuthorityRole;
   readonly statusCheckRefs?: readonly StateRef[];
   readonly substrateRefs?: readonly StateRef[];
+}
+
+export interface ArrowHedgeContinuityCheck {
+  readonly agentId: string;
+  readonly checkpoints: readonly ContinuityCheckpoint[];
+  readonly requiredDecisionRefs?: readonly string[];
+  readonly requiredEvidenceEventIds?: readonly EventId[];
 }
 
 export interface ArrowHedgeStateReviewArtifactCorpusInput
@@ -1044,6 +1060,11 @@ export function buildArrowHedgeActionOutcomeEnvelope(
   const artifact = buildArrowHedgeStateReviewArtifact(input);
   if (!artifact) return null;
 
+  const continuityRefs = arrowHedgeContinuityRefs(input.continuityCheck);
+  const continuityBlockingCauses = buildArrowHedgeContinuityBlockingCauses(
+    input.tenantId,
+    input.continuityCheck,
+  );
   const actionId = input.actionId ?? arrowHedgeActionId(input, artifact);
   const outcomeRef = stateRef(
     "action_outcome_envelope",
@@ -1084,13 +1105,15 @@ export function buildArrowHedgeActionOutcomeEnvelope(
     requestedTerminalOutcome,
     decidedAt: input.decidedAt ?? artifact.generatedAt,
     decidedBy: input.decidedBy ?? "arrowhedge:proposal-review-gate",
-    evidenceRefs: artifact.provenance.used,
+    evidenceRefs: uniqueStateRefs([...artifact.provenance.used, ...continuityRefs]),
     substrateRefs: uniqueStateRefs([
       outcomeRef,
       stateRef("state_review_artifact", artifact.artifactId),
       artifact.review.currentStateView.subject,
+      ...continuityRefs,
       ...(input.substrateRefs ?? []),
     ]),
+    blockingCauses: continuityBlockingCauses,
     proposalReview: artifact.review,
   });
 }
@@ -1163,8 +1186,11 @@ export function buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus(
 export function buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus(
   input: ArrowHedgeCanonicalStateReviewArtifactCorpusInput,
 ): ArrowHedgeActionOutcomeEnvelopeCorpus {
-  const temporalCases = buildArrowHedgeTemporalMisalignmentFixtureCases(input);
-  const pairedInputs = temporalCases.flatMap((fixtureCase) => [
+  const packetCases = [
+    ...buildArrowHedgeTemporalMisalignmentFixtureCases(input),
+    ...buildArrowHedgeContinuityFixtureCases(input),
+  ];
+  const pairedInputs = packetCases.flatMap((fixtureCase) => [
     buildBaselineTerminalObservationCase(fixtureCase),
     {
       ...fixtureCase,
@@ -1177,11 +1203,12 @@ export function buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus(
 }
 
 function buildBaselineTerminalObservationCase(
-  input: ArrowHedgeStateReviewArtifactCorpusInput,
+  input: ArrowHedgeStateReviewArtifactCorpusInput & ArrowHedgeActionOutcomeEnvelopeInput,
 ): ArrowHedgeActionOutcomeEnvelopeInput {
+  const { continuityCheck: _continuityCheck, ...baselineInput } = input;
   const artifact = input.artifact;
   return {
-    ...input,
+    ...baselineInput,
     actionId: arrowHedgeBaselineObservationActionId(input),
     requestedTerminalOutcome: "accepted",
     enforcementMode: "advisory",
@@ -1390,6 +1417,110 @@ export function buildArrowHedgeTemporalMisalignmentFixtureCases(
           sessionId: "arrowhedge-temporal-fixture-feedback-observation",
           workflowRunId: "arrowhedge-temporal-workflow-feedback-observation",
           evalEventIds: ["eval_arrowhedge_feedback_to_observation"],
+        },
+      },
+    },
+  ];
+}
+
+export function buildArrowHedgeContinuityFixtureCases(
+  input: ArrowHedgeTemporalMisalignmentFixtureCasesInput,
+): readonly ArrowHedgeStateReviewArtifactCorpusInput[] {
+  const view = buildArrowHedgeCurrentStateView({
+    ...input,
+    evaluatedAt: input.observationCapturedAt,
+  });
+  const ticker = input.state.tickers[input.symbol];
+  const decisionId = ticker?.latestDecision?.decisionId;
+  if (!view || !decisionId) return [];
+
+  const proposedBy = input.proposedBy ?? "agent:portfolio-manager";
+  const readSet = buildReadSetFromCurrentStateView(view, view.authorityRule);
+  const observationContract = buildObservationContractFromCurrentStateView(view);
+  const continuityAgentId = "arrowhedge-axis-a-continuity";
+
+  return [
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-memory-drift-conflicting-position",
+      actionType: "portfolio.decision.accept",
+      payload: {
+        decisionId,
+        memoryCheckpointId: "chk_arrowhedge_memory_drift_new_001",
+      },
+      proposedBy,
+      proposedAt: input.observationCapturedAt,
+      readSet,
+      observationContract,
+      continuityCheck: {
+        agentId: continuityAgentId,
+        checkpoints: buildArrowHedgeMemoryDriftCheckpoints(
+          input.tenantId,
+          continuityAgentId,
+          decisionId,
+        ),
+      },
+      artifact: {
+        artifactId: "artifact_arrowhedge_memory_drift_conflict_001",
+        metadata: {
+          temporalMisalignmentPhase: "none",
+          invariantClasses: ["state_conflict", "required_evidence"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/continuity-memory-drift-conflict.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-continuity-fixture-memory-drift",
+          workflowRunId: "arrowhedge-continuity-workflow-memory-drift",
+          evalEventIds: ["eval_arrowhedge_memory_drift_conflict"],
+        },
+      },
+    },
+    {
+      tenantId: input.tenantId,
+      projectionName: input.projectionName,
+      ...(input.projectionVersion !== undefined
+        ? { projectionVersion: input.projectionVersion }
+        : {}),
+      symbol: input.symbol,
+      state: input.state,
+      scenarioId: "arrowhedge-continuity-break-missing-terminal-history",
+      actionType: "risk.refresh",
+      payload: {
+        decisionId,
+        refreshId: `refresh:${decisionId}:amnesiac_resume`,
+      },
+      proposedBy,
+      proposedAt: input.observationCapturedAt,
+      readSet,
+      observationContract,
+      continuityCheck: {
+        agentId: continuityAgentId,
+        checkpoints: buildArrowHedgeContinuityBreakCheckpoints(
+          input.tenantId,
+          continuityAgentId,
+          decisionId,
+        ),
+        requiredDecisionRefs: [`arrowhedge:terminal:${decisionId}`],
+      },
+      artifact: {
+        artifactId:
+          "artifact_arrowhedge_continuity_break_missing_terminal_001",
+        metadata: {
+          temporalMisalignmentPhase: "none",
+          invariantClasses: ["required_evidence", "workflow_position"],
+          fixtureId:
+            "fixtures/arrowhedge/state-review-artifacts/continuity-break-missing-terminal-history.json",
+          clientSurface: "codex",
+          provider: "openai",
+          sessionId: "arrowhedge-continuity-fixture-break",
+          workflowRunId: "arrowhedge-continuity-workflow-break",
+          evalEventIds: ["eval_arrowhedge_continuity_break_missing_terminal"],
         },
       },
     },
@@ -2096,6 +2227,7 @@ function arrowHedgeActionId(
   const actionDiscriminator =
     payloadString(input.payload, "refreshId") ??
     payloadString(input.payload, "feedbackId") ??
+    payloadString(input.payload, "memoryCheckpointId") ??
     missingObservationActionDiscriminator(input.payload) ??
     payloadString(input.payload, "decisionId") ??
     artifact.review.reviewId;
@@ -2136,6 +2268,105 @@ function defaultTerminalPacketAuthorityRole(
     : "substrate_authority";
 }
 
+function arrowHedgeContinuityRefs(
+  continuityCheck: ArrowHedgeContinuityCheck | undefined,
+): readonly StateRef[] {
+  return uniqueStateRefs(
+    (continuityCheck?.checkpoints ?? []).map((checkpoint) =>
+      stateRef("continuity_checkpoint", checkpoint.id, checkpoint.title),
+    ),
+  );
+}
+
+function buildArrowHedgeContinuityBlockingCauses(
+  tenantId: TenantId,
+  continuityCheck: ArrowHedgeContinuityCheck | undefined,
+): readonly ActionOutcomeBlockingCause[] {
+  if (continuityCheck === undefined) return [];
+
+  const refs = arrowHedgeContinuityRefs(continuityCheck);
+  const causes: ActionOutcomeBlockingCause[] = [];
+  const report = verifyContinuityCheckpointChain({
+    tenantId,
+    agentId: continuityCheck.agentId,
+    checkpoints: continuityCheck.checkpoints,
+  });
+
+  if (!report.valid) {
+    causes.push({
+      source: "status_check",
+      code: "continuity_checkpoint_chain_invalid",
+      message:
+        "Continuity checkpoint chain failed hash/prior-link verification before terminal action admission.",
+      refs,
+      invariantClasses: ["required_evidence", "source_authority"],
+    });
+  }
+
+  const contradictions = findContinuityContradictions(
+    continuityCheck.checkpoints,
+  );
+  if (contradictions.length > 0) {
+    causes.push({
+      source: "local_view",
+      code: "continuity_memory_drift_conflict",
+      message:
+        "Continuity checkpoints contain conflicting open decision or claim summaries.",
+      refs: uniqueStateRefs(
+        contradictions.flatMap((finding) => [
+          stateRef(
+            "continuity_checkpoint",
+            finding.older.id,
+            finding.older.title,
+          ),
+          stateRef(
+            "continuity_checkpoint",
+            finding.newer.id,
+            finding.newer.title,
+          ),
+        ]),
+      ),
+      invariantClasses: ["state_conflict"],
+    });
+  }
+
+  const presentDecisionRefs = new Set(
+    continuityCheck.checkpoints.flatMap((checkpoint) => checkpoint.decisionRefs),
+  );
+  const missingDecisionRefs = (continuityCheck.requiredDecisionRefs ?? []).filter(
+    (ref) => !presentDecisionRefs.has(ref),
+  );
+  if (missingDecisionRefs.length > 0) {
+    causes.push({
+      source: "policy",
+      code: "continuity_terminal_history_missing",
+      message: `Continuity checkpoints are missing required terminal decision refs: ${missingDecisionRefs.join(", ")}.`,
+      refs,
+      invariantClasses: ["required_evidence", "workflow_position"],
+    });
+  }
+
+  const presentEvidenceEventIds = new Set(
+    continuityCheck.checkpoints.flatMap((checkpoint) =>
+      checkpoint.evidenceEventIds.map(String),
+    ),
+  );
+  const missingEvidenceEventIds = (
+    continuityCheck.requiredEvidenceEventIds ?? []
+  ).filter((eventId) => !presentEvidenceEventIds.has(String(eventId)));
+  if (missingEvidenceEventIds.length > 0) {
+    causes.push({
+      source: "policy",
+      code: "continuity_evidence_history_missing",
+      message: `Continuity checkpoints are missing required evidence event ids: ${missingEvidenceEventIds.join(", ")}.`,
+      refs,
+      invariantClasses: ["required_evidence"],
+    });
+  }
+
+  return causes;
+}
+
 function actionOutcomeEnvelopeRef(envelope: ActionOutcomeEnvelope): StateRef {
   const ref = envelope.substrateRefs.find(
     (candidate) => candidate.kind === "action_outcome_envelope",
@@ -2168,6 +2399,88 @@ function missingObservationActionDiscriminator(
     return undefined;
   }
   return `${decisionId}:missing:${missingObservation}`;
+}
+
+function buildArrowHedgeMemoryDriftCheckpoints(
+  tenantId: TenantId,
+  agentId: string,
+  decisionId: string,
+): readonly ContinuityCheckpoint[] {
+  const first = arrowHedgeContinuityCheckpoint({
+    id: "chk_arrowhedge_memory_drift_old_001",
+    tenantId,
+    agentId,
+    scope: "axis-a/arrowhedge/aapl",
+    kind: "claim",
+    title: `AAPL terminal decision ${decisionId}`,
+    summary:
+      "Terminal decision is blocked until current risk state is refreshed.",
+    evidenceEventIds: ["evt_arrowhedge_risk_1400" as EventId],
+    decisionRefs: [`arrowhedge:terminal:${decisionId}:blocked`],
+    status: "open",
+    payload: {
+      symbol: "AAPL",
+      failureClass: "memory_drift",
+    },
+    createdAt: "2026-06-03T14:01:00.000Z" as Timestamp,
+    priorCheckpointHash: null,
+  });
+  const second = arrowHedgeContinuityCheckpoint({
+    id: "chk_arrowhedge_memory_drift_new_001",
+    tenantId,
+    agentId,
+    scope: "axis-a/arrowhedge/aapl",
+    kind: "claim",
+    title: `AAPL terminal decision ${decisionId}`,
+    summary:
+      "Private resume memory says terminal decision was accepted and can continue.",
+    evidenceEventIds: ["evt_arrowhedge_resume_memory" as EventId],
+    decisionRefs: [`arrowhedge:terminal:${decisionId}:accepted-from-memory`],
+    status: "open",
+    payload: {
+      symbol: "AAPL",
+      failureClass: "memory_drift",
+    },
+    createdAt: "2026-06-03T14:08:00.000Z" as Timestamp,
+    priorCheckpointHash: first.contentHash,
+  });
+  return [first, second];
+}
+
+function buildArrowHedgeContinuityBreakCheckpoints(
+  tenantId: TenantId,
+  agentId: string,
+  decisionId: string,
+): readonly ContinuityCheckpoint[] {
+  const first = arrowHedgeContinuityCheckpoint({
+    id: "chk_arrowhedge_continuity_break_001",
+    tenantId,
+    agentId,
+    scope: "axis-a/arrowhedge/aapl",
+    kind: "handoff",
+    title: `Resume AAPL decision ${decisionId}`,
+    summary:
+      "Resume packet carries source evidence but omits the terminal outcome history.",
+    evidenceEventIds: ["evt_arrowhedge_risk_1400" as EventId],
+    decisionRefs: [`arrowhedge:risk:${decisionId}:observed`],
+    status: "open",
+    payload: {
+      symbol: "AAPL",
+      failureClass: "continuity_break",
+    },
+    createdAt: "2026-06-03T14:09:00.000Z" as Timestamp,
+    priorCheckpointHash: null,
+  });
+  return [first];
+}
+
+function arrowHedgeContinuityCheckpoint(
+  input: Omit<ContinuityCheckpoint, "contentHash">,
+): ContinuityCheckpoint {
+  return {
+    ...input,
+    contentHash: checkpointHash(input),
+  };
 }
 
 function payloadString(

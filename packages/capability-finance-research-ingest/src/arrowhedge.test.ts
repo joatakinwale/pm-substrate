@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS,
   ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
   PostgresEvalEventStore,
   analyzeThreeAxisCoverage,
@@ -24,6 +25,7 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgeIngestionPlan,
+  buildArrowHedgeActionOutcomeEnvelopeCorpus,
   buildArrowHedgeActionOutcomeEnvelope,
   buildArrowHedgeCanonicalActionOutcomeEnvelopeCorpus,
   buildArrowHedgeCanonicalPairedActionOutcomeEnvelopeCorpus,
@@ -31,6 +33,7 @@ import {
   buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCanonicalStateReviewArtifactCorpus,
   buildArrowHedgeCurrentStateView,
+  buildArrowHedgeContinuityFixtureCases,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
   compareArrowHedgeStateReviewArtifactCorpusEquivalence,
@@ -1096,6 +1099,62 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     ).toBe(true);
   });
 
+  it("turns ArrowHedge continuity drift and missing terminal history into substrate blockers", async () => {
+    const tenant = tenantId("tnt_arrowhedge_continuity_packets");
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_continuity_packets",
+    );
+    const state = await foldPlanIntoCop(projection, plan);
+
+    const cases = buildArrowHedgeContinuityFixtureCases({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+      observationCapturedAt: timestamp("2026-06-03T14:05:00.000Z"),
+      observationToActionProposedAt: timestamp("2026-06-03T14:12:30.000Z"),
+      actionToFeedbackProposedAt: timestamp("2026-06-03T14:06:30.000Z"),
+      feedbackToObservationProposedAt: timestamp("2026-06-03T14:07:30.000Z"),
+      proposedBy: "agent:portfolio-manager",
+    });
+    const corpus = buildArrowHedgeActionOutcomeEnvelopeCorpus(cases);
+
+    expect(cases.map((fixtureCase) => fixtureCase.scenarioId)).toEqual([
+      "arrowhedge-memory-drift-conflicting-position",
+      "arrowhedge-continuity-break-missing-terminal-history",
+    ]);
+    expect(corpus.valid).toBe(true);
+    expect(corpus.terminalOutcomeCounts).toMatchObject({
+      blocked: 2,
+    });
+    expect(
+      corpus.packets.every((packet) =>
+        packet.envelope.substrateRefs.some(
+          (ref) => ref.kind === "continuity_checkpoint",
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      corpus.packets.find(
+        (packet) =>
+          packet.scenarioId === "arrowhedge-memory-drift-conflicting-position",
+      )?.envelope.blockingCauses.map((cause) => cause.code),
+    ).toContain("continuity_memory_drift_conflict");
+    expect(
+      corpus.packets.find(
+        (packet) =>
+          packet.scenarioId ===
+          "arrowhedge-continuity-break-missing-terminal-history",
+      )?.envelope.blockingCauses.map((cause) => cause.code),
+    ).toContain("continuity_terminal_history_missing");
+  });
+
   it("maps canonical terminal packets into Axis A eval events without verified overclaim", async () => {
     const tenant = tenantId("tnt_arrowhedge_terminal_packet_eval_mapping");
     const plan = buildArrowHedgeIngestionPlan(snapshot, {
@@ -1195,7 +1254,7 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     expect(report.byAxis.finance.verified).toBe(false);
   });
 
-  it("builds paired baseline/substrate temporal packets for strict Axis A source recovery", async () => {
+  it("builds paired baseline/substrate Axis A packets for strict source recovery", async () => {
     const tenant = tenantId("tnt_arrowhedge_paired_terminal_packets");
     const plan = buildArrowHedgeIngestionPlan(snapshot, {
       tenantId: tenant,
@@ -1220,17 +1279,17 @@ describe("ArrowHedge Common Operating Picture projection", () => {
     });
 
     expect(corpus.valid).toBe(true);
-    expect(corpus.packets).toHaveLength(6);
+    expect(corpus.packets).toHaveLength(10);
     expect(corpus.terminalOutcomeCounts).toMatchObject({
-      accepted: 3,
-      blocked: 3,
+      accepted: 5,
+      blocked: 5,
     });
     expect(
       corpus.packets.filter((packet) => packet.runArm === "baseline"),
-    ).toHaveLength(3);
+    ).toHaveLength(5);
     expect(
       corpus.packets.filter((packet) => packet.runArm === "substrate"),
-    ).toHaveLength(3);
+    ).toHaveLength(5);
     expect(
       corpus.packets
         .filter((packet) => packet.runArm === "baseline")
@@ -1258,7 +1317,7 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       terminalOutcome: packet.terminalOutcome,
     }));
     const sourceBundleInput = {
-      sourceId: "axis-a-arrowhedge-paired-temporal-packets",
+      sourceId: "axis-a-arrowhedge-paired-packets",
       tenantId: tenant,
       observedAt: timestamp("2026-06-03T14:13:00.000Z"),
       runIdPrefix: "run_arrowhedge_paired_packets",
@@ -1273,7 +1332,7 @@ describe("ArrowHedge Common Operating Picture projection", () => {
         eventIds: ["evt_signal", "evt_risk", "evt_decision"],
         projectionIds: [projection.name],
       },
-      scenarioSpecs: ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS,
+      scenarioSpecs: ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS,
       actionOutcomeEnvelopes: mappedActionOutcomeRefs,
       operationalSamples: [],
     } as const;
@@ -1290,15 +1349,26 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       verified: true,
       terminalProofBackedPairs: 1,
     });
+    expect(report.byCell.finance.memory_drift).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
+    expect(report.byCell.finance.continuity_break).toMatchObject({
+      verified: true,
+      terminalProofBackedPairs: 1,
+    });
     expect(report.byAxis.finance.verified).toBe(false);
     expect(report.byAxis.finance.missingFailureClasses).toEqual(
-      expect.arrayContaining(["memory_drift", "continuity_break"]),
+      expect.arrayContaining([
+        "representation_loss",
+        "source_authority_conflict",
+      ]),
     );
 
     const substrateMappedEvents = sourceBundleWithoutRecovery.events.filter(
       (event) =>
         event.runArm === "substrate" &&
-        ARROWHEDGE_CANONICAL_TERMINAL_PACKET_SCENARIOS.some(
+        ARROWHEDGE_CANONICAL_AXIS_A_PACKET_SCENARIOS.some(
           (scenario) => scenario.scenarioId === event.scenarioId,
         ),
     );
@@ -1317,37 +1387,37 @@ describe("ArrowHedge Common Operating Picture projection", () => {
       authorityRecoverySuite: recoverySuite,
     });
     const assembly = buildStrictThreeAxisProofPacketAssembly({
-      packetId: "three_axis_proof_arrowhedge_paired_temporal_packets",
+      packetId: "three_axis_proof_arrowhedge_paired_packets",
       generatedAt: timestamp("2026-06-03T14:13:30.000Z"),
       sourceBundles: [sourceBundle],
     });
 
     expect(recoverySuite.summary).toMatchObject({
-      totalEvents: 3,
-      auditedEvents: 3,
-      validRecoveries: 3,
+      totalEvents: 5,
+      auditedEvents: 5,
+      validRecoveries: 5,
       invalidRecoveries: 0,
       byStatus: {
-        terminal_outcome_refused_authority: 3,
+        terminal_outcome_refused_authority: 5,
       },
     });
     expect(assembly.sourceRecoveries).toEqual([
       expect.objectContaining({
-        sourceId: "axis-a-arrowhedge-paired-temporal-packets",
+        sourceId: "axis-a-arrowhedge-paired-packets",
         axis: "finance",
-        eventCount: 20,
-        obligationCount: 3,
+        eventCount: 24,
+        obligationCount: 5,
         recoveryStatus: "provided",
-        recoveryCount: 3,
-        validRecoveries: 3,
+        recoveryCount: 5,
+        validRecoveries: 5,
         invalidRecoveries: 0,
       }),
     ]);
     expect(assembly.packet.authorityRecoveryGate).toMatchObject({
       required: true,
       passed: true,
-      obligationCount: 3,
-      validObligations: 3,
+      obligationCount: 5,
+      validObligations: 5,
       invalidObligations: [],
     });
     expect(assembly.packet.report.byAxis.finance.verified).toBe(false);
