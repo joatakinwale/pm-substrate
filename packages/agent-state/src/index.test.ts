@@ -12,8 +12,16 @@ import {
   buildProjectionReplayCertificateRef,
   buildProjectionReplayCertificateRefFromRecord,
   buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpoint,
+  buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord,
+  buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpoint,
+  buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpoint,
+  buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition,
+  buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord,
   buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord,
   buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition,
+  buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition,
+  buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpoint,
+  buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecord,
   buildEvidenceLinkedContinuityPayloadFromStateReviewArtifact,
   buildActionOutcomeEnvelope,
   buildActionOutcomeProviderAuthority,
@@ -22,8 +30,15 @@ import {
   buildStateReviewArtifact,
   compareObservedReadSetToDeclared,
   computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash,
+  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash,
+  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash,
   computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionSignaturePayloadHash,
+  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash,
+  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash,
+  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessObservationSignaturePayloadHash,
   computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessObservationSignaturePayloadHash,
+  computeProjectionReplayPruningTombstoneHistoryStoreHeadWitnessObservationSignaturePayloadHash,
+  computeProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash,
   computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadHash,
   computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash,
   computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionSignaturePayloadHash,
@@ -37,7 +52,14 @@ import {
   evaluateProjectionReplayCertificateStoreRootWitnessSettlement,
   evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificate,
   evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmission,
+  evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmission,
+  evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission,
+  evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmission,
+  evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission,
+  evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate,
   evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate,
+  evaluateProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpointAdmission,
+  evaluateProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificate,
   evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadObservation,
   importStateReviewArtifact,
   importStateReviewArtifactsJsonl,
@@ -47,10 +69,20 @@ import {
   InMemoryProjectionReplayCertificateStoreRootWitnessLedger,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStore,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore,
+  InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore,
+  InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore,
+  InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore,
+  InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore,
+  InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger,
+  InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore,
+  InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore,
+  InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessLedger,
+  InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore,
+  InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecordStore,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitness,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitionStore,
   InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessLedger,
@@ -58,12 +90,23 @@ import {
   LedgerBackedProjectionReplayCertificateStoreRootWitness,
   LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitness,
   LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness,
+  LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness,
+  LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness,
   projectionReplayCertificateStoreEntryFromRecord,
   projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord,
+  projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord,
+  projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord,
   projectionReplayCertificateStoreRootWitnessSettlementRefFromRecord,
   projectionReplayCertificateStoreRootWitnessSettlementStoreHeadFromRecord,
   projectionReplayCertificateStoreRootFromEntry,
   replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords,
+  replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords,
+  replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords,
+  replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecords,
+  replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecords,
+  replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions,
+  replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords,
+  replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords,
   replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneRecords,
   replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions,
   replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords,
@@ -71,11 +114,16 @@ import {
   replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessRecords,
   replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessAuthorityTransitions,
   replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertificateRecords,
+  replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions,
+  replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecords,
+  replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords,
   replayProjectionReplayCertificateStoreRootWitnessAuthorityTransitions,
   replayProjectionReplayCertificateStoreRootWitnessRecords,
   replayProjectionReplayCertificateStoreRootWitnessSettlementRecords,
   StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessQuorumCertifier,
   StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier,
+  StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier,
+  StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertifier,
   verifyProjectionReplayCertificateStoreRootWitnessSettlementRef,
   reviewProposedActionAgainstCurrentState,
   serializeStateReviewArtifact,
@@ -83,6 +131,8 @@ import {
   stateRef,
   validateProposedActionReadSet,
   verifyActionOutcomeEnvelopeHash,
+  verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity,
+  verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity,
   verifyProjectionReplayCertificateHash,
   verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPrunedStoreContinuity,
   verifyProjectionReplayCertificateStoreConsistencyProof,
@@ -347,6 +397,46 @@ const signedTombstoneHeadObservation = (
 ) => {
   const payloadHash =
     computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessObservationSignaturePayloadHash(
+      input,
+    );
+  return {
+    ...input,
+    signature: testSignatureFor({
+      principalId: input.observerId,
+      keyId,
+      payloadHash,
+    }),
+  };
+};
+
+const signedPruningTombstoneStoreHeadObservation = (
+  input: Parameters<
+    LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness["observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead"]
+  >[0],
+  keyId: string,
+) => {
+  const payloadHash =
+    computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessObservationSignaturePayloadHash(
+      input,
+    );
+  return {
+    ...input,
+    signature: testSignatureFor({
+      principalId: input.observerId,
+      keyId,
+      payloadHash,
+    }),
+  };
+};
+
+const signedPruningTombstoneHistoryStoreHeadObservation = (
+  input: Parameters<
+    LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness["observeProjectionReplayPruningTombstoneHistoryStoreHead"]
+  >[0],
+  keyId: string,
+) => {
+  const payloadHash =
+    computeProjectionReplayPruningTombstoneHistoryStoreHeadWitnessObservationSignaturePayloadHash(
       input,
     );
   return {
@@ -7934,5 +8024,5087 @@ describe("@pm/agent-state read-set validation", () => {
       ],
     });
     expect(verifyActionOutcomeEnvelopeHash(envelope).valid).toBe(true);
+  });
+
+  it("refuses revoked or superseded tombstone-head witness keys during certification and certificate-record replay", async () => {
+    const view = baseView();
+    const tombstoneHeadBody = {
+      tenantId: view.tenantId,
+      pruningTombstoneSequence: 1,
+      pruningTombstoneRecordHash: "pruning_tombstone_key_status_record_hash",
+      recordedAt: timestamp("2026-06-03T14:08:05.000Z"),
+    };
+    const tombstoneHead = {
+      ...tombstoneHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          tombstoneHeadBody,
+        ),
+    };
+    const strictIdentityPolicy = {
+      required: true,
+      verifier: testSignatureVerifier,
+    };
+
+    const tombstoneHeadWitnessLedger =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger();
+    const tombstoneHeadWitness =
+      new LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness(
+        tombstoneHeadWitnessLedger,
+        strictIdentityPolicy,
+      );
+    await tombstoneHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      signedTombstoneHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-monitor",
+          observedAt: timestamp("2026-06-03T14:08:05.500Z"),
+          head: tombstoneHead,
+        },
+        "key-pruning-tombstone-monitor",
+      ),
+    );
+    await tombstoneHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      signedTombstoneHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-monitor-b",
+          observedAt: timestamp("2026-06-03T14:08:05.750Z"),
+          head: tombstoneHead,
+        },
+        "key-pruning-tombstone-monitor-b",
+      ),
+    );
+
+    const tombstoneHeadAuthorityStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore();
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_key_status_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:08:04.000Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        requiredWitnesses: 2,
+        minimumWitnesses: 1,
+      },
+    );
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_key_status_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:08:04.100Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-monitor",
+        signatureKeyId: "key-pruning-tombstone-monitor",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_key_status_admit_b",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:08:04.200Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-monitor-b",
+        signatureKeyId: "key-pruning-tombstone-monitor-b",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+
+    const tombstoneHeadCertifier =
+      new StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier(
+        tombstoneHeadAuthorityStore,
+        tombstoneHeadWitnessLedger,
+      );
+    const certificate =
+      await tombstoneHeadCertifier.certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: tombstoneHead,
+          signaturePolicy: strictIdentityPolicy,
+        },
+      );
+    expect(certificate).toMatchObject({
+      certified: true,
+      acceptedWitnessIds: [
+        "pruning-tombstone-monitor",
+        "pruning-tombstone-monitor-b",
+      ],
+    });
+
+    const currentTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence: tombstoneHead.pruningTombstoneSequence,
+          transitions:
+            await tombstoneHeadAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    const witnessRecords =
+      await tombstoneHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const recordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore();
+    const certificateRecord =
+      await recordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate,
+          witnessRecords,
+          signaturePolicy: {
+            ...strictIdentityPolicy,
+            pruningTombstoneHeadAuthorityTopology: currentTopology,
+          },
+          recordedAt: timestamp("2026-06-03T14:08:06.000Z"),
+        },
+      );
+    expect(certificateRecord.acceptedWitnessEvidence).toEqual([
+      expect.objectContaining({
+        witnessId: "pruning-tombstone-monitor",
+        signature: expect.objectContaining({
+          keyId: "key-pruning-tombstone-monitor",
+        }),
+      }),
+      expect.objectContaining({
+        witnessId: "pruning-tombstone-monitor-b",
+        signature: expect.objectContaining({
+          keyId: "key-pruning-tombstone-monitor-b",
+        }),
+      }),
+    ]);
+
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_key_status_revoke_a",
+        transitionKind: "revoke_signature_key",
+        recordedAt: timestamp("2026-06-03T14:08:06.100Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-monitor",
+        signatureKeyId: "key-pruning-tombstone-monitor",
+        reason: "compromised tombstone-head witness signing key",
+      },
+    );
+
+    await expect(
+      tombstoneHeadCertifier.certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: tombstoneHead,
+          signaturePolicy: strictIdentityPolicy,
+        },
+      ),
+    ).resolves.toMatchObject({
+      certified: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_replay_invalid",
+        }),
+      ]),
+    });
+    const revokedTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence: tombstoneHead.pruningTombstoneSequence,
+          transitions:
+            await tombstoneHeadAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(revokedTopology).toMatchObject({
+      valid: true,
+      principals: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-monitor",
+          signatureKeyId: "key-pruning-tombstone-monitor",
+          signatureKeyStatus: "revoked",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await recordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: {
+            ...strictIdentityPolicy,
+            pruningTombstoneHeadAuthorityTopology: revokedTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current",
+          path: "/records/0/acceptedWitnessEvidence/0/signature/keyId",
+        }),
+      ]),
+    });
+    await expect(
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore().appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate,
+          witnessRecords,
+          signaturePolicy: {
+            ...strictIdentityPolicy,
+            pruningTombstoneHeadAuthorityTopology: revokedTopology,
+          },
+        },
+      ),
+    ).rejects.toThrow(/signature_key_not_current/);
+
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_key_status_rotate_a",
+        transitionKind: "rotate_signature_key",
+        recordedAt: timestamp("2026-06-03T14:08:06.200Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-monitor",
+        signatureKeyId: "key-pruning-tombstone-monitor-v2",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    const rotatedTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence: tombstoneHead.pruningTombstoneSequence,
+          transitions:
+            await tombstoneHeadAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(rotatedTopology).toMatchObject({
+      valid: true,
+      principals: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-monitor",
+          signatureKeyId: "key-pruning-tombstone-monitor-v2",
+          signatureKeyStatus: "active",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await recordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: {
+            ...strictIdentityPolicy,
+            pruningTombstoneHeadAuthorityTopology: rotatedTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_key_not_current",
+          path: "/records/0/acceptedWitnessEvidence/0/signature/keyId",
+        }),
+      ]),
+    });
+  });
+
+  it("resumes tombstone-head replay from an admitted proof-preserving compaction checkpoint", async () => {
+    const view = baseView();
+    const tombstoneHeadBody = {
+      tenantId: view.tenantId,
+      pruningTombstoneSequence: 1,
+      pruningTombstoneRecordHash:
+        "pruning_tombstone_replay_compaction_record_hash",
+      recordedAt: timestamp("2026-06-03T14:09:05.000Z"),
+    };
+    const tombstoneHead = {
+      ...tombstoneHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          tombstoneHeadBody,
+        ),
+    };
+    const strictIdentityPolicy = {
+      required: true,
+      verifier: testSignatureVerifier,
+    };
+
+    const tombstoneHeadWitnessLedger =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger();
+    const tombstoneHeadWitness =
+      new LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness(
+        tombstoneHeadWitnessLedger,
+        strictIdentityPolicy,
+      );
+    await tombstoneHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      signedTombstoneHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-checkpoint-monitor",
+          observedAt: timestamp("2026-06-03T14:09:05.500Z"),
+          head: tombstoneHead,
+        },
+        "key-pruning-tombstone-checkpoint-monitor",
+      ),
+    );
+    await tombstoneHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      signedTombstoneHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-checkpoint-monitor-b",
+          observedAt: timestamp("2026-06-03T14:09:05.750Z"),
+          head: tombstoneHead,
+        },
+        "key-pruning-tombstone-checkpoint-monitor-b",
+      ),
+    );
+
+    const tombstoneHeadAuthorityStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore();
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_replay_compaction_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:04.000Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        requiredWitnesses: 2,
+        minimumWitnesses: 1,
+      },
+    );
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_replay_compaction_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:04.100Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-checkpoint-monitor",
+        signatureKeyId: "key-pruning-tombstone-checkpoint-monitor",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "pruning_tombstone_head_replay_compaction_admit_b",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:04.200Z"),
+        recordedBy: "authority:pruning-tombstone-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-checkpoint-monitor-b",
+        signatureKeyId: "key-pruning-tombstone-checkpoint-monitor-b",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+
+    const authorityTransitionsBeforeRotation =
+      await tombstoneHeadAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const topologyBeforeRotation =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence: tombstoneHead.pruningTombstoneSequence,
+          transitions: authorityTransitionsBeforeRotation,
+        },
+      );
+    expect(topologyBeforeRotation.valid).toBe(true);
+    const strictTombstonePolicy = {
+      ...strictIdentityPolicy,
+      pruningTombstoneHeadAuthorityTopology: topologyBeforeRotation,
+    };
+
+    const tombstoneHeadCertifier =
+      new StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier(
+        tombstoneHeadAuthorityStore,
+        tombstoneHeadWitnessLedger,
+      );
+    const certificate =
+      await tombstoneHeadCertifier.certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: tombstoneHead,
+          signaturePolicy: strictIdentityPolicy,
+        },
+      );
+    expect(certificate.certified).toBe(true);
+
+    const witnessRecords =
+      await tombstoneHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const firstWitnessReplay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: [witnessRecords[0]!],
+          signaturePolicy: strictTombstonePolicy,
+        },
+      );
+    expect(firstWitnessReplay.valid).toBe(true);
+
+    const recordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore();
+    const firstCertificateRecord =
+      await recordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate,
+          witnessRecords,
+          signaturePolicy: strictTombstonePolicy,
+          recordedAt: timestamp("2026-06-03T14:09:06.000Z"),
+        },
+      );
+    const secondCertificateRecord =
+      await recordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate,
+          witnessRecords,
+          signaturePolicy: strictTombstonePolicy,
+          recordedAt: timestamp("2026-06-03T14:09:06.500Z"),
+        },
+      );
+
+    const checkpoint =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpoint(
+        {
+          tenantId: view.tenantId,
+          checkpointId:
+            "pruning_tombstone_head_replay_compaction_checkpoint_001",
+          recordedAt: timestamp("2026-06-03T14:09:07.000Z"),
+          witnessLedger: {
+            compactedThroughWitnessSequence:
+              witnessRecords[0]!.witnessSequence,
+            compactedThroughObservationHash:
+              witnessRecords[0]!.observationHash,
+            acceptedHeads: firstWitnessReplay.acceptedHeads,
+          },
+          authorityTopology: {
+            pruningTombstoneSequence: tombstoneHead.pruningTombstoneSequence,
+            compactedThroughAuthoritySequence:
+              authorityTransitionsBeforeRotation[2]!.authoritySequence,
+            compactedThroughAuthorityHash:
+              authorityTransitionsBeforeRotation[2]!.authorityHash,
+            requiredWitnesses: topologyBeforeRotation.requiredWitnesses!,
+            minimumWitnesses: topologyBeforeRotation.minimumWitnesses!,
+            effectiveAuthorityHash:
+              topologyBeforeRotation.effectiveAuthorityHash!,
+            principals: topologyBeforeRotation.principals,
+            authorityEpochSeals: topologyBeforeRotation.authorityEpochSeals,
+          },
+          quorumCertificateRecords: {
+            compactedThroughQuorumCertificateSequence:
+              firstCertificateRecord.quorumCertificateSequence,
+            compactedThroughQuorumCertificateRecordHash:
+              firstCertificateRecord.quorumCertificateRecordHash,
+            latestCertifiedRecord: firstCertificateRecord,
+          },
+        },
+      );
+    const checkpointWitnessEvidence = [
+      {
+        witnessId: "pruning-tombstone-checkpoint-monitor",
+        keyId: "key-pruning-tombstone-checkpoint-monitor",
+        witnessedAt: timestamp("2026-06-03T14:09:07.100Z"),
+      },
+      {
+        witnessId: "pruning-tombstone-checkpoint-monitor-b",
+        keyId: "key-pruning-tombstone-checkpoint-monitor-b",
+        witnessedAt: timestamp("2026-06-03T14:09:07.200Z"),
+      },
+    ].map(({ witnessId, keyId, witnessedAt }) => {
+      const payloadHash =
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+          {
+            tenantId: view.tenantId,
+            witnessId,
+            checkpointHash: checkpoint.checkpointHash,
+            witnessedAt,
+          },
+        );
+      return {
+        witnessId,
+        checkpointHash: checkpoint.checkpointHash,
+        witnessedAt,
+        signature: testSignatureFor({
+          principalId: witnessId,
+          keyId,
+          payloadHash,
+        }),
+      };
+    });
+    const checkpointAdmission =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpoint,
+          authorityTopology: topologyBeforeRotation,
+          witnessEvidence: checkpointWitnessEvidence,
+          signaturePolicy: strictIdentityPolicy,
+        },
+      );
+    expect(checkpointAdmission).toMatchObject({
+      admitted: true,
+      status: "admitted",
+      acceptedWitnessIds: [
+        "pruning-tombstone-checkpoint-monitor",
+        "pruning-tombstone-checkpoint-monitor-b",
+      ],
+      issues: [],
+    });
+    const insufficientCheckpointAdmission =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpoint,
+          authorityTopology: topologyBeforeRotation,
+          witnessEvidence: checkpointWitnessEvidence.slice(0, 1),
+          signaturePolicy: strictIdentityPolicy,
+        },
+      );
+    expect(insufficientCheckpointAdmission).toMatchObject({
+      admitted: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_checkpoint_admission_quorum_not_met",
+        }),
+      ]),
+    });
+    const checkpointAdmissionRecordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore();
+    await expect(
+      checkpointAdmissionRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpoint,
+          admission: insufficientCheckpointAdmission,
+          signaturePolicy: strictIdentityPolicy,
+          recordedAt: timestamp("2026-06-03T14:09:07.250Z"),
+        },
+      ),
+    ).rejects.toThrow(/admission_record_admission_invalid/);
+    const checkpointAdmissionRecord =
+      await checkpointAdmissionRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpoint,
+          admission: checkpointAdmission,
+          signaturePolicy: strictIdentityPolicy,
+          recordedAt: timestamp("2026-06-03T14:09:07.300Z"),
+        },
+      );
+    const checkpointAdmissionRecords =
+      await checkpointAdmissionRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const checkpointAdmissionRecordReplay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: view.tenantId,
+          records: checkpointAdmissionRecords,
+          signaturePolicy: strictIdentityPolicy,
+        },
+      );
+    expect(checkpointAdmissionRecordReplay).toMatchObject({
+      valid: true,
+      latestAdmissionRecord: expect.objectContaining({
+        checkpointAdmissionRecordHash:
+          checkpointAdmissionRecord.checkpointAdmissionRecordHash,
+      }),
+      issues: [],
+    });
+    const recoveredCheckpointAdmission =
+      checkpointAdmissionRecordReplay.latestAdmissionRecord!.admission;
+    const conflictingCheckpoint =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpoint(
+        {
+          tenantId: view.tenantId,
+          checkpointId:
+            "pruning_tombstone_head_replay_compaction_checkpoint_001",
+          recordedAt: timestamp("2026-06-03T14:09:07.350Z"),
+          witnessLedger: {
+            compactedThroughWitnessSequence:
+              witnessRecords[0]!.witnessSequence,
+            compactedThroughObservationHash:
+              witnessRecords[0]!.observationHash,
+            acceptedHeads: firstWitnessReplay.acceptedHeads,
+          },
+          authorityTopology: {
+            pruningTombstoneSequence: tombstoneHead.pruningTombstoneSequence,
+            compactedThroughAuthoritySequence:
+              authorityTransitionsBeforeRotation[2]!.authoritySequence,
+            compactedThroughAuthorityHash:
+              authorityTransitionsBeforeRotation[2]!.authorityHash,
+            requiredWitnesses: topologyBeforeRotation.requiredWitnesses!,
+            minimumWitnesses: topologyBeforeRotation.minimumWitnesses!,
+            effectiveAuthorityHash:
+              topologyBeforeRotation.effectiveAuthorityHash!,
+            principals: topologyBeforeRotation.principals,
+            authorityEpochSeals: topologyBeforeRotation.authorityEpochSeals,
+          },
+          quorumCertificateRecords: {
+            compactedThroughQuorumCertificateSequence:
+              firstCertificateRecord.quorumCertificateSequence,
+            compactedThroughQuorumCertificateRecordHash:
+              firstCertificateRecord.quorumCertificateRecordHash,
+            latestCertifiedRecord: firstCertificateRecord,
+          },
+        },
+      );
+    const conflictingWitnessEvidence = checkpointWitnessEvidence.map(
+      (evidence) => {
+        const payloadHash =
+          computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+            {
+              tenantId: view.tenantId,
+              witnessId: evidence.witnessId,
+              checkpointHash: conflictingCheckpoint.checkpointHash,
+              witnessedAt: evidence.witnessedAt,
+            },
+          );
+        return {
+          witnessId: evidence.witnessId,
+          checkpointHash: conflictingCheckpoint.checkpointHash,
+          witnessedAt: evidence.witnessedAt,
+          signature: testSignatureFor({
+            principalId: evidence.witnessId,
+            keyId: evidence.signature!.keyId,
+            payloadHash,
+          }),
+        };
+      },
+    );
+    const conflictingCheckpointAdmission =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpoint: conflictingCheckpoint,
+          authorityTopology: topologyBeforeRotation,
+          witnessEvidence: conflictingWitnessEvidence,
+          signaturePolicy: strictIdentityPolicy,
+        },
+      );
+    expect(conflictingCheckpointAdmission.admitted).toBe(true);
+    await expect(
+      checkpointAdmissionRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpoint: conflictingCheckpoint,
+          admission: conflictingCheckpointAdmission,
+          signaturePolicy: strictIdentityPolicy,
+          recordedAt: timestamp("2026-06-03T14:09:07.400Z"),
+        },
+      ),
+    ).rejects.toThrow(/checkpoint_conflict/);
+    const tamperedCheckpointAdmissionRecord = {
+      ...checkpointAdmissionRecord,
+      admission: {
+        ...checkpointAdmissionRecord.admission,
+        checkpointAdmissionHash:
+          "tampered_pruning_tombstone_checkpoint_admission_hash",
+      },
+    };
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: view.tenantId,
+          records: [tamperedCheckpointAdmissionRecord],
+          signaturePolicy: strictIdentityPolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_checkpoint_admission_record_admission_hash_mismatch",
+        }),
+      ]),
+    });
+
+    const rotationTransition =
+      await tombstoneHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "pruning_tombstone_head_replay_compaction_rotate_a",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:07.500Z"),
+          recordedBy: "authority:pruning-tombstone-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          witnessId: "pruning-tombstone-checkpoint-monitor",
+          signatureKeyId: "key-pruning-tombstone-checkpoint-monitor-v2",
+          signatureAlgorithm: "test-signature-v1",
+        },
+      );
+
+    const pruningAdmission =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord,
+          checkpointAdmissionRecords,
+          signaturePolicy: strictTombstonePolicy,
+          witnessRecords: witnessRecords.slice(1),
+          authorityTransitions: [rotationTransition],
+          quorumCertificateRecords: [secondCertificateRecord],
+        },
+      );
+    expect(pruningAdmission).toMatchObject({
+      status: "admitted",
+      admitted: true,
+      lanes: [
+        "witness_ledger",
+        "authority_topology",
+        "quorum_certificate_records",
+      ],
+      witnessSuffixRecordCount: 1,
+      authoritySuffixTransitionCount: 1,
+      quorumCertificateSuffixRecordCount: 1,
+      issues: [],
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord,
+          checkpointAdmissionRecords: [],
+          signaturePolicy: strictTombstonePolicy,
+          witnessRecords: witnessRecords.slice(1),
+          authorityTransitions: [rotationTransition],
+          quorumCertificateRecords: [secondCertificateRecord],
+        },
+      ),
+    ).toMatchObject({
+      status: "obstructed",
+      admitted: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_record_missing",
+        }),
+      ]),
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord,
+          checkpointAdmissionRecords,
+          signaturePolicy: strictTombstonePolicy,
+          witnessRecords,
+          authorityTransitions: [rotationTransition],
+          quorumCertificateRecords: [secondCertificateRecord],
+        },
+      ),
+    ).toMatchObject({
+      status: "obstructed",
+      admitted: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_witness_suffix_invalid",
+        }),
+      ]),
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord,
+          checkpointAdmissionRecords,
+          signaturePolicy: strictTombstonePolicy,
+          witnessRecords: witnessRecords.slice(1),
+          authorityTransitions: authorityTransitionsBeforeRotation,
+          quorumCertificateRecords: [secondCertificateRecord],
+        },
+      ),
+    ).toMatchObject({
+      status: "obstructed",
+      admitted: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_authority_suffix_invalid",
+        }),
+      ]),
+    });
+
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: witnessRecords.slice(1),
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_sequence_gap",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: witnessRecords.slice(1),
+          signaturePolicy: strictTombstonePolicy,
+          compactionCheckpoint: checkpoint,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_compaction_checkpoint_invalid",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: witnessRecords.slice(1),
+          signaturePolicy: strictTombstonePolicy,
+          compactionCheckpoint: checkpoint,
+          compactionCheckpointAdmission: recoveredCheckpointAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestHead: tombstoneHead,
+      acceptedHeads: [tombstoneHead],
+      issues: [],
+    });
+
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence: tombstoneHead.pruningTombstoneSequence,
+          transitions: [rotationTransition],
+          signaturePolicy: strictIdentityPolicy,
+          compactionCheckpoint: checkpoint,
+          compactionCheckpointAdmission: recoveredCheckpointAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestAuthorityHash: rotationTransition.authorityHash,
+      principals: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-checkpoint-monitor",
+          signatureKeyId: "key-pruning-tombstone-checkpoint-monitor-v2",
+          signatureKeyStatus: "active",
+        }),
+      ]),
+      issues: [],
+    });
+
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [secondCertificateRecord],
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_sequence_gap",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [secondCertificateRecord],
+          signaturePolicy: strictTombstonePolicy,
+          compactionCheckpoint: checkpoint,
+          compactionCheckpointAdmission: recoveredCheckpointAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestCertifiedRecord: expect.objectContaining({
+        quorumCertificateRecordHash:
+          secondCertificateRecord.quorumCertificateRecordHash,
+      }),
+      issues: [],
+    });
+
+    const tamperedCheckpoint = {
+      ...checkpoint,
+      checkpointId:
+        "pruning_tombstone_head_replay_compaction_checkpoint_tampered",
+    };
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: witnessRecords.slice(1),
+          signaturePolicy: strictTombstonePolicy,
+          compactionCheckpoint: tamperedCheckpoint,
+          compactionCheckpointAdmission: recoveredCheckpointAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_compaction_checkpoint_invalid",
+        }),
+      ]),
+    });
+
+    const pruningTombstoneRecordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore();
+    const pruningTombstoneRecord =
+      await pruningTombstoneRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+        {
+          checkpointAdmissionRecord,
+          pruningAdmission,
+          signaturePolicy: strictTombstonePolicy,
+          recordedAt: timestamp("2026-06-03T14:09:08.000Z"),
+        },
+      );
+    const pruningTombstoneRecords =
+      await pruningTombstoneRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: view.tenantId,
+          records: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestTombstoneRecord: expect.objectContaining({
+        pruningTombstoneRecordHash:
+          pruningTombstoneRecord.pruningTombstoneRecordHash,
+      }),
+      latestPrunedFrontiers: expect.arrayContaining([
+        expect.objectContaining({
+          lane: "witness_ledger",
+          compactedThroughSequence: witnessRecords[0]!.witnessSequence,
+        }),
+        expect.objectContaining({
+          lane: "authority_topology",
+          compactedThroughSequence:
+            authorityTransitionsBeforeRotation[2]!.authoritySequence,
+        }),
+        expect.objectContaining({
+          lane: "quorum_certificate_records",
+          compactedThroughSequence:
+            firstCertificateRecord.quorumCertificateSequence,
+        }),
+      ]),
+      issues: [],
+    });
+
+    await expect(
+      tombstoneHeadWitnessLedger.pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneRecord,
+        },
+      ),
+    ).resolves.toBe(1);
+    await expect(
+      tombstoneHeadAuthorityStore.pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneRecord,
+        },
+      ),
+    ).resolves.toBe(3);
+    await expect(
+      recordStore.pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneRecord,
+        },
+      ),
+    ).resolves.toBe(1);
+
+    const prunedWitnessRecords =
+      await tombstoneHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const prunedAuthorityTransitions =
+      await tombstoneHeadAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const prunedQuorumCertificateRecords =
+      await recordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    expect(prunedWitnessRecords).toHaveLength(1);
+    expect(prunedWitnessRecords[0]!.observationHash).toBe(
+      witnessRecords[1]!.observationHash,
+    );
+    expect(prunedAuthorityTransitions).toHaveLength(1);
+    expect(prunedAuthorityTransitions[0]!.authorityHash).toBe(
+      rotationTransition.authorityHash,
+    );
+    expect(prunedQuorumCertificateRecords).toHaveLength(1);
+    expect(prunedQuorumCertificateRecords[0]!.quorumCertificateRecordHash).toBe(
+      secondCertificateRecord.quorumCertificateRecordHash,
+    );
+    const requiredPruningTombstoneStoreHead =
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord(
+        pruningTombstoneRecord,
+      );
+    const pruningTombstoneStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger();
+    const pruningTombstoneStoreHeadWitness =
+      new LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness(
+        pruningTombstoneStoreHeadWitnessLedger,
+        strictTombstonePolicy,
+      );
+	    await expect(
+	      pruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+	        signedPruningTombstoneStoreHeadObservation(
+	          {
+	            tenantId: view.tenantId,
+	            observerId: "pruning-tombstone-store-monitor",
+	            observedAt: timestamp("2026-06-03T14:09:08.500Z"),
+	            head: requiredPruningTombstoneStoreHead,
+	          },
+	          "pruning-tombstone-store-monitor-key",
+	        ),
+	      ),
+	    ).resolves.toMatchObject({
+      accepted: true,
+      status: "accepted_initial",
+      latestHead: requiredPruningTombstoneStoreHead,
+      issues: [],
+    });
+    const pruningTombstoneStoreHeadWitnessRecords =
+      await pruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const recoveredPruningTombstoneStoreHeadReplay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: pruningTombstoneStoreHeadWitnessRecords,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      );
+    expect(recoveredPruningTombstoneStoreHeadReplay).toMatchObject({
+      valid: true,
+      latestHead: requiredPruningTombstoneStoreHead,
+      acceptedHeads: [requiredPruningTombstoneStoreHead],
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: [
+            {
+              ...pruningTombstoneStoreHeadWitnessRecords[0]!,
+              decision: {
+                ...pruningTombstoneStoreHeadWitnessRecords[0]!.decision,
+                accepted: false,
+              },
+            },
+          ],
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_hash_mismatch",
+        }),
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_decision_mismatch",
+        }),
+      ]),
+    });
+    const pruningTombstoneStoreHeadWitnessQuorumTransition =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 1,
+          transitionId: "pruning_tombstone_store_head_set_quorum",
+          transitionKind: "set_quorum",
+          recordedAt: timestamp("2026-06-03T14:09:08.510Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          requiredWitnesses: 2,
+          minimumWitnesses: 1,
+        },
+      );
+    const pruningTombstoneStoreHeadWitnessAdmitA =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 2,
+          transitionId: "pruning_tombstone_store_head_admit_a",
+          transitionKind: "admit_witness",
+          recordedAt: timestamp("2026-06-03T14:09:08.520Z"),
+	          recordedBy: "authority:pruning-tombstone-store-head",
+	          effectiveFromPruningTombstoneSequence: 1,
+	          witnessId: "pruning-tombstone-store-monitor",
+	          signatureKeyId: "pruning-tombstone-store-monitor-key",
+	          signatureAlgorithm: "test-signature-v1",
+	          signaturePublicKeyFingerprint:
+	            "fingerprint:pruning-tombstone-store-monitor-key",
+	          previousAuthorityHash:
+	            pruningTombstoneStoreHeadWitnessQuorumTransition.authorityHash,
+	        },
+      );
+    const pruningTombstoneStoreHeadWitnessAdmitB =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 3,
+          transitionId: "pruning_tombstone_store_head_admit_b",
+          transitionKind: "admit_witness",
+          recordedAt: timestamp("2026-06-03T14:09:08.530Z"),
+	          recordedBy: "authority:pruning-tombstone-store-head",
+	          effectiveFromPruningTombstoneSequence: 1,
+	          witnessId: "pruning-tombstone-store-monitor-b",
+	          signatureKeyId: "pruning-tombstone-store-monitor-b-key",
+	          signatureAlgorithm: "test-signature-v1",
+	          signaturePublicKeyFingerprint:
+	            "fingerprint:pruning-tombstone-store-monitor-b-key",
+	          previousAuthorityHash:
+	            pruningTombstoneStoreHeadWitnessAdmitA.authorityHash,
+	        },
+      );
+    const pruningTombstoneStoreHeadWitnessTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions: [
+            pruningTombstoneStoreHeadWitnessQuorumTransition,
+            pruningTombstoneStoreHeadWitnessAdmitA,
+            pruningTombstoneStoreHeadWitnessAdmitB,
+          ],
+        },
+      );
+    expect(pruningTombstoneStoreHeadWitnessTopology).toMatchObject({
+      valid: true,
+      eligibleWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+      ],
+      requiredWitnesses: 2,
+      minimumWitnesses: 1,
+      issues: [],
+    });
+    const pruningTombstoneStoreHeadWitnessAuthorityStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore();
+    const storedPruningTombstoneStoreHeadWitnessQuorumTransition =
+      await pruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "pruning_tombstone_store_head_set_quorum",
+          transitionKind: "set_quorum",
+          recordedAt: timestamp("2026-06-03T14:09:08.510Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          requiredWitnesses: 2,
+          minimumWitnesses: 1,
+        },
+      );
+    const storedPruningTombstoneStoreHeadWitnessAdmitA =
+      await pruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "pruning_tombstone_store_head_admit_a",
+          transitionKind: "admit_witness",
+          recordedAt: timestamp("2026-06-03T14:09:08.520Z"),
+	          recordedBy: "authority:pruning-tombstone-store-head",
+	          effectiveFromPruningTombstoneSequence: 1,
+	          witnessId: "pruning-tombstone-store-monitor",
+	          signatureKeyId: "pruning-tombstone-store-monitor-key",
+	          signatureAlgorithm: "test-signature-v1",
+	          signaturePublicKeyFingerprint:
+	            "fingerprint:pruning-tombstone-store-monitor-key",
+	        },
+	      );
+    const storedPruningTombstoneStoreHeadWitnessAdmitB =
+      await pruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "pruning_tombstone_store_head_admit_b",
+          transitionKind: "admit_witness",
+          recordedAt: timestamp("2026-06-03T14:09:08.530Z"),
+	          recordedBy: "authority:pruning-tombstone-store-head",
+	          effectiveFromPruningTombstoneSequence: 1,
+	          witnessId: "pruning-tombstone-store-monitor-b",
+	          signatureKeyId: "pruning-tombstone-store-monitor-b-key",
+	          signatureAlgorithm: "test-signature-v1",
+	          signaturePublicKeyFingerprint:
+	            "fingerprint:pruning-tombstone-store-monitor-b-key",
+	        },
+	      );
+    expect(storedPruningTombstoneStoreHeadWitnessQuorumTransition).toMatchObject({
+      authoritySequence: 1,
+      authorityHash: pruningTombstoneStoreHeadWitnessQuorumTransition.authorityHash,
+    });
+    expect(storedPruningTombstoneStoreHeadWitnessAdmitA).toMatchObject({
+      authoritySequence: 2,
+      previousAuthorityHash:
+        storedPruningTombstoneStoreHeadWitnessQuorumTransition.authorityHash,
+      authorityHash: pruningTombstoneStoreHeadWitnessAdmitA.authorityHash,
+    });
+    expect(storedPruningTombstoneStoreHeadWitnessAdmitB).toMatchObject({
+      authoritySequence: 3,
+      previousAuthorityHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitA.authorityHash,
+      authorityHash: pruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+    });
+    const storedPruningTombstoneStoreHeadWitnessTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions:
+            await pruningTombstoneStoreHeadWitnessAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+	    expect(storedPruningTombstoneStoreHeadWitnessTopology).toMatchObject({
+	      valid: true,
+	      effectiveAuthorityHash:
+	        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      eligibleWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+	      ],
+	      issues: [],
+	    });
+	    expect(storedPruningTombstoneStoreHeadWitnessTopology.principals).toEqual(
+	      expect.arrayContaining([
+	        expect.objectContaining({
+	          witnessId: "pruning-tombstone-store-monitor",
+	          signatureKeyId: "pruning-tombstone-store-monitor-key",
+	          signatureAlgorithm: "test-signature-v1",
+	          signatureKeyStatus: "active",
+	        }),
+	        expect.objectContaining({
+	          witnessId: "pruning-tombstone-store-monitor-b",
+	          signatureKeyId: "pruning-tombstone-store-monitor-b-key",
+	          signatureAlgorithm: "test-signature-v1",
+	          signatureKeyStatus: "active",
+	        }),
+	      ]),
+	    );
+	    const unsignedPruningTombstoneStoreHeadWitnessLedger =
+	      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger();
+	    const unsignedPruningTombstoneStoreHeadWitness =
+	      new LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness(
+	        unsignedPruningTombstoneStoreHeadWitnessLedger,
+	        strictTombstonePolicy,
+	      );
+	    await unsignedPruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+	      {
+	        tenantId: view.tenantId,
+	        observerId: "pruning-tombstone-store-monitor",
+	        observedAt: timestamp("2026-06-03T14:09:08.540Z"),
+	        head: requiredPruningTombstoneStoreHead,
+	      },
+	    );
+	    await unsignedPruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+	      {
+	        tenantId: view.tenantId,
+	        observerId: "pruning-tombstone-store-monitor-b",
+	        observedAt: timestamp("2026-06-03T14:09:08.545Z"),
+	        head: requiredPruningTombstoneStoreHead,
+	      },
+	    );
+	    await expect(
+	      new StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier(
+	        pruningTombstoneStoreHeadWitnessAuthorityStore,
+	        unsignedPruningTombstoneStoreHeadWitnessLedger,
+	      ).certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+	        {
+	          tenantId: view.tenantId,
+	          head: requiredPruningTombstoneStoreHead,
+	          signaturePolicy: strictTombstonePolicy,
+	        },
+	      ),
+	    ).resolves.toMatchObject({
+	      certified: false,
+	      status: "obstructed",
+	      issues: expect.arrayContaining([
+	        expect.objectContaining({
+	          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_replay_invalid",
+	        }),
+	      ]),
+	    });
+	    const wrongKeyPruningTombstoneStoreHeadWitnessLedger =
+	      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger();
+	    const wrongKeyPruningTombstoneStoreHeadWitness =
+	      new LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness(
+	        wrongKeyPruningTombstoneStoreHeadWitnessLedger,
+	        strictTombstonePolicy,
+	      );
+	    await wrongKeyPruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+	      signedPruningTombstoneStoreHeadObservation(
+	        {
+	          tenantId: view.tenantId,
+	          observerId: "pruning-tombstone-store-monitor",
+	          observedAt: timestamp("2026-06-03T14:09:08.550Z"),
+	          head: requiredPruningTombstoneStoreHead,
+	        },
+	        "wrong-pruning-tombstone-store-monitor-key",
+	      ),
+	    );
+	    expect(
+	      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+	        {
+	          tenantId: view.tenantId,
+	          records:
+	            await wrongKeyPruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+	              {
+	                tenantId: view.tenantId,
+	              },
+	            ),
+	          signaturePolicy: {
+	            ...strictTombstonePolicy,
+	            pruningTombstoneStoreHeadAuthorityTopology:
+	              storedPruningTombstoneStoreHeadWitnessTopology,
+	          },
+	        },
+	      ),
+	    ).toMatchObject({
+	      valid: false,
+	      issues: expect.arrayContaining([
+	        expect.objectContaining({
+	          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_mismatch",
+	        }),
+	      ]),
+	    });
+	    await expect(
+	      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore().appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+	        {
+          tenantId: view.tenantId,
+          transitionId: "invalid_pruning_tombstone_store_head_quorum",
+          transitionKind: "set_quorum",
+          recordedAt: timestamp("2026-06-03T14:09:08.515Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          requiredWitnesses: 1,
+          minimumWitnesses: 2,
+        },
+      ),
+    ).rejects.toThrow("authority transition failed replay");
+    const storeBackedPruningTombstoneStoreHeadWitnessCertifier =
+      new StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier(
+        pruningTombstoneStoreHeadWitnessAuthorityStore,
+        pruningTombstoneStoreHeadWitnessLedger,
+      );
+    const singlePruningTombstoneStoreHeadQuorumCertificate =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          witnessReplay: recoveredPruningTombstoneStoreHeadReplay,
+          authorityTopology: pruningTombstoneStoreHeadWitnessTopology,
+        },
+      );
+    expect(singlePruningTombstoneStoreHeadQuorumCertificate).toMatchObject({
+      certified: false,
+      status: "witnessed",
+      acceptedWitnessIds: ["pruning-tombstone-store-monitor"],
+      requiredWitnesses: 2,
+      allowedAction: "collect_more_pruning_tombstone_store_head_witnesses",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_not_met",
+        }),
+      ]),
+    });
+    await expect(
+      storeBackedPruningTombstoneStoreHeadWitnessCertifier.certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).resolves.toMatchObject({
+      certified: false,
+      status: "witnessed",
+      acceptedWitnessIds: ["pruning-tombstone-store-monitor"],
+      requiredWitnesses: 2,
+      authorityTopologyHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      allowedAction: "collect_more_pruning_tombstone_store_head_witnesses",
+    });
+	    await expect(
+	      pruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+	        signedPruningTombstoneStoreHeadObservation(
+	          {
+	            tenantId: view.tenantId,
+	            observerId: "pruning-tombstone-store-monitor-b",
+	            observedAt: timestamp("2026-06-03T14:09:08.625Z"),
+	            head: requiredPruningTombstoneStoreHead,
+	          },
+	          "pruning-tombstone-store-monitor-b-key",
+	        ),
+	      ),
+	    ).resolves.toMatchObject({
+      accepted: true,
+      status: "accepted_duplicate",
+      latestHead: requiredPruningTombstoneStoreHead,
+      issues: [],
+    });
+    const quorumPruningTombstoneStoreHeadReplay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await pruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: strictTombstonePolicy,
+        },
+      );
+    const certifiedPruningTombstoneStoreHeadQuorumCertificate =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          witnessReplay: quorumPruningTombstoneStoreHeadReplay,
+          authorityTopology: pruningTombstoneStoreHeadWitnessTopology,
+        },
+      );
+    expect(certifiedPruningTombstoneStoreHeadQuorumCertificate).toMatchObject({
+      certified: true,
+      status: "certified",
+      acceptedWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+      ],
+      eligibleWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+      ],
+      requiredWitnesses: 2,
+      minimumWitnesses: 1,
+      authorityTopologyHash:
+        pruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      issues: [],
+    });
+    await expect(
+      storeBackedPruningTombstoneStoreHeadWitnessCertifier.certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).resolves.toMatchObject({
+      certified: true,
+      status: "certified",
+      acceptedWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+      ],
+      eligibleWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+      ],
+      authorityTopologyHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      issues: [],
+    });
+    const pruningTombstoneStoreHeadWitnessSeal =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 4,
+          transitionId: "pruning_tombstone_store_head_seal_epoch",
+          transitionKind: "seal_authority_epoch",
+          recordedAt: timestamp("2026-06-03T14:09:08.632Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          sealedThroughPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          sealedAuthorityTopologyHash:
+            pruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+          sealedQuorumCertificateHash:
+            certifiedPruningTombstoneStoreHeadQuorumCertificate.quorumCertificateHash,
+          previousAuthorityHash:
+            pruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+        },
+      );
+    const sealedPruningTombstoneStoreHeadWitnessTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions: [
+            pruningTombstoneStoreHeadWitnessQuorumTransition,
+            pruningTombstoneStoreHeadWitnessAdmitA,
+            pruningTombstoneStoreHeadWitnessAdmitB,
+            pruningTombstoneStoreHeadWitnessSeal,
+          ],
+        },
+      );
+    expect(sealedPruningTombstoneStoreHeadWitnessTopology).toMatchObject({
+      valid: true,
+      effectiveAuthorityHash:
+        pruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      latestAuthorityHash: pruningTombstoneStoreHeadWitnessSeal.authorityHash,
+      sealedThroughPruningTombstoneSequence:
+        requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+      authorityEpochSeals: [
+        expect.objectContaining({
+          transitionId: "pruning_tombstone_store_head_seal_epoch",
+          sealedAuthorityTopologyHash:
+            pruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+          sealedQuorumCertificateHash:
+            certifiedPruningTombstoneStoreHeadQuorumCertificate.quorumCertificateHash,
+        }),
+      ],
+      issues: [],
+    });
+    const retroactivePruningTombstoneStoreHeadWitnessKeyTransition =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 5,
+          transitionId: "retroactive_pruning_tombstone_store_head_key",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.632Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-store-monitor",
+          signatureKeyId: "pruning-tombstone-store-monitor-key-v2",
+          signatureAlgorithm: "test-signature-v1",
+          previousAuthorityHash:
+            pruningTombstoneStoreHeadWitnessSeal.authorityHash,
+        },
+      );
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions: [
+            pruningTombstoneStoreHeadWitnessQuorumTransition,
+            pruningTombstoneStoreHeadWitnessAdmitA,
+            pruningTombstoneStoreHeadWitnessAdmitB,
+            pruningTombstoneStoreHeadWitnessSeal,
+            retroactivePruningTombstoneStoreHeadWitnessKeyTransition,
+          ],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_retroactive_transition",
+        }),
+      ]),
+    });
+    const forgedPruningTombstoneStoreHeadWitnessSeal =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 4,
+          transitionId: "forged_pruning_tombstone_store_head_seal_epoch",
+          transitionKind: "seal_authority_epoch",
+          recordedAt: timestamp("2026-06-03T14:09:08.633Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          sealedThroughPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          sealedAuthorityTopologyHash: "not-the-effective-authority-hash",
+          sealedQuorumCertificateHash:
+            certifiedPruningTombstoneStoreHeadQuorumCertificate.quorumCertificateHash,
+          previousAuthorityHash:
+            pruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+        },
+      );
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions: [
+            pruningTombstoneStoreHeadWitnessQuorumTransition,
+            pruningTombstoneStoreHeadWitnessAdmitA,
+            pruningTombstoneStoreHeadWitnessAdmitB,
+            forgedPruningTombstoneStoreHeadWitnessSeal,
+          ],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid",
+        }),
+      ]),
+    });
+    const storedPruningTombstoneStoreHeadWitnessSeal =
+      await pruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "stored_pruning_tombstone_store_head_seal_epoch",
+          transitionKind: "seal_authority_epoch",
+          recordedAt: timestamp("2026-06-03T14:09:08.634Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          sealedThroughPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          sealedAuthorityTopologyHash:
+            storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+          sealedQuorumCertificateHash:
+            certifiedPruningTombstoneStoreHeadQuorumCertificate.quorumCertificateHash,
+        },
+      );
+    expect(storedPruningTombstoneStoreHeadWitnessSeal).toMatchObject({
+      authoritySequence: 4,
+      previousAuthorityHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      sealedAuthorityTopologyHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      sealedQuorumCertificateHash:
+        certifiedPruningTombstoneStoreHeadQuorumCertificate.quorumCertificateHash,
+    });
+    const storedSealedPruningTombstoneStoreHeadWitnessTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions:
+            await pruningTombstoneStoreHeadWitnessAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(storedSealedPruningTombstoneStoreHeadWitnessTopology).toMatchObject({
+      valid: true,
+      effectiveAuthorityHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      latestAuthorityHash:
+        storedPruningTombstoneStoreHeadWitnessSeal.authorityHash,
+      sealedThroughPruningTombstoneSequence:
+        requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+      issues: [],
+    });
+    const storedCertifiedPruningTombstoneStoreHeadQuorumCertificate =
+      await storeBackedPruningTombstoneStoreHeadWitnessCertifier.certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      );
+    expect(storedCertifiedPruningTombstoneStoreHeadQuorumCertificate).toMatchObject({
+      certified: true,
+      status: "certified",
+      authorityTopologyHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      issues: [],
+    });
+    const signedPruningTombstoneStoreHeadWitnessRecords =
+      await pruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const pruningTombstoneStoreHeadQuorumCertificateRecordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore();
+    const pruningTombstoneStoreHeadQuorumCertificateRecord =
+      await pruningTombstoneStoreHeadQuorumCertificateRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate: storedCertifiedPruningTombstoneStoreHeadQuorumCertificate,
+          witnessRecords: signedPruningTombstoneStoreHeadWitnessRecords,
+          authorityEpochSeal: storedPruningTombstoneStoreHeadWitnessSeal,
+          signaturePolicy: {
+            ...strictTombstonePolicy,
+            pruningTombstoneStoreHeadAuthorityTopology:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology,
+          },
+          recordedAt: timestamp("2026-06-03T14:09:08.636Z"),
+        },
+      );
+    expect(pruningTombstoneStoreHeadQuorumCertificateRecord).toMatchObject({
+      quorumCertificateSequence: 1,
+      certificate: {
+        quorumCertificateHash:
+          storedCertifiedPruningTombstoneStoreHeadQuorumCertificate.quorumCertificateHash,
+        authorityTopologyHash:
+          storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      },
+      acceptedWitnessEvidence: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-store-monitor",
+          signature: expect.objectContaining({
+            keyId: "pruning-tombstone-store-monitor-key",
+          }),
+        }),
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-store-monitor-b",
+          signature: expect.objectContaining({
+            keyId: "pruning-tombstone-store-monitor-b-key",
+          }),
+        }),
+      ]),
+      authorityEpochSeal: expect.objectContaining({
+        authorityHash: storedPruningTombstoneStoreHeadWitnessSeal.authorityHash,
+      }),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await pruningTombstoneStoreHeadQuorumCertificateRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: {
+            ...strictTombstonePolicy,
+            pruningTombstoneStoreHeadAuthorityTopology:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestCertifiedRecord: expect.objectContaining({
+        quorumCertificateRecordHash:
+          pruningTombstoneStoreHeadQuorumCertificateRecord.quorumCertificateRecordHash,
+      }),
+      issues: [],
+    });
+    const strictPruningTombstoneStoreHeadPolicy = {
+      ...strictTombstonePolicy,
+      pruningTombstoneStoreHeadAuthorityTopology:
+        storedSealedPruningTombstoneStoreHeadWitnessTopology,
+    };
+    const pruningTombstoneStoreHeadReplayCompactionCheckpoint =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpoint(
+        {
+          tenantId: view.tenantId,
+          checkpointId:
+            "pruning_tombstone_store_head_witness_replay_checkpoint_1",
+          recordedAt: timestamp("2026-06-03T14:09:08.639Z"),
+          witnessLedger: {
+            compactedThroughWitnessSequence:
+              signedPruningTombstoneStoreHeadWitnessRecords[0]!.witnessSequence,
+            compactedThroughObservationHash:
+              signedPruningTombstoneStoreHeadWitnessRecords[0]!.observationHash,
+            acceptedHeads:
+              signedPruningTombstoneStoreHeadWitnessRecords[0]!.decision
+                .acceptedHeads,
+          },
+          authorityTopology: {
+            pruningTombstoneSequence:
+              requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+            compactedThroughAuthoritySequence:
+              storedPruningTombstoneStoreHeadWitnessAdmitB.authoritySequence,
+            compactedThroughAuthorityHash:
+              storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+            requiredWitnesses:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology.requiredWitnesses,
+            minimumWitnesses:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology.minimumWitnesses,
+            effectiveAuthorityHash:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology.effectiveAuthorityHash,
+            principals:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology.principals,
+            authorityEpochSeals: [],
+          },
+          quorumCertificateRecords: {
+            compactedThroughQuorumCertificateSequence:
+              pruningTombstoneStoreHeadQuorumCertificateRecord.quorumCertificateSequence,
+            compactedThroughQuorumCertificateRecordHash:
+              pruningTombstoneStoreHeadQuorumCertificateRecord.quorumCertificateRecordHash,
+            latestCertifiedRecord:
+              pruningTombstoneStoreHeadQuorumCertificateRecord,
+          },
+        },
+      );
+    const pruningTombstoneStoreHeadReplayCompactionWitnessedAt =
+      timestamp("2026-06-03T14:09:08.640Z");
+    const pruningTombstoneStoreHeadReplayCompactionAdmission =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpoint:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint,
+          authorityTopology:
+            storedSealedPruningTombstoneStoreHeadWitnessTopology,
+          witnessEvidence: [
+            {
+              witnessId: "pruning-tombstone-store-monitor",
+              checkpointHash:
+                pruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+              witnessedAt:
+                pruningTombstoneStoreHeadReplayCompactionWitnessedAt,
+              signature: testSignatureFor({
+                principalId: "pruning-tombstone-store-monitor",
+                keyId: "pruning-tombstone-store-monitor-key",
+                payloadHash:
+                  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+                    {
+                      tenantId: view.tenantId,
+                      witnessId: "pruning-tombstone-store-monitor",
+                      checkpointHash:
+                        pruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+                      witnessedAt:
+                        pruningTombstoneStoreHeadReplayCompactionWitnessedAt,
+                    },
+                  ),
+              }),
+            },
+            {
+              witnessId: "pruning-tombstone-store-monitor-b",
+              checkpointHash:
+                pruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+              witnessedAt:
+                pruningTombstoneStoreHeadReplayCompactionWitnessedAt,
+              signature: testSignatureFor({
+                principalId: "pruning-tombstone-store-monitor-b",
+                keyId: "pruning-tombstone-store-monitor-b-key",
+                payloadHash:
+                  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+                    {
+                      tenantId: view.tenantId,
+                      witnessId: "pruning-tombstone-store-monitor-b",
+                      checkpointHash:
+                        pruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+                      witnessedAt:
+                        pruningTombstoneStoreHeadReplayCompactionWitnessedAt,
+                    },
+                  ),
+              }),
+            },
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      );
+    expect(pruningTombstoneStoreHeadReplayCompactionAdmission).toMatchObject({
+      admitted: true,
+      acceptedWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+      ],
+      issues: [],
+    });
+    const pruningTombstoneStoreHeadCheckpointAdmissionRecordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore();
+    const pruningTombstoneStoreHeadCheckpointAdmissionRecord =
+      await pruningTombstoneStoreHeadCheckpointAdmissionRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpoint: pruningTombstoneStoreHeadReplayCompactionCheckpoint,
+          admission: pruningTombstoneStoreHeadReplayCompactionAdmission,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          recordedAt: timestamp("2026-06-03T14:09:08.641Z"),
+        },
+      );
+    expect(pruningTombstoneStoreHeadCheckpointAdmissionRecord).toMatchObject({
+      checkpointAdmissionSequence: 1,
+      checkpoint: {
+        checkpointHash:
+          pruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+      },
+      admission: {
+        checkpointAdmissionHash:
+          pruningTombstoneStoreHeadReplayCompactionAdmission.checkpointAdmissionHash,
+      },
+    });
+    const recoveredPruningTombstoneStoreHeadCheckpointAdmissionReplay =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await pruningTombstoneStoreHeadCheckpointAdmissionRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      );
+    expect(recoveredPruningTombstoneStoreHeadCheckpointAdmissionReplay).toMatchObject({
+      valid: true,
+      latestAdmissionRecord: expect.objectContaining({
+        checkpointAdmissionRecordHash:
+          pruningTombstoneStoreHeadCheckpointAdmissionRecord.checkpointAdmissionRecordHash,
+      }),
+      issues: [],
+    });
+    await expect(
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecordStore().appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpoint: pruningTombstoneStoreHeadReplayCompactionCheckpoint,
+          admission: {
+            ...pruningTombstoneStoreHeadReplayCompactionAdmission,
+            checkpointAdmissionHash: "tampered-checkpoint-admission-hash",
+          },
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          recordedAt: timestamp("2026-06-03T14:09:08.642Z"),
+        },
+      ),
+    ).rejects.toThrow(
+      "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_checkpoint_admission_record_admission_hash_mismatch",
+    );
+    const conflictingPruningTombstoneStoreHeadReplayCompactionCheckpoint =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpoint(
+        {
+          tenantId: view.tenantId,
+          checkpointId:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointId,
+          recordedAt: timestamp("2026-06-03T14:09:08.643Z"),
+          witnessLedger:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint.witnessLedger!,
+          authorityTopology:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint.authorityTopology!,
+          quorumCertificateRecords:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint.quorumCertificateRecords!,
+        },
+      );
+    const conflictingPruningTombstoneStoreHeadWitnessedAt = timestamp(
+      "2026-06-03T14:09:08.644Z",
+    );
+    const conflictingPruningTombstoneStoreHeadReplayCompactionAdmission =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpoint:
+            conflictingPruningTombstoneStoreHeadReplayCompactionCheckpoint,
+          authorityTopology:
+            storedSealedPruningTombstoneStoreHeadWitnessTopology,
+          witnessEvidence: [
+            {
+              witnessId: "pruning-tombstone-store-monitor",
+              checkpointHash:
+                conflictingPruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+              witnessedAt:
+                conflictingPruningTombstoneStoreHeadWitnessedAt,
+              signature: testSignatureFor({
+                principalId: "pruning-tombstone-store-monitor",
+                keyId: "pruning-tombstone-store-monitor-key",
+                payloadHash:
+                  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+                    {
+                      tenantId: view.tenantId,
+                      witnessId: "pruning-tombstone-store-monitor",
+                      checkpointHash:
+                        conflictingPruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+                      witnessedAt:
+                        conflictingPruningTombstoneStoreHeadWitnessedAt,
+                    },
+                  ),
+              }),
+            },
+            {
+              witnessId: "pruning-tombstone-store-monitor-b",
+              checkpointHash:
+                conflictingPruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+              witnessedAt:
+                conflictingPruningTombstoneStoreHeadWitnessedAt,
+              signature: testSignatureFor({
+                principalId: "pruning-tombstone-store-monitor-b",
+                keyId: "pruning-tombstone-store-monitor-b-key",
+                payloadHash:
+                  computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+                    {
+                      tenantId: view.tenantId,
+                      witnessId: "pruning-tombstone-store-monitor-b",
+                      checkpointHash:
+                        conflictingPruningTombstoneStoreHeadReplayCompactionCheckpoint.checkpointHash,
+                      witnessedAt:
+                        conflictingPruningTombstoneStoreHeadWitnessedAt,
+                    },
+                  ),
+              }),
+            },
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      );
+    const conflictingPruningTombstoneStoreHeadCheckpointAdmissionRecord =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord(
+        {
+          checkpointAdmissionSequence: 2,
+          checkpoint:
+            conflictingPruningTombstoneStoreHeadReplayCompactionCheckpoint,
+          admission:
+            conflictingPruningTombstoneStoreHeadReplayCompactionAdmission,
+          previousCheckpointAdmissionRecordHash:
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord.checkpointAdmissionRecordHash,
+          recordedAt: timestamp("2026-06-03T14:09:08.645Z"),
+        },
+      );
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: view.tenantId,
+          records: [
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+            conflictingPruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_checkpoint_admission_record_checkpoint_conflict",
+        }),
+      ]),
+    });
+    const pruningTombstoneStoreHeadWitnessSuffix =
+      signedPruningTombstoneStoreHeadWitnessRecords.slice(1);
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: pruningTombstoneStoreHeadWitnessSuffix,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_sequence_gap",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: pruningTombstoneStoreHeadWitnessSuffix,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          compactionCheckpoint:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_compaction_checkpoint_invalid",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records: pruningTombstoneStoreHeadWitnessSuffix,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          compactionCheckpoint:
+            recoveredPruningTombstoneStoreHeadCheckpointAdmissionReplay
+              .latestAdmissionRecord!.checkpoint,
+          compactionCheckpointAdmission:
+            recoveredPruningTombstoneStoreHeadCheckpointAdmissionReplay
+              .latestAdmissionRecord!.admission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestHead: requiredPruningTombstoneStoreHead,
+      acceptedHeads: [requiredPruningTombstoneStoreHead],
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_authority_sequence_gap",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          compactionCheckpoint:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint,
+          compactionCheckpointAdmission:
+            pruningTombstoneStoreHeadReplayCompactionAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      effectiveAuthorityHash:
+        storedPruningTombstoneStoreHeadWitnessAdmitB.authorityHash,
+      latestAuthorityHash:
+        storedPruningTombstoneStoreHeadWitnessSeal.authorityHash,
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          compactionCheckpoint:
+            pruningTombstoneStoreHeadReplayCompactionCheckpoint,
+          compactionCheckpointAdmission:
+            pruningTombstoneStoreHeadReplayCompactionAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestCertifiedRecord: expect.objectContaining({
+        quorumCertificateRecordHash:
+          pruningTombstoneStoreHeadQuorumCertificateRecord.quorumCertificateRecordHash,
+      }),
+      issues: [],
+    });
+    const pruningTombstoneStoreHeadReplayCompactionPruningAdmission =
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord:
+            recoveredPruningTombstoneStoreHeadCheckpointAdmissionReplay
+              .latestAdmissionRecord!,
+          checkpointAdmissionRecords:
+            await pruningTombstoneStoreHeadCheckpointAdmissionRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionCheckpointAdmissionRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      );
+    expect(pruningTombstoneStoreHeadReplayCompactionPruningAdmission).toMatchObject(
+      {
+        admitted: true,
+        status: "admitted",
+        authorityBoundary:
+          "projection_replay_pruning_tombstone_head_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission",
+        lanes: expect.arrayContaining([
+          "witness_ledger",
+          "authority_topology",
+          "quorum_certificate_records",
+        ]),
+        witnessSuffixRecordCount: pruningTombstoneStoreHeadWitnessSuffix.length,
+        authoritySuffixTransitionCount: 1,
+        quorumCertificateSuffixRecordCount: 0,
+        issues: [],
+      },
+    );
+    const pruningTombstoneStoreHeadPruningTombstoneRecordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecordStore();
+    const pruningTombstoneStoreHeadPruningTombstoneRecord =
+      await pruningTombstoneStoreHeadPruningTombstoneRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecord(
+        {
+          checkpointAdmissionRecord:
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          pruningAdmission:
+            pruningTombstoneStoreHeadReplayCompactionPruningAdmission,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          recordedAt: timestamp("2026-06-03T14:09:08.650Z"),
+        },
+      );
+    const pruningTombstoneStoreHeadPruningTombstoneRecords =
+      await pruningTombstoneStoreHeadPruningTombstoneRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: view.tenantId,
+          records: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestPrunedFrontiers: expect.arrayContaining([
+        expect.objectContaining({
+          lane: "witness_ledger",
+          compactedThroughSequence:
+            signedPruningTombstoneStoreHeadWitnessRecords[0]!.witnessSequence,
+        }),
+        expect.objectContaining({
+          lane: "authority_topology",
+          compactedThroughSequence:
+            storedPruningTombstoneStoreHeadWitnessAdmitB.authoritySequence,
+        }),
+        expect.objectContaining({
+          lane: "quorum_certificate_records",
+          compactedThroughSequence:
+            pruningTombstoneStoreHeadQuorumCertificateRecord.quorumCertificateSequence,
+        }),
+      ]),
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneRecords(
+        {
+          tenantId: view.tenantId,
+          records: [
+            {
+              ...pruningTombstoneStoreHeadPruningTombstoneRecord,
+              pruningTombstoneRecordHash: "tampered",
+            },
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_hash_mismatch",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestTombstoneRecord: expect.objectContaining({
+        pruningTombstoneRecordHash:
+          pruningTombstoneStoreHeadPruningTombstoneRecord.pruningTombstoneRecordHash,
+      }),
+      issues: [],
+    });
+    const requiredPruningTombstoneHistoryStoreHead =
+      projectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadFromRecord(
+        pruningTombstoneStoreHeadPruningTombstoneRecord,
+      );
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          requiredPruningTombstoneStoreHead:
+            requiredPruningTombstoneHistoryStoreHead,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      pruningTombstoneStoreHead: requiredPruningTombstoneHistoryStoreHead,
+      issues: [],
+    });
+    const pruningTombstoneHistoryHeadWitnessLedger =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessLedger();
+    const pruningTombstoneHistoryHeadWitness =
+      new LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness(
+        pruningTombstoneHistoryHeadWitnessLedger,
+        strictPruningTombstoneStoreHeadPolicy,
+      );
+    await expect(
+      pruningTombstoneHistoryHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor",
+          observedAt: timestamp("2026-06-03T14:09:08.670Z"),
+          head: requiredPruningTombstoneHistoryStoreHead,
+          consistencyProof: {
+            tenantId: view.tenantId,
+            toHead: requiredPruningTombstoneHistoryStoreHead,
+            records: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          },
+        },
+      ),
+    ).resolves.toMatchObject({
+      accepted: true,
+      status: "accepted_initial",
+      latestHead: requiredPruningTombstoneHistoryStoreHead,
+      issues: [],
+    });
+    const replayedPruningTombstoneHistoryHeadWitness =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records:
+          await pruningTombstoneHistoryHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords(
+            {
+              tenantId: view.tenantId,
+            },
+          ),
+        signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+      });
+    expect(replayedPruningTombstoneHistoryHeadWitness).toMatchObject({
+      valid: true,
+      latestHead: requiredPruningTombstoneHistoryStoreHead,
+      issues: [],
+    });
+    const recoveredPruningTombstoneHistoryStoreHead =
+      replayedPruningTombstoneHistoryHeadWitness.latestHead;
+    if (recoveredPruningTombstoneHistoryStoreHead === undefined) {
+      throw new Error(
+        "expected pruning tombstone history-store head witness replay to recover a latest head",
+      );
+    }
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          requiredPruningTombstoneStoreHead:
+            recoveredPruningTombstoneHistoryStoreHead,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      pruningTombstoneStoreHead:
+        recoveredPruningTombstoneHistoryStoreHead,
+      issues: [],
+    });
+    const historyStoreHeadSetQuorum =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 1,
+          transitionId: "pruning_tombstone_history_store_head_set_quorum",
+          transitionKind: "set_quorum",
+          recordedAt: timestamp("2026-06-03T14:09:08.661Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          requiredWitnesses: 2,
+          minimumWitnesses: 1,
+        },
+      );
+    const historyStoreHeadAdmitA =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 2,
+          transitionId: "pruning_tombstone_history_store_head_admit_a",
+          transitionKind: "admit_witness",
+          recordedAt: timestamp("2026-06-03T14:09:08.662Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-a",
+          signatureAlgorithm: "test-signature-v1",
+          previousAuthorityHash: historyStoreHeadSetQuorum.authorityHash,
+        },
+      );
+    const historyStoreHeadAdmitB =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 3,
+          transitionId: "pruning_tombstone_history_store_head_admit_b",
+          transitionKind: "admit_witness",
+          recordedAt: timestamp("2026-06-03T14:09:08.663Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-b",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-b",
+          signatureAlgorithm: "test-signature-v1",
+          previousAuthorityHash: historyStoreHeadAdmitA.authorityHash,
+        },
+      );
+    const historyStoreHeadAuthorityTopology =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions: [
+            historyStoreHeadSetQuorum,
+            historyStoreHeadAdmitA,
+            historyStoreHeadAdmitB,
+          ],
+        },
+      );
+    expect(historyStoreHeadAuthorityTopology).toMatchObject({
+      valid: true,
+      requiredWitnesses: 2,
+      minimumWitnesses: 1,
+      eligibleWitnessIds: [
+        "pruning-tombstone-history-monitor-a",
+        "pruning-tombstone-history-monitor-b",
+      ],
+      issues: [],
+    });
+    const strictPruningTombstoneHistoryStoreHeadPolicy = {
+      ...strictPruningTombstoneStoreHeadPolicy,
+      pruningTombstoneHistoryStoreHeadAuthorityTopology:
+        historyStoreHeadAuthorityTopology,
+    };
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records:
+          await pruningTombstoneHistoryHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords(
+            {
+              tenantId: view.tenantId,
+            },
+          ),
+        signaturePolicy: strictPruningTombstoneHistoryStoreHeadPolicy,
+      }),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_signature_missing",
+        }),
+      ]),
+    });
+    const signedHistoryStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessLedger();
+    const signedHistoryStoreHeadWitness =
+      new LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness(
+        signedHistoryStoreHeadWitnessLedger,
+        strictPruningTombstoneHistoryStoreHeadPolicy,
+      );
+    await signedHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      signedPruningTombstoneHistoryStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor-a",
+          observedAt: timestamp("2026-06-03T14:09:08.671Z"),
+          head: requiredPruningTombstoneHistoryStoreHead,
+          consistencyProof: {
+            tenantId: view.tenantId,
+            toHead: requiredPruningTombstoneHistoryStoreHead,
+            records: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          },
+        },
+        "key-pruning-tombstone-history-monitor-a",
+      ),
+    );
+    await signedHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      signedPruningTombstoneHistoryStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor-b",
+          observedAt: timestamp("2026-06-03T14:09:08.672Z"),
+          head: requiredPruningTombstoneHistoryStoreHead,
+        },
+        "key-pruning-tombstone-history-monitor-b",
+      ),
+    );
+    const signedHistoryStoreHeadWitnessRecords =
+      await signedHistoryStoreHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    const signedHistoryStoreHeadWitnessReplay =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records: signedHistoryStoreHeadWitnessRecords,
+        signaturePolicy: strictPruningTombstoneHistoryStoreHeadPolicy,
+      });
+    expect(signedHistoryStoreHeadWitnessReplay).toMatchObject({
+      valid: true,
+      latestHead: requiredPruningTombstoneHistoryStoreHead,
+      issues: [],
+    });
+    const certifiedHistoryStoreHeadQuorum =
+      evaluateProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificate(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneHistoryStoreHead,
+          witnessReplay: signedHistoryStoreHeadWitnessReplay,
+          authorityTopology: historyStoreHeadAuthorityTopology,
+          signaturePolicy: strictPruningTombstoneHistoryStoreHeadPolicy,
+          policy: {
+            requiredWitnesses: 2,
+            minimumWitnesses: 1,
+          },
+        },
+      );
+    expect(certifiedHistoryStoreHeadQuorum).toMatchObject({
+      certified: true,
+      status: "certified",
+      acceptedWitnessIds: [
+        "pruning-tombstone-history-monitor-a",
+        "pruning-tombstone-history-monitor-b",
+      ],
+      requiredWitnesses: 2,
+      minimumWitnesses: 1,
+      issues: [],
+      authorityBoundary:
+        "projection_replay_pruning_tombstone_history_store_head_witness_quorum",
+    });
+    const historyStoreHeadAuthorityStore =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore();
+    const storedHistoryStoreHeadQuorumTransition =
+      await historyStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "stored_pruning_tombstone_history_store_head_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.664Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        requiredWitnesses: 2,
+        minimumWitnesses: 1,
+      },
+    );
+    const storedHistoryStoreHeadAdmitA =
+      await historyStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "stored_pruning_tombstone_history_store_head_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.665Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        witnessId: "pruning-tombstone-history-monitor-a",
+        signatureKeyId: "key-pruning-tombstone-history-monitor-a",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    const storedHistoryStoreHeadAdmitB =
+      await historyStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "stored_pruning_tombstone_history_store_head_admit_b",
+          transitionKind: "admit_witness",
+          recordedAt: timestamp("2026-06-03T14:09:08.666Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-b",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-b",
+          signatureAlgorithm: "test-signature-v1",
+        },
+      );
+    const storeBackedHistoryStoreHeadCertifier =
+      new StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertifier(
+        historyStoreHeadAuthorityStore,
+        signedHistoryStoreHeadWitnessLedger,
+      );
+    const storeBackedCertifiedHistoryStoreHeadQuorum =
+      await storeBackedHistoryStoreHeadCertifier.certifyProjectionReplayPruningTombstoneHistoryStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneHistoryStoreHead,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          policy: {
+            requiredWitnesses: 2,
+            minimumWitnesses: 1,
+          },
+        },
+      );
+    expect(storeBackedCertifiedHistoryStoreHeadQuorum).toMatchObject({
+      certified: true,
+      status: "certified",
+      authorityTopologyHash: storedHistoryStoreHeadAdmitB.authorityHash,
+      acceptedWitnessIds: [
+        "pruning-tombstone-history-monitor-a",
+        "pruning-tombstone-history-monitor-b",
+      ],
+      issues: [],
+    });
+    const storedHistoryStoreHeadAuthoritySeal =
+      await historyStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "stored_pruning_tombstone_history_store_head_seal_epoch",
+          transitionKind: "seal_authority_epoch",
+          recordedAt: timestamp("2026-06-03T14:09:08.667Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          sealedThroughPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          sealedAuthorityTopologyHash: storedHistoryStoreHeadAdmitB.authorityHash,
+          sealedQuorumCertificateHash:
+            storeBackedCertifiedHistoryStoreHeadQuorum.quorumCertificateHash,
+        },
+      );
+    const sealedHistoryStoreHeadAuthorityTopology =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions:
+            await historyStoreHeadAuthorityStore.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(sealedHistoryStoreHeadAuthorityTopology).toMatchObject({
+      valid: true,
+      effectiveAuthorityHash: storedHistoryStoreHeadAdmitB.authorityHash,
+      latestAuthorityHash: storedHistoryStoreHeadAuthoritySeal.authorityHash,
+      sealedThroughPruningTombstoneSequence:
+        requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+      authorityEpochSeals: [
+        expect.objectContaining({
+          transitionId:
+            "stored_pruning_tombstone_history_store_head_seal_epoch",
+          sealedAuthorityTopologyHash: storedHistoryStoreHeadAdmitB.authorityHash,
+          sealedQuorumCertificateHash:
+            storeBackedCertifiedHistoryStoreHeadQuorum.quorumCertificateHash,
+        }),
+      ],
+      issues: [],
+    });
+    await expect(
+      storeBackedHistoryStoreHeadCertifier.certifyProjectionReplayPruningTombstoneHistoryStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneHistoryStoreHead,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+        },
+      ),
+    ).resolves.toMatchObject({
+      certified: true,
+      status: "certified",
+      authorityTopologyHash: storedHistoryStoreHeadAdmitB.authorityHash,
+      issues: [],
+    });
+    const retroactiveHistoryStoreHeadAuthorityTransition =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 5,
+          transitionId:
+            "retroactive_pruning_tombstone_history_store_head_rotate_a",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.668Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-a-v2",
+          signatureAlgorithm: "test-signature-v1",
+          previousAuthorityHash: storedHistoryStoreHeadAuthoritySeal.authorityHash,
+        },
+      );
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions: [
+            storedHistoryStoreHeadQuorumTransition,
+            storedHistoryStoreHeadAdmitA,
+            storedHistoryStoreHeadAdmitB,
+            storedHistoryStoreHeadAuthoritySeal,
+            retroactiveHistoryStoreHeadAuthorityTransition,
+          ],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_authority_retroactive_transition",
+        }),
+      ]),
+    });
+    const forgedHistoryStoreHeadAuthoritySeal =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence: 4,
+          transitionId:
+            "forged_pruning_tombstone_history_store_head_seal_epoch",
+          transitionKind: "seal_authority_epoch",
+          recordedAt: timestamp("2026-06-03T14:09:08.669Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          sealedThroughPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          sealedAuthorityTopologyHash: "not-the-effective-authority-hash",
+          sealedQuorumCertificateHash:
+            storeBackedCertifiedHistoryStoreHeadQuorum.quorumCertificateHash,
+          previousAuthorityHash: storedHistoryStoreHeadAdmitB.authorityHash,
+        },
+      );
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions: [
+            storedHistoryStoreHeadQuorumTransition,
+            storedHistoryStoreHeadAdmitA,
+            storedHistoryStoreHeadAdmitB,
+            forgedHistoryStoreHeadAuthoritySeal,
+          ],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_authority_epoch_seal_invalid",
+        }),
+      ]),
+    });
+    await expect(
+      historyStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "stored_retroactive_pruning_tombstone_history_store_head_rotate_a",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.670Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-a-v2",
+          signatureAlgorithm: "test-signature-v1",
+        },
+      ),
+    ).rejects.toThrow(
+      "cannot modify sealed pruning tombstone history-store epoch",
+    );
+    const historyStoreHeadQuorumCertificateRecordStore =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecordStore();
+    const historyStoreHeadQuorumCertificateRecord =
+      await historyStoreHeadQuorumCertificateRecordStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate: storeBackedCertifiedHistoryStoreHeadQuorum,
+          witnessRecords: signedHistoryStoreHeadWitnessRecords,
+          authorityEpochSeal: storedHistoryStoreHeadAuthoritySeal,
+          signaturePolicy: {
+            ...strictPruningTombstoneStoreHeadPolicy,
+            pruningTombstoneHistoryStoreHeadAuthorityTopology:
+              sealedHistoryStoreHeadAuthorityTopology,
+          },
+          recordedAt: timestamp("2026-06-03T14:09:08.671Z"),
+        },
+      );
+    expect(historyStoreHeadQuorumCertificateRecord).toMatchObject({
+      quorumCertificateSequence: 1,
+      certificate: expect.objectContaining({
+        certified: true,
+        quorumCertificateHash:
+          storeBackedCertifiedHistoryStoreHeadQuorum.quorumCertificateHash,
+      }),
+      acceptedWitnessEvidence: [
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-history-monitor-a",
+          observationHash: signedHistoryStoreHeadWitnessRecords[0]!
+            .observationHash,
+        }),
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-history-monitor-b",
+          observationHash: signedHistoryStoreHeadWitnessRecords[1]!
+            .observationHash,
+        }),
+      ],
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await historyStoreHeadQuorumCertificateRecordStore.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: {
+            ...strictPruningTombstoneStoreHeadPolicy,
+            pruningTombstoneHistoryStoreHeadAuthorityTopology:
+              sealedHistoryStoreHeadAuthorityTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestCertifiedRecord: expect.objectContaining({
+        quorumCertificateRecordHash:
+          historyStoreHeadQuorumCertificateRecord.quorumCertificateRecordHash,
+      }),
+      issues: [],
+    });
+    const strictSealedPruningTombstoneHistoryStoreHeadPolicy = {
+      ...strictPruningTombstoneStoreHeadPolicy,
+      pruningTombstoneHistoryStoreHeadAuthorityTopology:
+        sealedHistoryStoreHeadAuthorityTopology,
+    };
+    const historyStoreHeadReplayCompactionCheckpoint =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpoint(
+        {
+          tenantId: view.tenantId,
+          checkpointId:
+            "pruning_tombstone_history_store_head_replay_compaction_checkpoint_1",
+          recordedAt: timestamp("2026-06-03T14:09:08.671Z"),
+          witnessLedger: {
+            compactedThroughWitnessSequence:
+              signedHistoryStoreHeadWitnessRecords[0]!.witnessSequence,
+            compactedThroughObservationHash:
+              signedHistoryStoreHeadWitnessRecords[0]!.observationHash,
+            acceptedHeads:
+              signedHistoryStoreHeadWitnessRecords[0]!.decision.acceptedHeads,
+          },
+          authorityTopology: {
+            pruningTombstoneSequence:
+              requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+            compactedThroughAuthoritySequence:
+              storedHistoryStoreHeadAdmitB.authoritySequence,
+            compactedThroughAuthorityHash:
+              storedHistoryStoreHeadAdmitB.authorityHash,
+            requiredWitnesses:
+              sealedHistoryStoreHeadAuthorityTopology.requiredWitnesses!,
+            minimumWitnesses:
+              sealedHistoryStoreHeadAuthorityTopology.minimumWitnesses!,
+            effectiveAuthorityHash: storedHistoryStoreHeadAdmitB.authorityHash,
+            principals: sealedHistoryStoreHeadAuthorityTopology.principals,
+            authorityEpochSeals: [],
+          },
+          quorumCertificateRecords: {
+            compactedThroughQuorumCertificateSequence:
+              historyStoreHeadQuorumCertificateRecord.quorumCertificateSequence,
+            compactedThroughQuorumCertificateRecordHash:
+              historyStoreHeadQuorumCertificateRecord.quorumCertificateRecordHash,
+            latestCertifiedRecord: historyStoreHeadQuorumCertificateRecord,
+          },
+        },
+      );
+    const historyStoreHeadReplayCompactionWitnessedAtA = timestamp(
+      "2026-06-03T14:09:08.672Z",
+    );
+    const historyStoreHeadReplayCompactionWitnessedAtB = timestamp(
+      "2026-06-03T14:09:08.673Z",
+    );
+    const historyStoreHeadReplayCompactionAdmission =
+      evaluateProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpointAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpoint: historyStoreHeadReplayCompactionCheckpoint,
+          authorityTopology: sealedHistoryStoreHeadAuthorityTopology,
+          signaturePolicy: strictSealedPruningTombstoneHistoryStoreHeadPolicy,
+          witnessEvidence: [
+            {
+              witnessId: "pruning-tombstone-history-monitor-a",
+              checkpointHash:
+                historyStoreHeadReplayCompactionCheckpoint.checkpointHash,
+              witnessedAt: historyStoreHeadReplayCompactionWitnessedAtA,
+              signature: testSignatureFor({
+                principalId: "pruning-tombstone-history-monitor-a",
+                keyId: "key-pruning-tombstone-history-monitor-a",
+                payloadHash:
+                  computeProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+                    {
+                      tenantId: view.tenantId,
+                      witnessId: "pruning-tombstone-history-monitor-a",
+                      checkpointHash:
+                        historyStoreHeadReplayCompactionCheckpoint.checkpointHash,
+                      witnessedAt: historyStoreHeadReplayCompactionWitnessedAtA,
+                    },
+                  ),
+              }),
+            },
+            {
+              witnessId: "pruning-tombstone-history-monitor-b",
+              checkpointHash:
+                historyStoreHeadReplayCompactionCheckpoint.checkpointHash,
+              witnessedAt: historyStoreHeadReplayCompactionWitnessedAtB,
+              signature: testSignatureFor({
+                principalId: "pruning-tombstone-history-monitor-b",
+                keyId: "key-pruning-tombstone-history-monitor-b",
+                payloadHash:
+                  computeProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpointAdmissionWitnessSignaturePayloadHash(
+                    {
+                      tenantId: view.tenantId,
+                      witnessId: "pruning-tombstone-history-monitor-b",
+                      checkpointHash:
+                        historyStoreHeadReplayCompactionCheckpoint.checkpointHash,
+                      witnessedAt: historyStoreHeadReplayCompactionWitnessedAtB,
+                    },
+                  ),
+              }),
+            },
+          ],
+        },
+      );
+    expect(historyStoreHeadReplayCompactionAdmission).toMatchObject({
+      admitted: true,
+      status: "admitted",
+      acceptedWitnessIds: [
+        "pruning-tombstone-history-monitor-a",
+        "pruning-tombstone-history-monitor-b",
+      ],
+      authorityBoundary:
+        "projection_replay_pruning_tombstone_history_store_head_witness_replay_compaction_checkpoint_admission",
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records: [signedHistoryStoreHeadWitnessRecords[1]!],
+        signaturePolicy: strictSealedPruningTombstoneHistoryStoreHeadPolicy,
+      }),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_sequence_gap",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records: [signedHistoryStoreHeadWitnessRecords[1]!],
+        signaturePolicy: strictSealedPruningTombstoneHistoryStoreHeadPolicy,
+        compactionCheckpoint: historyStoreHeadReplayCompactionCheckpoint,
+      }),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_compaction_checkpoint_invalid",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records: [signedHistoryStoreHeadWitnessRecords[1]!],
+        signaturePolicy: strictSealedPruningTombstoneHistoryStoreHeadPolicy,
+        compactionCheckpoint: historyStoreHeadReplayCompactionCheckpoint,
+        compactionCheckpointAdmission:
+          historyStoreHeadReplayCompactionAdmission,
+      }),
+    ).toMatchObject({
+      valid: true,
+      latestHead: requiredPruningTombstoneHistoryStoreHead,
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions: [storedHistoryStoreHeadAuthoritySeal],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_authority_sequence_gap",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions: [storedHistoryStoreHeadAuthoritySeal],
+          signaturePolicy: strictSealedPruningTombstoneHistoryStoreHeadPolicy,
+          compactionCheckpoint: historyStoreHeadReplayCompactionCheckpoint,
+          compactionCheckpointAdmission:
+            historyStoreHeadReplayCompactionAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      effectiveAuthorityHash: storedHistoryStoreHeadAdmitB.authorityHash,
+      latestAuthorityHash: storedHistoryStoreHeadAuthoritySeal.authorityHash,
+      authorityEpochSeals: [
+        expect.objectContaining({
+          authorityHash: storedHistoryStoreHeadAuthoritySeal.authorityHash,
+        }),
+      ],
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [],
+          signaturePolicy: strictSealedPruningTombstoneHistoryStoreHeadPolicy,
+          compactionCheckpoint: historyStoreHeadReplayCompactionCheckpoint,
+          compactionCheckpointAdmission:
+            historyStoreHeadReplayCompactionAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestCertifiedRecord: expect.objectContaining({
+        quorumCertificateRecordHash:
+          historyStoreHeadQuorumCertificateRecord.quorumCertificateRecordHash,
+      }),
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [],
+          signaturePolicy: strictSealedPruningTombstoneHistoryStoreHeadPolicy,
+          compactionCheckpoint: {
+            ...historyStoreHeadReplayCompactionCheckpoint,
+            checkpointHash: "tampered-history-store-head-checkpoint",
+          },
+          compactionCheckpointAdmission:
+            historyStoreHeadReplayCompactionAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid",
+        }),
+      ]),
+    });
+    const tamperedHistoryStoreHeadWitnessEvidenceRecord =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence: 1,
+          certificate: storeBackedCertifiedHistoryStoreHeadQuorum,
+          acceptedWitnessEvidence:
+            historyStoreHeadQuorumCertificateRecord.acceptedWitnessEvidence.map(
+              (evidence, index) =>
+                index === 0
+                  ? { ...evidence, observationHash: "" }
+                  : evidence,
+            ),
+          authorityEpochSeal: storedHistoryStoreHeadAuthoritySeal,
+          recordedAt: timestamp("2026-06-03T14:09:08.672Z"),
+        },
+      );
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [tamperedHistoryStoreHeadWitnessEvidenceRecord],
+          signaturePolicy: {
+            ...strictPruningTombstoneStoreHeadPolicy,
+            pruningTombstoneHistoryStoreHeadAuthorityTopology:
+              sealedHistoryStoreHeadAuthorityTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_quorum_certificate_record_witness_evidence_mismatch",
+        }),
+      ]),
+    });
+    const forgedHistoryStoreHeadQuorumRecordSeal =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence:
+            storedHistoryStoreHeadAuthoritySeal.authoritySequence,
+          transitionId: storedHistoryStoreHeadAuthoritySeal.transitionId,
+          transitionKind: "seal_authority_epoch",
+          recordedAt: storedHistoryStoreHeadAuthoritySeal.recordedAt,
+          recordedBy: storedHistoryStoreHeadAuthoritySeal.recordedBy,
+          effectiveFromPruningTombstoneSequence:
+            storedHistoryStoreHeadAuthoritySeal.effectiveFromPruningTombstoneSequence,
+          sealedThroughPruningTombstoneSequence:
+            storedHistoryStoreHeadAuthoritySeal.sealedThroughPruningTombstoneSequence,
+          sealedAuthorityTopologyHash:
+            storedHistoryStoreHeadAuthoritySeal.sealedAuthorityTopologyHash,
+          sealedQuorumCertificateHash: "not-the-quorum-certificate-hash",
+          previousAuthorityHash:
+            storedHistoryStoreHeadAuthoritySeal.previousAuthorityHash,
+        },
+      );
+    const forgedHistoryStoreHeadQuorumRecord =
+      buildProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence: 1,
+          certificate: storeBackedCertifiedHistoryStoreHeadQuorum,
+          acceptedWitnessEvidence:
+            historyStoreHeadQuorumCertificateRecord.acceptedWitnessEvidence,
+          authorityEpochSeal: forgedHistoryStoreHeadQuorumRecordSeal,
+          recordedAt: timestamp("2026-06-03T14:09:08.673Z"),
+        },
+      );
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [forgedHistoryStoreHeadQuorumRecord],
+          signaturePolicy: {
+            ...strictPruningTombstoneStoreHeadPolicy,
+            pruningTombstoneHistoryStoreHeadAuthorityTopology:
+              sealedHistoryStoreHeadAuthorityTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_quorum_certificate_record_authority_seal_mismatch",
+        }),
+      ]),
+    });
+    const unsignedHistoryStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessLedger();
+    const unsignedHistoryStoreHeadWitness =
+      new LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness(
+        unsignedHistoryStoreHeadWitnessLedger,
+        strictPruningTombstoneStoreHeadPolicy,
+      );
+    await unsignedHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      {
+        tenantId: view.tenantId,
+        observerId: "pruning-tombstone-history-monitor-a",
+        observedAt: timestamp("2026-06-03T14:09:08.674Z"),
+        head: requiredPruningTombstoneHistoryStoreHead,
+      },
+    );
+    await unsignedHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      {
+        tenantId: view.tenantId,
+        observerId: "pruning-tombstone-history-monitor-b",
+        observedAt: timestamp("2026-06-03T14:09:08.675Z"),
+        head: requiredPruningTombstoneHistoryStoreHead,
+      },
+    );
+    await expect(
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecordStore().appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate: storeBackedCertifiedHistoryStoreHeadQuorum,
+          witnessRecords:
+            await unsignedHistoryStoreHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          authorityEpochSeal: storedHistoryStoreHeadAuthoritySeal,
+          signaturePolicy: {
+            ...strictPruningTombstoneStoreHeadPolicy,
+            pruningTombstoneHistoryStoreHeadAuthorityTopology:
+              sealedHistoryStoreHeadAuthorityTopology,
+          },
+        },
+      ),
+    ).rejects.toThrow(
+      "projection_replay_pruning_tombstone_history_store_head_witness_quorum_certificate_record_signature_invalid",
+    );
+    const rotatedHistoryStoreHeadAuthorityStore =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore();
+    await rotatedHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "rotated_pruning_tombstone_history_store_head_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.675Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        requiredWitnesses: 2,
+        minimumWitnesses: 1,
+      },
+    );
+    await rotatedHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "rotated_pruning_tombstone_history_store_head_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.676Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        witnessId: "pruning-tombstone-history-monitor-a",
+        signatureKeyId: "key-pruning-tombstone-history-monitor-a",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    await rotatedHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "rotated_pruning_tombstone_history_store_head_admit_b",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.677Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        witnessId: "pruning-tombstone-history-monitor-b",
+        signatureKeyId: "key-pruning-tombstone-history-monitor-b",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    const rotatedHistoryStoreHeadKeyTransition =
+      await rotatedHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "rotated_pruning_tombstone_history_store_head_rotate_a",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.678Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-a-v2",
+          signatureAlgorithm: "test-signature-v1",
+        },
+      );
+    const rotatedHistoryStoreHeadTopology =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions:
+            await rotatedHistoryStoreHeadAuthorityStore.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(rotatedHistoryStoreHeadTopology).toMatchObject({
+      valid: true,
+      latestAuthorityHash: rotatedHistoryStoreHeadKeyTransition.authorityHash,
+      principals: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-a-v2",
+          signatureKeyStatus: "active",
+        }),
+      ]),
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records: signedHistoryStoreHeadWitnessRecords,
+        signaturePolicy: {
+          ...strictPruningTombstoneStoreHeadPolicy,
+          pruningTombstoneHistoryStoreHeadAuthorityTopology:
+            rotatedHistoryStoreHeadTopology,
+        },
+      }),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_signature_key_mismatch",
+        }),
+      ]),
+    });
+    await expect(
+      new StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertifier(
+        rotatedHistoryStoreHeadAuthorityStore,
+        signedHistoryStoreHeadWitnessLedger,
+      ).certifyProjectionReplayPruningTombstoneHistoryStoreHead({
+        tenantId: view.tenantId,
+        head: requiredPruningTombstoneHistoryStoreHead,
+        signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+      }),
+    ).resolves.toMatchObject({
+      certified: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_quorum_witness_replay_invalid",
+        }),
+      ]),
+    });
+    const rotatedKeyHistoryStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessLedger();
+    const rotatedKeyHistoryStoreHeadWitness =
+      new LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness(
+        rotatedKeyHistoryStoreHeadWitnessLedger,
+        strictPruningTombstoneStoreHeadPolicy,
+      );
+    await rotatedKeyHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      signedPruningTombstoneHistoryStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor-a",
+          observedAt: timestamp("2026-06-03T14:09:08.679Z"),
+          head: requiredPruningTombstoneHistoryStoreHead,
+          consistencyProof: {
+            tenantId: view.tenantId,
+            toHead: requiredPruningTombstoneHistoryStoreHead,
+            records: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          },
+        },
+        "key-pruning-tombstone-history-monitor-a-v2",
+      ),
+    );
+    await rotatedKeyHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      signedPruningTombstoneHistoryStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor-b",
+          observedAt: timestamp("2026-06-03T14:09:08.680Z"),
+          head: requiredPruningTombstoneHistoryStoreHead,
+        },
+        "key-pruning-tombstone-history-monitor-b",
+      ),
+    );
+    await expect(
+      new StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertifier(
+        rotatedHistoryStoreHeadAuthorityStore,
+        rotatedKeyHistoryStoreHeadWitnessLedger,
+      ).certifyProjectionReplayPruningTombstoneHistoryStoreHead({
+        tenantId: view.tenantId,
+        head: requiredPruningTombstoneHistoryStoreHead,
+        signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+      }),
+    ).resolves.toMatchObject({
+      certified: true,
+      status: "certified",
+      acceptedWitnessIds: [
+        "pruning-tombstone-history-monitor-a",
+        "pruning-tombstone-history-monitor-b",
+      ],
+      authorityTopologyHash: rotatedHistoryStoreHeadKeyTransition.authorityHash,
+      issues: [],
+    });
+    const revokedHistoryStoreHeadAuthorityStore =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore();
+    await revokedHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "revoked_pruning_tombstone_history_store_head_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.681Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        requiredWitnesses: 1,
+      },
+    );
+    await revokedHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "revoked_pruning_tombstone_history_store_head_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.682Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        witnessId: "pruning-tombstone-history-monitor-a",
+        signatureKeyId: "key-pruning-tombstone-history-monitor-a",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    const revokedHistoryStoreHeadKeyTransition =
+      await revokedHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "revoked_pruning_tombstone_history_store_head_revoke_a_key",
+          transitionKind: "revoke_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.683Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-a",
+        },
+      );
+    const revokedHistoryStoreHeadTopology =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          transitions:
+            await revokedHistoryStoreHeadAuthorityStore.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(revokedHistoryStoreHeadTopology).toMatchObject({
+      valid: true,
+      latestAuthorityHash: revokedHistoryStoreHeadKeyTransition.authorityHash,
+      principals: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyStatus: "revoked",
+        }),
+      ]),
+      issues: [],
+    });
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records: [signedHistoryStoreHeadWitnessRecords[0]!],
+        signaturePolicy: {
+          ...strictPruningTombstoneStoreHeadPolicy,
+          pruningTombstoneHistoryStoreHeadAuthorityTopology:
+            revokedHistoryStoreHeadTopology,
+        },
+      }),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_signature_key_not_current",
+        }),
+      ]),
+    });
+    await expect(
+      new StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertifier(
+        revokedHistoryStoreHeadAuthorityStore,
+        signedHistoryStoreHeadWitnessLedger,
+      ).certifyProjectionReplayPruningTombstoneHistoryStoreHead({
+        tenantId: view.tenantId,
+        head: requiredPruningTombstoneHistoryStoreHead,
+        signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+      }),
+    ).resolves.toMatchObject({
+      certified: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_quorum_witness_replay_invalid",
+        }),
+      ]),
+    });
+    const invalidHistoryStoreHeadKeyTransitionStore =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore();
+    await invalidHistoryStoreHeadKeyTransitionStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "invalid_key_pruning_tombstone_history_store_head_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.684Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        requiredWitnesses: 1,
+      },
+    );
+    await expect(
+      invalidHistoryStoreHeadKeyTransitionStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "invalid_key_pruning_tombstone_history_store_head_rotate_missing_principal",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.685Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-history-monitor-a",
+          signatureKeyId: "key-pruning-tombstone-history-monitor-a-v2",
+          signatureAlgorithm: "test-signature-v1",
+        },
+      ),
+    ).rejects.toThrow(
+      "projection_replay_pruning_tombstone_history_store_head_witness_authority_signature_key_transition_invalid",
+    );
+    const incompleteHistoryStoreHeadAuthorityStore =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore();
+    await incompleteHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "incomplete_pruning_tombstone_history_store_head_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.667Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        requiredWitnesses: 2,
+        minimumWitnesses: 1,
+      },
+    );
+    await incompleteHistoryStoreHeadAuthorityStore.appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId:
+          "incomplete_pruning_tombstone_history_store_head_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.668Z"),
+        recordedBy: "authority:pruning-tombstone-history-store-head",
+        effectiveFromPruningTombstoneSequence:
+          requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+        witnessId: "pruning-tombstone-history-monitor-a",
+        signatureKeyId: "key-pruning-tombstone-history-monitor-a",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    await expect(
+      new StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertifier(
+        incompleteHistoryStoreHeadAuthorityStore,
+        signedHistoryStoreHeadWitnessLedger,
+      ).certifyProjectionReplayPruningTombstoneHistoryStoreHead({
+        tenantId: view.tenantId,
+        head: requiredPruningTombstoneHistoryStoreHead,
+        signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+      }),
+    ).resolves.toMatchObject({
+      certified: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_quorum_witness_replay_invalid",
+        }),
+      ]),
+    });
+    await expect(
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore().appendProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId:
+            "invalid_pruning_tombstone_history_store_head_set_quorum",
+          transitionKind: "set_quorum",
+          recordedAt: timestamp("2026-06-03T14:09:08.669Z"),
+          recordedBy: "authority:pruning-tombstone-history-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+          requiredWitnesses: 0,
+        },
+      ),
+    ).rejects.toThrow(
+      "projection_replay_pruning_tombstone_history_store_head_witness_authority_quorum_invalid",
+    );
+    const oneWitnessHistoryStoreHeadReplay =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records: [signedHistoryStoreHeadWitnessRecords[0]!],
+        signaturePolicy: strictPruningTombstoneHistoryStoreHeadPolicy,
+      });
+    expect(oneWitnessHistoryStoreHeadReplay).toMatchObject({
+      valid: true,
+      issues: [],
+    });
+    expect(
+      evaluateProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificate(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneHistoryStoreHead,
+          witnessReplay: oneWitnessHistoryStoreHeadReplay,
+          authorityTopology: historyStoreHeadAuthorityTopology,
+          signaturePolicy: strictPruningTombstoneHistoryStoreHeadPolicy,
+        },
+      ),
+    ).toMatchObject({
+      certified: false,
+      status: "obstructed",
+      acceptedWitnessIds: ["pruning-tombstone-history-monitor-a"],
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_quorum_not_met",
+        }),
+      ]),
+    });
+    const wrongKeyHistoryStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessLedger();
+    const wrongKeyHistoryStoreHeadWitness =
+      new LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness(
+        wrongKeyHistoryStoreHeadWitnessLedger,
+        strictPruningTombstoneStoreHeadPolicy,
+      );
+    await wrongKeyHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      signedPruningTombstoneHistoryStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor-a",
+          observedAt: timestamp("2026-06-03T14:09:08.673Z"),
+          head: requiredPruningTombstoneHistoryStoreHead,
+          consistencyProof: {
+            tenantId: view.tenantId,
+            toHead: requiredPruningTombstoneHistoryStoreHead,
+            records: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          },
+        },
+        "forged-pruning-tombstone-history-monitor-a-key",
+      ),
+    );
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records:
+          await wrongKeyHistoryStoreHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords(
+            {
+              tenantId: view.tenantId,
+            },
+          ),
+        signaturePolicy: strictPruningTombstoneHistoryStoreHeadPolicy,
+      }),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_signature_key_mismatch",
+        }),
+      ]),
+    });
+    const unauthorizedHistoryStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayPruningTombstoneHistoryStoreHeadWitnessLedger();
+    const unauthorizedHistoryStoreHeadWitness =
+      new LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness(
+        unauthorizedHistoryStoreHeadWitnessLedger,
+        strictPruningTombstoneStoreHeadPolicy,
+      );
+    await unauthorizedHistoryStoreHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+      signedPruningTombstoneHistoryStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor-c",
+          observedAt: timestamp("2026-06-03T14:09:08.674Z"),
+          head: requiredPruningTombstoneHistoryStoreHead,
+          consistencyProof: {
+            tenantId: view.tenantId,
+            toHead: requiredPruningTombstoneHistoryStoreHead,
+            records: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          },
+        },
+        "key-pruning-tombstone-history-monitor-c",
+      ),
+    );
+    expect(
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records:
+          await unauthorizedHistoryStoreHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords(
+            {
+              tenantId: view.tenantId,
+            },
+          ),
+        signaturePolicy: strictPruningTombstoneHistoryStoreHeadPolicy,
+      }),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_signature_principal_not_authorized",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: [],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          requiredPruningTombstoneStoreHead:
+            requiredPruningTombstoneHistoryStoreHead,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_missing",
+        }),
+      ]),
+    });
+    const futurePruningTombstoneHistoryStoreHeadBody = {
+      tenantId: requiredPruningTombstoneHistoryStoreHead.tenantId,
+      pruningTombstoneSequence:
+        requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence + 1,
+      pruningTombstoneRecordHash: "future_pruning_tombstone_history_hash",
+      recordedAt: timestamp("2026-06-03T14:09:08.660Z"),
+    };
+    const futurePruningTombstoneHistoryStoreHead = {
+      ...futurePruningTombstoneHistoryStoreHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          futurePruningTombstoneHistoryStoreHeadBody,
+        ),
+    };
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          requiredPruningTombstoneStoreHead:
+            futurePruningTombstoneHistoryStoreHead,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_stale",
+        }),
+      ]),
+    });
+    const previousPruningTombstoneHistoryStoreHeadBody = {
+      tenantId: requiredPruningTombstoneHistoryStoreHead.tenantId,
+      pruningTombstoneSequence:
+        requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence - 1,
+      pruningTombstoneRecordHash: "previous_pruning_tombstone_history_hash",
+      recordedAt: timestamp("2026-06-03T14:09:08.640Z"),
+    };
+    const previousPruningTombstoneHistoryStoreHead = {
+      ...previousPruningTombstoneHistoryStoreHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          previousPruningTombstoneHistoryStoreHeadBody,
+        ),
+    };
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          requiredPruningTombstoneStoreHead:
+            previousPruningTombstoneHistoryStoreHead,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_unwitnessed_advance",
+        }),
+      ]),
+    });
+    const forkedPruningTombstoneHistoryStoreHeadBody = {
+      tenantId: requiredPruningTombstoneHistoryStoreHead.tenantId,
+      pruningTombstoneSequence:
+        requiredPruningTombstoneHistoryStoreHead.pruningTombstoneSequence,
+      pruningTombstoneRecordHash: "forked_pruning_tombstone_history_hash",
+      recordedAt: requiredPruningTombstoneHistoryStoreHead.recordedAt,
+    };
+    const forkedPruningTombstoneHistoryStoreHead = {
+      ...forkedPruningTombstoneHistoryStoreHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          forkedPruningTombstoneHistoryStoreHeadBody,
+        ),
+    };
+    const resumedPruningTombstoneHistoryHeadWitness =
+      new LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness(
+        pruningTombstoneHistoryHeadWitnessLedger,
+        strictPruningTombstoneStoreHeadPolicy,
+      );
+    await expect(
+      resumedPruningTombstoneHistoryHeadWitness.observeProjectionReplayPruningTombstoneHistoryStoreHead(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-history-monitor",
+          observedAt: timestamp("2026-06-03T14:09:08.680Z"),
+          head: forkedPruningTombstoneHistoryStoreHead,
+        },
+      ),
+    ).resolves.toMatchObject({
+      accepted: false,
+      status: "obstructed",
+      latestHead: requiredPruningTombstoneHistoryStoreHead,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_fork",
+        }),
+      ]),
+    });
+    const forkedPruningTombstoneHistoryHeadWitnessReplay =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records:
+          await pruningTombstoneHistoryHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords(
+            {
+              tenantId: view.tenantId,
+            },
+          ),
+        signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+      });
+    expect(forkedPruningTombstoneHistoryHeadWitnessReplay).toMatchObject({
+      valid: true,
+      latestHead: requiredPruningTombstoneHistoryStoreHead,
+      acceptedHeads: [requiredPruningTombstoneHistoryStoreHead],
+      issues: [],
+    });
+    const tamperedPruningTombstoneHistoryHeadWitnessReplay =
+      replayProjectionReplayPruningTombstoneHistoryStoreHeadWitnessRecords({
+        tenantId: view.tenantId,
+        records:
+          forkedPruningTombstoneHistoryHeadWitnessReplay.records.map(
+            (record, index) =>
+              index === 0
+                ? {
+                    ...record,
+                    observationHash:
+                      "tampered_pruning_tombstone_history_head_witness_hash",
+                  }
+                : record,
+          ),
+        signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+      });
+    expect(tamperedPruningTombstoneHistoryHeadWitnessReplay).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_pruning_tombstone_history_store_head_witness_ledger_hash_mismatch",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          requiredPruningTombstoneStoreHead:
+            forkedPruningTombstoneHistoryStoreHead,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_fork",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          requiredPruningTombstoneStoreHead: {
+            ...requiredPruningTombstoneHistoryStoreHead,
+            headHash: "tampered_pruning_tombstone_history_store_head_hash",
+          },
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_hash_mismatch",
+        }),
+      ]),
+    });
+    const prunablePruningTombstoneStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger();
+    for (const record of signedPruningTombstoneStoreHeadWitnessRecords) {
+      await prunablePruningTombstoneStoreHeadWitnessLedger.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecord(
+        {
+          observation: {
+            tenantId: record.tenantId,
+            observerId: record.observerId,
+            observedAt: record.observedAt,
+            head: record.head,
+            ...(record.consistencyProof !== undefined
+              ? { consistencyProof: record.consistencyProof }
+              : {}),
+            ...(record.signature !== undefined
+              ? { signature: record.signature }
+              : {}),
+          },
+          decision: record.decision,
+          recordedAt: record.recordedAt,
+        },
+      );
+    }
+    const prunablePruningTombstoneStoreHeadAuthorityStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore();
+    for (const transition of await pruningTombstoneStoreHeadWitnessAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+      {
+        tenantId: view.tenantId,
+      },
+    )) {
+      await prunablePruningTombstoneStoreHeadAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        transition,
+      );
+    }
+    const prunablePruningTombstoneStoreHeadQuorumCertificateRecordStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore();
+    for (const record of await pruningTombstoneStoreHeadQuorumCertificateRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+      {
+        tenantId: view.tenantId,
+      },
+    )) {
+      await prunablePruningTombstoneStoreHeadQuorumCertificateRecordStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate: record.certificate,
+          witnessRecords: signedPruningTombstoneStoreHeadWitnessRecords,
+          ...(record.authorityEpochSeal !== undefined
+            ? { authorityEpochSeal: record.authorityEpochSeal }
+            : {}),
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          recordedAt: record.recordedAt,
+        },
+      );
+    }
+    await expect(
+      prunablePruningTombstoneStoreHeadWitnessLedger.pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneRecord: {
+            ...pruningTombstoneStoreHeadPruningTombstoneRecord,
+            pruningTombstoneRecordHash: "tampered",
+          },
+        },
+      ),
+    ).rejects.toThrow(/hash mismatch/);
+    expect(
+      await prunablePruningTombstoneStoreHeadWitnessLedger.pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneRecord:
+            pruningTombstoneStoreHeadPruningTombstoneRecord,
+        },
+      ),
+    ).toBe(1);
+    expect(
+      await prunablePruningTombstoneStoreHeadAuthorityStore.pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneRecord:
+            pruningTombstoneStoreHeadPruningTombstoneRecord,
+        },
+      ),
+    ).toBe(3);
+    expect(
+      await prunablePruningTombstoneStoreHeadQuorumCertificateRecordStore.pruneProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneRecord:
+            pruningTombstoneStoreHeadPruningTombstoneRecord,
+        },
+      ),
+    ).toBe(1);
+    const prunedPruningTombstoneStoreHeadWitnessRecords =
+      await prunablePruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    expect(prunedPruningTombstoneStoreHeadWitnessRecords).toHaveLength(1);
+    expect(prunedPruningTombstoneStoreHeadWitnessRecords[0]).toMatchObject({
+      observationHash:
+        signedPruningTombstoneStoreHeadWitnessRecords[1]!.observationHash,
+    });
+    const prunedPruningTombstoneStoreHeadAuthorityTransitions =
+      await prunablePruningTombstoneStoreHeadAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+        },
+      );
+    expect(prunedPruningTombstoneStoreHeadAuthorityTransitions).toHaveLength(1);
+    expect(prunedPruningTombstoneStoreHeadAuthorityTransitions[0]).toMatchObject(
+      {
+        authorityHash: storedPruningTombstoneStoreHeadWitnessSeal.authorityHash,
+      },
+    );
+    expect(
+      await prunablePruningTombstoneStoreHeadQuorumCertificateRecordStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+        },
+      ),
+    ).toHaveLength(0);
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: prunedPruningTombstoneStoreHeadWitnessRecords,
+          authorityTransitions:
+            prunedPruningTombstoneStoreHeadAuthorityTransitions,
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      issues: [],
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneStoreHeadPruningTombstoneRecords,
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: [],
+          authorityTransitions:
+            prunedPruningTombstoneStoreHeadAuthorityTransitions,
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_witness_suffix_truncated",
+        }),
+      ]),
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord:
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          checkpointAdmissionRecords: [],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      admitted: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_record_missing",
+        }),
+      ]),
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord:
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          checkpointAdmissionRecords: [
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+            conflictingPruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      admitted: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_record_replay_invalid",
+        }),
+      ]),
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord:
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          checkpointAdmissionRecords: [
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: signedPruningTombstoneStoreHeadWitnessRecords,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      admitted: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_witness_suffix_invalid",
+        }),
+      ]),
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord:
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          checkpointAdmissionRecords: [
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessAdmitB],
+          quorumCertificateRecords: [],
+        },
+      ),
+    ).toMatchObject({
+      admitted: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_authority_suffix_invalid",
+        }),
+      ]),
+    });
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission(
+        {
+          tenantId: view.tenantId,
+          checkpointAdmissionRecord:
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          checkpointAdmissionRecords: [
+            pruningTombstoneStoreHeadCheckpointAdmissionRecord,
+          ],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          witnessRecords: pruningTombstoneStoreHeadWitnessSuffix,
+          authorityTransitions: [storedPruningTombstoneStoreHeadWitnessSeal],
+          quorumCertificateRecords: [
+            pruningTombstoneStoreHeadQuorumCertificateRecord,
+          ],
+        },
+      ),
+    ).toMatchObject({
+      admitted: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_admission_quorum_certificate_suffix_invalid",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [],
+          signaturePolicy: strictPruningTombstoneStoreHeadPolicy,
+          compactionCheckpoint: {
+            ...pruningTombstoneStoreHeadReplayCompactionCheckpoint,
+            checkpointHash: "tampered-checkpoint-hash",
+          },
+          compactionCheckpointAdmission:
+            pruningTombstoneStoreHeadReplayCompactionAdmission,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_compaction_checkpoint_invalid",
+        }),
+      ]),
+    });
+    const tamperedPruningTombstoneStoreHeadWitnessEvidenceRecord =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence: 1,
+          certificate: storedCertifiedPruningTombstoneStoreHeadQuorumCertificate,
+          acceptedWitnessEvidence:
+            pruningTombstoneStoreHeadQuorumCertificateRecord.acceptedWitnessEvidence.map(
+              (evidence, index) =>
+                index === 0 ? { ...evidence, observationHash: "" } : evidence,
+            ),
+          authorityEpochSeal: storedPruningTombstoneStoreHeadWitnessSeal,
+          recordedAt: timestamp("2026-06-03T14:09:08.637Z"),
+        },
+      );
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [tamperedPruningTombstoneStoreHeadWitnessEvidenceRecord],
+          signaturePolicy: {
+            ...strictTombstonePolicy,
+            pruningTombstoneStoreHeadAuthorityTopology:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_witness_evidence_mismatch",
+        }),
+      ]),
+    });
+    const forgedPruningTombstoneStoreHeadQuorumRecordSeal =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          authoritySequence:
+            storedPruningTombstoneStoreHeadWitnessSeal.authoritySequence,
+          transitionId:
+            storedPruningTombstoneStoreHeadWitnessSeal.transitionId,
+          transitionKind: "seal_authority_epoch",
+          recordedAt: storedPruningTombstoneStoreHeadWitnessSeal.recordedAt,
+          recordedBy: storedPruningTombstoneStoreHeadWitnessSeal.recordedBy,
+          effectiveFromPruningTombstoneSequence:
+            storedPruningTombstoneStoreHeadWitnessSeal.effectiveFromPruningTombstoneSequence,
+          sealedThroughPruningTombstoneSequence:
+            storedPruningTombstoneStoreHeadWitnessSeal.sealedThroughPruningTombstoneSequence,
+          sealedAuthorityTopologyHash:
+            storedPruningTombstoneStoreHeadWitnessSeal.sealedAuthorityTopologyHash,
+          sealedQuorumCertificateHash: "not-the-quorum-certificate-hash",
+          previousAuthorityHash:
+            storedPruningTombstoneStoreHeadWitnessSeal.previousAuthorityHash,
+        },
+      );
+    const forgedPruningTombstoneStoreHeadQuorumRecord =
+      buildProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          quorumCertificateSequence: 1,
+          certificate: storedCertifiedPruningTombstoneStoreHeadQuorumCertificate,
+          acceptedWitnessEvidence:
+            pruningTombstoneStoreHeadQuorumCertificateRecord.acceptedWitnessEvidence,
+          authorityEpochSeal: forgedPruningTombstoneStoreHeadQuorumRecordSeal,
+          recordedAt: timestamp("2026-06-03T14:09:08.638Z"),
+        },
+      );
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecords(
+        {
+          tenantId: view.tenantId,
+          records: [forgedPruningTombstoneStoreHeadQuorumRecord],
+          signaturePolicy: {
+            ...strictTombstonePolicy,
+            pruningTombstoneStoreHeadAuthorityTopology:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_authority_seal_mismatch",
+        }),
+      ]),
+    });
+    await expect(
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecordStore().appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificateRecord(
+        {
+          certificate: storedCertifiedPruningTombstoneStoreHeadQuorumCertificate,
+          witnessRecords:
+            await unsignedPruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          authorityEpochSeal: storedPruningTombstoneStoreHeadWitnessSeal,
+          signaturePolicy: {
+            ...strictTombstonePolicy,
+            pruningTombstoneStoreHeadAuthorityTopology:
+              storedSealedPruningTombstoneStoreHeadWitnessTopology,
+          },
+        },
+      ),
+    ).rejects.toThrow(
+      "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_certificate_record_signature_invalid",
+    );
+    await expect(
+      pruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "retroactive_pruning_tombstone_store_head_rotate_a",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.635Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          witnessId: "pruning-tombstone-store-monitor",
+          signatureKeyId: "pruning-tombstone-store-monitor-key-v2",
+          signatureAlgorithm: "test-signature-v1",
+        },
+      ),
+    ).rejects.toThrow(/cannot modify sealed pruning tombstone-store epoch/);
+    const rotatedPruningTombstoneStoreHeadWitnessAuthorityStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore();
+    await rotatedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "rotated_pruning_tombstone_store_head_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.510Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        requiredWitnesses: 2,
+        minimumWitnesses: 1,
+      },
+    );
+    await rotatedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "rotated_pruning_tombstone_store_head_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.520Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-store-monitor",
+        signatureKeyId: "pruning-tombstone-store-monitor-key",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    await rotatedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "rotated_pruning_tombstone_store_head_admit_b",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.530Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-store-monitor-b",
+        signatureKeyId: "pruning-tombstone-store-monitor-b-key",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    const rotatedPruningTombstoneStoreHeadWitnessKey =
+      await rotatedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "rotated_pruning_tombstone_store_head_rotate_a",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.535Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          witnessId: "pruning-tombstone-store-monitor",
+          signatureKeyId: "pruning-tombstone-store-monitor-key-v2",
+          signatureAlgorithm: "test-signature-v1",
+          signaturePublicKeyFingerprint:
+            "fingerprint:pruning-tombstone-store-monitor-key-v2",
+        },
+      );
+    const rotatedPruningTombstoneStoreHeadWitnessTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions:
+            await rotatedPruningTombstoneStoreHeadWitnessAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(rotatedPruningTombstoneStoreHeadWitnessTopology).toMatchObject({
+      valid: true,
+      effectiveAuthorityHash:
+        rotatedPruningTombstoneStoreHeadWitnessKey.authorityHash,
+      principals: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-store-monitor",
+          signatureKeyId: "pruning-tombstone-store-monitor-key-v2",
+          signatureKeyStatus: "active",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await pruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: {
+            ...strictTombstonePolicy,
+            pruningTombstoneStoreHeadAuthorityTopology:
+              rotatedPruningTombstoneStoreHeadWitnessTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_mismatch",
+        }),
+      ]),
+    });
+    await expect(
+      new StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier(
+        rotatedPruningTombstoneStoreHeadWitnessAuthorityStore,
+        pruningTombstoneStoreHeadWitnessLedger,
+      ).certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).resolves.toMatchObject({
+      certified: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_replay_invalid",
+        }),
+      ]),
+    });
+    const rotatedKeyPruningTombstoneStoreHeadWitnessLedger =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessLedger();
+    const rotatedKeyPruningTombstoneStoreHeadWitness =
+      new LedgerBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitness(
+        rotatedKeyPruningTombstoneStoreHeadWitnessLedger,
+        strictTombstonePolicy,
+      );
+    await rotatedKeyPruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      signedPruningTombstoneStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-store-monitor",
+          observedAt: timestamp("2026-06-03T14:09:08.560Z"),
+          head: requiredPruningTombstoneStoreHead,
+        },
+        "pruning-tombstone-store-monitor-key-v2",
+      ),
+    );
+    await rotatedKeyPruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+      signedPruningTombstoneStoreHeadObservation(
+        {
+          tenantId: view.tenantId,
+          observerId: "pruning-tombstone-store-monitor-b",
+          observedAt: timestamp("2026-06-03T14:09:08.565Z"),
+          head: requiredPruningTombstoneStoreHead,
+        },
+        "pruning-tombstone-store-monitor-b-key",
+      ),
+    );
+    await expect(
+      new StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier(
+        rotatedPruningTombstoneStoreHeadWitnessAuthorityStore,
+        rotatedKeyPruningTombstoneStoreHeadWitnessLedger,
+      ).certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).resolves.toMatchObject({
+      certified: true,
+      status: "certified",
+      acceptedWitnessIds: [
+        "pruning-tombstone-store-monitor",
+        "pruning-tombstone-store-monitor-b",
+      ],
+      authorityTopologyHash:
+        rotatedPruningTombstoneStoreHeadWitnessKey.authorityHash,
+      issues: [],
+    });
+    const revokedPruningTombstoneStoreHeadWitnessAuthorityStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore();
+    await revokedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "revoked_pruning_tombstone_store_head_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.510Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        requiredWitnesses: 2,
+        minimumWitnesses: 1,
+      },
+    );
+    await revokedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "revoked_pruning_tombstone_store_head_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.520Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-store-monitor",
+        signatureKeyId: "pruning-tombstone-store-monitor-key",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    await revokedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "revoked_pruning_tombstone_store_head_admit_b",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.530Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-store-monitor-b",
+        signatureKeyId: "pruning-tombstone-store-monitor-b-key",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    const revokedPruningTombstoneStoreHeadWitnessKey =
+      await revokedPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "revoked_pruning_tombstone_store_head_revoke_b",
+          transitionKind: "revoke_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.535Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          witnessId: "pruning-tombstone-store-monitor-b",
+          signatureKeyId: "pruning-tombstone-store-monitor-b-key",
+        },
+      );
+    const revokedPruningTombstoneStoreHeadWitnessTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions:
+            await revokedPruningTombstoneStoreHeadWitnessAuthorityStore.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+        },
+      );
+    expect(revokedPruningTombstoneStoreHeadWitnessTopology).toMatchObject({
+      valid: true,
+      effectiveAuthorityHash:
+        revokedPruningTombstoneStoreHeadWitnessKey.authorityHash,
+      principals: expect.arrayContaining([
+        expect.objectContaining({
+          witnessId: "pruning-tombstone-store-monitor-b",
+          signatureKeyId: "pruning-tombstone-store-monitor-b-key",
+          signatureKeyStatus: "revoked",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await pruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: {
+            ...strictTombstonePolicy,
+            pruningTombstoneStoreHeadAuthorityTopology:
+              revokedPruningTombstoneStoreHeadWitnessTopology,
+          },
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_ledger_signature_key_not_current",
+        }),
+      ]),
+    });
+    await expect(
+      new StoreBackedProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertifier(
+        revokedPruningTombstoneStoreHeadWitnessAuthorityStore,
+        pruningTombstoneStoreHeadWitnessLedger,
+      ).certifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).resolves.toMatchObject({
+      certified: false,
+      status: "obstructed",
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_replay_invalid",
+        }),
+      ]),
+    });
+    const invalidPruningTombstoneStoreHeadWitnessAuthorityStore =
+      new InMemoryProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitionStore();
+    await invalidPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "invalid_pruning_tombstone_store_head_key_set_quorum",
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:09:08.510Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        requiredWitnesses: 1,
+        minimumWitnesses: 1,
+      },
+    );
+    await invalidPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+      {
+        tenantId: view.tenantId,
+        transitionId: "invalid_pruning_tombstone_store_head_key_admit_a",
+        transitionKind: "admit_witness",
+        recordedAt: timestamp("2026-06-03T14:09:08.520Z"),
+        recordedBy: "authority:pruning-tombstone-store-head",
+        effectiveFromPruningTombstoneSequence: 1,
+        witnessId: "pruning-tombstone-store-monitor",
+        signatureKeyId: "pruning-tombstone-store-monitor-key",
+        signatureAlgorithm: "test-signature-v1",
+      },
+    );
+    await expect(
+      invalidPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "invalid_pruning_tombstone_store_head_rotate_a",
+          transitionKind: "rotate_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.530Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          witnessId: "pruning-tombstone-store-monitor",
+          signatureKeyId: "pruning-tombstone-store-monitor-key-v2",
+        },
+      ),
+    ).rejects.toThrow(/authority transition failed replay/);
+    await expect(
+      invalidPruningTombstoneStoreHeadWitnessAuthorityStore.appendProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransition(
+        {
+          tenantId: view.tenantId,
+          transitionId: "invalid_pruning_tombstone_store_head_revoke_a",
+          transitionKind: "revoke_signature_key",
+          recordedAt: timestamp("2026-06-03T14:09:08.535Z"),
+          recordedBy: "authority:pruning-tombstone-store-head",
+          effectiveFromPruningTombstoneSequence: 1,
+          witnessId: "pruning-tombstone-store-monitor",
+          signatureKeyId: "not-the-current-key",
+        },
+      ),
+    ).rejects.toThrow(/authority transition failed replay/);
+    const oneWitnessPruningTombstoneStoreHeadTopology =
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessAuthorityTransitions(
+        {
+          tenantId: view.tenantId,
+          pruningTombstoneSequence:
+            requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+          transitions: [
+            pruningTombstoneStoreHeadWitnessQuorumTransition,
+            pruningTombstoneStoreHeadWitnessAdmitA,
+          ],
+        },
+      );
+    expect(
+      evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessQuorumCertificate(
+        {
+          tenantId: view.tenantId,
+          head: requiredPruningTombstoneStoreHead,
+          witnessReplay: quorumPruningTombstoneStoreHeadReplay,
+          authorityTopology: oneWitnessPruningTombstoneStoreHeadTopology,
+        },
+      ),
+    ).toMatchObject({
+      certified: false,
+      status: "witnessed",
+      acceptedWitnessIds: ["pruning-tombstone-store-monitor"],
+      invalidWitnessIds: ["pruning-tombstone-store-monitor-b"],
+      requiredWitnesses: 2,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_witness_not_authorized",
+        }),
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_quorum_not_met",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHead:
+            recoveredPruningTombstoneStoreHeadReplay.latestHead!,
+          requirePruningTombstoneStoreHeadQuorumCertificate: true,
+          witnessRecords: prunedWitnessRecords,
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_quorum_certificate_missing",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHead:
+            recoveredPruningTombstoneStoreHeadReplay.latestHead!,
+          requiredPruningTombstoneStoreHeadQuorumCertificate:
+            singlePruningTombstoneStoreHeadQuorumCertificate,
+          requirePruningTombstoneStoreHeadQuorumCertificate: true,
+          witnessRecords: prunedWitnessRecords,
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_quorum_certificate_invalid",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHeadQuorumCertificate:
+            certifiedPruningTombstoneStoreHeadQuorumCertificate,
+          requirePruningTombstoneStoreHeadQuorumCertificate: true,
+          witnessRecords: prunedWitnessRecords,
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestTombstoneRecord: expect.objectContaining({
+        pruningTombstoneRecordHash:
+          pruningTombstoneRecord.pruningTombstoneRecordHash,
+      }),
+      pruningTombstoneStoreHead: requiredPruningTombstoneStoreHead,
+      issues: [],
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: [],
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHead,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_missing",
+        }),
+      ]),
+    });
+    const futurePruningTombstoneStoreHeadBody = {
+      tenantId: requiredPruningTombstoneStoreHead.tenantId,
+      pruningTombstoneSequence:
+        requiredPruningTombstoneStoreHead.pruningTombstoneSequence + 1,
+      pruningTombstoneRecordHash: "future_pruning_tombstone_record_hash",
+      recordedAt: timestamp("2026-06-03T14:09:09.000Z"),
+    };
+    const futurePruningTombstoneStoreHead = {
+      ...futurePruningTombstoneStoreHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          futurePruningTombstoneStoreHeadBody,
+        ),
+    };
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHead: futurePruningTombstoneStoreHead,
+          witnessRecords: prunedWitnessRecords,
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_stale",
+        }),
+      ]),
+    });
+    const previousPruningTombstoneStoreHeadBody = {
+      tenantId: requiredPruningTombstoneStoreHead.tenantId,
+      pruningTombstoneSequence:
+        requiredPruningTombstoneStoreHead.pruningTombstoneSequence - 1,
+      pruningTombstoneRecordHash: "previous_pruning_tombstone_record_hash",
+      recordedAt: timestamp("2026-06-03T14:09:07.000Z"),
+    };
+    const previousPruningTombstoneStoreHead = {
+      ...previousPruningTombstoneStoreHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          previousPruningTombstoneStoreHeadBody,
+        ),
+    };
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHead: previousPruningTombstoneStoreHead,
+          witnessRecords: prunedWitnessRecords,
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_unwitnessed_advance",
+        }),
+      ]),
+    });
+    const forkedPruningTombstoneStoreHeadBody = {
+      tenantId: requiredPruningTombstoneStoreHead.tenantId,
+      pruningTombstoneSequence:
+        requiredPruningTombstoneStoreHead.pruningTombstoneSequence,
+      pruningTombstoneRecordHash: "forked_pruning_tombstone_record_hash",
+      recordedAt: requiredPruningTombstoneStoreHead.recordedAt,
+    };
+    const forkedPruningTombstoneStoreHead = {
+      ...forkedPruningTombstoneStoreHeadBody,
+      headHash:
+        computeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadHash(
+          forkedPruningTombstoneStoreHeadBody,
+        ),
+    };
+	    await expect(
+	      pruningTombstoneStoreHeadWitness.observeProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead(
+	        signedPruningTombstoneStoreHeadObservation(
+	          {
+	            tenantId: view.tenantId,
+	            observerId: "pruning-tombstone-store-monitor-b",
+	            observedAt: timestamp("2026-06-03T14:09:08.750Z"),
+	            head: forkedPruningTombstoneStoreHead,
+	          },
+	          "pruning-tombstone-store-monitor-b-key",
+	        ),
+	      ),
+	    ).resolves.toMatchObject({
+      accepted: false,
+      status: "obstructed",
+      latestHead: requiredPruningTombstoneStoreHead,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruning_tombstone_store_head_fork",
+        }),
+      ]),
+    });
+    expect(
+      replayProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          records:
+            await pruningTombstoneStoreHeadWitnessLedger.listProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessRecords(
+              {
+                tenantId: view.tenantId,
+              },
+            ),
+          signaturePolicy: strictTombstonePolicy,
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      latestHead: requiredPruningTombstoneStoreHead,
+      acceptedHeads: [requiredPruningTombstoneStoreHead],
+      issues: [],
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHead: forkedPruningTombstoneStoreHead,
+          witnessRecords: prunedWitnessRecords,
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_fork",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          requiredPruningTombstoneStoreHead: {
+            ...requiredPruningTombstoneStoreHead,
+            headHash: "tampered_pruning_tombstone_store_head_hash",
+          },
+          witnessRecords: prunedWitnessRecords,
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_pruning_tombstone_store_head_hash_mismatch",
+        }),
+      ]),
+    });
+    expect(
+      verifyProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningTombstoneStoreHeadWitnessReplayCompactionPrunedStoreContinuity(
+        {
+          tenantId: view.tenantId,
+          tombstoneRecords: pruningTombstoneRecords,
+          signaturePolicy: strictTombstonePolicy,
+          witnessRecords: [],
+          authorityTransitions: prunedAuthorityTransitions,
+          quorumCertificateRecords: prunedQuorumCertificateRecords,
+        },
+      ),
+    ).toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining([
+        expect.objectContaining({
+          code: "projection_replay_certificate_store_root_witness_settlement_store_head_witness_replay_compaction_pruning_tombstone_store_head_witness_replay_compaction_pruned_store_witness_suffix_truncated",
+        }),
+      ]),
+    });
   });
 });

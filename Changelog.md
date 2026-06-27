@@ -1,5 +1,244 @@
 # Changelog
 
+## 2026-06-26 - Pruning tombstone history-store head quorum-certificate record
+
+- Added `research/daily-arrowsmith-agent-state/v117-pruning-tombstone-history-store-head-quorum-certificate-record-2026-06-26.md`, closing SQ64 with durable QC proof records for certified pruning tombstone history-store heads and replacing it with SQ65.
+- Added `ProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertificateRecord` and witness-evidence types in `@pm/agent-state`.
+- Added deterministic history-store head QC record hashing, witness-evidence extraction, and record-chain replay.
+- Added replay checks for certified-only admission, certificate hash, record hash, accepted witness evidence membership, strict witness signatures, replayed key currentness, and authority epoch seal binding.
+- Added in-memory and Postgres-backed history-store head QC record stores that reject append unless the full proof-record history replays.
+- Added migration `0049_agent_state_projection_replay_pruning_tombstone_history_store_head_witness_quorum_certificates.sql`.
+- Extended focused agent-state tests to prove valid durable record replay, tampered witness-evidence rejection, forged seal rejection, and unsigned-evidence append rejection.
+- Claim boundary: v117 makes certified history-store heads recoverable from durable proof records, but proof-preserving compaction/pruning, runtime/Axis adoption, live restart proof, and production crypto remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head witness authority epoch seal
+
+- Added `research/daily-arrowsmith-agent-state/v116-pruning-tombstone-history-store-head-witness-authority-epoch-seal-2026-06-26.md`, closing SQ63 with non-retroactive authority epoch seals for v115 history-store head witness topology/key-status history and replacing it with SQ64.
+- Added `seal_authority_epoch` to `ProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionKind`.
+- Added seal fields for sealed pruning tombstone sequence, sealed authority topology hash, and sealed quorum-certificate hash across transition inputs, hashing, replay, and store surfaces.
+- Added `effectiveAuthorityHash`, `sealedThroughPruningTombstoneSequence`, and `authorityEpochSeals` to replayed history-store head witness topology.
+- Extended migration `0048` and the Postgres authority-transition store insert/select path with seal columns.
+- Added replay and store append rejection for non-seal topology/key-status transitions effective at or before a sealed frontier.
+- Changed history-store head witness quorum certification to report the effective topology hash after a seal, not the seal transition hash.
+- Extended focused agent-state tests to prove valid seal replay, forged-seal rejection, retroactive replay rejection, store append retroactive rejection, and store-backed certification preserving the sealed effective topology hash.
+- Claim boundary: v116 prevents later topology/key-status transitions from rewriting sealed certified currentness, but durable quorum-certificate records, proof-preserving compaction/pruning, runtime/Axis adoption, and live restart proof remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head witness key status
+
+- Added `research/daily-arrowsmith-agent-state/v115-pruning-tombstone-history-store-head-witness-key-status-2026-06-26.md`, closing SQ62 with key-status replay for v114 history-store head witness keys and replacing it with SQ63.
+- Added `rotate_signature_key` and `revoke_signature_key` to `ProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionKind`.
+- Added replay validation so malformed history-store head witness key-status transitions cannot enter the v114 authority store.
+- Added `signatureKeyStatus` and key-change metadata to replayed history-store head witness principals.
+- Extended strict witness ledger and quorum signature replay so old rotated keys and revoked keys cannot authorize store-backed certified currentness.
+- Extended focused agent-state tests to prove old-key obstruction after rotation, rotated-key certification, revoked-key obstruction, and invalid key-transition rejection.
+- Claim boundary: v115 prevents stale or revoked witness keys from certifying currentness, but authority epoch seals, durable quorum-certificate records, proof-preserving compaction/pruning, runtime/Axis adoption, and live restart proof remain open.
+
+## 2026-06-26 - Durable pruning tombstone history-store head witness authority store
+
+- Added `research/daily-arrowsmith-agent-state/v114-pruning-tombstone-history-store-head-witness-authority-store-2026-06-26.md`, closing SQ61 with durable authority-transition stores for v113 topology and replacing it with SQ62.
+- Added `ProjectionReplayPruningTombstoneHistoryStoreHeadWitnessAuthorityTransitionStore` plus append input in `@pm/agent-state`.
+- Added in-memory and Postgres-backed pruning tombstone history-store head witness authority-transition stores.
+- Added append-time replay validation so malformed quorum topology cannot enter the store as durable authority.
+- Added `StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitnessQuorumCertifier`, deriving topology from stored authority history and witness rows before certification.
+- Added migration `0048_agent_state_projection_replay_pruning_tombstone_history_store_head_witness_authority.sql`.
+- Extended focused agent-state tests to prove store-backed two-witness certification, incomplete-store obstruction, and invalid stored quorum-transition rejection.
+- Claim boundary: v114 prevents adapter-supplied topology arrays from certifying history-store head currentness, but key-status replay, authority epoch seals, durable quorum-certificate records, proof-preserving compaction/pruning, runtime/Axis adoption, and live restart proof remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head witness quorum authority
+
+- Added `research/daily-arrowsmith-agent-state/v113-pruning-tombstone-history-store-head-witness-quorum-authority-2026-06-26.md`, closing SQ60 with signed quorum authority for v112 required-head currentness and replacing it with SQ61.
+- Added v113 pruning tombstone history-store head witness authority transition, topology, quorum policy, quorum certificate, and certificate hash types in `@pm/agent-state`.
+- Added signature payload hashing for v112 history-store head observations and strict replay checks against the v113 topology.
+- Extended v112 witness observations and records to preserve optional signatures through in-memory replay and Postgres persistence.
+- Extended migration `0047_agent_state_projection_replay_pruning_tombstone_history_store_head_witness.sql` with a `signature` column.
+- Extended focused agent-state tests to prove signed two-witness certification, unsigned strict-replay rejection, one-witness non-certification, wrong-key rejection, and unauthorized-observer rejection.
+- Claim boundary: v113 prevents one observer, unsigned rows, wrong keys, or forged observer ids from certifying history-store head currentness, but durable authority-transition stores, store-backed certification, key-status replay, epoch seals, durable quorum-certificate records, runtime/Axis adoption, and live restart proof remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head witness ledger
+
+- Added `research/daily-arrowsmith-agent-state/v112-pruning-tombstone-history-store-head-witness-ledger-2026-06-26.md`, closing SQ59 with durable witness-ledger recovery for required v111 heads and replacing it with SQ60.
+- Added v112 pruning tombstone history-store head witness proof, observation, decision, record, replay, and ledger types in `@pm/agent-state`.
+- Added consistency-proof validation over v110 pruning tombstone records and replay recomputation of witness decisions from prior accepted heads.
+- Added in-memory and Postgres-backed witness ledgers plus `LedgerBackedProjectionReplayPruningTombstoneHistoryStoreHeadWitness`.
+- Added migration `0047_agent_state_projection_replay_pruning_tombstone_history_store_head_witness.sql`.
+- Extended focused agent-state tests to prove replay-derived required-head continuity after amnesia, same-sequence fork obstruction after resume, and tampered witness-record invalidation.
+- Claim boundary: durable recovery now exists for this required head, but quorum topology/signature-bound authority, runtime/Axis adoption, live Postgres restart proof, generic currentness abstraction, and recovery-kernel inventory remain open.
+
+## 2026-06-26 - Pruning tombstone history currentness
+
+- Added `research/daily-arrowsmith-agent-state/v111-pruning-tombstone-store-head-pruning-tombstone-history-currentness-2026-06-26.md`, closing SQ58 with v110 pruning tombstone history currentness and replacing it with SQ59.
+- Added a replay-derived v110 pruning tombstone-store head type, deterministic head hashing, and record-to-head projection in `@pm/agent-state`.
+- Extended v110 pruned-store continuity with `requiredPruningTombstoneStoreHead` and `pruningTombstoneStoreHead`.
+- Continuity now rejects missing local tombstone history, stale local history, unwitnessed local advance, same-sequence forked history, and hash-invalid required heads before pruned row absence can authorize projection recovery.
+- Extended focused agent-state tests to prove valid required-head recovery and all pruning tombstone history currentness obstruction paths.
+- Claim boundary: currentness now exists for this tombstone ledger, but durable witness/quorum recovery of the required v111 head, runtime/Axis adoption, live Postgres restart proof, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone-store head pruning tombstone store API
+
+- Added `research/daily-arrowsmith-agent-state/v110-pruning-tombstone-store-head-pruning-tombstone-store-api-2026-06-26.md`, closing SQ57 with tombstone-gated physical pruning and replacing it with SQ58.
+- Added pruning tombstone-store head replay compaction pruning tombstone record, frontier, replay, continuity, and store types in `@pm/agent-state`.
+- Added deterministic tombstone record hashing and replay over sequence continuity, previous hash, checkpoint/admission binding, frontier derivation, frontier regression, and record hash.
+- Added in-memory and Postgres-backed pruning tombstone record stores plus migration `0046_agent_state_projection_replay_pruning_tombstone_head_pruning_store_head_witness_pruning_tombstones.sql`.
+- Added tombstone-gated prune APIs for pruning tombstone-store head witness, authority, and quorum-certificate stores.
+- Added pruned-store continuity checks that replay retained suffixes after physical deletion and detect out-of-band retained-suffix truncation.
+- Extended focused agent-state tests to prove admitted record append/replay, tamper rejection, guarded physical pruning, post-prune continuity, and silent truncation detection.
+- Claim boundary: actual row deletion is now replayable for this layer, but currentness/witnessing for the new pruning tombstone ledger, runtime/Axis adoption, live Postgres restart proof, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone-store head compaction pruning admission
+
+- Added `research/daily-arrowsmith-agent-state/v109-pruning-tombstone-store-head-compaction-pruning-admission-2026-06-26.md`, closing SQ56 with pruning tombstone-store head compaction pruning admission and replacing it with SQ57.
+- Added pruning tombstone-store head compaction pruning-admission lane, status, issue, admission, and deterministic hash types in `@pm/agent-state`.
+- Added pruning admission evaluation that requires replay-valid durable pruning tombstone-store head checkpoint-admission history before physical prefix deletion can be admitted.
+- Pruning admission now validates retained pruning tombstone-store head witness-ledger, authority-topology, and quorum-certificate-record suffixes by replaying each selected lane from the admitted checkpoint frontier.
+- Extended focused agent-state tests to prove admitted pruning plus missing-record, conflicting-record-history, invalid-witness-suffix, invalid-authority-suffix, and invalid-quorum-certificate-suffix obstructions.
+- Claim boundary: pure pruning admission now exists for this layer, but tombstone-gated physical pruning APIs, durable pruning tombstone records, pruned-store continuity, runtime/Axis adoption, live Postgres recovery, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Durable pruning tombstone-store head checkpoint admission store
+
+- Added `research/daily-arrowsmith-agent-state/v108-pruning-tombstone-store-head-durable-checkpoint-admission-store-2026-06-26.md`, closing SQ55 with durable pruning tombstone-store head checkpoint-admission records and replacing it with SQ56.
+- Added pruning tombstone-store head checkpoint-admission record types, deterministic record hashing, and record-chain replay in `@pm/agent-state`.
+- Added replay checks for tenant, sequence, previous-record hash, checkpoint hash, admission hash, strict admission re-evaluation, record hash, checkpoint-id conflicts, and compacted-frontier conflicts.
+- Added in-memory and Postgres-backed checkpoint-admission record stores plus migration `0045_agent_state_projection_replay_pruning_tombstone_store_head_checkpoint_admissions.sql`.
+- Extended focused agent-state tests so compacted replay consumes the admission certificate recovered from the durable record store, while tampered admissions and conflicting checkpoint records fail.
+- Claim boundary: durable compacted checkpoint authority now exists for this layer, but pruning admission, tombstone-gated physical pruning APIs, pruned-store continuity, runtime/Axis adoption, live Postgres recovery, cross-agent monitoring, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone-store head proof-preserving compaction
+
+- Added `research/daily-arrowsmith-agent-state/v107-pruning-tombstone-store-head-proof-preserving-compaction-2026-06-26.md`, closing SQ54 with admitted pruning tombstone-store head replay compaction checkpoints and replacing it with SQ55.
+- Added pruning tombstone-store head replay compaction checkpoint and checkpoint-admission certificate types in `@pm/agent-state`.
+- Added deterministic checkpoint and admission hashing for compacted witness-ledger, authority/key/seal, and quorum-certificate-record frontiers.
+- Witness, authority, and QC-record replay can now resume from admitted checkpoint frontiers plus retained hash-linked suffixes.
+- Replay rejects suffix-only histories, missing checkpoint admissions, and tampered checkpoint bodies before compacted state can seed operational state.
+- Extended focused agent-state tests to prove suffix-only failure, missing-admission failure, admitted recovery, authority suffix recovery, latest QC-record recovery, and tampered-checkpoint rejection.
+- Claim boundary: admitted checkpoint-seeded replay now exists for this layer, but durable checkpoint-admission stores, pruning admission, physical pruning APIs, runtime/Axis adoption, live Postgres recovery, and production crypto adapters remain open.
+
+## 2026-06-26 - Durable pruning tombstone-store head quorum-certificate records
+
+- Added `research/daily-arrowsmith-agent-state/v106-pruning-tombstone-store-head-quorum-certificate-record-2026-06-26.md`, closing SQ53 with durable pruning tombstone-store head quorum-certificate records and replacing it with SQ54.
+- Added pruning tombstone-store head quorum-certificate record and witness-evidence types in `@pm/agent-state`.
+- Added record-chain replay that validates certified status, certificate hash, record hash, accepted witness evidence, strict witness signatures, key currentness, and authority epoch seal binding.
+- Added in-memory and Postgres-backed quorum-certificate record stores that reject append unless the full proof history replays.
+- Added migration `0044_agent_state_projection_replay_pruning_tombstone_head_pruning_store_head_witness_quorum_certificates.sql`.
+- Extended focused agent-state tests to prove valid durable proof replay, malformed witness-evidence rejection, forged seal rejection, and unsigned-evidence append rejection.
+- Claim boundary: durable certified required-head proof now exists for this layer, but proof-preserving compaction/pruning, runtime/Axis adoption, live Postgres restart proof, topology-transition signer authority, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone-store head witness authority epoch seal
+
+- Added `research/daily-arrowsmith-agent-state/v105-pruning-tombstone-store-head-witness-authority-epoch-seal-2026-06-26.md`, closing SQ52 with pruning tombstone-store head witness authority epoch seals and replacing it with SQ53.
+- Added `seal_authority_epoch` authority transitions for pruning tombstone-store head witnesses in `@pm/agent-state`.
+- Pruning tombstone-store head witness authority replay now validates seal sequence, effective sequence, monotonic seal advancement, effective topology hash binding, and quorum certificate hash binding.
+- Replayed pruning tombstone-store head witness topology now exposes accepted authority epoch seals and the sealed pruning tombstone sequence frontier.
+- Authority replay and authority-transition stores now reject later non-seal transitions that try to mutate a sealed pruning tombstone-store head witness epoch.
+- Extended focused agent-state tests to prove valid seal replay, forged topology-hash seal rejection, direct retroactive replay rejection, append-time retroactive rejection, and store-backed certification preserving the effective pre-seal topology hash.
+- Claim boundary: non-retroactive authority sealing now exists for this layer, but durable quorum-certificate records, proof-preserving compaction/pruning, runtime/Axis adoption, topology-transition signer authority, live Postgres recovery, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone-store head witness key status
+
+- Added `research/daily-arrowsmith-agent-state/v104-pruning-tombstone-store-head-witness-key-status-2026-06-26.md`, closing SQ51 with pruning tombstone-store head witness key-status replay and replacing it with SQ52.
+- Added `rotate_signature_key` and `revoke_signature_key` authority transitions for pruning tombstone-store head witnesses in `@pm/agent-state`.
+- Pruning tombstone-store head witness authority replay now validates key-status transitions against active admitted principals, requires rotations to provide a key id and algorithm, and requires revocations to target the current admitted key.
+- Replayed pruning tombstone-store head witness principals now project active/revoked key status plus key-change authority metadata.
+- Store-backed pruning tombstone-store head certification now fails closed when stored observations were signed by revoked or superseded keys.
+- Extended focused agent-state tests to prove old-key obstruction after rotation, rotated-key certification, revoked-key obstruction, and malformed key-status append rejection.
+- Claim boundary: key-status replay now exists for this layer, but non-retroactive authority epoch seals, durable quorum-certificate records, proof-preserving compaction/pruning, runtime/Axis adoption, and production crypto adapters remain open.
+
+## 2026-06-26 - Signature-bound pruning tombstone-store head witness identity
+
+- Added `research/daily-arrowsmith-agent-state/v103-signature-bound-pruning-tombstone-store-head-witness-identity-2026-06-26.md`, closing SQ50 with signature-bound pruning tombstone-store head witness identity and replacing it with SQ51.
+- Added pruning tombstone-store head witness observation signature payload hashing in `@pm/agent-state`.
+- Pruning tombstone-store head witness records now preserve optional principal signatures through record building, in-memory replay, Postgres persistence, and row mapping.
+- Pruning tombstone-store head witness authority transitions now carry admitted key id, algorithm, and public-key fingerprint metadata into replayed principal state.
+- Store-backed pruning tombstone-store head certification now replays witness signatures against store-derived authority topology before quorum evaluation.
+- Added migration `0043_agent_state_projection_replay_pruning_tombstone_head_pruning_store_head_witness_signatures.sql`.
+- Extended focused agent-state tests to prove signed two-witness certification, unsigned persisted witness obstruction, wrong-key replay invalidation, and admitted key projection.
+- Claim boundary: signature-bound identity now exists for this layer, but key-status rotation/revocation, authority epoch seals, durable quorum-certificate records, runtime/Axis adoption, and production crypto adapters remain open.
+
+## 2026-06-26 - Durable pruning tombstone-store head witness authority store
+
+- Added `research/daily-arrowsmith-agent-state/v102-durable-pruning-tombstone-store-head-witness-authority-store-2026-06-26.md`, closing SQ49 with durable pruning tombstone-store head witness authority-transition stores and replacing it with SQ50.
+- Added pruning tombstone-store head witness authority store contracts plus in-memory and Postgres-backed implementations in `@pm/agent-state`.
+- Added migration `0042_agent_state_projection_replay_pruning_tombstone_head_pruning_store_head_witness_authority.sql`.
+- Added store-backed pruning tombstone-store head witness quorum certification, deriving topology from stored authority transitions plus stored witness records.
+- Extended focused agent-state tests to prove stored transition chaining, malformed quorum append rejection, single-witness non-certification through the store-backed certifier, and two-witness certification through store replay.
+- Claim boundary: certified required-head recovery can now derive quorum topology from admitted store history, but signature-bound identity, key status, authority epoch seals, durable certificate records, runtime/Axis adoption, and live restart proof remain open.
+
+## 2026-06-26 - Pruning tombstone-store head witness quorum topology
+
+- Added `research/daily-arrowsmith-agent-state/v101-pruning-tombstone-store-head-witness-quorum-topology-2026-06-26.md`, closing SQ48 with pruning tombstone-store head witness quorum topology and replacing it with SQ49.
+- Added pruning tombstone-store head witness authority-transition/topology replay, quorum policy, quorum certificate, and deterministic certificate hashing in `@pm/agent-state`.
+- Tombstone-head pruned-store continuity now supports `requiredPruningTombstoneStoreHeadQuorumCertificate` and strict `requirePruningTombstoneStoreHeadQuorumCertificate` enforcement.
+- Extended focused agent-state tests to prove one observer cannot certify, unauthorized observers cannot count, two admitted observers can certify, and strict continuity rejects raw or non-certified required heads.
+- Claim boundary: pruning tombstone-store head currentness can now require topology-bound quorum certification, but durable topology stores, store-backed certification, signatures/key status, certificate records, runtime/Axis adoption, and live restart proof remain open.
+
+## 2026-06-26 - Durable pruning tombstone-store head witness ledger
+
+- Added `research/daily-arrowsmith-agent-state/v100-durable-pruning-tombstone-store-head-witness-ledger-2026-06-26.md`, closing SQ47 with durable pruning tombstone-store head witness recovery and replacing it with SQ48.
+- Added pruning tombstone-store head witness observation, decision, record, replay, and ledger types in `@pm/agent-state`.
+- Added in-memory and Postgres-backed pruning tombstone-store head witness ledgers plus migration `0041_agent_state_projection_replay_pruning_tombstone_head_pruning_store_head_witness.sql`.
+- Added a ledger-backed witness that recovers the latest accepted required pruning tombstone-store head from replayed witness records before observing new heads.
+- Extended focused agent-state tests to prove replay-derived required-head continuity, tampered witness-record invalidation, and forked-head obstruction without replacing the accepted head.
+- Claim boundary: required pruning tombstone-store heads can now survive amnesia through durable witness replay, but quorum topology, signature/key status, runtime/Axis adoption, live Postgres restart proof, and production crypto adapters remain open.
+
+## 2026-06-26 - Tombstone-head pruning tombstone-store head currentness
+
+- Added `research/daily-arrowsmith-agent-state/v99-tombstone-head-pruning-tombstone-store-head-currentness-2026-06-26.md`, closing SQ46 with pruning tombstone-store head currentness and replacing it with SQ47.
+- Added deterministic tombstone-head pruning tombstone-store head hashing and derivation from replayed pruning tombstone records in `@pm/agent-state`.
+- Tombstone-head pruned-store continuity now accepts `requiredPruningTombstoneStoreHead`, returns the replay-derived `pruningTombstoneStoreHead`, and rejects missing, stale, unwitnessed-advance, same-sequence forked, or hash-invalid pruning tombstone histories.
+- Extended focused agent-state tests to prove valid required-head recovery and all pruning tombstone-store head currentness obstruction paths.
+- Claim boundary: pruning tombstone replay validity no longer suffices for pruned operational state, but durable witness/quorum recovery of `requiredPruningTombstoneStoreHead`, runtime/Axis adoption, live Postgres recovery, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Tombstone-head pruning tombstone store API
+
+- Added `research/daily-arrowsmith-agent-state/v98-tombstone-head-pruning-tombstone-store-api-2026-06-26.md`, closing SQ45 with tombstone-head tombstone-gated store pruning APIs and replacing it with SQ46.
+- Added tombstone-head replay compaction pruning tombstone record, frontier, replay, continuity, and store types in `@pm/agent-state`.
+- Added deterministic tombstone-head pruning tombstone record hashing and replay over checkpoint admission, pruning admission, frontiers, sequence continuity, previous hash, and record hash.
+- Added in-memory and Postgres-backed tombstone-head pruning tombstone record stores.
+- Added migration `0040_agent_state_projection_replay_pruning_tombstone_head_pruning_tombstones.sql`.
+- Tombstone-head witness, authority, and quorum-certificate stores now expose tombstone-gated prune APIs that derive deletion frontiers only from replay-valid tombstone records.
+- Added tombstone-head pruned-store continuity verification and focused tests proving actual pruning plus out-of-band retained-suffix truncation detection.
+- Claim boundary: tombstone-head physical pruning is now replayable as a durable tombstone transition, but tombstone-head pruning tombstone-store head currentness, runtime/Axis adoption, live Postgres recovery, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Tombstone-head compaction pruning admission
+
+- Added `research/daily-arrowsmith-agent-state/v97-tombstone-head-compaction-pruning-admission-2026-06-26.md`, closing SQ44 with tombstone-head replay compaction pruning admission and replacing it with SQ45.
+- Added pruning tombstone-head replay compaction pruning lane, status, issue, admission, and hash types in `@pm/agent-state`.
+- Added pruning admission evaluation that requires replay-valid durable tombstone-head checkpoint-admission history before a checkpoint can authorize pruning.
+- Pruning admission now validates retained tombstone-head witness-ledger, authority-topology, and quorum-certificate-record suffixes by replaying each selected lane from the admitted checkpoint frontier.
+- Extended the focused tombstone-head compaction test to prove admitted pruning plus missing-record, invalid-witness-suffix, and invalid-authority-suffix obstruction.
+- Claim boundary: pure tombstone-head pruning admission now exists, but tombstone-gated physical pruning APIs, durable pruning tombstone stores, pruned-store continuity, Postgres pruning recovery, runtime/Axis adoption, and production crypto adapters remain open.
+
+## 2026-06-26 - Durable tombstone-head checkpoint admission store
+
+- Added `research/daily-arrowsmith-agent-state/v96-durable-tombstone-head-checkpoint-admission-store-2026-06-26.md`, closing SQ43 with durable tombstone-head checkpoint-admission records and replacing it with SQ44.
+- Added pruning tombstone-head checkpoint-admission record types, deterministic record hashing, replay result types, and issue codes in `@pm/agent-state`.
+- Checkpoint-admission record replay now verifies sequence continuity, previous-record hashes, checkpoint body hashes, admission certificate hashes, strict admission re-evaluation, record hashes, and conflicting checkpoint ids/frontiers.
+- Added in-memory and Postgres-backed tombstone-head checkpoint-admission record stores.
+- Added migration `0039_agent_state_projection_replay_pruning_tombstone_head_checkpoint_admissions.sql`.
+- Extended the tombstone-head compaction test so checkpoint-seeded replay consumes the admission certificate recovered from the durable record store, while under-quorum, conflicting, and tampered records fail before replay can consume them.
+- Claim boundary: durable tombstone-head checkpoint-admission history now exists, but tombstone-head pruning admission, tombstone-gated physical pruning APIs for the tombstone-head lanes, runtime/Axis adoption, cross-agent checkpoint-admission witnessing, Postgres pruning recovery, and production crypto adapters remain open.
+
+## 2026-06-26 - Tombstone-head proof-preserving compaction
+
+- Added `research/daily-arrowsmith-agent-state/v95-tombstone-head-proof-preserving-compaction-2026-06-26.md`, closing SQ42 with admitted tombstone-head replay compaction checkpoints and replacing it with SQ43.
+- Added pruning tombstone-head witness replay compaction checkpoint types in `@pm/agent-state`.
+- Added deterministic checkpoint and checkpoint-admission hashing for tombstone-head replay compaction.
+- Added tombstone-head checkpoint admission certificates signed by replay-admitted tombstone-head witness principals under strict signature policy.
+- Tombstone-head witness-ledger, authority/key-history, and quorum-certificate-record replay can now resume from admitted checkpoint frontiers plus retained hash-linked suffixes.
+- Replay now rejects tombstone-head suffix-only histories, missing checkpoint admissions, and tampered checkpoints before they can seed operational state.
+- Added focused tests proving admitted checkpoint suffix recovery, missing-admission failure, tampered-checkpoint rejection, authority key-state recovery, and latest QC-record recovery.
+- Claim boundary: pure tombstone-head checkpoint/admission replay now exists, but durable tombstone-head checkpoint-admission stores, physical pruning admission, Postgres pruning recovery, runtime/Axis adoption, cross-agent monitoring, and production crypto adapters remain open.
+
+## 2026-06-26 - Tombstone-head witness key status
+
+- Added `research/daily-arrowsmith-agent-state/v94-tombstone-head-witness-key-status-2026-06-26.md`, closing SQ41 with replayed tombstone-head witness key status and replacing it with SQ42.
+- Added `rotate_signature_key` and `revoke_signature_key` authority transitions for pruning tombstone-head witnesses in `@pm/agent-state`.
+- Tombstone-head authority replay now validates key-status transitions against active admitted principals, requires rotations to provide a new key id and algorithm, and requires revocations to target the currently admitted key.
+- Tombstone-head principal replay now projects active/revoked key status plus key-change authority metadata.
+- Store-backed tombstone-head certification now fails closed when accepted witness observations were signed by a revoked or superseded key.
+- Durable tombstone-head quorum-certificate record replay now rejects accepted witness evidence signed by revoked or superseded keys under strict tombstone-head authority policy.
+- Added focused tests proving revoked and rotated tombstone-head keys obstruct certification and certificate-record replay.
+- Claim boundary: tombstone-head key-status replay now exists, but tombstone-head proof-preserving compaction, runtime/Axis adoption, live Postgres pruning recovery, cross-agent monitoring, and production crypto adapters remain open.
+
 ## 2026-06-26 - Durable tombstone-head quorum-certificate record
 
 - Added `research/daily-arrowsmith-agent-state/v93-durable-tombstone-head-quorum-certificate-record-2026-06-26.md`, closing SQ40 with durable tombstone-head quorum-certificate proof records and replacing it with SQ41.

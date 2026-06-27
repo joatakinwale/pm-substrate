@@ -1,7 +1,7 @@
 # v93 Durable Tombstone-Head Quorum Certificate Record
 
 Date: 2026-06-26
-Status: new substrate primitive implemented; focused verification passed
+Status: new substrate primitive implemented; focused and broad verification passed
 Parent: `research/daily-arrowsmith-agent-state/v92-signature-bound-tombstone-head-witness-identity-2026-06-26.md`
 
 ## 1. Research Question Closed
@@ -173,12 +173,18 @@ Commands run:
 ```bash
 pnpm --filter @pm/agent-state typecheck
 pnpm vitest run packages/agent-state/src/index.test.ts
+pnpm typecheck
+pnpm exec vitest run $(rg --files packages | rg '(agent-state|capability-kit|workflow|graph|evals|local-agent-lab|capability-finance-research-ingest|profile-agency|domain).*(test|spec)\.ts$')
+git diff --check
 ```
 
 Result:
 
 - Focused `@pm/agent-state` typecheck passed.
 - Focused Vitest passed: `packages/agent-state/src/index.test.ts` 71 tests.
+- Full workspace typecheck passed.
+- Broad substrate/frontier Vitest sweep passed: 31 files passed, 8 skipped; 391 tests passed, 65 skipped.
+- `git diff --check` passed.
 
 Proof boundary:
 

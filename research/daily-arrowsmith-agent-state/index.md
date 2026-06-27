@@ -115,6 +115,54 @@ v92 update: SQ39 is closed by adding signature-bound pruning tombstone-head witn
 
 v93 update: SQ40 is closed by adding durable pruning tombstone-head quorum-certificate records. `@pm/agent-state` now stores tombstone-head certificate proof records that bind the certified head, accepted witness evidence, witness signatures, optional authority epoch seal, previous record hash, and record hash; replay rejects provisional certificates, bad evidence, mismatched seals, and unsigned evidence under strict tombstone-head authority policy. The next substrate question is SQ41: what tombstone-head witness key-status and rotation semantics keep durable certificate-record replay from accepting revoked or superseded keys?
 
+v94 update: SQ41 is closed by adding replayed pruning tombstone-head witness key status. `@pm/agent-state` now admits tombstone-head `rotate_signature_key` and `revoke_signature_key` authority transitions, projects active/revoked key state into tombstone-head principals, and rejects certification or durable QC record replay when accepted witness evidence was signed by revoked or superseded keys. The next substrate question is SQ42: what tombstone-head proof-preserving compaction checkpoint preserves witness ledgers, key-status history, and quorum-certificate records without letting summaries become authority?
+
+v95 update: SQ42 is closed by adding admitted pruning tombstone-head replay compaction checkpoints. `@pm/agent-state` now has tombstone-head checkpoint/admission certificate types, deterministic checkpoint hashes, and checkpoint-seeded replay for tombstone-head witness ledgers, authority/key histories, and quorum-certificate records. Replay rejects suffix-only histories, missing admissions, and tampered checkpoints. The next substrate question is SQ43: what durable tombstone-head checkpoint-admission record store and consistency proof make admitted checkpoints recoverable and non-equivocating across agents and restarts?
+
+v96 update: SQ43 is closed by adding durable pruning tombstone-head checkpoint-admission record stores. `@pm/agent-state` now persists tombstone-head checkpoint bodies and admission certificates together in a hash-linked record history, replays sequence/previous-hash/checkpoint/admission/conflict checks, revalidates the admission under strict witness signatures, and recovers checkpoint authority after amnesia from durable records instead of memory. The next substrate question is SQ44: what tombstone-head pruning admission rule makes physical prefix deletion impossible unless a durable admitted tombstone-head checkpoint record and retained suffix continuity have both replayed?
+
+v97 update: SQ44 is closed by adding pruning tombstone-head replay compaction pruning admission. `@pm/agent-state` now admits tombstone-head pruning only when durable checkpoint-admission record history replays and retained witness, authority, and quorum-certificate suffixes replay from the admitted checkpoint frontier. The next substrate question is SQ45: what tombstone-head tombstone-gated store pruning API makes actual witness, authority, and QC-record row deletion replayable and makes out-of-band truncation detectable?
+
+v98 update: SQ45 is closed by adding pruning tombstone-head replay compaction pruning tombstone records and tombstone-gated store prune APIs. `@pm/agent-state` now records actual tombstone-head witness, authority, and QC-record row deletion as a durable hash-linked tombstone transition, prunes those stores only through replay-valid tombstone records, persists the tombstone ledger through migration `0040`, and detects retained-suffix truncation after physical pruning. The next substrate question is SQ46: what tombstone-head pruning tombstone-store head currentness or witness protocol makes the new pruning tombstone ledger itself non-stale and non-forked after amnesia?
+
+v99 update: SQ46 is closed by adding tombstone-head pruning tombstone-store head currentness. `@pm/agent-state` now derives a deterministic head from replayed tombstone-head pruning tombstones, lets pruned-store continuity require an exact `requiredPruningTombstoneStoreHead`, returns the replay-derived `pruningTombstoneStoreHead`, and obstructs missing, stale, unwitnessed-advance, same-sequence forked, or hash-invalid pruning tombstone histories before row absence can authorize a projection. The next substrate question is SQ47: what durable witness ledger or quorum protocol makes required tombstone-head pruning tombstone-store heads recoverable and non-equivocating after amnesia rather than supplied by local memory, adapters, or connector caches?
+
+v100 update: SQ47 is closed by adding a durable pruning tombstone-store head witness ledger. `@pm/agent-state` now records pruning tombstone-store head observations as hash-linked witness records, replays those records to recover the latest accepted required head after amnesia, rejects tampered witness decisions or record hashes during replay, and records same-sequence forked heads as durable obstructions without replacing the accepted head. The next substrate question is SQ48: what witness authority topology and quorum certificate protocol prevents a single observer from unilaterally defining tombstone-head pruning tombstone-store head currentness?
+
+v101 update: SQ48 is closed by adding pruning tombstone-store head witness quorum topology. `@pm/agent-state` now replays authority transitions for the v100 pruning tombstone-store head witness ledger, evaluates topology-bound quorum certificates over replayed observations, and lets strict tombstone-head pruned-store continuity require a certified quorum certificate before accepting a required pruning tombstone-store head. The next substrate question is SQ49: what durable pruning tombstone-store head witness authority-transition store prevents adapters from supplying synthetic quorum topology for certified required-head recovery?
+
+v102 update: SQ49 is closed by adding durable pruning tombstone-store head witness authority-transition stores. `@pm/agent-state` now has in-memory and Postgres-backed stores for the v101 topology transitions, append-time replay validation, and a store-backed certifier that reconstructs quorum topology from stored authority history plus stored witness records instead of caller-supplied topology. The next substrate question is SQ50: what signature-bound pruning tombstone-store head witness identity prevents unsigned, wrong-key, or equivocated stored witness/topology evidence from counting toward certified required-head recovery?
+
+v103 update: SQ50 is closed by adding signature-bound pruning tombstone-store head witness identity. `@pm/agent-state` now preserves witness signatures for the v100/v102 required-head witness ledger, projects admitted key metadata from replayed authority transitions, persists signatures and key metadata, and makes store-backed certification replay witness signatures against store-derived topology before quorum evaluation. The next substrate question is SQ51: what key-status replay and rotation semantics prevent revoked or superseded pruning tombstone-store head witness keys from authorizing certified required-head recovery?
+
+v104 update: SQ51 is closed by adding pruning tombstone-store head witness key-status replay. `@pm/agent-state` now admits `rotate_signature_key` and `revoke_signature_key` transitions for this layer, validates them against active admitted principals, projects active/revoked key status into replayed topology, and makes store-backed certification reject old-key or revoked-key witness rows while accepting current rotated-key rows. The next substrate question is SQ52: what non-retroactive authority epoch seal prevents later pruning tombstone-store head witness topology or key-status transitions from rewriting historical required-head certification?
+
+v105 update: SQ52 is closed by adding pruning tombstone-store head witness authority epoch seals. `@pm/agent-state` now admits `seal_authority_epoch` transitions that bind a pruning tombstone-store head sequence to the effective authority topology hash and quorum certificate hash, projects accepted seals into topology, keeps seal hash-chain progress distinct from certification topology, rejects retroactive post-seal replay, and refuses retroactive store appends. The next substrate question is SQ53: what durable quorum-certificate proof record makes certified pruning tombstone-store heads recoverable without transient recertification or later topology/key-status replay?
+
+v106 update: SQ53 is closed by adding durable pruning tombstone-store head quorum-certificate proof records. `@pm/agent-state` now records certified pruning tombstone-store head quorum certificates with accepted witness evidence, witness signatures, optional authority epoch seal linkage, previous-record hashes, and record hashes; replay rejects uncertified certificates, broken hashes, malformed evidence, unsigned evidence under strict policy, and seal mismatches. The next substrate question is SQ54: what proof-preserving compaction checkpoint lets pruning tombstone-store head witness ledgers, authority/key/seal history, and quorum-certificate records recover after pruning without trusting summaries?
+
+v107 update: SQ54 is closed by adding admitted pruning tombstone-store head replay compaction checkpoints. `@pm/agent-state` now builds hash-stable checkpoints over compacted witness, authority/key/seal, and QC-record frontiers; checkpoint admission certificates require enough active pruning tombstone-store head witnesses to sign the exact checkpoint hash under strict policy; and witness, authority, and QC-record replay can resume only from an admitted checkpoint plus retained hash-linked suffixes. The next substrate question is SQ55: what durable checkpoint-admission record store and consistency proof make pruning tombstone-store head replay compaction checkpoints recoverable, non-equivocating, and prunable across agents and restarts?
+
+v108 update: SQ55 is closed by adding durable pruning tombstone-store head replay compaction checkpoint-admission records. `@pm/agent-state` now persists checkpoint bodies and witness admission certificates together in a hash-linked admission-record chain, replays sequence/previous-hash/checkpoint/admission/conflict checks, exposes in-memory and Postgres-backed stores, and proves recovered durable admissions can seed compacted required-head replay without trusting process memory. The next substrate question is SQ56: what pruning admission rule requires durable pruning tombstone-store head checkpoint-admission history plus retained witness, authority, and quorum-certificate suffix continuity before physical prefix deletion?
+
+v109 update: SQ56 is closed by adding pruning tombstone-store head replay compaction pruning admission. `@pm/agent-state` now admits pruning only when the v108 durable checkpoint-admission record history replays and retained witness, authority, and quorum-certificate suffixes replay from the admitted checkpoint frontier. The next substrate question is SQ57: what tombstone-gated store pruning API and durable tombstone record make pruning tombstone-store head witness, authority, and quorum-certificate row deletion replayable and out-of-band truncation detectable?
+
+v110 update: SQ57 is closed by adding pruning tombstone-store head replay compaction pruning tombstone records and tombstone-gated store pruning APIs. `@pm/agent-state` now records actual pruning as a replayable hash-linked tombstone ledger, requires that record before witness/authority/quorum-certificate row deletion, and verifies retained suffix continuity after physical pruning. The next substrate question is SQ58: what currentness or witness rule prevents a replay-valid but stale, forked, or unwitnessed v110 pruning tombstone history from authorizing pruned required-head projections?
+
+v111 update: SQ58 is closed by adding pruning tombstone-store head pruning tombstone history currentness. `@pm/agent-state` now derives a stable head from the v110 pruning tombstone ledger, lets pruned-store continuity require that exact head, and obstructs missing, stale, unwitnessed-advance, same-sequence forked, or hash-invalid tombstone histories before pruned row absence can authorize projection recovery. The next substrate question is SQ59: what durable witness ledger or quorum certificate makes the required v111 pruning tombstone-store head recoverable after amnesia rather than supplied by memory, adapters, or a single local process?
+
+v112 update: SQ59 is closed by adding a durable pruning tombstone history-store head witness ledger. `@pm/agent-state` now records v111 head observations as hash-linked witness records, replays and recomputes decisions from prior accepted heads, recovers the latest accepted required head after amnesia, and preserves same-sequence forks as obstructions instead of replacing accepted currentness. The next substrate question is SQ60: what quorum topology or signature-bound authority makes the v112 witness ledger resistant to one-observer or forged-observer currentness?
+
+v113 update: SQ60 is closed by adding pruning tombstone history-store head witness quorum authority. `@pm/agent-state` now replays v112-specific witness authority transitions into eligible principals and thresholds, requires strict signed observations when that topology is supplied, persists v112 witness signatures, and certifies a required history-store head only when enough admitted signed witnesses accepted the exact head. The next substrate question is SQ61: what durable authority-transition store makes the v113 topology recoverable after amnesia instead of supplied as in-memory transition arrays?
+
+v114 update: SQ61 is closed by adding durable pruning tombstone history-store head witness authority-transition stores. `@pm/agent-state` now persists v113 topology transitions in memory/Postgres stores, validates append-time replay, and can certify a required history-store head through a store-backed certifier that derives topology from durable authority history plus stored witness rows. The next substrate question is SQ62: what key-status replay and rotation semantics prevent revoked or superseded v114 witness keys from authorizing certified currentness?
+
+v115 update: SQ62 is closed by adding pruning tombstone history-store head witness key-status replay. `@pm/agent-state` now admits `rotate_signature_key` and `revoke_signature_key` transitions for this layer, projects active/revoked key status into replayed history-store head witness topology, rejects old-key and revoked-key witness rows during store-backed certification, and accepts rows signed by the replayed rotated key. The next substrate question is SQ63: what non-retroactive authority epoch seal prevents later topology or key-status transitions from rewriting historical certified currentness?
+
+v116 update: SQ63 is closed by adding pruning tombstone history-store head witness authority epoch seals. `@pm/agent-state` now admits `seal_authority_epoch` transitions that bind a pruning tombstone history-store head sequence to the effective authority topology hash and quorum certificate hash, projects accepted seals into topology, keeps seal hash-chain progress distinct from certification topology, rejects retroactive post-seal replay, and refuses retroactive store appends. The next substrate question is SQ64: what durable quorum-certificate proof record makes certified pruning tombstone history-store heads recoverable without transient recertification or later topology/key-status replay?
+
+v117 update: SQ64 is closed by adding durable pruning tombstone history-store head quorum-certificate proof records. `@pm/agent-state` now records certified history-store head quorum certificates with accepted witness evidence, witness signatures, optional authority epoch seal linkage, previous-record hashes, and record hashes; replay rejects uncertified certificates, broken hashes, malformed evidence, unsigned evidence under strict policy, and seal mismatches. The next substrate question is SQ65: what proof-preserving compaction checkpoint lets pruning tombstone history-store head witness ledgers, authority/key/seal history, and quorum-certificate records recover after pruning without trusting summaries?
+
 ## Versions
 
 | Version | Date | File | Role | Top delta |
@@ -214,6 +262,30 @@ v93 update: SQ40 is closed by adding durable pruning tombstone-head quorum-certi
 | v91 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v91-tombstone-head-authority-epoch-seal-2026-06-26.md` | Tombstone-head authority epoch seal research and implementation | Closed SQ38 by sealing historical tombstone-head authority epochs against retroactive topology changes. |
 | v92 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v92-signature-bound-tombstone-head-witness-identity-2026-06-26.md` | Signature-bound tombstone-head witness identity research and implementation | Closed SQ39 by requiring strict principal/key signatures for tombstone-head observations and authority epoch seals. |
 | v93 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v93-durable-tombstone-head-quorum-certificate-record-2026-06-26.md` | Durable tombstone-head quorum-certificate record research and implementation | Closed SQ40 by making certified tombstone-head quorum proof recoverable from durable record history. |
+| v94 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v94-tombstone-head-witness-key-status-2026-06-26.md` | Tombstone-head witness key-status research and implementation | Closed SQ41 by replaying tombstone-head key rotation/revocation before certification and QC record replay. |
+| v95 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v95-tombstone-head-proof-preserving-compaction-2026-06-26.md` | Tombstone-head proof-preserving compaction research and implementation | Closed SQ42 by adding admitted checkpoint-seeded replay for tombstone-head witness ledgers, authority/key histories, and QC records. |
+| v96 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v96-durable-tombstone-head-checkpoint-admission-store-2026-06-26.md` | Durable tombstone-head checkpoint-admission store research and implementation | Closed SQ43 by making admitted tombstone-head checkpoint authority recoverable from hash-linked durable record history. |
+| v97 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v97-tombstone-head-compaction-pruning-admission-2026-06-26.md` | Tombstone-head compaction pruning admission research and implementation | Closed SQ44 by requiring durable checkpoint-admission history plus retained suffix replay before tombstone-head pruning can be admitted. |
+| v98 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v98-tombstone-head-pruning-tombstone-store-api-2026-06-26.md` | Tombstone-head pruning tombstone store API research and implementation | Closed SQ45 by making actual tombstone-head witness, authority, and QC-row deletion replayable through durable pruning tombstones. |
+| v117 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v117-pruning-tombstone-history-store-head-quorum-certificate-record-2026-06-26.md` | Pruning tombstone history-store head quorum-certificate record research and implementation | Closed SQ64 by making certified history-store heads recoverable from durable QC proof records. |
+| v116 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v116-pruning-tombstone-history-store-head-witness-authority-epoch-seal-2026-06-26.md` | Pruning tombstone history-store head witness authority epoch seal research and implementation | Closed SQ63 by sealing v115 topology/key-status history against retroactive authority rewrites. |
+| v115 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v115-pruning-tombstone-history-store-head-witness-key-status-2026-06-26.md` | Pruning tombstone history-store head witness key-status research and implementation | Closed SQ62 by replaying history-store head witness key rotation/revocation before store-backed certification. |
+| v114 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v114-pruning-tombstone-history-store-head-witness-authority-store-2026-06-26.md` | Durable pruning tombstone history-store head witness authority store research and implementation | Closed SQ61 by making v113 topology recoverable from durable authority-transition stores and store-backed certification. |
+| v113 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v113-pruning-tombstone-history-store-head-witness-quorum-authority-2026-06-26.md` | Pruning tombstone history-store head witness quorum authority research and implementation | Closed SQ60 by requiring replayed topology, admitted signatures, and two-witness quorum certification for v112 required-head currentness. |
+| v112 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v112-pruning-tombstone-history-store-head-witness-ledger-2026-06-26.md` | Pruning tombstone history-store head witness ledger research and implementation | Closed SQ59 by making required v111 heads recoverable from replayed witness history after amnesia. |
+| v111 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v111-pruning-tombstone-store-head-pruning-tombstone-history-currentness-2026-06-26.md` | Pruning tombstone-store head pruning tombstone history currentness research and implementation | Closed SQ58 by making v110 pruning tombstone histories currentness-gated through replay-derived required heads. |
+| v110 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v110-pruning-tombstone-store-head-pruning-tombstone-store-api-2026-06-26.md` | Pruning tombstone-store head pruning tombstone store API research and implementation | Closed SQ57 by making actual pruning tombstone-store head witness, authority, and QC-row deletion replayable through durable pruning tombstones. |
+| v109 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v109-pruning-tombstone-store-head-compaction-pruning-admission-2026-06-26.md` | Pruning tombstone-store head compaction pruning admission research and implementation | Closed SQ56 by requiring durable checkpoint-admission history plus retained suffix replay before pruning tombstone-store head compaction can authorize physical prefix deletion. |
+| v108 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v108-pruning-tombstone-store-head-durable-checkpoint-admission-store-2026-06-26.md` | Durable pruning tombstone-store head checkpoint-admission store research and implementation | Closed SQ55 by making admitted pruning tombstone-store head compaction checkpoint authority recoverable from hash-linked durable record history. |
+| v107 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v107-pruning-tombstone-store-head-proof-preserving-compaction-2026-06-26.md` | Pruning tombstone-store head proof-preserving compaction research and implementation | Closed SQ54 by requiring admitted checkpoint-seeded replay for pruning tombstone-store head witness ledgers, authority/key/seal history, and QC records. |
+| v106 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v106-pruning-tombstone-store-head-quorum-certificate-record-2026-06-26.md` | Pruning tombstone-store head quorum-certificate record research and implementation | Closed SQ53 by making certified pruning tombstone-store heads recoverable from durable QC proof records. |
+| v105 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v105-pruning-tombstone-store-head-witness-authority-epoch-seal-2026-06-26.md` | Pruning tombstone-store head witness authority epoch seal research and implementation | Closed SQ52 by sealing pruning tombstone-store head witness authority epochs against retroactive topology/key-status rewrites. |
+| v104 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v104-pruning-tombstone-store-head-witness-key-status-2026-06-26.md` | Pruning tombstone-store head witness key-status research and implementation | Closed SQ51 by replaying pruning tombstone-store head witness key rotation/revocation before certification. |
+| v103 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v103-signature-bound-pruning-tombstone-store-head-witness-identity-2026-06-26.md` | Signature-bound pruning tombstone-store head witness identity research and implementation | Closed SQ50 by requiring strict principal/key signatures before pruning tombstone-store head witness rows can count toward certified required-head recovery. |
+| v102 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v102-durable-pruning-tombstone-store-head-witness-authority-store-2026-06-26.md` | Durable pruning tombstone-store head witness authority store research and implementation | Closed SQ49 by making pruning tombstone-store head witness quorum topology recoverable from stored authority transitions. |
+| v101 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v101-pruning-tombstone-store-head-witness-quorum-topology-2026-06-26.md` | Pruning tombstone-store head witness quorum topology research and implementation | Closed SQ48 by requiring topology-bound quorum certification for strict required-head continuity. |
+| v100 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v100-durable-pruning-tombstone-store-head-witness-ledger-2026-06-26.md` | Durable pruning tombstone-store head witness ledger research and implementation | Closed SQ47 by recovering required pruning tombstone-store heads from replayed witness records after amnesia. |
+| v99 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v99-tombstone-head-pruning-tombstone-store-head-currentness-2026-06-26.md` | Tombstone-head pruning tombstone-store head currentness research and implementation | Closed SQ46 by requiring tombstone-head pruned-store continuity to match an exact pruning tombstone-store head. |
 
 ## Top Findings
 
@@ -324,8 +396,188 @@ v93 update: SQ40 is closed by adding durable pruning tombstone-head quorum-certi
 105. **Certified tombstone-head authority needs a sealed epoch.** v91 adds tombstone-head authority epoch seals so later topology changes cannot retroactively rewrite the authority basis or certificate hash of a historical pruning tombstone-head certification.
 106. **Tombstone-head witness rows need admitted signatures.** v92 adds strict tombstone-head witness identity so observations and authority epoch seals cannot count as operational authority unless replay proves signer, payload, key, and tombstone-head authority topology.
 107. **Tombstone-head quorum certificates need durable proof identity.** v93 adds hash-chained tombstone-head QC records so accepted witness signatures and epoch seals survive amnesiac recovery as replayable proof objects.
+108. **Tombstone-head witness signatures need replayed key currentness.** v94 adds tombstone-head key rotation/revocation transitions so revoked or superseded keys cannot authorize certification or QC record replay.
+109. **Tombstone-head compaction checkpoints need replayed admission.** v95 adds tombstone-head replay compaction checkpoints plus witness-signed admission certificates so compacted prefixes can seed replay without turning local summaries into authority.
+110. **Tombstone-head checkpoint admissions must be durable replay history.** v96 stores tombstone-head checkpoint bodies and their admission certificates in a hash-linked record chain so recovered checkpoint authority comes from admitted history, not process memory or adapter-supplied summaries.
+111. **Tombstone-head physical pruning needs admission before deletion.** v97 adds tombstone-head pruning admission so durable checkpoint records cannot authorize prefix deletion unless retained witness, authority, and QC suffixes replay from the admitted checkpoint frontier.
+112. **Tombstone-head row absence needs tombstone history.** v98 adds durable tombstone-head pruning tombstones and tombstone-gated prune APIs so actual witness, authority, and QC row deletion is replayable and retained-suffix truncation is detectable.
+113. **Tombstone-head pruning tombstone replay validity is not currentness.** v99 adds pruning tombstone-store head currentness so replay-valid but missing, stale, forked, unwitnessed-advance, or hash-invalid tombstone histories cannot authorize pruned projections.
+114. **Required pruning tombstone-store heads must survive amnesia.** v100 adds a durable witness ledger so the required head consumed by tombstone-head pruned-store continuity is recovered from replayed witness records, not memory, adapters, connector caches, or local summaries.
+115. **Durable required-head recovery is not quorum authority.** v101 adds pruning tombstone-store head witness quorum topology so strict continuity can require enough replay-eligible observers to certify the exact required head.
+116. **Pruning tombstone-store head quorum topology must come from stored authority history.** v102 adds durable authority-transition stores and store-backed certification so caller-supplied topology cannot become certified required-head authority.
+117. **Stored pruning tombstone-store head witness rows need signature-bound identity.** v103 requires strict replay of signer, payload, admitted key, and store-derived topology before stored witness observations can count toward certified required-head recovery.
+118. **Pruning tombstone-store head witness signatures need replayed key currentness.** v104 adds key rotation/revocation transitions so old or revoked keys cannot authorize store-backed required-head certification.
+119. **Pruning tombstone-store head witness authority needs sealed epochs.** v105 adds `seal_authority_epoch` transitions so later topology or key-status changes cannot retroactively govern a sealed required-head certification epoch.
+120. **Certified pruning tombstone-store heads need durable proof records.** v106 adds hash-chained quorum-certificate records so certified required heads recover from admitted witness evidence, signatures, and seal linkage rather than transient recertification or memory.
+121. **Pruning tombstone-store head compaction checkpoints must be admitted authority, not summaries.** v107 adds checkpoint/admission certificates so compacted witness, authority/key/seal, and QC-record prefixes can seed replay only after active witnesses sign the exact checkpoint hash and retained suffixes chain from the compacted frontiers.
+122. **Pruning tombstone-store head checkpoint admission must itself be durable replay history.** v108 stores checkpoint bodies and admission certificates together in a hash-linked record chain so recovered compaction authority comes from admitted transition history, not process memory, adapter input, connector cache, or agent summaries.
+123. **Pruning tombstone-store head physical pruning needs its own admission proof.** v109 adds a pruning-admission object so durable checkpoint history cannot authorize prefix deletion unless retained witness, authority, and quorum-certificate suffixes replay from the admitted checkpoint frontier.
+124. **Pruning tombstone-store head row absence needs a replayable tombstone transition.** v110 adds a durable pruning tombstone ledger and tombstone-gated prune APIs so physical row deletion is replayable and out-of-band retained-suffix truncation is detectable.
+125. **Pruning tombstone-store head row absence also needs current tombstone history.** v111 adds a replay-derived v110 pruning tombstone-store head and required-head continuity checks so stale, forked, unwitnessed-advance, missing, or hash-invalid tombstone histories cannot authorize pruned projection recovery.
+126. **Required pruning tombstone history heads must survive amnesia through witness replay.** v112 adds a durable witness ledger for v111 pruning tombstone history-store heads, so currentness can be recovered from hash-linked admitted observations instead of memory, adapters, connector cache, or summaries.
+127. **Recovered pruning tombstone history heads still need signed quorum authority.** v113 adds v112-specific topology replay, signed witness observation replay, and quorum certificates so one observer, unsigned rows, wrong keys, or unauthorized observer ids cannot certify required-head currentness.
+128. **History-store head witness topology must come from durable authority history.** v114 adds durable authority-transition stores and a store-backed certifier so certified v112 required-head currentness derives eligibility and thresholds from replayed store history instead of in-memory transition arrays.
+129. **History-store head witness signatures need replayed key currentness.** v115 adds key rotation/revocation transitions so old or revoked witness keys cannot authorize store-backed certified currentness.
+130. **History-store head witness authority needs sealed epochs.** v116 adds `seal_authority_epoch` transitions so later topology or key-status changes cannot retroactively govern a sealed certification epoch.
+131. **Certified history-store heads need durable proof records.** v117 adds hash-chained quorum-certificate records so certified required heads recover from admitted witness evidence, signatures, and seal linkage rather than transient recertification or memory.
 
 ## Source Changes
+
+### Added on 2026-06-26 v117
+
+- PBFT supplied the retained-proof bridge: recovery and view change depend on authenticated evidence for prior decisions, not a replica's private memory.
+- HotStuff supplied the quorum-certificate bridge: a certified value should travel as an explicit proof object that later replay can verify.
+- CHAINIAC supplied the collectively signed log bridge: out-of-date clients catch up from a tamper-proof signed release history rather than live local state.
+
+### Added on 2026-06-26 v116
+
+- Vertical Paxos supplied the reconfiguration-authority bridge: agreement about values and agreement about which authority configuration governs are separate replayable facts.
+- PBFT supplied the stable-checkpoint bridge: a finalized frontier should prevent later protocol history from being accepted below that frontier.
+- Raft supplied the committed-configuration bridge: membership/topology changes are log transitions, not remembered local facts.
+- Viewstamped Replication supplied the view/reconfiguration bridge: later views must not retroactively govern operations certified under earlier views.
+
+### Added on 2026-06-26 v115
+
+- CONIKS supplied the key-transparency bridge: key bindings are auditable directory state, not remembered local facts.
+- AKI supplied the accountable-revocation bridge: issuance, update, revocation, and recovery are protocol operations.
+- ARPKI supplied the transparent-validation bridge: a signature only counts after replayed key-status validation.
+- Enhanced Certificate Transparency supplied the currentness bridge: current authority requires inclusion plus non-revocation evidence.
+
+### Added on 2026-06-26 v114
+
+- Raft supplied the ordered-log bridge: topology changes are state-machine commands in an append-only log, not local facts.
+- ARIES supplied the recovery bridge: after amnesia, operational state must be reconstructed by repeating durable history.
+- Tamper-evident logging supplied the store-integrity bridge: stored authority rows need sequence and hash commitments before they can be trusted.
+- SUNDR supplied the untrusted-store bridge: durable storage is acceptable only when forked or inconsistent histories become detectable.
+
+### Added on 2026-06-26 v113
+
+- PBFT supplied the authenticated quorum bridge: a state claim is not stable because one replica reports it, but because authenticated messages satisfy a threshold.
+- Byzantine quorum systems supplied the eligible-set bridge: only replay-admitted witnesses inside the topology can count toward currentness, and thresholds are part of state.
+- CoSi supplied the witness-cosigning bridge for binding currentness statements to admitted signers rather than process memory.
+- CHAINIAC supplied the collective-transparency bridge: independent signed witness evidence should be preserved as a replayable proof object.
+
+### Added on 2026-06-26 v112
+
+- CoSi supplied the witness-cosigning bridge: a currentness statement should become client-acceptable only after witnessed accountability, not because one authority or process returned it.
+- CHAINIAC supplied the collective transparency bridge: independent verification plus tamper-evident history makes a recovered head replayable rather than remembered.
+- SUNDR supplied the fork-detection bridge: same-sequence divergent heads must become durable obstructions instead of silently replacing the accepted projection.
+
+### Added on 2026-06-26 v111
+
+- SUNDR supplied the fork-consistency bridge: a locally coherent history is not enough when another admissible head says the history forked.
+- CONIKS supplied the snapshot-currentness bridge: clients monitor committed heads for consistency/currentness rather than trusting a provider-returned latest view.
+- Tamper-evident log auditing supplied the head-commitment bridge: current log state is challenged against prior commitments, so the substrate needs a stable head object for the v110 tombstone ledger.
+
+### Added on 2026-06-26 v110
+
+- LSM-tree deletion supplied the logged-deletion bridge: deletion must be represented as a write in durable history before physical absence can be treated as state.
+- Delete-aware LSM compaction supplied the persistence bridge: logical deletion and physical pruning are distinct steps, so the substrate needs a separate tombstone record for actual row pruning.
+- Tamper-evident logging supplied the replay/audit bridge: row absence must be challengeable by a hash-linked tombstone ledger, not inferred from the current store contents.
+
+### Added on 2026-06-26 v109
+
+- PBFT supplied the stable-checkpoint garbage-collection bridge: log prefixes are discarded only after a checkpoint has proof, so deletion is a separate proof step rather than a side effect of checkpoint existence.
+- Raft supplied the snapshot boundary bridge: compacted recovery must preserve enough boundary metadata for the retained suffix to pass consistency checks.
+- ARIES supplied the logged-recovery bridge: recovery and deletion safety come from checkpoint plus log replay, not buffer memory, process continuity, or inferred current state.
+
+### Added on 2026-06-26 v108
+
+- Crosby and Wallach's tamper-evident logging work supplied the hash-linked commitment and deletion-proof bridge: compacted history remains trustworthy only when pruning/recovery can prove which append-only commitment admitted the checkpoint.
+- SUNDR supplied the fork-consistency bridge: a server or local process may equivocate only by creating durable divergent histories that later clients can detect as forks.
+- CONIKS supplied the transparency/non-equivocation bridge: clients should monitor compact commitments, not trust a provider or adapter to report the current admitted state honestly.
+
+### Added on 2026-06-26 v107
+
+- ARIES supplied the repeat-history recovery bridge: checkpoints are recovery frontiers, while replay still follows logged sequence/hash history.
+- Raft supplied the snapshot-position bridge: compacted state must carry enough frontier metadata for later log entries to continue consistency checks.
+- PBFT supplied the stable-checkpoint bridge: log truncation requires quorum proof, so a checkpoint summary cannot seed operational state without witness admission.
+
+### Added on 2026-06-26 v106
+
+- PBFT supplied the stable-proof bridge: committed or checkpointed state needs retained proof messages before logs can be safely truncated.
+- HotStuff supplied the quorum-certificate bridge: certified history is a first-class object that later recovery can reason from.
+- CHAINIAC supplied the transparency-log bridge: collectively witnessed updates can be validated by out-of-date clients from durable signed log history.
+
+### Added on 2026-06-26 v105
+
+- Vertical Paxos supplied the reconfiguration-authority bridge: configuration authority changes need explicit governance rather than later local inference.
+- PBFT supplied the stable-checkpoint bridge: enough checkpoint proof fixes prior protocol history below a low-water mark.
+- Raft supplied the configuration-log-entry bridge: authority topology changes are admitted log entries, and historical decisions are not reinterpreted by later configurations.
+
+### Added on 2026-06-26 v104
+
+- CONIKS supplied the key-status bridge: name-to-key bindings are auditable directory state, so a stale local key id cannot stand in for current authority.
+- AKI supplied the accountable update/revocation bridge: key changes need checks-and-balances and explicit revocation/recovery semantics rather than private caller facts.
+- ARPKI supplied the transparent certificate-operation bridge: issuance, update, revocation, and validation are all accountable operations, not separate adapter concerns.
+- CTng supplied the revocation-transparency bridge: relying parties should validate current revocation state from threshold-verifiable updates before accepting cached evidence.
+
+### Added on 2026-06-26 v103
+
+- in-toto supplied the signed-metadata bridge: evidence should count only when a functionary signature binds exact payload hashes to authorized actors.
+- CONIKS supplied the key-binding bridge: identity-to-key mappings are auditable state, not local memory or adapter configuration.
+- PBFT supplied the authenticated-quorum bridge: quorum progress depends on authenticated messages, not only participant names.
+- TrInc carried forward the anti-equivocation bridge: v102 gave this layer monotonic topology history, while v103 binds observations to replay-admitted identity/key state.
+
+### Added on 2026-06-26 v102
+
+- Tamper-evident logging supplied the store-history bridge: authority claims are accepted by replaying append order and hash commitments, not by trusting an untrusted server or caller object.
+- Dynamic Byzantine quorum systems supplied the dynamic-topology bridge: quorum membership and thresholds are mutable system state that must change through controlled history.
+- TrInc supplied the anti-equivocation bridge: claims need monotonic identity/counter discipline so conflicting histories cannot be silently issued. v102 implements the durable history slice; signature-bound identity remains SQ50.
+
+### Added on 2026-06-26 v101
+
+- CoSi supplied the witness-cosigning bridge: authoritative statements should be accepted only after enough independent witnesses have seen and validated them.
+- PBFT supplied the matching-participant bridge: arbitrary faulty behavior is contained by requiring enough matching participants from an authority set.
+- Byzantine quorum systems supplied the topology/intersection bridge: only authorized quorums can operate on behalf of a replicated authority.
+- Dynamic Byzantine quorum systems supplied the changing-topology bridge: quorum membership and thresholds are state that must be replayed, not caller-supplied context.
+
+### Added on 2026-06-26 v100
+
+- Tamper-evident logging supplied the append-only commitment bridge: current and prior commitments must be replay-consistent before an untrusted log can be treated as authoritative.
+- SUNDR supplied the fork-consistency bridge: same-sequence divergent views should become detectable obstructions rather than competing operational memories.
+- Practical key transparency supplied the witness-commitment bridge: users recover trusted currentness from witness-certified history instead of a provider response.
+- Parakeet supplied the queryable witness-history bridge: commitments and certificates must be recoverable after restart, not reconstructed from process memory.
+
+### Added on 2026-06-26 v99
+
+- Certificate Transparency supplied the signed-tree-head and consistency-proof bridge: local append-only replay still needs a current head object to detect stale or forked views.
+- CONIKS supplied the directory-consistency bridge: a signed binding or record is not enough if clients can observe inconsistent authoritative views.
+- Append-only authenticated dictionary transparency supplied the user/monitor/auditor bridge: exact head comparison is the minimal currentness slice before durable witness/quorum recovery.
+- Accountable Key Infrastructure supplied the checks-and-balances bridge: required heads should ultimately be recovered from monitored substrate history, not a single caller.
+
+### Added on 2026-06-26 v98
+
+- LSM-tree delete nodes supplied the explicit-delete-record bridge: absence is not authoritative unless a delete/tombstone record participates in the merge/replay history.
+- ARIES supplied the logged-physical-change bridge: physical row changes must be redoable from history, not reconstructed from process memory or current storage shape.
+- Dostoevsky/LSM compaction supplied the storage-reclamation bridge: removing obsolete entries is an optimization governed by merge/replay policy, not a separate authority path.
+
+### Added on 2026-06-26 v97
+
+- Raft supplied the snapshot-position bridge: deletion is safe only when the snapshot preserves the last-included frontier needed by the retained log.
+- ARIES supplied the recovery-boundary bridge: truncation is a recovery calculation over logged history, not a guess from current storage state.
+- PBFT supplied the stable-checkpoint garbage-collection bridge: old protocol state can be collected only below stable checkpoint evidence.
+- BFT systems survey work reinforced that irreversible pruning decisions need stable evidence backed by enough non-faulty replicas or witnesses.
+
+### Added on 2026-06-26 v96
+
+- Tamper-evident logging supplied the hash-linked/auditable-history bridge for making checkpoint-admission records detect missing, reordered, or mutated history.
+- Append-only authenticated dictionaries supplied the lookup-plus-consistency bridge for recovering checkpoint admissions without trusting latest-value responses.
+- Secure logging and certificate-transparency analysis supplied the distinction between inclusion proof and append-only consistency proof.
+- PBFT stable checkpoints reinforced that checkpoint proof material must survive recovery and view changes, not exist only as volatile process state.
+
+### Added on 2026-06-26 v95
+
+- ARIES supplied the checkpoint-plus-log recovery bridge: checkpoints establish a recovery frontier, while replay/redo still comes from log history after that boundary.
+- Raft supplied the snapshot-positioning bridge: compacted state must carry a log position so the suffix can continue the history.
+- PBFT supplied the stable-checkpoint bridge: checkpoints become safe only when backed by signed proof from enough replicas.
+
+### Added on 2026-06-26 v94
+
+- AKI supplied the accountable key-revocation bridge: key validation needs logged revocation/accountability state.
+- CONIKS supplied the key-binding currentness bridge: signatures only count against a consistency-audited current key binding.
+- CRLite supplied the fail-closed revocation bridge: unavailable or stale revocation state must not silently validate compromised keys.
+- Enhanced Certificate Transparency supplied the current-proof bridge: a key must be issued and not revoked, not merely present in history.
 
 ### Added on 2026-06-26 v93
 
@@ -1036,7 +1288,14 @@ v93 update: SQ40 is closed by adding durable pruning tombstone-head quorum-certi
 35. Adopt SQ38 tombstone-head authority epoch seals in runtime recovery paths so later topology transitions cannot retroactively change historical tombstone-head certifications.
 36. Adopt SQ39 signature-bound tombstone-head witness identity in runtime recovery paths so unsigned or wrong-key tombstone-head observations and seals cannot authorize pruning currentness.
 37. Adopt SQ40 durable tombstone-head quorum-certificate records in runtime recovery paths so accepted witness signatures and authority epoch seals are recovered as proof objects rather than transient recertification results.
-38. Answer SQ41 by adding tombstone-head witness key-status and rotation semantics so durable certificate-record replay cannot accept revoked or superseded keys.
+38. Adopt SQ41 tombstone-head witness key-status replay in runtime recovery paths so revoked or superseded tombstone-head keys cannot authorize pruned-store currentness.
+39. Adopt SQ45 tombstone-head pruning tombstone APIs in runtime recovery paths so actual row absence is accepted only after durable tombstone replay and retained-suffix continuity checks.
+40. Adopt SQ46 tombstone-head pruning tombstone-store head currentness in runtime recovery paths so replay-valid but missing, stale, forked, unwitnessed-advance, or hash-invalid tombstone histories cannot authorize pruned projections.
+41. Adopt SQ47 durable pruning tombstone-store head witness ledgers in runtime recovery paths so pruned-store continuity derives `requiredPruningTombstoneStoreHead` from replayed witness history rather than memory, adapters, or connector caches.
+42. Adopt SQ48 pruning tombstone-store head witness quorum certificates in strict runtime recovery paths so one observer cannot unilaterally certify required pruning tombstone-store head currentness.
+43. Adopt SQ49 durable pruning tombstone-store head witness authority-transition stores in runtime recovery paths so certified required-head recovery gets topology from admitted store replay.
+44. Adopt SQ50 signature-bound pruning tombstone-store head witness identity in runtime recovery paths so unsigned or wrong-key persisted evidence cannot certify required heads.
+45. Answer SQ65 by adding proof-preserving compaction checkpoints for pruning tombstone history-store head witness ledgers, authority/key/seal history, and quorum-certificate records so replay can recover after pruning without trusting summaries.
 
 ## Metrics Queue
 
