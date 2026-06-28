@@ -17,6 +17,8 @@ export const PROJECTION_REPLAY_CERTIFICATE_SCHEMA_VERSION =
   "projection-replay-certificate.v1" as const;
 export const OPERATIONAL_STATE_RECOVERY_CUT_SCHEMA_VERSION =
   "operational-state-recovery-cut.v1" as const;
+export const OPERATIONAL_STATE_RECOVERY_CUT_SUBJECT_KIND =
+  "operational_state_recovery_cut" as const;
 export const OPERATIONAL_STATE_RECOVERY_CUT_ADMISSION_SCHEMA_VERSION =
   "operational-state-recovery-cut-admission.v1" as const;
 export const OPERATIONAL_STATE_RECOVERY_CUT_ADMISSION_WITNESS_SCHEMA_VERSION =
@@ -49,6 +51,8 @@ export const OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_SCHEMA_VERSION =
   "operational-state-pruning-policy-admission.v1" as const;
 export const OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_WITNESS_SCHEMA_VERSION =
   "operational-state-pruning-policy-admission-witness.v1" as const;
+export const OPERATIONAL_STATE_PRIVACY_PRESERVING_POLICY_PROOF_SCHEMA_VERSION =
+  "operational-state-privacy-preserving-policy-proof.v1" as const;
 export const OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_SCHEMA_VERSION =
   "operational-state-pruning-policy-admission-witness-authority-transition-admission.v1" as const;
 export const OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_WITNESS_SCHEMA_VERSION =
@@ -65,6 +69,8 @@ export const OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_WI
   "operational-state-storage-mutation-guard-authorization-admission-witness-authority-transition-admission.v1" as const;
 export const OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_WITNESS_SCHEMA_VERSION =
   "operational-state-storage-mutation-guard-authorization-admission-witness-authority-transition-admission-witness.v1" as const;
+export const OPERATIONAL_STATE_SEPARATION_OF_DUTY_PROOF_SCHEMA_VERSION =
+  "operational-state-separation-of-duty-proof.v1" as const;
 export const OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_RECORD_SUBJECT_KIND =
   "operational_state_storage_mutation_guard_authorization_admission_record" as const;
 export const OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND =
@@ -103,6 +109,8 @@ export const OPERATIONAL_STATE_WITNESS_LEDGER_COMPACTION_CHECKPOINT_ADMISSION_WI
   "operational_state_witness_ledger_compaction_checkpoint_admission_witness_authority_transition_admission_record" as const;
 export const OPERATIONAL_STATE_QUORUM_CERTIFICATE_PROOF_RECORD_SCHEMA_VERSION =
   "operational-state-quorum-certificate-proof-record.v1" as const;
+export const OPERATIONAL_STATE_COMPOSITIONAL_QUORUM_INTERSECTION_PROOF_SCHEMA_VERSION =
+  "operational-state-compositional-quorum-intersection-proof.v1" as const;
 export const OPERATIONAL_STATE_QUORUM_CERTIFICATE_PROOF_RECORD_ADMISSION_SCHEMA_VERSION =
   "operational-state-quorum-certificate-proof-record-admission.v1" as const;
 export const OPERATIONAL_STATE_QUORUM_CERTIFICATE_PROOF_RECORD_ADMISSION_WITNESS_SCHEMA_VERSION =
@@ -119,6 +127,16 @@ export const OPERATIONAL_STATE_QUORUM_CERTIFICATE_PROOF_RECORD_ADMISSION_WITNESS
   "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_record" as const;
 export const OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_SCHEMA_VERSION =
   "operational-state-authority-topology-compaction.v1" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TRANSITION_REPLAY_SEMANTICS_SCHEMA_VERSION =
+  "operational-state-authority-transition-replay-semantics.v1" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TRANSITION_REPLAY_SEMANTICS_PROOF_SCHEMA_VERSION =
+  "operational-state-authority-transition-replay-semantics-proof.v1" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TRANSITION_REPLAY_SEMANTICS_SUBJECT_KIND =
+  "operational_state_authority_transition_replay_semantics" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_PROOF_SCHEMA_VERSION =
+  "operational-state-authority-topology-settlement-proof.v1" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_SUBJECT_KIND =
+  "operational_state_authority_topology_settlement" as const;
 export const OPERATIONAL_STATE_AUTHORITY_BOOTSTRAP_CERTIFICATE_SCHEMA_VERSION =
   "operational-state-authority-bootstrap-certificate.v1" as const;
 export const OPERATIONAL_STATE_AUTHORITY_BOOTSTRAP_SETTLEMENT_SCHEMA_VERSION =
@@ -137,8 +155,16 @@ export const OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_ADMISSIO
   "operational_state_authority_topology_compaction_checkpoint_admission_record" as const;
 export const OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND =
   "operational_state_authority_topology_compaction_checkpoint_admission_witness_authority_transition_admission_record" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SCHEMA_VERSION =
+  "operational-state-authority-transition-ledger-compaction-checkpoint.v1" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_ADMISSION_SCHEMA_VERSION =
+  "operational-state-authority-transition-ledger-compaction-checkpoint-admission.v1" as const;
+export const OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SUBJECT_KIND =
+  "operational_state_authority_transition_ledger_compaction_checkpoint" as const;
 export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_SCHEMA_VERSION =
   "operational-state-signature-verifier-adapter.v1" as const;
+export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ROLE_SETTLEMENT_PROOF_SCHEMA_VERSION =
+  "operational-state-signature-verifier-role-settlement-proof.v1" as const;
 export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_ADMISSION_SCHEMA_VERSION =
   "operational-state-signature-verifier-adapter-proof-admission.v1" as const;
 export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_ADMISSION_WITNESS_SCHEMA_VERSION =
@@ -149,12 +175,16 @@ export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_ADMISSION_WITNES
   "operational-state-signature-verifier-adapter-proof-admission-witness-authority-transition-admission-witness.v1" as const;
 export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_SUBJECT_KIND =
   "operational_state_signature_verifier_adapter_proof" as const;
+export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ROLE_SETTLEMENT_SUBJECT_KIND =
+  "operational_state_signature_verifier_role_settlement" as const;
 export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_ADMISSION_RECORD_SUBJECT_KIND =
   "operational_state_signature_verifier_adapter_proof_admission_record" as const;
 export const OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND =
   "operational_state_signature_verifier_adapter_proof_admission_witness_authority_transition_admission_record" as const;
 export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_SCHEMA_VERSION =
   "operational-state-authority-epoch-seal-finalizer.v1" as const;
+export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_ACCOUNTABLE_FINALITY_EVIDENCE_SCHEMA_VERSION =
+  "operational-state-authority-epoch-seal-accountable-finality-evidence.v1" as const;
 export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_ADMISSION_SCHEMA_VERSION =
   "operational-state-authority-epoch-seal-finalizer-proof-admission.v1" as const;
 export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_ADMISSION_WITNESS_SCHEMA_VERSION =
@@ -165,6 +195,8 @@ export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_ADMISSION_WI
   "operational-state-authority-epoch-seal-finalizer-proof-admission-witness-authority-transition-admission-witness.v1" as const;
 export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_SUBJECT_KIND =
   "operational_state_authority_epoch_seal_finalizer_proof" as const;
+export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_ACCOUNTABLE_FINALITY_EVIDENCE_SUBJECT_KIND =
+  "operational_state_authority_epoch_seal_accountable_finality_evidence" as const;
 export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_ADMISSION_RECORD_SUBJECT_KIND =
   "operational_state_authority_epoch_seal_finalizer_proof_admission_record" as const;
 export const OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND =
@@ -403,7 +435,9 @@ export type OperationalStateRecoveryCutIssueCode =
   | "operational_state_recovery_dependency_sequence_regression"
   | "operational_state_recovery_dependency_head_mismatch"
   | "operational_state_recovery_dependency_history_mismatch"
-  | "operational_state_recovery_dependency_authority_mismatch";
+  | "operational_state_recovery_dependency_authority_mismatch"
+  | "operational_state_recovery_quorum_intersection_proof_missing"
+  | "operational_state_recovery_quorum_intersection_proof_invalid";
 
 export interface OperationalStateRecoveryCutIssue {
   readonly code: OperationalStateRecoveryCutIssueCode;
@@ -417,6 +451,8 @@ export interface OperationalStateRecoveryCutEvaluationOptions {
   readonly expectedAuthorityScope?: string;
   readonly requireCurrentProjection?: boolean;
   readonly requireAllRequiredLanesReplayable?: boolean;
+  readonly requireCompositionalQuorumIntersectionProof?: boolean;
+  readonly quorumIntersectionProof?: OperationalStateCompositionalQuorumIntersectionProof;
 }
 
 export interface OperationalStateRecoveryCutEvaluation {
@@ -427,6 +463,7 @@ export interface OperationalStateRecoveryCutEvaluation {
   readonly requiredLaneCount: number;
   readonly projectionLaneCount: number;
   readonly excludedPrivateLaneCount: number;
+  readonly quorumIntersectionProofEvaluation?: OperationalStateCompositionalQuorumIntersectionProofEvaluation;
   readonly issues: readonly OperationalStateRecoveryCutIssue[];
 }
 
@@ -1347,6 +1384,17 @@ export type OperationalStatePruningPolicyIssueCode =
   | "operational_state_pruning_policy_admission_witness_admission_record_mismatch"
   | "operational_state_pruning_policy_admission_witness_replay_missing"
   | "operational_state_pruning_policy_admission_witness_replay_invalid"
+  | "operational_state_pruning_policy_privacy_proof_missing"
+  | "operational_state_pruning_policy_privacy_proof_hash_mismatch"
+  | "operational_state_pruning_policy_privacy_proof_invalid"
+  | "operational_state_pruning_policy_privacy_proof_tenant_mismatch"
+  | "operational_state_pruning_policy_privacy_proof_scope_mismatch"
+  | "operational_state_pruning_policy_privacy_proof_subject_mismatch"
+  | "operational_state_pruning_policy_privacy_proof_policy_mismatch"
+  | "operational_state_pruning_policy_privacy_proof_verifier_not_allowed"
+  | "operational_state_pruning_policy_privacy_proof_private_input_disclosed"
+  | "operational_state_pruning_policy_privacy_proof_statement_missing"
+  | "operational_state_pruning_policy_privacy_proof_claim_overreach"
   | "operational_state_pruning_policy_admission_latest_record_not_witnessed";
 
 export interface OperationalStatePruningPolicyIssue {
@@ -1470,6 +1518,78 @@ export interface OperationalStatePruningPolicyAdmissionWitnessRecord {
   readonly witnessedBy: string;
   readonly witnessReason?: string;
   readonly witnessRecordHash: string;
+}
+
+export type OperationalStatePrivacyPreservingPolicyProofResult =
+  | "valid"
+  | "invalid";
+
+export type OperationalStatePrivacyPreservingPolicyProofSystem =
+  | "anonymous_credential_presentation"
+  | "selective_disclosure_credential"
+  | "zero_knowledge_policy_proof"
+  | string;
+
+export interface OperationalStatePrivacyPreservingPolicyProofInput {
+  readonly proofId: string;
+  readonly tenantId: TenantId | string;
+  readonly policyStoreId: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly subjectKind?: string;
+  readonly subjectId?: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly policyId: string;
+  readonly policyHash: string;
+  readonly policyRecordHash: string;
+  readonly proofSystem: OperationalStatePrivacyPreservingPolicyProofSystem;
+  readonly proofSystemVersion?: string;
+  readonly verifierId: string;
+  readonly verifierVersion?: string;
+  readonly verificationKeyHash: string;
+  readonly publicStatementHash: string;
+  readonly predicateCommitmentHash: string;
+  readonly hiddenWitnessCommitmentHash: string;
+  readonly proofTranscriptHash: string;
+  readonly challengeNonce: string;
+  readonly verifiedAt: Timestamp | string;
+  readonly result: OperationalStatePrivacyPreservingPolicyProofResult;
+  readonly disclosedClaimHashes?: readonly string[];
+  readonly adapterClaims?: readonly string[];
+  readonly privateInputRefs?: readonly string[];
+}
+
+export interface OperationalStatePrivacyPreservingPolicyProof {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_PRIVACY_PRESERVING_POLICY_PROOF_SCHEMA_VERSION;
+  readonly proofId: string;
+  readonly tenantId: TenantId;
+  readonly policyStoreId: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly policyId: string;
+  readonly policyHash: string;
+  readonly policyRecordHash: string;
+  readonly proofSystem: OperationalStatePrivacyPreservingPolicyProofSystem;
+  readonly proofSystemVersion?: string;
+  readonly verifierId: string;
+  readonly verifierVersion?: string;
+  readonly verificationKeyHash: string;
+  readonly publicStatementHash: string;
+  readonly predicateCommitmentHash: string;
+  readonly hiddenWitnessCommitmentHash: string;
+  readonly proofTranscriptHash: string;
+  readonly challengeNonce: string;
+  readonly verifiedAt: Timestamp | string;
+  readonly result: OperationalStatePrivacyPreservingPolicyProofResult;
+  readonly disclosedClaimHashes: readonly string[];
+  readonly adapterClaims: readonly string[];
+  readonly privateInputRefs: readonly string[];
+  readonly policyProofHash: string;
 }
 
 export interface OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecordInput {
@@ -1666,6 +1786,9 @@ export interface OperationalStatePruningPolicyAdmissionWitnessReplay {
 export interface OperationalStatePruningPolicyAdmissionEvaluationInput {
   readonly compilation?: OperationalStatePruningPolicyCompilation;
   readonly admissionReplay?: OperationalStatePruningPolicyAdmissionReplay;
+  readonly privacyPreservingPolicyProof?: OperationalStatePrivacyPreservingPolicyProof;
+  readonly requirePrivacyPreservingPolicyProof?: boolean;
+  readonly allowedPrivacyPreservingPolicyProofVerifierIds?: readonly string[];
   readonly requireAdmissionWitnessQuorum?: boolean;
   readonly requireAdmissionWitnessAuthorityTopology?: boolean;
   readonly requireAdmissionWitnessAuthorityTransitionAdmission?: boolean;
@@ -1682,6 +1805,7 @@ export interface OperationalStatePruningPolicyAdmissionEvaluation {
   readonly policyHash?: string;
   readonly admissionReplay?: OperationalStatePruningPolicyAdmissionReplay;
   readonly admissionWitnessReplay?: OperationalStatePruningPolicyAdmissionWitnessReplay;
+  readonly privacyPreservingPolicyProof?: OperationalStatePrivacyPreservingPolicyProof;
   readonly latestAdmittedRecord?: OperationalStatePruningPolicyAdmissionRecord;
   readonly latestWitnessRecord?: OperationalStatePruningPolicyAdmissionWitnessRecord;
   readonly issues: readonly OperationalStatePruningPolicyIssue[];
@@ -1810,6 +1934,17 @@ export type OperationalStateStorageMutationGuardIssueCode =
   | "operational_state_storage_mutation_authorization_admission_witness_replay_missing"
   | "operational_state_storage_mutation_authorization_admission_witness_replay_invalid"
   | "operational_state_storage_mutation_authorization_admission_latest_record_not_witnessed"
+  | "operational_state_storage_mutation_separation_of_duty_proof_missing"
+  | "operational_state_storage_mutation_separation_of_duty_proof_hash_mismatch"
+  | "operational_state_storage_mutation_separation_of_duty_proof_invalid"
+  | "operational_state_storage_mutation_separation_of_duty_proof_tenant_mismatch"
+  | "operational_state_storage_mutation_separation_of_duty_proof_scope_mismatch"
+  | "operational_state_storage_mutation_separation_of_duty_proof_subject_mismatch"
+  | "operational_state_storage_mutation_separation_of_duty_proof_authorization_mismatch"
+  | "operational_state_storage_mutation_separation_of_duty_proof_admission_path_mismatch"
+  | "operational_state_storage_mutation_separation_of_duty_proof_executor_missing"
+  | "operational_state_storage_mutation_separation_of_duty_proof_conflict"
+  | "operational_state_storage_mutation_separation_of_duty_proof_claim_overreach"
   | "operational_state_storage_mutation_authorization_not_admitted";
 
 export interface OperationalStateStorageMutationGuardIssue {
@@ -1937,6 +2072,80 @@ export interface OperationalStateStorageMutationGuardAuthorizationAdmissionWitne
   readonly witnessedBy: string;
   readonly witnessReason?: string;
   readonly witnessRecordHash: string;
+}
+
+export type OperationalStateSeparationOfDutyProofResult =
+  | "valid"
+  | "invalid";
+
+export type OperationalStateSeparationOfDutyProofRule =
+  | "dynamic_separation_of_duty"
+  | "mutual_exclusion"
+  | "two_person_control"
+  | string;
+
+export interface OperationalStateSeparationOfDutyProofInput {
+  readonly proofId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly subjectKind?: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly guardId: string;
+  readonly protectedSchema: string;
+  readonly protectedTable: string;
+  readonly operation: OperationalStateStorageMutationOperation;
+  readonly targetSequence: number;
+  readonly authorizationHash: string;
+  readonly admissionRecordHash: string;
+  readonly admissionRole: string;
+  readonly executionRole: string;
+  readonly admissionAuthorityIds: readonly string[];
+  readonly executionAuthorityIds: readonly string[];
+  readonly conflictAuthorityIds?: readonly string[];
+  readonly disjoint: boolean;
+  readonly proofRule: OperationalStateSeparationOfDutyProofRule;
+  readonly proofReason?: string;
+  readonly evaluatedAt: Timestamp | string;
+  readonly evaluatedBy: string;
+  readonly verifierId?: string;
+  readonly result: OperationalStateSeparationOfDutyProofResult;
+  readonly adapterClaims?: readonly string[];
+}
+
+export interface OperationalStateSeparationOfDutyProof {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_SEPARATION_OF_DUTY_PROOF_SCHEMA_VERSION;
+  readonly proofId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly guardId: string;
+  readonly protectedSchema: string;
+  readonly protectedTable: string;
+  readonly operation: OperationalStateStorageMutationOperation;
+  readonly targetSequence: number;
+  readonly authorizationHash: string;
+  readonly admissionRecordHash: string;
+  readonly admissionRole: string;
+  readonly executionRole: string;
+  readonly admissionAuthorityIds: readonly string[];
+  readonly executionAuthorityIds: readonly string[];
+  readonly conflictAuthorityIds: readonly string[];
+  readonly disjoint: boolean;
+  readonly proofRule: OperationalStateSeparationOfDutyProofRule;
+  readonly proofReason?: string;
+  readonly evaluatedAt: Timestamp | string;
+  readonly evaluatedBy: string;
+  readonly verifierId?: string;
+  readonly result: OperationalStateSeparationOfDutyProofResult;
+  readonly adapterClaims: readonly string[];
+  readonly separationOfDutyProofHash: string;
 }
 
 export interface OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmissionRecordInput {
@@ -2157,6 +2366,8 @@ export interface OperationalStateStorageMutationGuardEvaluationInput {
   readonly authorizations: readonly OperationalStateStorageMutationGuardAuthorization[];
   readonly requireAuthorizationAdmission?: boolean;
   readonly authorizationAdmissionReplay?: OperationalStateStorageMutationGuardAuthorizationAdmissionReplay;
+  readonly separationOfDutyProof?: OperationalStateSeparationOfDutyProof;
+  readonly requireSeparationOfDutyProof?: boolean;
   readonly requireAuthorizationAdmissionWitnessQuorum?: boolean;
   readonly requireAuthorizationAdmissionWitnessAuthorityTopology?: boolean;
   readonly requireAuthorizationAdmissionWitnessAuthorityTransitionAdmission?: boolean;
@@ -2171,6 +2382,7 @@ export interface OperationalStateStorageMutationGuardEvaluation {
   readonly matchedAuthorization?: OperationalStateStorageMutationGuardAuthorization;
   readonly authorizationAdmissionReplay?: OperationalStateStorageMutationGuardAuthorizationAdmissionReplay;
   readonly authorizationAdmissionWitnessReplay?: OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessReplay;
+  readonly separationOfDutyProof?: OperationalStateSeparationOfDutyProof;
   readonly latestAdmittedRecord?: OperationalStateStorageMutationGuardAuthorizationAdmissionRecord;
   readonly latestAdmissionWitnessRecord?: OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecord;
   readonly issues: readonly OperationalStateStorageMutationGuardIssue[];
@@ -3208,6 +3420,137 @@ export interface OperationalStateQuorumCertificateProofCertificate {
   readonly quorumCertificateHash: string;
 }
 
+export type OperationalStateCompositionalQuorumIntersectionMode =
+  | "pairwise_active_intersection"
+  | "global_active_intersection";
+
+export interface OperationalStateCompositionalQuorumClaimInput {
+  readonly claimId: string;
+  readonly laneId?: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly topologyId: string;
+  readonly authorityTopology: OperationalStateAuthorityTopology;
+  readonly quorumCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly authorityTransitionAdmissionStoreId?: string;
+  readonly authorityTransitionAdmissionRecordHash?: string;
+}
+
+export interface OperationalStateCompositionalQuorumClaim {
+  readonly claimId: string;
+  readonly laneId?: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly topologyId: string;
+  readonly authorityTopology: OperationalStateAuthorityTopology;
+  readonly authorityTopologyHash: string;
+  readonly quorumCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly quorumCertificateHash: string;
+  readonly authorityTransitionAdmissionStoreId?: string;
+  readonly authorityTransitionAdmissionRecordHash?: string;
+}
+
+export interface OperationalStateCompositionalQuorumPairwiseIntersection {
+  readonly leftClaimId: string;
+  readonly rightClaimId: string;
+  readonly activeIntersectionWitnessIds: readonly string[];
+  readonly intersectionSize: number;
+}
+
+export interface OperationalStateCompositionalQuorumIntersectionProofInput {
+  readonly proofId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly intersectionMode: OperationalStateCompositionalQuorumIntersectionMode;
+  readonly requiredIntersectionWitnesses: number;
+  readonly claims: readonly OperationalStateCompositionalQuorumClaimInput[];
+  readonly evaluatedAt: Timestamp | string;
+  readonly evaluatedBy: string;
+  readonly proofReason?: string;
+}
+
+export interface OperationalStateCompositionalQuorumIntersectionProof {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_COMPOSITIONAL_QUORUM_INTERSECTION_PROOF_SCHEMA_VERSION;
+  readonly proofId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly intersectionMode: OperationalStateCompositionalQuorumIntersectionMode;
+  readonly requiredIntersectionWitnesses: number;
+  readonly claims: readonly OperationalStateCompositionalQuorumClaim[];
+  readonly pairwiseIntersections: readonly OperationalStateCompositionalQuorumPairwiseIntersection[];
+  readonly globalIntersectionWitnessIds: readonly string[];
+  readonly evaluatedAt: Timestamp | string;
+  readonly evaluatedBy: string;
+  readonly proofReason?: string;
+  readonly proofHash: string;
+}
+
+export type OperationalStateCompositionalQuorumIntersectionIssueCode =
+  | "operational_state_compositional_quorum_intersection_proof_missing"
+  | "operational_state_compositional_quorum_intersection_proof_hash_mismatch"
+  | "operational_state_compositional_quorum_intersection_tenant_mismatch"
+  | "operational_state_compositional_quorum_intersection_scope_mismatch"
+  | "operational_state_compositional_quorum_intersection_subject_mismatch"
+  | "operational_state_compositional_quorum_intersection_required_intersection_invalid"
+  | "operational_state_compositional_quorum_intersection_claim_count_insufficient"
+  | "operational_state_compositional_quorum_intersection_claim_duplicate"
+  | "operational_state_compositional_quorum_intersection_topology_hash_mismatch"
+  | "operational_state_compositional_quorum_intersection_topology_tenant_mismatch"
+  | "operational_state_compositional_quorum_intersection_topology_scope_mismatch"
+  | "operational_state_compositional_quorum_intersection_topology_id_mismatch"
+  | "operational_state_compositional_quorum_intersection_certificate_hash_mismatch"
+  | "operational_state_compositional_quorum_intersection_certificate_not_certified"
+  | "operational_state_compositional_quorum_intersection_certificate_quorum_not_met"
+  | "operational_state_compositional_quorum_intersection_certificate_tenant_mismatch"
+  | "operational_state_compositional_quorum_intersection_certificate_scope_mismatch"
+  | "operational_state_compositional_quorum_intersection_certificate_boundary_mismatch"
+  | "operational_state_compositional_quorum_intersection_certificate_topology_mismatch"
+  | "operational_state_compositional_quorum_intersection_duplicate_witness"
+  | "operational_state_compositional_quorum_intersection_witness_unknown"
+  | "operational_state_compositional_quorum_intersection_witness_not_active"
+  | "operational_state_compositional_quorum_intersection_pairwise_intersection_mismatch"
+  | "operational_state_compositional_quorum_intersection_global_intersection_mismatch"
+  | "operational_state_compositional_quorum_intersection_pairwise_missing"
+  | "operational_state_compositional_quorum_intersection_global_missing";
+
+export interface OperationalStateCompositionalQuorumIntersectionIssue {
+  readonly code: OperationalStateCompositionalQuorumIntersectionIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface OperationalStateCompositionalQuorumIntersectionProofEvaluationInput {
+  readonly proof?: OperationalStateCompositionalQuorumIntersectionProof;
+  readonly expectedTenantId?: TenantId | string;
+  readonly expectedAuthorityScope?: string;
+  readonly expectedSubjectKind?: string;
+  readonly expectedSubjectId?: string;
+  readonly expectedSubjectSequence?: number;
+  readonly expectedSubjectHash?: string;
+  readonly requiredIntersectionWitnesses?: number;
+}
+
+export interface OperationalStateCompositionalQuorumIntersectionProofEvaluation {
+  readonly valid: boolean;
+  readonly accepted: boolean;
+  readonly proofId?: string;
+  readonly proofHash?: string;
+  readonly claimCount: number;
+  readonly pairwiseIntersections: readonly OperationalStateCompositionalQuorumPairwiseIntersection[];
+  readonly globalIntersectionWitnessIds: readonly string[];
+  readonly issues: readonly OperationalStateCompositionalQuorumIntersectionIssue[];
+}
+
 export interface OperationalStateQuorumCertificateProofEvidence {
   readonly witnessId: string;
   readonly evidenceSequence: number;
@@ -3752,6 +4095,468 @@ export interface OperationalStateAuthorityTopology {
   readonly sealedQuorumCertificateHash?: string;
   readonly latestSealHash?: string;
   readonly topologyHash: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsRuleInput {
+  readonly transitionKind: OperationalStateAuthorityTransitionKind;
+  readonly ruleId?: string;
+  readonly recordSchemaVersion?: string;
+  readonly effectSummary: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsRule {
+  readonly transitionKind: OperationalStateAuthorityTransitionKind;
+  readonly ruleId: string;
+  readonly recordSchemaVersion: string;
+  readonly effectSummary: string;
+  readonly ruleHash: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsManifestInput {
+  readonly manifestId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly semanticsId: string;
+  readonly semanticsVersion: string;
+  readonly validFromAuthoritySequence: number;
+  readonly validThroughAuthoritySequence?: number;
+  readonly rules: readonly OperationalStateAuthorityTransitionReplaySemanticsRuleInput[];
+  readonly compatiblePreviousManifestHashes?: readonly string[];
+  readonly sourceCodeHash?: string;
+  readonly admittedAt: Timestamp | string;
+  readonly admittedBy: string;
+  readonly manifestReason?: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsManifest {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_AUTHORITY_TRANSITION_REPLAY_SEMANTICS_SCHEMA_VERSION;
+  readonly manifestId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly semanticsId: string;
+  readonly semanticsVersion: string;
+  readonly validFromAuthoritySequence: number;
+  readonly validThroughAuthoritySequence?: number;
+  readonly rules: readonly OperationalStateAuthorityTransitionReplaySemanticsRule[];
+  readonly compatiblePreviousManifestHashes: readonly string[];
+  readonly sourceCodeHash?: string;
+  readonly admittedAt: Timestamp | string;
+  readonly admittedBy: string;
+  readonly manifestReason?: string;
+  readonly manifestHash: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsTransitionBinding {
+  readonly authoritySequence: number;
+  readonly transitionKind: OperationalStateAuthorityTransitionKind;
+  readonly transitionRecordHash: string;
+  readonly recordSchemaVersion: string;
+  readonly ruleId: string;
+  readonly ruleHash: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsProofInput {
+  readonly proofId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly manifest: OperationalStateAuthorityTransitionReplaySemanticsManifest;
+  readonly startingTopology?: OperationalStateAuthorityTopology;
+  readonly transitions: readonly OperationalStateAuthorityTransitionRecord[];
+  readonly replayedAt: Timestamp | string;
+  readonly replayedBy: string;
+  readonly proofReason?: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsProof {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_AUTHORITY_TRANSITION_REPLAY_SEMANTICS_PROOF_SCHEMA_VERSION;
+  readonly proofId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly manifest: OperationalStateAuthorityTransitionReplaySemanticsManifest;
+  readonly manifestHash: string;
+  readonly startingTopology?: OperationalStateAuthorityTopology;
+  readonly startingTopologyHash?: string;
+  readonly startingAuthoritySequence: number;
+  readonly transitions: readonly OperationalStateAuthorityTransitionRecord[];
+  readonly transitionBindings: readonly OperationalStateAuthorityTransitionReplaySemanticsTransitionBinding[];
+  readonly resultAuthorityTopologyHash: string;
+  readonly resultAuthorityRecordHash: string;
+  readonly replayedAt: Timestamp | string;
+  readonly replayedBy: string;
+  readonly proofReason?: string;
+  readonly proofHash: string;
+}
+
+export type OperationalStateAuthorityTransitionReplaySemanticsIssueCode =
+  | "operational_state_authority_transition_replay_semantics_proof_missing"
+  | "operational_state_authority_transition_replay_semantics_proof_hash_mismatch"
+  | "operational_state_authority_transition_replay_semantics_manifest_hash_mismatch"
+  | "operational_state_authority_transition_replay_semantics_required_manifest_mismatch"
+  | "operational_state_authority_transition_replay_semantics_tenant_mismatch"
+  | "operational_state_authority_transition_replay_semantics_scope_mismatch"
+  | "operational_state_authority_transition_replay_semantics_topology_mismatch"
+  | "operational_state_authority_transition_replay_semantics_subject_mismatch"
+  | "operational_state_authority_transition_replay_semantics_rule_duplicate"
+  | "operational_state_authority_transition_replay_semantics_rule_hash_mismatch"
+  | "operational_state_authority_transition_replay_semantics_rule_missing"
+  | "operational_state_authority_transition_replay_semantics_manifest_sequence_mismatch"
+  | "operational_state_authority_transition_replay_semantics_transition_hash_mismatch"
+  | "operational_state_authority_transition_replay_semantics_transition_scope_mismatch"
+  | "operational_state_authority_transition_replay_semantics_transition_sequence_gap"
+  | "operational_state_authority_transition_replay_semantics_transition_previous_hash_mismatch"
+  | "operational_state_authority_transition_replay_semantics_transition_record_schema_mismatch"
+  | "operational_state_authority_transition_replay_semantics_transition_binding_mismatch"
+  | "operational_state_authority_transition_replay_semantics_expected_transition_mismatch"
+  | "operational_state_authority_transition_replay_semantics_starting_topology_hash_mismatch"
+  | "operational_state_authority_transition_replay_semantics_result_topology_mismatch";
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsIssue {
+  readonly code: OperationalStateAuthorityTransitionReplaySemanticsIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsEvaluationInput {
+  readonly proof?: OperationalStateAuthorityTransitionReplaySemanticsProof;
+  readonly expectedTenantId?: TenantId | string;
+  readonly expectedAuthorityScope?: string;
+  readonly expectedTopologyId?: string;
+  readonly expectedSubjectKind?: string;
+  readonly expectedSubjectId?: string;
+  readonly expectedSubjectSequence?: number;
+  readonly expectedSubjectHash?: string;
+  readonly requiredManifestHash?: string;
+  readonly expectedTransitions?: readonly OperationalStateAuthorityTransitionRecord[];
+  readonly expectedResultAuthorityTopologyHash?: string;
+}
+
+export interface OperationalStateAuthorityTransitionReplaySemanticsEvaluation {
+  readonly valid: boolean;
+  readonly accepted: boolean;
+  readonly proofId?: string;
+  readonly proofHash?: string;
+  readonly manifestHash?: string;
+  readonly transitionCount: number;
+  readonly resultAuthorityTopologyHash?: string;
+  readonly transitionBindings: readonly OperationalStateAuthorityTransitionReplaySemanticsTransitionBinding[];
+  readonly issues: readonly OperationalStateAuthorityTransitionReplaySemanticsIssue[];
+}
+
+export interface OperationalStateAuthorityTopologySettlementCandidateInput {
+  readonly candidateId: string;
+  readonly branchId: string;
+  readonly topology: OperationalStateAuthorityTopology;
+  readonly evidenceRefs?: readonly string[];
+  readonly candidateReason?: string;
+}
+
+export interface OperationalStateAuthorityTopologySettlementCandidate {
+  readonly candidateId: string;
+  readonly branchId: string;
+  readonly topology: OperationalStateAuthorityTopology;
+  readonly topologyHash: string;
+  readonly authorityRecordHash: string;
+  readonly authoritySequence: number;
+  readonly evidenceRefs: readonly string[];
+  readonly candidateReason?: string;
+  readonly candidateHash: string;
+}
+
+export interface OperationalStateAuthorityTopologySettlementClaimHashInput {
+  readonly settlementId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly selectedCandidateId: string;
+  readonly candidateSetHash: string;
+  readonly settledTopologyHash: string;
+  readonly settledAuthorityRecordHash: string;
+  readonly settledAuthoritySequence: number;
+}
+
+export interface OperationalStateAuthorityTopologySettlementProofInput {
+  readonly proofId: string;
+  readonly settlementId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly settlementAuthorityBoundary: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly candidates: readonly OperationalStateAuthorityTopologySettlementCandidateInput[];
+  readonly selectedCandidateId: string;
+  readonly settlementCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly settledAt: Timestamp | string;
+  readonly settledBy: string;
+  readonly proofReason?: string;
+}
+
+export interface OperationalStateAuthorityTopologySettlementProof {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_PROOF_SCHEMA_VERSION;
+  readonly proofId: string;
+  readonly settlementId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly settlementAuthorityBoundary: string;
+  readonly subjectKind: string;
+  readonly subjectId: string;
+  readonly subjectSequence: number;
+  readonly subjectHash: string;
+  readonly candidateSetHash: string;
+  readonly candidates: readonly OperationalStateAuthorityTopologySettlementCandidate[];
+  readonly selectedCandidateId: string;
+  readonly settledTopologyHash: string;
+  readonly settledAuthorityRecordHash: string;
+  readonly settledAuthoritySequence: number;
+  readonly settlementClaimHash: string;
+  readonly settlementCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly settledAt: Timestamp | string;
+  readonly settledBy: string;
+  readonly proofReason?: string;
+  readonly proofHash: string;
+}
+
+export type OperationalStateAuthorityTopologySettlementIssueCode =
+  | "operational_state_authority_topology_settlement_proof_missing"
+  | "operational_state_authority_topology_settlement_proof_hash_mismatch"
+  | "operational_state_authority_topology_settlement_tenant_mismatch"
+  | "operational_state_authority_topology_settlement_scope_mismatch"
+  | "operational_state_authority_topology_settlement_topology_id_mismatch"
+  | "operational_state_authority_topology_settlement_subject_mismatch"
+  | "operational_state_authority_topology_settlement_candidate_count_insufficient"
+  | "operational_state_authority_topology_settlement_candidate_duplicate"
+  | "operational_state_authority_topology_settlement_candidate_hash_mismatch"
+  | "operational_state_authority_topology_settlement_candidate_topology_hash_mismatch"
+  | "operational_state_authority_topology_settlement_candidate_scope_mismatch"
+  | "operational_state_authority_topology_settlement_candidate_set_hash_mismatch"
+  | "operational_state_authority_topology_settlement_selected_candidate_missing"
+  | "operational_state_authority_topology_settlement_selected_topology_mismatch"
+  | "operational_state_authority_topology_settlement_claim_hash_mismatch"
+  | "operational_state_authority_topology_settlement_certificate_hash_mismatch"
+  | "operational_state_authority_topology_settlement_certificate_not_certified"
+  | "operational_state_authority_topology_settlement_certificate_quorum_not_met"
+  | "operational_state_authority_topology_settlement_certificate_subject_mismatch"
+  | "operational_state_authority_topology_settlement_certificate_authority_boundary_mismatch";
+
+export interface OperationalStateAuthorityTopologySettlementIssue {
+  readonly code: OperationalStateAuthorityTopologySettlementIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface OperationalStateAuthorityTopologySettlementEvaluationInput {
+  readonly proof?: OperationalStateAuthorityTopologySettlementProof;
+  readonly expectedTenantId?: TenantId | string;
+  readonly expectedAuthorityScope?: string;
+  readonly expectedTopologyId?: string;
+  readonly expectedSubjectKind?: string;
+  readonly expectedSubjectId?: string;
+  readonly expectedSubjectSequence?: number;
+  readonly expectedSubjectHash?: string;
+  readonly requiredSettlementAuthorityBoundary?: string;
+  readonly requiredSettledTopologyHash?: string;
+}
+
+export interface OperationalStateAuthorityTopologySettlementEvaluation {
+  readonly valid: boolean;
+  readonly accepted: boolean;
+  readonly proofId?: string;
+  readonly proofHash?: string;
+  readonly settlementClaimHash?: string;
+  readonly candidateSetHash?: string;
+  readonly candidateCount: number;
+  readonly settledTopologyHash?: string;
+  readonly issues: readonly OperationalStateAuthorityTopologySettlementIssue[];
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionCheckpointInput {
+  readonly checkpointId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly transitionAdmissionStoreId: string;
+  readonly topologyId: string;
+  readonly compactedThroughAdmissionSequence: number;
+  readonly compactedThroughAuthoritySequence: number;
+  readonly compactedThroughAdmissionRecordHash: string;
+  readonly compactedThroughAuthorityRecordHash: string;
+  readonly compactedThroughAuthorityTopologyHash: string;
+  readonly retainedFromAdmissionSequence: number;
+  readonly retainedFromAuthoritySequence: number;
+  readonly sourceReplayHash: string;
+  readonly checkpointedAt: Timestamp | string;
+  readonly checkpointedBy: string;
+  readonly checkpointReason?: string;
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionCheckpoint {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SCHEMA_VERSION;
+  readonly checkpointId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly transitionAdmissionStoreId: string;
+  readonly topologyId: string;
+  readonly compactedThroughAdmissionSequence: number;
+  readonly compactedThroughAuthoritySequence: number;
+  readonly compactedThroughAdmissionRecordHash: string;
+  readonly compactedThroughAuthorityRecordHash: string;
+  readonly compactedThroughAuthorityTopologyHash: string;
+  readonly retainedFromAdmissionSequence: number;
+  readonly retainedFromAuthoritySequence: number;
+  readonly sourceReplayHash: string;
+  readonly checkpointedAt: Timestamp | string;
+  readonly checkpointedBy: string;
+  readonly checkpointReason?: string;
+  readonly checkpointHash: string;
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecordInput {
+  readonly tenantId: TenantId | string;
+  readonly checkpointAdmissionStoreId: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly transitionAdmissionStoreId: string;
+  readonly topologyId: string;
+  readonly admissionSequence: number;
+  readonly checkpoint: OperationalStateAuthorityTransitionLedgerCompactionCheckpoint;
+  readonly quorumCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly previousAdmissionRecordHash?: string;
+  readonly admittedAt: Timestamp | string;
+  readonly admittedBy: string;
+  readonly admissionReason?: string;
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_ADMISSION_SCHEMA_VERSION;
+  readonly tenantId: TenantId;
+  readonly checkpointAdmissionStoreId: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly transitionAdmissionStoreId: string;
+  readonly topologyId: string;
+  readonly admissionSequence: number;
+  readonly checkpointId: string;
+  readonly checkpointHash: string;
+  readonly compactedThroughAdmissionSequence: number;
+  readonly compactedThroughAuthoritySequence: number;
+  readonly retainedFromAdmissionSequence: number;
+  readonly retainedFromAuthoritySequence: number;
+  readonly previousAdmissionRecordHash?: string;
+  readonly checkpoint: OperationalStateAuthorityTransitionLedgerCompactionCheckpoint;
+  readonly quorumCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly admittedAt: Timestamp | string;
+  readonly admittedBy: string;
+  readonly admissionReason?: string;
+  readonly admissionRecordHash: string;
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionReplayInput {
+  readonly tenantId: TenantId | string;
+  readonly checkpointAdmissionStoreId: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly transitionAdmissionStoreId: string;
+  readonly topologyId: string;
+  readonly records: readonly OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord[];
+  readonly requiredCheckpoint?: OperationalStateAuthorityTransitionLedgerCompactionCheckpoint;
+  readonly requiredAuthorityBoundary?: string;
+  readonly requiredPruneThroughAdmissionSequence?: number;
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionReplay {
+  readonly valid: boolean;
+  readonly tenantId: TenantId | string;
+  readonly checkpointAdmissionStoreId: string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly transitionAdmissionStoreId: string;
+  readonly topologyId: string;
+  readonly admittedRecordCount: number;
+  readonly latestAdmittedRecord?: OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord;
+  readonly requiredCheckpoint?: OperationalStateAuthorityTransitionLedgerCompactionCheckpoint;
+  readonly issues: readonly OperationalStateAuthorityTransitionLedgerCompactionIssue[];
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionRetainedAdmissionRecordRef {
+  readonly admissionSequence: number;
+  readonly admissionRecordHash: string;
+  readonly previousAdmissionRecordHash?: string;
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionEvaluationInput {
+  readonly checkpoint?: OperationalStateAuthorityTransitionLedgerCompactionCheckpoint;
+  readonly retainedAdmissionRecords?: readonly OperationalStateAuthorityTransitionLedgerCompactionRetainedAdmissionRecordRef[];
+  readonly requireCheckpointAdmission?: boolean;
+  readonly checkpointAdmissionReplay?: OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionReplay;
+  readonly requiredPruneThroughAdmissionSequence?: number;
+}
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionEvaluation {
+  readonly valid: boolean;
+  readonly checkpoint?: OperationalStateAuthorityTransitionLedgerCompactionCheckpoint;
+  readonly checkpointAdmissionReplay?: OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionReplay;
+  readonly latestCheckpointAdmissionRecord?: OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord;
+  readonly issues: readonly OperationalStateAuthorityTransitionLedgerCompactionIssue[];
+}
+
+export type OperationalStateAuthorityTransitionLedgerCompactionIssueCode =
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_missing"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_hash_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_scope_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_retained_from_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_retained_suffix_gap"
+  | "operational_state_authority_transition_ledger_compaction_retained_suffix_previous_hash_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_required_prune_beyond_checkpoint"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_replay_missing"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_replay_invalid"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_not_admitted"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_fork"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_tenant_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_scope_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_boundary_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_store_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_transition_store_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_topology_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_sequence_gap"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_previous_hash_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_hash_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_checkpoint_hash_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_hash_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_not_certified"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_quorum_not_met"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_subject_mismatch"
+  | "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_authority_boundary_mismatch";
+
+export interface OperationalStateAuthorityTransitionLedgerCompactionIssue {
+  readonly code: OperationalStateAuthorityTransitionLedgerCompactionIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
 }
 
 export interface OperationalStateAuthorityBootstrapCertificateInput {
@@ -4429,7 +5234,11 @@ export type OperationalStateAuthorityTopologyCompactionIssueCode =
   | "operational_state_authority_topology_checkpoint_admission_witness_replay_missing"
   | "operational_state_authority_topology_checkpoint_admission_witness_replay_invalid"
   | "operational_state_authority_topology_checkpoint_admission_latest_record_not_witnessed"
-  | "operational_state_authority_topology_checkpoint_not_admitted";
+  | "operational_state_authority_topology_checkpoint_not_admitted"
+  | "operational_state_authority_topology_replay_semantics_proof_missing"
+  | "operational_state_authority_topology_replay_semantics_proof_invalid"
+  | "operational_state_authority_topology_settlement_proof_missing"
+  | "operational_state_authority_topology_settlement_proof_invalid";
 
 export interface OperationalStateAuthorityTopologyCompactionIssue {
   readonly code: OperationalStateAuthorityTopologyCompactionIssueCode;
@@ -4452,6 +5261,12 @@ export interface OperationalStateAuthorityTopologyCompactionEvaluationInput {
   readonly requireCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessAuthorityTopology?: boolean;
   readonly requireCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessAuthorityTransitionAdmission?: boolean;
   readonly checkpointAdmissionWitnessReplay?: OperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessReplay;
+  readonly requireReplaySemanticsProof?: boolean;
+  readonly replaySemanticsProof?: OperationalStateAuthorityTransitionReplaySemanticsProof;
+  readonly requiredReplaySemanticsManifestHash?: string;
+  readonly requireTopologySettlementProof?: boolean;
+  readonly topologySettlementProof?: OperationalStateAuthorityTopologySettlementProof;
+  readonly requiredTopologySettlementAuthorityBoundary?: string;
 }
 
 export interface OperationalStateAuthorityTopologyCompactionEvaluation {
@@ -4462,6 +5277,8 @@ export interface OperationalStateAuthorityTopologyCompactionEvaluation {
   readonly requiredTopology?: OperationalStateAuthorityTopology;
   readonly checkpointAdmissionReplay?: OperationalStateAuthorityTopologyCompactionCheckpointAdmissionReplay;
   readonly checkpointAdmissionWitnessReplay?: OperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessReplay;
+  readonly replaySemanticsProofEvaluation?: OperationalStateAuthorityTransitionReplaySemanticsEvaluation;
+  readonly topologySettlementProofEvaluation?: OperationalStateAuthorityTopologySettlementEvaluation;
   readonly latestCheckpointAdmissionRecord?: OperationalStateAuthorityTopologyCompactionCheckpointAdmissionRecord;
   readonly latestCheckpointAdmissionWitnessRecord?: OperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecord;
   readonly issues: readonly OperationalStateAuthorityTopologyCompactionIssue[];
@@ -4556,6 +5373,154 @@ export interface OperationalStateSignatureVerifierAdapterProof {
   readonly adapterClaims: readonly OperationalStateSignatureVerifierAdapterClaim[];
   readonly failureReason?: string;
   readonly proofHash: string;
+}
+
+export type OperationalStateSignatureVerifierRole = "signature_verifier";
+
+export interface OperationalStateSignatureVerifierRoleMetadataHashInput {
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly verifierId: string;
+  readonly verifierVersion: string;
+  readonly verifierRole: OperationalStateSignatureVerifierRole;
+  readonly roleMetadataSequence: number;
+  readonly allowedClaims: readonly OperationalStateSignatureVerifierAdapterClaim[];
+  readonly validFromAuthoritySequence: number;
+  readonly validThroughAuthoritySequence?: number;
+  readonly verifierKeyId?: string;
+  readonly verifierPublicKeyFingerprint?: string;
+  readonly verifierKeyMaterialHash?: string;
+  readonly previousRoleMetadataHash?: string;
+}
+
+export interface OperationalStateSignatureVerifierRoleSettlementClaimHashInput {
+  readonly settlementId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly verifierId: string;
+  readonly verifierVersion: string;
+  readonly roleMetadataSequence: number;
+  readonly roleMetadataHash: string;
+  readonly transparencyLogId: string;
+  readonly transparencyTreeHeadHash: string;
+  readonly transparencyTreeSize: number;
+  readonly transparencyInclusionProofHash: string;
+  readonly transparencyConsistencyProofHash: string;
+}
+
+export interface OperationalStateSignatureVerifierRoleSettlementProofInput {
+  readonly proofId: string;
+  readonly settlementId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly verifierId: string;
+  readonly verifierVersion: string;
+  readonly verifierRole?: OperationalStateSignatureVerifierRole;
+  readonly roleMetadataSequence: number;
+  readonly allowedClaims: readonly OperationalStateSignatureVerifierAdapterClaim[];
+  readonly validFromAuthoritySequence: number;
+  readonly validThroughAuthoritySequence?: number;
+  readonly verifierKeyId?: string;
+  readonly verifierPublicKeyFingerprint?: string;
+  readonly verifierKeyMaterialHash?: string;
+  readonly previousRoleMetadataHash?: string;
+  readonly transparencyLogId: string;
+  readonly transparencyTreeHeadHash: string;
+  readonly transparencyTreeSize: number;
+  readonly transparencyInclusionProofHash: string;
+  readonly transparencyConsistencyProofHash: string;
+  readonly settlementAuthorityBoundary: string;
+  readonly settlementCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly settledAt: Timestamp | string;
+  readonly settledBy: string;
+  readonly proofReason?: string;
+}
+
+export interface OperationalStateSignatureVerifierRoleSettlementProof {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_SIGNATURE_VERIFIER_ROLE_SETTLEMENT_PROOF_SCHEMA_VERSION;
+  readonly proofId: string;
+  readonly settlementId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly verifierId: string;
+  readonly verifierVersion: string;
+  readonly verifierRole: OperationalStateSignatureVerifierRole;
+  readonly roleMetadataSequence: number;
+  readonly allowedClaims: readonly OperationalStateSignatureVerifierAdapterClaim[];
+  readonly validFromAuthoritySequence: number;
+  readonly validThroughAuthoritySequence?: number;
+  readonly verifierKeyId?: string;
+  readonly verifierPublicKeyFingerprint?: string;
+  readonly verifierKeyMaterialHash?: string;
+  readonly previousRoleMetadataHash?: string;
+  readonly roleMetadataHash: string;
+  readonly transparencyLogId: string;
+  readonly transparencyTreeHeadHash: string;
+  readonly transparencyTreeSize: number;
+  readonly transparencyInclusionProofHash: string;
+  readonly transparencyConsistencyProofHash: string;
+  readonly settlementAuthorityBoundary: string;
+  readonly settlementClaimHash: string;
+  readonly settlementCertificate: OperationalStateQuorumCertificateProofCertificate;
+  readonly settledAt: Timestamp | string;
+  readonly settledBy: string;
+  readonly proofReason?: string;
+  readonly proofHash: string;
+}
+
+export type OperationalStateSignatureVerifierRoleSettlementIssueCode =
+  | "operational_state_signature_verifier_role_settlement_proof_missing"
+  | "operational_state_signature_verifier_role_settlement_proof_hash_mismatch"
+  | "operational_state_signature_verifier_role_settlement_tenant_mismatch"
+  | "operational_state_signature_verifier_role_settlement_scope_mismatch"
+  | "operational_state_signature_verifier_role_settlement_verifier_mismatch"
+  | "operational_state_signature_verifier_role_settlement_role_mismatch"
+  | "operational_state_signature_verifier_role_settlement_claim_overreach"
+  | "operational_state_signature_verifier_role_settlement_expected_claim_missing"
+  | "operational_state_signature_verifier_role_settlement_key_material_missing"
+  | "operational_state_signature_verifier_role_settlement_transparency_missing"
+  | "operational_state_signature_verifier_role_settlement_currentness_mismatch"
+  | "operational_state_signature_verifier_role_settlement_metadata_hash_mismatch"
+  | "operational_state_signature_verifier_role_settlement_claim_hash_mismatch"
+  | "operational_state_signature_verifier_role_settlement_certificate_hash_mismatch"
+  | "operational_state_signature_verifier_role_settlement_certificate_not_certified"
+  | "operational_state_signature_verifier_role_settlement_certificate_quorum_not_met"
+  | "operational_state_signature_verifier_role_settlement_certificate_subject_mismatch"
+  | "operational_state_signature_verifier_role_settlement_certificate_authority_boundary_mismatch";
+
+export interface OperationalStateSignatureVerifierRoleSettlementIssue {
+  readonly code: OperationalStateSignatureVerifierRoleSettlementIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface OperationalStateSignatureVerifierRoleSettlementEvaluationInput {
+  readonly proof?: OperationalStateSignatureVerifierRoleSettlementProof;
+  readonly expectedTenantId?: TenantId | string;
+  readonly expectedAuthorityScope?: string;
+  readonly expectedVerifierId?: string;
+  readonly expectedVerifierVersion?: string;
+  readonly expectedAllowedClaims?: readonly OperationalStateSignatureVerifierAdapterClaim[];
+  readonly requiredSettlementAuthorityBoundary?: string;
+  readonly requiredTransparencyLogId?: string;
+  readonly requiredAuthoritySequence?: number;
+}
+
+export interface OperationalStateSignatureVerifierRoleSettlementEvaluation {
+  readonly valid: boolean;
+  readonly accepted: boolean;
+  readonly proofId?: string;
+  readonly proofHash?: string;
+  readonly verifierId?: string;
+  readonly verifierVersion?: string;
+  readonly roleMetadataHash?: string;
+  readonly settlementClaimHash?: string;
+  readonly transparencyLogId?: string;
+  readonly transparencyTreeHeadHash?: string;
+  readonly allowedClaims: readonly OperationalStateSignatureVerifierAdapterClaim[];
+  readonly issues: readonly OperationalStateSignatureVerifierRoleSettlementIssue[];
 }
 
 export interface OperationalStateSignatureVerifierAdapterProofAdmissionRecordInput {
@@ -4838,6 +5803,8 @@ export type OperationalStateSignatureVerifierAdapterIssueCode =
   | "operational_state_signature_verifier_key_not_current"
   | "operational_state_signature_verifier_adapter_not_allowed"
   | "operational_state_signature_verifier_adapter_authority_claim"
+  | "operational_state_signature_verifier_role_settlement_proof_missing"
+  | "operational_state_signature_verifier_role_settlement_proof_invalid"
   | "operational_state_signature_verifier_signature_invalid"
   | "operational_state_signature_verifier_proof_admission_replay_missing"
   | "operational_state_signature_verifier_proof_admission_replay_invalid"
@@ -4960,6 +5927,10 @@ export interface OperationalStateSignatureVerifierAdapterEvaluationInput {
   readonly expectedSignatureHash: string;
   readonly allowedVerifierIds?: readonly string[];
   readonly requireActiveKey?: boolean;
+  readonly requireVerifierRoleSettlementProof?: boolean;
+  readonly verifierRoleSettlementProof?: OperationalStateSignatureVerifierRoleSettlementProof;
+  readonly requiredVerifierRoleSettlementAuthorityBoundary?: string;
+  readonly requiredVerifierTransparencyLogId?: string;
   readonly requireProofAdmission?: boolean;
   readonly proofAdmissionReplay?: OperationalStateSignatureVerifierAdapterProofAdmissionReplay;
   readonly requireProofAdmissionWitnessQuorum?: boolean;
@@ -4976,6 +5947,7 @@ export interface OperationalStateSignatureVerifierAdapterEvaluation {
   readonly accepted: boolean;
   readonly keyBinding?: OperationalStateSignatureKeyBinding;
   readonly proof?: OperationalStateSignatureVerifierAdapterProof;
+  readonly verifierRoleSettlementProofEvaluation?: OperationalStateSignatureVerifierRoleSettlementEvaluation;
   readonly proofAdmissionReplay?: OperationalStateSignatureVerifierAdapterProofAdmissionReplay;
   readonly requiredProofAdmissionRecord?: OperationalStateSignatureVerifierAdapterProofAdmissionRecord;
   readonly proofAdmissionWitnessReplay?: OperationalStateSignatureVerifierAdapterProofAdmissionWitnessReplay;
@@ -5060,6 +6032,100 @@ export interface OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord
   readonly admittedBy: string;
   readonly admissionReason?: string;
   readonly admissionRecordHash: string;
+}
+
+export type OperationalStateAuthorityEpochSealFinalityConflictKind =
+  | "sealed_authority_topology_conflict"
+  | "sealed_quorum_certificate_conflict"
+  | "authority_transition_conflict";
+
+export interface OperationalStateAuthorityEpochSealAccountableFinalityEvidenceInput {
+  readonly evidenceId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly finalizerProofAdmissionAuthorityBoundary: string;
+  readonly firstFinalizerProofAdmissionRecord: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord;
+  readonly secondFinalizerProofAdmissionRecord: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly evidenceReason?: string;
+}
+
+export interface OperationalStateAuthorityEpochSealAccountableFinalityEvidence {
+  readonly schemaVersion: typeof OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_ACCOUNTABLE_FINALITY_EVIDENCE_SCHEMA_VERSION;
+  readonly evidenceId: string;
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly authorityBoundary: string;
+  readonly finalizerProofAdmissionAuthorityBoundary: string;
+  readonly sealedSubjectKind: string;
+  readonly sealedSubjectId: string;
+  readonly sealedSubjectSequence: number;
+  readonly firstFinalizerProofAdmissionRecord: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord;
+  readonly secondFinalizerProofAdmissionRecord: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord;
+  readonly firstFinalizerProofHash: string;
+  readonly secondFinalizerProofHash: string;
+  readonly firstSealPayloadHash: string;
+  readonly secondSealPayloadHash: string;
+  readonly firstAdmissionRecordHash: string;
+  readonly secondAdmissionRecordHash: string;
+  readonly firstAdmissionCertificateHash: string;
+  readonly secondAdmissionCertificateHash: string;
+  readonly sharedAcceptedWitnessIds: readonly string[];
+  readonly conflictKinds: readonly OperationalStateAuthorityEpochSealFinalityConflictKind[];
+  readonly conflictHash: string;
+  readonly recordedAt: Timestamp | string;
+  readonly recordedBy: string;
+  readonly evidenceReason?: string;
+  readonly evidenceHash: string;
+}
+
+export type OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssueCode =
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_missing"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_hash_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_tenant_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_scope_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_boundary_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_record_hash_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_proof_hash_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_hash_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_not_certified"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_quorum_not_met"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_subject_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_subject_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_no_conflict"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_shared_witness_missing"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_shared_witness_mismatch"
+  | "operational_state_authority_epoch_seal_accountable_finality_evidence_conflict_hash_mismatch";
+
+export interface OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue {
+  readonly code: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssueCode;
+  readonly path: string;
+  readonly message: string;
+  readonly expected?: string | number;
+  readonly actual?: string | number;
+}
+
+export interface OperationalStateAuthorityEpochSealAccountableFinalityEvidenceEvaluationInput {
+  readonly evidence?: OperationalStateAuthorityEpochSealAccountableFinalityEvidence;
+  readonly expectedTenantId?: TenantId | string;
+  readonly expectedAuthorityScope?: string;
+  readonly expectedAuthorityBoundary?: string;
+  readonly expectedFinalizerProofAdmissionAuthorityBoundary?: string;
+  readonly expectedSealedSubjectKind?: string;
+  readonly expectedSealedSubjectId?: string;
+  readonly expectedSealedSubjectSequence?: number;
+  readonly expectedFinalizerProofHash?: string;
+}
+
+export interface OperationalStateAuthorityEpochSealAccountableFinalityEvidenceEvaluation {
+  readonly valid: boolean;
+  readonly obstructsOperationalFinality: boolean;
+  readonly evidence?: OperationalStateAuthorityEpochSealAccountableFinalityEvidence;
+  readonly sharedAcceptedWitnessIds: readonly string[];
+  readonly conflictKinds: readonly OperationalStateAuthorityEpochSealFinalityConflictKind[];
+  readonly issues: readonly OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue[];
 }
 
 export interface OperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecordInput {
@@ -5308,6 +6374,8 @@ export type OperationalStateAuthorityEpochSealFinalizerIssueCode =
   | "operational_state_authority_epoch_seal_finalizer_seal_payload_mismatch"
   | "operational_state_authority_epoch_seal_finalizer_transition_hash_mismatch"
   | "operational_state_authority_epoch_seal_finalizer_sealed_frontier_invalid"
+  | "operational_state_authority_epoch_seal_finalizer_accountable_finality_evidence_invalid"
+  | "operational_state_authority_epoch_seal_finalizer_accountable_finality_conflict"
   | "operational_state_authority_epoch_seal_finalizer_proof_admission_replay_missing"
   | "operational_state_authority_epoch_seal_finalizer_proof_admission_replay_invalid"
   | "operational_state_authority_epoch_seal_finalizer_proof_admission_record_fork"
@@ -5452,6 +6520,7 @@ export interface OperationalStateAuthorityEpochSealFinalizerEvaluationInput {
   readonly finalizerProofAdmissionWitnessReplay?: OperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessReplay;
   readonly requireVerifierProofAdmission?: boolean;
   readonly verifierProofAdmissionReplay?: OperationalStateSignatureVerifierAdapterProofAdmissionReplay;
+  readonly accountableFinalityEvidence?: OperationalStateAuthorityEpochSealAccountableFinalityEvidence;
 }
 
 export interface OperationalStateAuthorityEpochSealFinalizerEvaluation {
@@ -5459,6 +6528,7 @@ export interface OperationalStateAuthorityEpochSealFinalizerEvaluation {
   readonly accepted: boolean;
   readonly finalizerProof?: OperationalStateAuthorityEpochSealFinalizerProof;
   readonly verifierEvaluation?: OperationalStateSignatureVerifierAdapterEvaluation;
+  readonly accountableFinalityEvidenceEvaluation?: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceEvaluation;
   readonly finalizerProofAdmissionReplay?: OperationalStateAuthorityEpochSealFinalizerProofAdmissionReplay;
   readonly requiredFinalizerProofAdmissionRecord?: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord;
   readonly finalizerProofAdmissionWitnessReplay?: OperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessReplay;
@@ -5682,6 +6752,9 @@ export interface ActionProposalReviewOptions {
   readonly pruningPolicyCompilation?: OperationalStatePruningPolicyCompilation;
   readonly requirePruningPolicyAdmission?: boolean;
   readonly pruningPolicyAdmissionReplay?: OperationalStatePruningPolicyAdmissionReplay;
+  readonly pruningPolicyPrivacyPreservingPolicyProof?: OperationalStatePrivacyPreservingPolicyProof;
+  readonly requirePruningPolicyPrivacyPreservingPolicyProof?: boolean;
+  readonly allowedPruningPolicyPrivacyPreservingPolicyProofVerifierIds?: readonly string[];
   readonly requirePruningPolicyAdmissionWitnessQuorum?: boolean;
   readonly requirePruningPolicyAdmissionWitnessAuthorityTopology?: boolean;
   readonly requirePruningPolicyAdmissionWitnessAuthorityTransitionAdmission?: boolean;
@@ -12199,6 +13272,77 @@ export function verifyOperationalStatePruningPolicyAdmissionWitnessRecordHash(
   };
 }
 
+export function buildOperationalStatePrivacyPreservingPolicyProof(
+  input: OperationalStatePrivacyPreservingPolicyProofInput,
+): OperationalStatePrivacyPreservingPolicyProof {
+  const payload: Omit<
+    OperationalStatePrivacyPreservingPolicyProof,
+    "policyProofHash"
+  > = {
+    schemaVersion: OPERATIONAL_STATE_PRIVACY_PRESERVING_POLICY_PROOF_SCHEMA_VERSION,
+    proofId: input.proofId,
+    tenantId: tenantId(String(input.tenantId)),
+    policyStoreId: input.policyStoreId,
+    authorityScope: input.authorityScope,
+    authorityBoundary: input.authorityBoundary,
+    subjectKind:
+      input.subjectKind ??
+      OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_RECORD_SUBJECT_KIND,
+    subjectId: input.subjectId ?? input.policyStoreId,
+    subjectSequence: input.subjectSequence,
+    subjectHash: input.subjectHash,
+    policyId: input.policyId,
+    policyHash: input.policyHash,
+    policyRecordHash: input.policyRecordHash,
+    proofSystem: input.proofSystem,
+    ...(input.proofSystemVersion !== undefined
+      ? { proofSystemVersion: input.proofSystemVersion }
+      : {}),
+    verifierId: input.verifierId,
+    ...(input.verifierVersion !== undefined
+      ? { verifierVersion: input.verifierVersion }
+      : {}),
+    verificationKeyHash: input.verificationKeyHash,
+    publicStatementHash: input.publicStatementHash,
+    predicateCommitmentHash: input.predicateCommitmentHash,
+    hiddenWitnessCommitmentHash: input.hiddenWitnessCommitmentHash,
+    proofTranscriptHash: input.proofTranscriptHash,
+    challengeNonce: input.challengeNonce,
+    verifiedAt: input.verifiedAt,
+    result: input.result,
+    disclosedClaimHashes: [...(input.disclosedClaimHashes ?? [])],
+    adapterClaims: [...(input.adapterClaims ?? [])],
+    privateInputRefs: [...(input.privateInputRefs ?? [])],
+  };
+  return {
+    ...payload,
+    policyProofHash:
+      computeOperationalStatePrivacyPreservingPolicyProofHash(payload),
+  };
+}
+
+export function computeOperationalStatePrivacyPreservingPolicyProofHash(
+  proof: Omit<
+    OperationalStatePrivacyPreservingPolicyProof,
+    "policyProofHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(proof));
+}
+
+export function verifyOperationalStatePrivacyPreservingPolicyProofHash(
+  proof: OperationalStatePrivacyPreservingPolicyProof,
+): StateReviewArtifactHashValidation {
+  const { policyProofHash, ...payload } = proof;
+  const expectedHash =
+    computeOperationalStatePrivacyPreservingPolicyProofHash(payload);
+  return {
+    valid: policyProofHash === expectedHash,
+    expectedHash,
+    actualHash: policyProofHash,
+  };
+}
+
 export function computeOperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecordHash(
   record: Omit<
     OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecord,
@@ -13468,6 +14612,18 @@ function pushOperationalStatePruningPolicyIssue(
   issues.push(issue);
 }
 
+const operationalStatePrivacyPreservingPolicyProofAdapterClaimAllowlist =
+  new Set([
+    "policy_predicate_satisfied",
+    "credential_commitment_verified",
+    "credential_not_revoked",
+    "proof_challenge_bound",
+  ]);
+
+function operationalStatePolicyProofFieldIsMissing(value: string): boolean {
+  return value.trim().length === 0;
+}
+
 export function replayOperationalStatePruningPolicyAdmissionRecords(
   input: OperationalStatePruningPolicyAdmissionReplayInput,
 ): OperationalStatePruningPolicyAdmissionReplay {
@@ -14383,6 +15539,188 @@ export function evaluateOperationalStatePruningPolicyAdmission(
     });
   }
 
+  const privacyPreservingPolicyProof = input.privacyPreservingPolicyProof;
+  if (
+    input.requirePrivacyPreservingPolicyProof === true ||
+    privacyPreservingPolicyProof !== undefined
+  ) {
+    if (privacyPreservingPolicyProof === undefined) {
+      pushOperationalStatePruningPolicyIssue(issues, {
+        code: "operational_state_pruning_policy_privacy_proof_missing",
+        path: "/pruningPolicyAdmission/privacyPreservingPolicyProof",
+        message:
+          "Compiled pruning policy requires a replayable privacy-preserving policy proof before it can authorize operational state.",
+      });
+    } else {
+      const { policyProofHash, ...privacyProofPayload } =
+        privacyPreservingPolicyProof;
+      const expectedPolicyProofHash =
+        computeOperationalStatePrivacyPreservingPolicyProofHash(
+          privacyProofPayload,
+        );
+      if (policyProofHash !== expectedPolicyProofHash) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_hash_mismatch",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/policyProofHash",
+          message:
+            "Privacy-preserving policy proof hash does not match its replayable proof payload.",
+          expected: expectedPolicyProofHash,
+          actual: policyProofHash,
+        });
+      }
+      if (privacyPreservingPolicyProof.result !== "valid") {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_invalid",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/result",
+          message:
+            "Privacy-preserving policy proof cannot authorize policy admission unless its verifier result is valid.",
+          expected: "valid",
+          actual: privacyPreservingPolicyProof.result,
+        });
+      }
+      if (
+        privacyPreservingPolicyProof.tenantId !== input.compilation.tenantId
+      ) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_tenant_mismatch",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/tenantId",
+          message:
+            "Privacy-preserving policy proof tenant does not match the compiled policy tenant.",
+          expected: input.compilation.tenantId,
+          actual: privacyPreservingPolicyProof.tenantId,
+        });
+      }
+      if (
+        privacyPreservingPolicyProof.authorityScope !==
+        input.compilation.authorityScope
+      ) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_scope_mismatch",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/authorityScope",
+          message:
+            "Privacy-preserving policy proof authority scope does not match the compiled policy scope.",
+          expected: input.compilation.authorityScope,
+          actual: privacyPreservingPolicyProof.authorityScope,
+        });
+      }
+      if (
+        privacyPreservingPolicyProof.policyId !== input.compilation.policyId ||
+        privacyPreservingPolicyProof.policyHash !==
+          input.compilation.policyHash
+      ) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_policy_mismatch",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/policyHash",
+          message:
+            "Privacy-preserving policy proof does not bind to the compiled pruning policy.",
+          expected: input.compilation.policyHash,
+          actual: privacyPreservingPolicyProof.policyHash,
+        });
+      }
+      if (
+        latestAdmittedRecord !== undefined &&
+        (privacyPreservingPolicyProof.policyStoreId !==
+          latestAdmittedRecord.policyStoreId ||
+          privacyPreservingPolicyProof.subjectKind !==
+            OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_RECORD_SUBJECT_KIND ||
+          privacyPreservingPolicyProof.subjectId !==
+            latestAdmittedRecord.policyStoreId ||
+          privacyPreservingPolicyProof.subjectSequence !==
+            latestAdmittedRecord.policySequence ||
+          privacyPreservingPolicyProof.subjectHash !==
+            latestAdmittedRecord.policyRecordHash ||
+          privacyPreservingPolicyProof.policyRecordHash !==
+            latestAdmittedRecord.policyRecordHash ||
+          privacyPreservingPolicyProof.policyId !==
+            latestAdmittedRecord.policyId ||
+          privacyPreservingPolicyProof.policyHash !==
+            latestAdmittedRecord.policyHash)
+      ) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_subject_mismatch",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/subjectHash",
+          message:
+            "Privacy-preserving policy proof does not bind to the latest replayed policy-admission record.",
+          expected: latestAdmittedRecord.policyRecordHash,
+          actual: privacyPreservingPolicyProof.subjectHash,
+        });
+      }
+      if (
+        (input.allowedPrivacyPreservingPolicyProofVerifierIds?.length ?? 0) >
+          0 &&
+        !input.allowedPrivacyPreservingPolicyProofVerifierIds?.includes(
+          privacyPreservingPolicyProof.verifierId,
+        )
+      ) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_verifier_not_allowed",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/verifierId",
+          message:
+            "Privacy-preserving policy proof was produced by a verifier outside the allowed policy-authority set.",
+          expected:
+            input.allowedPrivacyPreservingPolicyProofVerifierIds?.join(",") ??
+            "",
+          actual: privacyPreservingPolicyProof.verifierId,
+        });
+      }
+      if (privacyPreservingPolicyProof.privateInputRefs.length > 0) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_private_input_disclosed",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/privateInputRefs",
+          message:
+            "Privacy-preserving policy proof cannot disclose private witness or delegation material into operational state.",
+          actual: privacyPreservingPolicyProof.privateInputRefs.join(","),
+        });
+      }
+      const missingProofField = [
+        [
+          "verificationKeyHash",
+          privacyPreservingPolicyProof.verificationKeyHash,
+        ],
+        [
+          "publicStatementHash",
+          privacyPreservingPolicyProof.publicStatementHash,
+        ],
+        [
+          "predicateCommitmentHash",
+          privacyPreservingPolicyProof.predicateCommitmentHash,
+        ],
+        [
+          "hiddenWitnessCommitmentHash",
+          privacyPreservingPolicyProof.hiddenWitnessCommitmentHash,
+        ],
+        ["proofTranscriptHash", privacyPreservingPolicyProof.proofTranscriptHash],
+        ["challengeNonce", privacyPreservingPolicyProof.challengeNonce],
+      ].find(([, value]) =>
+        operationalStatePolicyProofFieldIsMissing(String(value)),
+      );
+      if (missingProofField !== undefined) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_statement_missing",
+          path: `/pruningPolicyAdmission/privacyPreservingPolicyProof/${missingProofField[0]}`,
+          message:
+            "Privacy-preserving policy proof must carry replayable verifier material, public statement, hidden-witness commitment, transcript, and challenge.",
+        });
+      }
+      const claimOverreach =
+        privacyPreservingPolicyProof.adapterClaims.find(
+          (claim) =>
+            !operationalStatePrivacyPreservingPolicyProofAdapterClaimAllowlist.has(
+              claim,
+            ),
+        );
+      if (claimOverreach !== undefined) {
+        pushOperationalStatePruningPolicyIssue(issues, {
+          code: "operational_state_pruning_policy_privacy_proof_claim_overreach",
+          path: "/pruningPolicyAdmission/privacyPreservingPolicyProof/adapterClaims",
+          message:
+            "Privacy-preserving policy proof adapter claims may prove only credential predicates, not operational authority, currentness, or admission.",
+          actual: claimOverreach,
+        });
+      }
+    }
+  }
+
   const admissionWitnessReplay = input.admissionWitnessReplay;
   const latestWitnessRecord =
     admissionWitnessReplay?.requiredAdmissionWitnessRecord;
@@ -14575,6 +15913,9 @@ export function evaluateOperationalStatePruningPolicyAdmission(
     policyHash: input.compilation.policyHash,
     admissionReplay: input.admissionReplay,
     ...(admissionWitnessReplay !== undefined ? { admissionWitnessReplay } : {}),
+    ...(privacyPreservingPolicyProof !== undefined
+      ? { privacyPreservingPolicyProof }
+      : {}),
     ...(latestAdmittedRecord !== undefined ? { latestAdmittedRecord } : {}),
     ...(latestWitnessRecord !== undefined ? { latestWitnessRecord } : {}),
     issues,
@@ -14881,6 +16222,104 @@ export function verifyOperationalStateStorageMutationGuardAuthorizationAdmission
     valid: witnessRecordHash === expectedHash,
     expectedHash,
     actualHash: witnessRecordHash,
+  };
+}
+
+function operationalStateUniqueSortedStringList(
+  values: readonly string[],
+): readonly string[] {
+  return [...new Set(values)].sort();
+}
+
+function operationalStateIntersectStringLists(
+  left: readonly string[],
+  right: readonly string[],
+): readonly string[] {
+  const rightSet = new Set(right);
+  return operationalStateUniqueSortedStringList(
+    left.filter((value) => rightSet.has(value)),
+  );
+}
+
+export function buildOperationalStateSeparationOfDutyProof(
+  input: OperationalStateSeparationOfDutyProofInput,
+): OperationalStateSeparationOfDutyProof {
+  const admissionAuthorityIds = operationalStateUniqueSortedStringList(
+    input.admissionAuthorityIds,
+  );
+  const executionAuthorityIds = operationalStateUniqueSortedStringList(
+    input.executionAuthorityIds,
+  );
+  const computedConflictAuthorityIds = operationalStateIntersectStringLists(
+    admissionAuthorityIds,
+    executionAuthorityIds,
+  );
+  const payload: Omit<
+    OperationalStateSeparationOfDutyProof,
+    "separationOfDutyProofHash"
+  > = {
+    schemaVersion: OPERATIONAL_STATE_SEPARATION_OF_DUTY_PROOF_SCHEMA_VERSION,
+    proofId: input.proofId,
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    authorityBoundary: input.authorityBoundary,
+    subjectKind:
+      input.subjectKind ??
+      OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_RECORD_SUBJECT_KIND,
+    subjectId: input.subjectId,
+    subjectSequence: input.subjectSequence,
+    subjectHash: input.subjectHash,
+    guardId: input.guardId,
+    protectedSchema: input.protectedSchema,
+    protectedTable: input.protectedTable,
+    operation: input.operation,
+    targetSequence: input.targetSequence,
+    authorizationHash: input.authorizationHash,
+    admissionRecordHash: input.admissionRecordHash,
+    admissionRole: input.admissionRole,
+    executionRole: input.executionRole,
+    admissionAuthorityIds,
+    executionAuthorityIds,
+    conflictAuthorityIds:
+      input.conflictAuthorityIds !== undefined
+        ? operationalStateUniqueSortedStringList(input.conflictAuthorityIds)
+        : computedConflictAuthorityIds,
+    disjoint: input.disjoint,
+    proofRule: input.proofRule,
+    ...(input.proofReason !== undefined
+      ? { proofReason: input.proofReason }
+      : {}),
+    evaluatedAt: input.evaluatedAt,
+    evaluatedBy: input.evaluatedBy,
+    ...(input.verifierId !== undefined ? { verifierId: input.verifierId } : {}),
+    result: input.result,
+    adapterClaims: [...(input.adapterClaims ?? [])],
+  };
+  return {
+    ...payload,
+    separationOfDutyProofHash:
+      computeOperationalStateSeparationOfDutyProofHash(payload),
+  };
+}
+
+export function computeOperationalStateSeparationOfDutyProofHash(
+  proof: Omit<
+    OperationalStateSeparationOfDutyProof,
+    "separationOfDutyProofHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(proof));
+}
+
+export function verifyOperationalStateSeparationOfDutyProofHash(
+  proof: OperationalStateSeparationOfDutyProof,
+): StateReviewArtifactHashValidation {
+  const { separationOfDutyProofHash, ...payload } = proof;
+  const expectedHash = computeOperationalStateSeparationOfDutyProofHash(payload);
+  return {
+    valid: separationOfDutyProofHash === expectedHash,
+    expectedHash,
+    actualHash: separationOfDutyProofHash,
   };
 }
 
@@ -15506,6 +16945,12 @@ function pushOperationalStateStorageMutationGuardIssue(
 ): void {
   issues.push(issue);
 }
+
+const operationalStateSeparationOfDutyProofAdapterClaimAllowlist = new Set([
+  "admission_execution_disjoint",
+  "executor_bound_to_request",
+  "admission_path_bound_to_record",
+]);
 
 export function replayOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmissionRecords(
   input: OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmissionReplayInput,
@@ -17137,6 +18582,8 @@ export function evaluateOperationalStateStorageMutationGuard(
   }
   if (
     input.requireAuthorizationAdmission === true ||
+    input.requireSeparationOfDutyProof === true ||
+    input.separationOfDutyProof !== undefined ||
     input.requireAuthorizationAdmissionWitnessQuorum === true ||
     input.requireAuthorizationAdmissionWitnessAuthorityTopology === true ||
     input.requireAuthorizationAdmissionWitnessAuthorityTransitionAdmission ===
@@ -17396,6 +18843,196 @@ export function evaluateOperationalStateStorageMutationGuard(
     }
   }
 
+  const separationOfDutyProof = input.separationOfDutyProof;
+  if (
+    input.requireSeparationOfDutyProof === true ||
+    separationOfDutyProof !== undefined
+  ) {
+    if (separationOfDutyProof === undefined) {
+      issues.push({
+        code: "operational_state_storage_mutation_separation_of_duty_proof_missing",
+        path: "/separationOfDutyProof",
+        message:
+          "Storage mutation cannot consume admitted authorization without a replayable separation-of-duty proof for admission and execution authority paths.",
+      });
+    } else {
+      const { separationOfDutyProofHash, ...separationOfDutyPayload } =
+        separationOfDutyProof;
+      const expectedProofHash =
+        computeOperationalStateSeparationOfDutyProofHash(
+          separationOfDutyPayload,
+        );
+      if (separationOfDutyProofHash !== expectedProofHash) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_hash_mismatch",
+          path: "/separationOfDutyProof/separationOfDutyProofHash",
+          message:
+            "Separation-of-duty proof hash does not match its replayable proof payload.",
+          expected: expectedProofHash,
+          actual: separationOfDutyProofHash,
+        });
+      }
+      if (separationOfDutyProof.result !== "valid") {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_invalid",
+          path: "/separationOfDutyProof/result",
+          message:
+            "Separation-of-duty proof cannot authorize protected mutation unless its verifier result is valid.",
+          expected: "valid",
+          actual: separationOfDutyProof.result,
+        });
+      }
+      if (separationOfDutyProof.tenantId !== tenantId(String(request.tenantId))) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_tenant_mismatch",
+          path: "/separationOfDutyProof/tenantId",
+          message:
+            "Separation-of-duty proof tenant does not match the mutation request tenant.",
+          expected: String(request.tenantId),
+          actual: separationOfDutyProof.tenantId,
+        });
+      }
+      if (
+        admissionWitnessReplay !== undefined &&
+        separationOfDutyProof.authorityScope !==
+          admissionWitnessReplay.authorityScope
+      ) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_scope_mismatch",
+          path: "/separationOfDutyProof/authorityScope",
+          message:
+            "Separation-of-duty proof authority scope does not match the replayed guard-admission witness scope.",
+          expected: admissionWitnessReplay.authorityScope,
+          actual: separationOfDutyProof.authorityScope,
+        });
+      }
+      if (
+        separationOfDutyProof.guardId !== request.guardId ||
+        separationOfDutyProof.protectedSchema !== request.protectedSchema ||
+        separationOfDutyProof.protectedTable !== request.protectedTable ||
+        separationOfDutyProof.operation !== request.operation ||
+        separationOfDutyProof.targetSequence !== request.targetSequence ||
+        separationOfDutyProof.authorizationHash !==
+          matchedAuthorization.authorizationHash
+      ) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_authorization_mismatch",
+          path: "/separationOfDutyProof/authorizationHash",
+          message:
+            "Separation-of-duty proof does not bind to the requested protected mutation authorization.",
+          expected: matchedAuthorization.authorizationHash,
+          actual: separationOfDutyProof.authorizationHash,
+        });
+      }
+      if (
+        latestAdmittedRecord !== undefined &&
+        (separationOfDutyProof.subjectKind !==
+          OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_RECORD_SUBJECT_KIND ||
+          separationOfDutyProof.subjectId !==
+            operationalStateStorageMutationGuardAuthorizationAdmissionSubjectId(
+              latestAdmittedRecord,
+            ) ||
+          separationOfDutyProof.subjectSequence !==
+            latestAdmittedRecord.admissionSequence ||
+          separationOfDutyProof.subjectHash !==
+            latestAdmittedRecord.admissionRecordHash ||
+          separationOfDutyProof.admissionRecordHash !==
+            latestAdmittedRecord.admissionRecordHash ||
+          separationOfDutyProof.admissionRole !==
+            latestAdmittedRecord.admissionRole)
+      ) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_subject_mismatch",
+          path: "/separationOfDutyProof/subjectHash",
+          message:
+            "Separation-of-duty proof does not bind to the latest replayed guard authorization admission record.",
+          expected: latestAdmittedRecord.admissionRecordHash,
+          actual: separationOfDutyProof.subjectHash,
+        });
+      }
+      const requiredAdmissionAuthorityIds =
+        latestAdmissionWitnessRecord !== undefined
+          ? latestAdmissionWitnessRecord.admissionCertificate.acceptedWitnessIds
+          : latestAdmittedRecord !== undefined
+            ? [latestAdmittedRecord.admittedBy]
+            : [];
+      const proofAdmissionAuthorityIds = new Set(
+        separationOfDutyProof.admissionAuthorityIds,
+      );
+      const missingAdmissionAuthorityId =
+        requiredAdmissionAuthorityIds.find(
+          (authorityId) => !proofAdmissionAuthorityIds.has(authorityId),
+        );
+      if (
+        requiredAdmissionAuthorityIds.length === 0 ||
+        separationOfDutyProof.admissionAuthorityIds.length === 0 ||
+        missingAdmissionAuthorityId !== undefined
+      ) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_admission_path_mismatch",
+          path: "/separationOfDutyProof/admissionAuthorityIds",
+          message:
+            "Separation-of-duty proof admission path must include the replayed admission authority path.",
+          expected: requiredAdmissionAuthorityIds.join(","),
+          actual: separationOfDutyProof.admissionAuthorityIds.join(","),
+        });
+      }
+      if (
+        separationOfDutyProof.executionRole.trim().length === 0 ||
+        separationOfDutyProof.executionAuthorityIds.length === 0
+      ) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_executor_missing",
+          path: "/separationOfDutyProof/executionAuthorityIds",
+          message:
+            "Separation-of-duty proof must bind the protected mutation to an execution role and at least one execution authority id.",
+        });
+      }
+      const computedConflictAuthorityIds = operationalStateIntersectStringLists(
+        separationOfDutyProof.admissionAuthorityIds,
+        separationOfDutyProof.executionAuthorityIds,
+      );
+      const recordedConflictAuthorityIds =
+        operationalStateUniqueSortedStringList(
+          separationOfDutyProof.conflictAuthorityIds,
+        );
+      if (
+        !separationOfDutyProof.disjoint ||
+        computedConflictAuthorityIds.length > 0 ||
+        recordedConflictAuthorityIds.length > 0 ||
+        recordedConflictAuthorityIds.join(",") !==
+          computedConflictAuthorityIds.join(",")
+      ) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_conflict",
+          path: "/separationOfDutyProof/conflictAuthorityIds",
+          message:
+            "Separation-of-duty proof cannot authorize protected mutation when admission and execution authority paths overlap.",
+          expected: "disjoint",
+          actual:
+            computedConflictAuthorityIds.join(",") ||
+            recordedConflictAuthorityIds.join(",") ||
+            "not-disjoint",
+        });
+      }
+      const claimOverreach = separationOfDutyProof.adapterClaims.find(
+        (claim) =>
+          !operationalStateSeparationOfDutyProofAdapterClaimAllowlist.has(
+            claim,
+          ),
+      );
+      if (claimOverreach !== undefined) {
+        issues.push({
+          code: "operational_state_storage_mutation_separation_of_duty_proof_claim_overreach",
+          path: "/separationOfDutyProof/adapterClaims",
+          message:
+            "Separation-of-duty proof adapter claims may prove only path separation, not operational mutation authority, admission, or finality.",
+          actual: claimOverreach,
+        });
+      }
+    }
+  }
+
   return {
     valid: issues.length === 0,
     matchedAuthorization,
@@ -17405,6 +19042,7 @@ export function evaluateOperationalStateStorageMutationGuard(
     ...(admissionWitnessReplay !== undefined
       ? { authorizationAdmissionWitnessReplay: admissionWitnessReplay }
       : {}),
+    ...(separationOfDutyProof !== undefined ? { separationOfDutyProof } : {}),
     ...(latestAdmittedRecord !== undefined ? { latestAdmittedRecord } : {}),
     ...(latestAdmissionWitnessRecord !== undefined
       ? { latestAdmissionWitnessRecord }
@@ -23249,6 +24887,567 @@ export function verifyOperationalStateQuorumCertificateProofCertificateHash(
   };
 }
 
+function normalizeOperationalStateCompositionalQuorumClaim(
+  claim: OperationalStateCompositionalQuorumClaimInput,
+): OperationalStateCompositionalQuorumClaim {
+  return {
+    claimId: claim.claimId,
+    ...(claim.laneId !== undefined ? { laneId: claim.laneId } : {}),
+    authorityScope: claim.authorityScope,
+    authorityBoundary: claim.authorityBoundary,
+    topologyId: claim.topologyId,
+    authorityTopology: claim.authorityTopology,
+    authorityTopologyHash: claim.authorityTopology.topologyHash,
+    quorumCertificate: claim.quorumCertificate,
+    quorumCertificateHash: claim.quorumCertificate.quorumCertificateHash,
+    ...(claim.authorityTransitionAdmissionStoreId !== undefined
+      ? {
+          authorityTransitionAdmissionStoreId:
+            claim.authorityTransitionAdmissionStoreId,
+        }
+      : {}),
+    ...(claim.authorityTransitionAdmissionRecordHash !== undefined
+      ? {
+          authorityTransitionAdmissionRecordHash:
+            claim.authorityTransitionAdmissionRecordHash,
+        }
+      : {}),
+  };
+}
+
+function sortOperationalStateCompositionalQuorumClaims(
+  claims: readonly OperationalStateCompositionalQuorumClaim[],
+): readonly OperationalStateCompositionalQuorumClaim[] {
+  return [...claims].sort((left, right) => {
+    const byClaimId = left.claimId.localeCompare(right.claimId);
+    if (byClaimId !== 0) return byClaimId;
+    const byTopologyId = left.topologyId.localeCompare(right.topologyId);
+    if (byTopologyId !== 0) return byTopologyId;
+    return left.quorumCertificateHash.localeCompare(right.quorumCertificateHash);
+  });
+}
+
+function activeOperationalStateAuthorityPrincipalIds(
+  topology: OperationalStateAuthorityTopology,
+): readonly string[] {
+  return operationalStateUniqueSortedStringList(
+    topology.principals
+      .filter((principal) => principal.status === "active")
+      .map((principal) => principal.principalId),
+  );
+}
+
+function activeAcceptedWitnessIdsForCompositionalQuorumClaim(
+  claim: OperationalStateCompositionalQuorumClaim,
+): readonly string[] {
+  const activePrincipalIds = new Set(
+    activeOperationalStateAuthorityPrincipalIds(claim.authorityTopology),
+  );
+  return operationalStateUniqueSortedStringList(
+    claim.quorumCertificate.acceptedWitnessIds.filter((witnessId) =>
+      activePrincipalIds.has(witnessId),
+    ),
+  );
+}
+
+function computeOperationalStateCompositionalQuorumPairwiseIntersections(
+  claims: readonly OperationalStateCompositionalQuorumClaim[],
+): readonly OperationalStateCompositionalQuorumPairwiseIntersection[] {
+  const sortedClaims = sortOperationalStateCompositionalQuorumClaims(claims);
+  const intersections: OperationalStateCompositionalQuorumPairwiseIntersection[] =
+    [];
+  for (let leftIndex = 0; leftIndex < sortedClaims.length; leftIndex += 1) {
+    const left = sortedClaims[leftIndex]!;
+    const leftAccepted =
+      activeAcceptedWitnessIdsForCompositionalQuorumClaim(left);
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < sortedClaims.length;
+      rightIndex += 1
+    ) {
+      const right = sortedClaims[rightIndex]!;
+      const rightAccepted =
+        activeAcceptedWitnessIdsForCompositionalQuorumClaim(right);
+      const activeIntersectionWitnessIds = operationalStateIntersectStringLists(
+        leftAccepted,
+        rightAccepted,
+      );
+      intersections.push({
+        leftClaimId: left.claimId,
+        rightClaimId: right.claimId,
+        activeIntersectionWitnessIds,
+        intersectionSize: activeIntersectionWitnessIds.length,
+      });
+    }
+  }
+  return intersections;
+}
+
+function computeOperationalStateCompositionalQuorumGlobalIntersectionWitnessIds(
+  claims: readonly OperationalStateCompositionalQuorumClaim[],
+): readonly string[] {
+  const sortedClaims = sortOperationalStateCompositionalQuorumClaims(claims);
+  if (sortedClaims.length === 0) return [];
+  let intersection =
+    activeAcceptedWitnessIdsForCompositionalQuorumClaim(sortedClaims[0]!);
+  for (const claim of sortedClaims.slice(1)) {
+    intersection = operationalStateIntersectStringLists(
+      intersection,
+      activeAcceptedWitnessIdsForCompositionalQuorumClaim(claim),
+    );
+  }
+  return operationalStateUniqueSortedStringList(intersection);
+}
+
+export function computeOperationalStateCompositionalQuorumIntersectionProofHash(
+  proof: Omit<
+    OperationalStateCompositionalQuorumIntersectionProof,
+    "proofHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(proof));
+}
+
+export function buildOperationalStateCompositionalQuorumIntersectionProof(
+  input: OperationalStateCompositionalQuorumIntersectionProofInput,
+): OperationalStateCompositionalQuorumIntersectionProof {
+  const claims = sortOperationalStateCompositionalQuorumClaims(
+    input.claims.map((claim) =>
+      normalizeOperationalStateCompositionalQuorumClaim(claim),
+    ),
+  );
+  const pairwiseIntersections =
+    computeOperationalStateCompositionalQuorumPairwiseIntersections(claims);
+  const globalIntersectionWitnessIds =
+    computeOperationalStateCompositionalQuorumGlobalIntersectionWitnessIds(
+      claims,
+    );
+  const payload: Omit<
+    OperationalStateCompositionalQuorumIntersectionProof,
+    "proofHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_COMPOSITIONAL_QUORUM_INTERSECTION_PROOF_SCHEMA_VERSION,
+    proofId: input.proofId,
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    subjectKind: input.subjectKind,
+    subjectId: input.subjectId,
+    subjectSequence: input.subjectSequence,
+    subjectHash: input.subjectHash,
+    intersectionMode: input.intersectionMode,
+    requiredIntersectionWitnesses: input.requiredIntersectionWitnesses,
+    claims,
+    pairwiseIntersections,
+    globalIntersectionWitnessIds,
+    evaluatedAt: input.evaluatedAt,
+    evaluatedBy: input.evaluatedBy,
+    ...(input.proofReason !== undefined ? { proofReason: input.proofReason } : {}),
+  };
+  return {
+    ...payload,
+    proofHash:
+      computeOperationalStateCompositionalQuorumIntersectionProofHash(payload),
+  };
+}
+
+export function verifyOperationalStateCompositionalQuorumIntersectionProofHash(
+  proof: OperationalStateCompositionalQuorumIntersectionProof,
+): StateReviewArtifactHashValidation {
+  const { proofHash, ...payload } = proof;
+  const expectedHash =
+    computeOperationalStateCompositionalQuorumIntersectionProofHash(payload);
+  return {
+    valid: proofHash === expectedHash,
+    expectedHash,
+    actualHash: proofHash,
+  };
+}
+
+function pushOperationalStateCompositionalQuorumIntersectionIssue(
+  issues: OperationalStateCompositionalQuorumIntersectionIssue[],
+  issue: OperationalStateCompositionalQuorumIntersectionIssue,
+): void {
+  issues.push(issue);
+}
+
+export function evaluateOperationalStateCompositionalQuorumIntersectionProof(
+  input: OperationalStateCompositionalQuorumIntersectionProofEvaluationInput,
+): OperationalStateCompositionalQuorumIntersectionProofEvaluation {
+  const issues: OperationalStateCompositionalQuorumIntersectionIssue[] = [];
+  const proof = input.proof;
+  if (proof === undefined) {
+    return {
+      valid: false,
+      accepted: false,
+      claimCount: 0,
+      pairwiseIntersections: [],
+      globalIntersectionWitnessIds: [],
+      issues: [
+        {
+          code: "operational_state_compositional_quorum_intersection_proof_missing",
+          path: "/proof",
+          message:
+            "Operational state composition requires an admitted quorum-intersection proof before independently certified authority histories can compose.",
+        },
+      ],
+    };
+  }
+
+  const proofHashValidation =
+    verifyOperationalStateCompositionalQuorumIntersectionProofHash(proof);
+  if (!proofHashValidation.valid) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_proof_hash_mismatch",
+      path: "/proof/proofHash",
+      message: `Compositional quorum-intersection proof hash ${proofHashValidation.actualHash} does not match recomputed hash ${proofHashValidation.expectedHash}.`,
+      expected: proofHashValidation.expectedHash,
+      actual: proofHashValidation.actualHash,
+    });
+  }
+
+  if (
+    input.expectedTenantId !== undefined &&
+    proof.tenantId !== tenantId(String(input.expectedTenantId))
+  ) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_tenant_mismatch",
+      path: "/proof/tenantId",
+      message:
+        "Compositional quorum-intersection proof tenant does not match the expected operational state tenant.",
+      expected: String(input.expectedTenantId),
+      actual: proof.tenantId,
+    });
+  }
+  if (
+    input.expectedAuthorityScope !== undefined &&
+    proof.authorityScope !== input.expectedAuthorityScope
+  ) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_scope_mismatch",
+      path: "/proof/authorityScope",
+      message:
+        "Compositional quorum-intersection proof authority scope does not match the expected recovery authority scope.",
+      expected: input.expectedAuthorityScope,
+      actual: proof.authorityScope,
+    });
+  }
+  if (
+    (input.expectedSubjectKind !== undefined &&
+      proof.subjectKind !== input.expectedSubjectKind) ||
+    (input.expectedSubjectId !== undefined &&
+      proof.subjectId !== input.expectedSubjectId) ||
+    (input.expectedSubjectSequence !== undefined &&
+      proof.subjectSequence !== input.expectedSubjectSequence) ||
+    (input.expectedSubjectHash !== undefined &&
+      proof.subjectHash !== input.expectedSubjectHash)
+  ) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_subject_mismatch",
+      path: "/proof/subject",
+      message:
+        "Compositional quorum-intersection proof does not bind to the expected operational state subject.",
+      ...(input.expectedSubjectHash !== undefined ||
+      input.expectedSubjectId !== undefined
+        ? { expected: input.expectedSubjectHash ?? input.expectedSubjectId }
+        : {}),
+      actual: proof.subjectHash,
+    });
+  }
+
+  const requiredIntersectionWitnesses =
+    input.requiredIntersectionWitnesses ?? proof.requiredIntersectionWitnesses;
+  if (
+    proof.requiredIntersectionWitnesses < 1 ||
+    requiredIntersectionWitnesses < 1
+  ) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_required_intersection_invalid",
+      path: "/proof/requiredIntersectionWitnesses",
+      message:
+        "Compositional quorum-intersection proof must require at least one active shared witness.",
+      expected: 1,
+      actual: proof.requiredIntersectionWitnesses,
+    });
+  }
+
+  if (proof.claims.length < 2) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_claim_count_insufficient",
+      path: "/proof/claims",
+      message:
+        "Compositional quorum-intersection proof needs at least two authority claims to prove composition.",
+      expected: 2,
+      actual: proof.claims.length,
+    });
+  }
+
+  const seenClaimIds = new Set<string>();
+  proof.claims.forEach((claim, claimIndex) => {
+    const path = `/proof/claims/${claimIndex}`;
+    if (seenClaimIds.has(claim.claimId)) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_claim_duplicate",
+        path: `${path}/claimId`,
+        message: `Compositional quorum claim ${claim.claimId} appears more than once.`,
+        actual: claim.claimId,
+      });
+    }
+    seenClaimIds.add(claim.claimId);
+
+    const topologyHashValidation = verifyOperationalStateAuthorityTopologyHash(
+      claim.authorityTopology,
+    );
+    if (
+      !topologyHashValidation.valid ||
+      claim.authorityTopologyHash !== claim.authorityTopology.topologyHash
+    ) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_topology_hash_mismatch",
+        path: `${path}/authorityTopologyHash`,
+        message:
+          "Compositional quorum claim must hash-bind the embedded authority topology.",
+        expected: topologyHashValidation.expectedHash,
+        actual: claim.authorityTopologyHash,
+      });
+    }
+    if (claim.authorityTopology.tenantId !== proof.tenantId) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_topology_tenant_mismatch",
+        path: `${path}/authorityTopology/tenantId`,
+        message:
+          "Compositional quorum claim topology tenant does not match proof tenant.",
+        expected: proof.tenantId,
+        actual: claim.authorityTopology.tenantId,
+      });
+    }
+    if (claim.authorityTopology.authorityScope !== proof.authorityScope) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_topology_scope_mismatch",
+        path: `${path}/authorityTopology/authorityScope`,
+        message:
+          "Compositional quorum claim topology scope does not match proof authority scope.",
+        expected: proof.authorityScope,
+        actual: claim.authorityTopology.authorityScope,
+      });
+    }
+    if (claim.authorityTopology.topologyId !== claim.topologyId) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_topology_id_mismatch",
+        path: `${path}/topologyId`,
+        message:
+          "Compositional quorum claim topology id does not match embedded topology.",
+        expected: claim.authorityTopology.topologyId,
+        actual: claim.topologyId,
+      });
+    }
+
+    const certificateHashValidation =
+      verifyOperationalStateQuorumCertificateProofCertificateHash(
+        claim.quorumCertificate,
+      );
+    if (
+      !certificateHashValidation.valid ||
+      claim.quorumCertificateHash !==
+        claim.quorumCertificate.quorumCertificateHash
+    ) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_certificate_hash_mismatch",
+        path: `${path}/quorumCertificateHash`,
+        message:
+          "Compositional quorum claim must hash-bind the embedded quorum certificate.",
+        expected: certificateHashValidation.expectedHash,
+        actual: claim.quorumCertificateHash,
+      });
+    }
+    if (
+      !claim.quorumCertificate.certified ||
+      claim.quorumCertificate.status !== "certified"
+    ) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_certificate_not_certified",
+        path: `${path}/quorumCertificate/status`,
+        message:
+          "Compositional quorum claim cannot compose a non-certified quorum certificate.",
+        expected: "certified",
+        actual: claim.quorumCertificate.status,
+      });
+    }
+
+    const acceptedWitnessIds = claim.quorumCertificate.acceptedWitnessIds;
+    const uniqueAcceptedWitnessIds =
+      operationalStateUniqueSortedStringList(acceptedWitnessIds);
+    if (uniqueAcceptedWitnessIds.length !== acceptedWitnessIds.length) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_duplicate_witness",
+        path: `${path}/quorumCertificate/acceptedWitnessIds`,
+        message:
+          "Compositional quorum claim certificate cannot count duplicate witness ids toward authority.",
+        expected: uniqueAcceptedWitnessIds.length,
+        actual: acceptedWitnessIds.length,
+      });
+    }
+    const minimumRequiredWitnesses = Math.max(
+      claim.quorumCertificate.requiredWitnesses,
+      claim.quorumCertificate.minimumWitnesses,
+    );
+    if (uniqueAcceptedWitnessIds.length < minimumRequiredWitnesses) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_certificate_quorum_not_met",
+        path: `${path}/quorumCertificate/acceptedWitnessIds`,
+        message:
+          "Compositional quorum claim certificate does not satisfy its witness quorum with unique accepted witnesses.",
+        expected: minimumRequiredWitnesses,
+        actual: uniqueAcceptedWitnessIds.length,
+      });
+    }
+    if (claim.quorumCertificate.tenantId !== proof.tenantId) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_certificate_tenant_mismatch",
+        path: `${path}/quorumCertificate/tenantId`,
+        message:
+          "Compositional quorum claim certificate tenant does not match proof tenant.",
+        expected: proof.tenantId,
+        actual: claim.quorumCertificate.tenantId,
+      });
+    }
+    if (
+      claim.quorumCertificate.authorityScope !== proof.authorityScope ||
+      claim.authorityScope !== proof.authorityScope
+    ) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_certificate_scope_mismatch",
+        path: `${path}/quorumCertificate/authorityScope`,
+        message:
+          "Compositional quorum claim certificate scope does not match proof authority scope.",
+        expected: proof.authorityScope,
+        actual: claim.quorumCertificate.authorityScope,
+      });
+    }
+    if (claim.quorumCertificate.authorityBoundary !== claim.authorityBoundary) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_certificate_boundary_mismatch",
+        path: `${path}/quorumCertificate/authorityBoundary`,
+        message:
+          "Compositional quorum claim certificate boundary does not match the claimed authority boundary.",
+        expected: claim.authorityBoundary,
+        actual: claim.quorumCertificate.authorityBoundary,
+      });
+    }
+    if (
+      claim.quorumCertificate.authorityTopologyHash !==
+      claim.authorityTopology.topologyHash
+    ) {
+      pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+        code: "operational_state_compositional_quorum_intersection_certificate_topology_mismatch",
+        path: `${path}/quorumCertificate/authorityTopologyHash`,
+        message:
+          "Compositional quorum claim certificate must bind to the embedded authority topology hash.",
+        expected: claim.authorityTopology.topologyHash,
+        actual: claim.quorumCertificate.authorityTopologyHash ?? "none",
+      });
+    }
+
+    const principalsById = new Map(
+      claim.authorityTopology.principals.map((principal) => [
+        principal.principalId,
+        principal,
+      ]),
+    );
+    uniqueAcceptedWitnessIds.forEach((witnessId, witnessIndex) => {
+      const principal = principalsById.get(witnessId);
+      if (principal === undefined) {
+        pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+          code: "operational_state_compositional_quorum_intersection_witness_unknown",
+          path: `${path}/quorumCertificate/acceptedWitnessIds/${witnessIndex}`,
+          message:
+            "Compositional quorum claim certificate names a witness outside the embedded authority topology.",
+          actual: witnessId,
+        });
+        return;
+      }
+      if (principal.status !== "active") {
+        pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+          code: "operational_state_compositional_quorum_intersection_witness_not_active",
+          path: `${path}/quorumCertificate/acceptedWitnessIds/${witnessIndex}`,
+          message:
+            "Compositional quorum claim certificate names a witness that is not active in the embedded authority topology.",
+          expected: "active",
+          actual: principal.status,
+        });
+      }
+    });
+  });
+
+  const recomputedPairwiseIntersections =
+    computeOperationalStateCompositionalQuorumPairwiseIntersections(
+      proof.claims,
+    );
+  const recomputedGlobalIntersectionWitnessIds =
+    computeOperationalStateCompositionalQuorumGlobalIntersectionWitnessIds(
+      proof.claims,
+    );
+  if (
+    canonicalStringify(proof.pairwiseIntersections) !==
+    canonicalStringify(recomputedPairwiseIntersections)
+  ) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_pairwise_intersection_mismatch",
+      path: "/proof/pairwiseIntersections",
+      message:
+        "Compositional quorum-intersection proof pairwise intersections do not replay from embedded claims.",
+    });
+  }
+  if (
+    canonicalStringify(proof.globalIntersectionWitnessIds) !==
+    canonicalStringify(recomputedGlobalIntersectionWitnessIds)
+  ) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_global_intersection_mismatch",
+      path: "/proof/globalIntersectionWitnessIds",
+      message:
+        "Compositional quorum-intersection proof global intersection does not replay from embedded claims.",
+    });
+  }
+
+  if (proof.intersectionMode === "pairwise_active_intersection") {
+    recomputedPairwiseIntersections.forEach((intersection, index) => {
+      if (intersection.intersectionSize < requiredIntersectionWitnesses) {
+        pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+          code: "operational_state_compositional_quorum_intersection_pairwise_missing",
+          path: `/proof/pairwiseIntersections/${index}/activeIntersectionWitnessIds`,
+          message:
+            "Compositional quorum-intersection proof lacks enough active shared witnesses for a pair of authority claims.",
+          expected: requiredIntersectionWitnesses,
+          actual: intersection.intersectionSize,
+        });
+      }
+    });
+  } else if (
+    recomputedGlobalIntersectionWitnessIds.length < requiredIntersectionWitnesses
+  ) {
+    pushOperationalStateCompositionalQuorumIntersectionIssue(issues, {
+      code: "operational_state_compositional_quorum_intersection_global_missing",
+      path: "/proof/globalIntersectionWitnessIds",
+      message:
+        "Compositional quorum-intersection proof lacks enough active witnesses shared by all authority claims.",
+      expected: requiredIntersectionWitnesses,
+      actual: recomputedGlobalIntersectionWitnessIds.length,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    accepted: issues.length === 0,
+    proofId: proof.proofId,
+    proofHash: proof.proofHash,
+    claimCount: proof.claims.length,
+    pairwiseIntersections: recomputedPairwiseIntersections,
+    globalIntersectionWitnessIds: recomputedGlobalIntersectionWitnessIds,
+    issues,
+  };
+}
+
 export function computeOperationalStateQuorumCertificateProofRecordHash(
   record: Omit<OperationalStateQuorumCertificateProofRecord, "proofRecordHash">,
 ): string {
@@ -26221,6 +28420,1907 @@ export function verifyOperationalStateAuthorityTransitionRecordHash(
     valid: authorityRecordHash === expectedHash,
     expectedHash,
     actualHash: authorityRecordHash,
+  };
+}
+
+const operationalStateAuthorityTransitionReplaySemanticsEffectSummaries: Record<
+  OperationalStateAuthorityTransitionKind,
+  string
+> = {
+  set_quorum:
+    "Set requiredWitnesses and minimumWitnesses for the topology without changing principals.",
+  admit_principal:
+    "Create or reactivate the principal as active, preserving or assigning signatureKeyId.",
+  suspend_principal:
+    "Mark the principal suspended and preserve any existing signatureKeyId.",
+  revoke_principal:
+    "Mark the principal revoked and preserve any existing signatureKeyId.",
+  rotate_signature_key:
+    "Preserve principal status and replace signatureKeyId with the transition signatureKeyId.",
+  mark_equivocated:
+    "Mark the principal equivocated and preserve any existing signatureKeyId.",
+  seal_authority_epoch:
+    "Set sealedThroughSubjectSequence, sealedQuorumCertificateHash, and latestSealHash from the seal transition.",
+};
+
+function operationalStateAuthorityTransitionReplaySemanticsRuleId(
+  transitionKind: OperationalStateAuthorityTransitionKind,
+): string {
+  return `operational-state-authority-transition:${transitionKind}:v1`;
+}
+
+export function computeOperationalStateAuthorityTransitionReplaySemanticsRuleHash(
+  rule: Omit<
+    OperationalStateAuthorityTransitionReplaySemanticsRule,
+    "ruleHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(rule));
+}
+
+function buildOperationalStateAuthorityTransitionReplaySemanticsRule(
+  input: OperationalStateAuthorityTransitionReplaySemanticsRuleInput,
+): OperationalStateAuthorityTransitionReplaySemanticsRule {
+  const payload: Omit<
+    OperationalStateAuthorityTransitionReplaySemanticsRule,
+    "ruleHash"
+  > = {
+    transitionKind: input.transitionKind,
+    ruleId:
+      input.ruleId ??
+      operationalStateAuthorityTransitionReplaySemanticsRuleId(
+        input.transitionKind,
+      ),
+    recordSchemaVersion:
+      input.recordSchemaVersion ??
+      OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_SCHEMA_VERSION,
+    effectSummary: input.effectSummary,
+  };
+  return {
+    ...payload,
+    ruleHash:
+      computeOperationalStateAuthorityTransitionReplaySemanticsRuleHash(payload),
+  };
+}
+
+function sortedOperationalStateAuthorityTransitionReplaySemanticsRules(
+  rules: readonly OperationalStateAuthorityTransitionReplaySemanticsRule[],
+): readonly OperationalStateAuthorityTransitionReplaySemanticsRule[] {
+  return [...rules].sort((left, right) =>
+    left.transitionKind.localeCompare(right.transitionKind),
+  );
+}
+
+function sortedOperationalStateAuthorityTransitions(
+  transitions: readonly OperationalStateAuthorityTransitionRecord[],
+): readonly OperationalStateAuthorityTransitionRecord[] {
+  return [...transitions].sort(
+    (left, right) => left.authoritySequence - right.authoritySequence,
+  );
+}
+
+export function computeOperationalStateAuthorityTransitionReplaySemanticsManifestHash(
+  manifest: Omit<
+    OperationalStateAuthorityTransitionReplaySemanticsManifest,
+    "manifestHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(manifest));
+}
+
+export function buildOperationalStateAuthorityTransitionReplaySemanticsManifest(
+  input: OperationalStateAuthorityTransitionReplaySemanticsManifestInput,
+): OperationalStateAuthorityTransitionReplaySemanticsManifest {
+  const rules = sortedOperationalStateAuthorityTransitionReplaySemanticsRules(
+    input.rules.map((rule) =>
+      buildOperationalStateAuthorityTransitionReplaySemanticsRule(rule),
+    ),
+  );
+  const payload: Omit<
+    OperationalStateAuthorityTransitionReplaySemanticsManifest,
+    "manifestHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_AUTHORITY_TRANSITION_REPLAY_SEMANTICS_SCHEMA_VERSION,
+    manifestId: input.manifestId,
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    topologyId: input.topologyId,
+    semanticsId: input.semanticsId,
+    semanticsVersion: input.semanticsVersion,
+    validFromAuthoritySequence: input.validFromAuthoritySequence,
+    ...(input.validThroughAuthoritySequence !== undefined
+      ? { validThroughAuthoritySequence: input.validThroughAuthoritySequence }
+      : {}),
+    rules,
+    compatiblePreviousManifestHashes: operationalStateUniqueSortedStringList(
+      input.compatiblePreviousManifestHashes ?? [],
+    ),
+    ...(input.sourceCodeHash !== undefined
+      ? { sourceCodeHash: input.sourceCodeHash }
+      : {}),
+    admittedAt: input.admittedAt,
+    admittedBy: input.admittedBy,
+    ...(input.manifestReason !== undefined
+      ? { manifestReason: input.manifestReason }
+      : {}),
+  };
+  return {
+    ...payload,
+    manifestHash:
+      computeOperationalStateAuthorityTransitionReplaySemanticsManifestHash(
+        payload,
+      ),
+  };
+}
+
+export function buildCurrentOperationalStateAuthorityTransitionReplaySemanticsManifest(input: {
+  readonly manifestId: string;
+  readonly tenantId: TenantId | string;
+  readonly authorityScope: string;
+  readonly topologyId: string;
+  readonly semanticsVersion?: string;
+  readonly validFromAuthoritySequence?: number;
+  readonly validThroughAuthoritySequence?: number;
+  readonly admittedAt: Timestamp | string;
+  readonly admittedBy: string;
+  readonly manifestReason?: string;
+}): OperationalStateAuthorityTransitionReplaySemanticsManifest {
+  return buildOperationalStateAuthorityTransitionReplaySemanticsManifest({
+    manifestId: input.manifestId,
+    tenantId: input.tenantId,
+    authorityScope: input.authorityScope,
+    topologyId: input.topologyId,
+    semanticsId:
+      "@pm/agent-state/operationalStateAuthorityTopologyFromTransition",
+    semanticsVersion: input.semanticsVersion ?? "v1",
+    validFromAuthoritySequence: input.validFromAuthoritySequence ?? 1,
+    ...(input.validThroughAuthoritySequence !== undefined
+      ? { validThroughAuthoritySequence: input.validThroughAuthoritySequence }
+      : {}),
+    rules: (
+      Object.keys(
+        operationalStateAuthorityTransitionReplaySemanticsEffectSummaries,
+      ) as OperationalStateAuthorityTransitionKind[]
+    ).map((transitionKind) => ({
+      transitionKind,
+      effectSummary:
+        operationalStateAuthorityTransitionReplaySemanticsEffectSummaries[
+          transitionKind
+        ],
+    })),
+    admittedAt: input.admittedAt,
+    admittedBy: input.admittedBy,
+    ...(input.manifestReason !== undefined
+      ? { manifestReason: input.manifestReason }
+      : {}),
+  });
+}
+
+export function verifyOperationalStateAuthorityTransitionReplaySemanticsManifestHash(
+  manifest: OperationalStateAuthorityTransitionReplaySemanticsManifest,
+): StateReviewArtifactHashValidation {
+  const { manifestHash, ...payload } = manifest;
+  const expectedHash =
+    computeOperationalStateAuthorityTransitionReplaySemanticsManifestHash(
+      payload,
+    );
+  return {
+    valid: manifestHash === expectedHash,
+    expectedHash,
+    actualHash: manifestHash,
+  };
+}
+
+function operationalStateAuthorityTransitionReplaySemanticsRuleByKind(
+  manifest: OperationalStateAuthorityTransitionReplaySemanticsManifest,
+): Map<
+  OperationalStateAuthorityTransitionKind,
+  OperationalStateAuthorityTransitionReplaySemanticsRule
+> {
+  return new Map(manifest.rules.map((rule) => [rule.transitionKind, rule]));
+}
+
+function buildOperationalStateAuthorityTransitionReplaySemanticsTransitionBindings(
+  manifest: OperationalStateAuthorityTransitionReplaySemanticsManifest,
+  transitions: readonly OperationalStateAuthorityTransitionRecord[],
+): readonly OperationalStateAuthorityTransitionReplaySemanticsTransitionBinding[] {
+  const rulesByKind =
+    operationalStateAuthorityTransitionReplaySemanticsRuleByKind(manifest);
+  return sortedOperationalStateAuthorityTransitions(transitions).map(
+    (transition) => {
+      const rule = rulesByKind.get(transition.transitionKind);
+      return {
+        authoritySequence: transition.authoritySequence,
+        transitionKind: transition.transitionKind,
+        transitionRecordHash: transition.authorityRecordHash,
+        recordSchemaVersion: transition.schemaVersion,
+        ruleId:
+          rule?.ruleId ??
+          operationalStateAuthorityTransitionReplaySemanticsRuleId(
+            transition.transitionKind,
+          ),
+        ruleHash: rule?.ruleHash ?? "missing-rule",
+      };
+    },
+  );
+}
+
+function replayOperationalStateAuthorityTransitionReplaySemanticsResult(input: {
+  readonly startingTopology?: OperationalStateAuthorityTopology;
+  readonly transitions: readonly OperationalStateAuthorityTransitionRecord[];
+}): OperationalStateAuthorityTopology | undefined {
+  let currentTopology = input.startingTopology;
+  for (const transition of sortedOperationalStateAuthorityTransitions(
+    input.transitions,
+  )) {
+    currentTopology = operationalStateAuthorityTopologyFromTransition(
+      transition,
+      currentTopology,
+    );
+  }
+  return currentTopology;
+}
+
+export function computeOperationalStateAuthorityTransitionReplaySemanticsProofHash(
+  proof: Omit<
+    OperationalStateAuthorityTransitionReplaySemanticsProof,
+    "proofHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(proof));
+}
+
+export function buildOperationalStateAuthorityTransitionReplaySemanticsProof(
+  input: OperationalStateAuthorityTransitionReplaySemanticsProofInput,
+): OperationalStateAuthorityTransitionReplaySemanticsProof {
+  const transitions = sortedOperationalStateAuthorityTransitions(input.transitions);
+  const resultTopology =
+    replayOperationalStateAuthorityTransitionReplaySemanticsResult({
+      ...(input.startingTopology !== undefined
+        ? { startingTopology: input.startingTopology }
+        : {}),
+      transitions,
+    });
+  if (resultTopology === undefined) {
+    throw new Error(
+      "authority transition replay semantics proof requires at least one transition or a starting topology",
+    );
+  }
+  const payload: Omit<
+    OperationalStateAuthorityTransitionReplaySemanticsProof,
+    "proofHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_AUTHORITY_TRANSITION_REPLAY_SEMANTICS_PROOF_SCHEMA_VERSION,
+    proofId: input.proofId,
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    topologyId: input.topologyId,
+    subjectKind: input.subjectKind,
+    subjectId: input.subjectId,
+    subjectSequence: input.subjectSequence,
+    subjectHash: input.subjectHash,
+    manifest: input.manifest,
+    manifestHash: input.manifest.manifestHash,
+    ...(input.startingTopology !== undefined
+      ? { startingTopology: input.startingTopology }
+      : {}),
+    ...(input.startingTopology !== undefined
+      ? { startingTopologyHash: input.startingTopology.topologyHash }
+      : {}),
+    startingAuthoritySequence: input.startingTopology?.authoritySequence ?? 0,
+    transitions,
+    transitionBindings:
+      buildOperationalStateAuthorityTransitionReplaySemanticsTransitionBindings(
+        input.manifest,
+        transitions,
+      ),
+    resultAuthorityTopologyHash: resultTopology.topologyHash,
+    resultAuthorityRecordHash: resultTopology.authorityRecordHash,
+    replayedAt: input.replayedAt,
+    replayedBy: input.replayedBy,
+    ...(input.proofReason !== undefined ? { proofReason: input.proofReason } : {}),
+  };
+  return {
+    ...payload,
+    proofHash:
+      computeOperationalStateAuthorityTransitionReplaySemanticsProofHash(
+        payload,
+      ),
+  };
+}
+
+export function verifyOperationalStateAuthorityTransitionReplaySemanticsProofHash(
+  proof: OperationalStateAuthorityTransitionReplaySemanticsProof,
+): StateReviewArtifactHashValidation {
+  const { proofHash, ...payload } = proof;
+  const expectedHash =
+    computeOperationalStateAuthorityTransitionReplaySemanticsProofHash(payload);
+  return {
+    valid: proofHash === expectedHash,
+    expectedHash,
+    actualHash: proofHash,
+  };
+}
+
+function pushOperationalStateAuthorityTransitionReplaySemanticsIssue(
+  issues: OperationalStateAuthorityTransitionReplaySemanticsIssue[],
+  issue: OperationalStateAuthorityTransitionReplaySemanticsIssue,
+): void {
+  issues.push(issue);
+}
+
+export function evaluateOperationalStateAuthorityTransitionReplaySemanticsProof(
+  input: OperationalStateAuthorityTransitionReplaySemanticsEvaluationInput,
+): OperationalStateAuthorityTransitionReplaySemanticsEvaluation {
+  const issues: OperationalStateAuthorityTransitionReplaySemanticsIssue[] = [];
+  const proof = input.proof;
+  if (proof === undefined) {
+    return {
+      valid: false,
+      accepted: false,
+      transitionCount: 0,
+      transitionBindings: [],
+      issues: [
+        {
+          code: "operational_state_authority_transition_replay_semantics_proof_missing",
+          path: "/proof",
+          message:
+            "Authority-transition replay requires a semantics proof; current code semantics cannot silently reinterpret admitted history.",
+        },
+      ],
+    };
+  }
+
+  const proofHashValidation =
+    verifyOperationalStateAuthorityTransitionReplaySemanticsProofHash(proof);
+  if (!proofHashValidation.valid) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_proof_hash_mismatch",
+      path: "/proof/proofHash",
+      message: `Authority-transition replay semantics proof hash ${proofHashValidation.actualHash} does not match recomputed hash ${proofHashValidation.expectedHash}.`,
+      expected: proofHashValidation.expectedHash,
+      actual: proofHashValidation.actualHash,
+    });
+  }
+
+  const manifestHashValidation =
+    verifyOperationalStateAuthorityTransitionReplaySemanticsManifestHash(
+      proof.manifest,
+    );
+  if (
+    !manifestHashValidation.valid ||
+    proof.manifestHash !== proof.manifest.manifestHash
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_manifest_hash_mismatch",
+      path: "/proof/manifestHash",
+      message:
+        "Authority-transition replay semantics proof must hash-bind the embedded manifest.",
+      expected: manifestHashValidation.expectedHash,
+      actual: proof.manifestHash,
+    });
+  }
+  if (
+    input.requiredManifestHash !== undefined &&
+    proof.manifestHash !== input.requiredManifestHash
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_required_manifest_mismatch",
+      path: "/proof/manifestHash",
+      message:
+        "Authority-transition replay semantics proof was produced under a different manifest than the required admitted replay semantics.",
+      expected: input.requiredManifestHash,
+      actual: proof.manifestHash,
+    });
+  }
+  if (
+    input.expectedTenantId !== undefined &&
+    proof.tenantId !== tenantId(String(input.expectedTenantId))
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_tenant_mismatch",
+      path: "/proof/tenantId",
+      message:
+        "Authority-transition replay semantics proof tenant does not match expected tenant.",
+      expected: String(input.expectedTenantId),
+      actual: proof.tenantId,
+    });
+  }
+  if (
+    input.expectedAuthorityScope !== undefined &&
+    proof.authorityScope !== input.expectedAuthorityScope
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_scope_mismatch",
+      path: "/proof/authorityScope",
+      message:
+        "Authority-transition replay semantics proof scope does not match expected scope.",
+      expected: input.expectedAuthorityScope,
+      actual: proof.authorityScope,
+    });
+  }
+  if (
+    input.expectedTopologyId !== undefined &&
+    proof.topologyId !== input.expectedTopologyId
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_topology_mismatch",
+      path: "/proof/topologyId",
+      message:
+        "Authority-transition replay semantics proof topology id does not match expected topology.",
+      expected: input.expectedTopologyId,
+      actual: proof.topologyId,
+    });
+  }
+  if (
+    (input.expectedSubjectKind !== undefined &&
+      proof.subjectKind !== input.expectedSubjectKind) ||
+    (input.expectedSubjectId !== undefined &&
+      proof.subjectId !== input.expectedSubjectId) ||
+    (input.expectedSubjectSequence !== undefined &&
+      proof.subjectSequence !== input.expectedSubjectSequence) ||
+    (input.expectedSubjectHash !== undefined &&
+      proof.subjectHash !== input.expectedSubjectHash)
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_subject_mismatch",
+      path: "/proof/subject",
+      message:
+        "Authority-transition replay semantics proof does not bind to the expected replay subject.",
+      ...(input.expectedSubjectHash !== undefined ||
+      input.expectedSubjectId !== undefined
+        ? { expected: input.expectedSubjectHash ?? input.expectedSubjectId }
+        : {}),
+      actual: proof.subjectHash,
+    });
+  }
+
+  const seenRuleKinds = new Set<OperationalStateAuthorityTransitionKind>();
+  const rulesByKind =
+    operationalStateAuthorityTransitionReplaySemanticsRuleByKind(proof.manifest);
+  proof.manifest.rules.forEach((rule, index) => {
+    if (seenRuleKinds.has(rule.transitionKind)) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_rule_duplicate",
+        path: `/proof/manifest/rules/${index}/transitionKind`,
+        message:
+          "Authority-transition replay semantics manifest cannot define the same transition kind more than once.",
+        actual: rule.transitionKind,
+      });
+    }
+    seenRuleKinds.add(rule.transitionKind);
+    const { ruleHash, ...rulePayload } = rule;
+    const expectedRuleHash =
+      computeOperationalStateAuthorityTransitionReplaySemanticsRuleHash(
+        rulePayload,
+      );
+    if (ruleHash !== expectedRuleHash) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_rule_hash_mismatch",
+        path: `/proof/manifest/rules/${index}/ruleHash`,
+        message:
+          "Authority-transition replay semantics rule hash does not match its declared effect.",
+        expected: expectedRuleHash,
+        actual: ruleHash,
+      });
+    }
+  });
+
+  if (proof.manifest.tenantId !== proof.tenantId) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_tenant_mismatch",
+      path: "/proof/manifest/tenantId",
+      message:
+        "Authority-transition replay semantics manifest tenant must match proof tenant.",
+      expected: proof.tenantId,
+      actual: proof.manifest.tenantId,
+    });
+  }
+  if (proof.manifest.authorityScope !== proof.authorityScope) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_scope_mismatch",
+      path: "/proof/manifest/authorityScope",
+      message:
+        "Authority-transition replay semantics manifest scope must match proof scope.",
+      expected: proof.authorityScope,
+      actual: proof.manifest.authorityScope,
+    });
+  }
+  if (proof.manifest.topologyId !== proof.topologyId) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_topology_mismatch",
+      path: "/proof/manifest/topologyId",
+      message:
+        "Authority-transition replay semantics manifest topology must match proof topology.",
+      expected: proof.topologyId,
+      actual: proof.manifest.topologyId,
+    });
+  }
+
+  if (proof.startingTopology !== undefined) {
+    const startingHashValidation = verifyOperationalStateAuthorityTopologyHash(
+      proof.startingTopology,
+    );
+    if (
+      !startingHashValidation.valid ||
+      proof.startingTopologyHash !== proof.startingTopology.topologyHash
+    ) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_starting_topology_hash_mismatch",
+        path: "/proof/startingTopologyHash",
+        message:
+          "Authority-transition replay semantics proof starting topology hash does not match the embedded starting topology.",
+        expected: startingHashValidation.expectedHash,
+        actual: proof.startingTopologyHash ?? "none",
+      });
+    }
+  }
+
+  if (input.expectedTransitions !== undefined) {
+    const expectedHashes = sortedOperationalStateAuthorityTransitions(
+      input.expectedTransitions,
+    ).map((transition) => transition.authorityRecordHash);
+    const actualHashes = sortedOperationalStateAuthorityTransitions(
+      proof.transitions,
+    ).map((transition) => transition.authorityRecordHash);
+    if (canonicalStringify(expectedHashes) !== canonicalStringify(actualHashes)) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_expected_transition_mismatch",
+        path: "/proof/transitions",
+        message:
+          "Authority-transition replay semantics proof transitions do not match the expected retained transition history.",
+        expected: expectedHashes.join(","),
+        actual: actualHashes.join(","),
+      });
+    }
+  }
+
+  const sortedTransitions = sortedOperationalStateAuthorityTransitions(
+    proof.transitions,
+  );
+  const recomputedBindings =
+    buildOperationalStateAuthorityTransitionReplaySemanticsTransitionBindings(
+      proof.manifest,
+      sortedTransitions,
+    );
+  if (
+    canonicalStringify(proof.transitionBindings) !==
+    canonicalStringify(recomputedBindings)
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_transition_binding_mismatch",
+      path: "/proof/transitionBindings",
+      message:
+        "Authority-transition replay semantics proof bindings do not replay from the embedded manifest and transitions.",
+    });
+  }
+
+  let expectedSequence = proof.startingAuthoritySequence + 1;
+  let expectedPreviousHash = proof.startingTopology?.authorityRecordHash;
+  sortedTransitions.forEach((transition, index) => {
+    const path = `/proof/transitions/${index}`;
+    const transitionHashValidation =
+      verifyOperationalStateAuthorityTransitionRecordHash(transition);
+    if (!transitionHashValidation.valid) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_transition_hash_mismatch",
+        path: `${path}/authorityRecordHash`,
+        message: `Authority transition hash ${transitionHashValidation.actualHash} does not match recomputed hash ${transitionHashValidation.expectedHash}.`,
+        expected: transitionHashValidation.expectedHash,
+        actual: transitionHashValidation.actualHash,
+      });
+    }
+    if (
+      transition.tenantId !== proof.tenantId ||
+      transition.authorityScope !== proof.authorityScope ||
+      transition.topologyId !== proof.topologyId
+    ) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_transition_scope_mismatch",
+        path,
+        message:
+          "Authority transition semantics proof cannot bind a transition outside the proof tenant, scope, and topology.",
+      });
+    }
+    if (transition.authoritySequence !== expectedSequence) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_transition_sequence_gap",
+        path: `${path}/authoritySequence`,
+        message:
+          "Authority transition semantics proof requires contiguous authority-transition replay.",
+        expected: expectedSequence,
+        actual: transition.authoritySequence,
+      });
+    }
+    if (transition.previousAuthorityRecordHash !== expectedPreviousHash) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_transition_previous_hash_mismatch",
+        path: `${path}/previousAuthorityRecordHash`,
+        message:
+          "Authority transition semantics proof requires transitions to hash-chain from the starting topology.",
+        expected: expectedPreviousHash ?? "none",
+        actual: transition.previousAuthorityRecordHash ?? "none",
+      });
+    }
+    const rule = rulesByKind.get(transition.transitionKind);
+    if (rule === undefined) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_rule_missing",
+        path: `${path}/transitionKind`,
+        message:
+          "Authority transition semantics manifest has no rule for a replayed transition kind.",
+        actual: transition.transitionKind,
+      });
+    } else if (rule.recordSchemaVersion !== transition.schemaVersion) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_transition_record_schema_mismatch",
+        path: `${path}/schemaVersion`,
+        message:
+          "Authority transition was admitted under a record schema not covered by its replay semantics rule.",
+        expected: rule.recordSchemaVersion,
+        actual: transition.schemaVersion,
+      });
+    }
+    if (
+      transition.authoritySequence <
+        proof.manifest.validFromAuthoritySequence ||
+      (proof.manifest.validThroughAuthoritySequence !== undefined &&
+        transition.authoritySequence >
+          proof.manifest.validThroughAuthoritySequence)
+    ) {
+      pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+        code: "operational_state_authority_transition_replay_semantics_manifest_sequence_mismatch",
+        path: `${path}/authoritySequence`,
+        message:
+          "Authority transition falls outside the authority-sequence range covered by the replay semantics manifest.",
+        expected:
+          proof.manifest.validThroughAuthoritySequence !== undefined
+            ? `${proof.manifest.validFromAuthoritySequence}-${proof.manifest.validThroughAuthoritySequence}`
+            : `>=${proof.manifest.validFromAuthoritySequence}`,
+        actual: transition.authoritySequence,
+      });
+    }
+    expectedSequence = transition.authoritySequence + 1;
+    expectedPreviousHash = transition.authorityRecordHash;
+  });
+
+  const resultTopology =
+    replayOperationalStateAuthorityTransitionReplaySemanticsResult({
+      ...(proof.startingTopology !== undefined
+        ? { startingTopology: proof.startingTopology }
+        : {}),
+      transitions: sortedTransitions,
+    });
+  if (
+    resultTopology === undefined ||
+    resultTopology.topologyHash !== proof.resultAuthorityTopologyHash ||
+    resultTopology.authorityRecordHash !== proof.resultAuthorityRecordHash
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_result_topology_mismatch",
+      path: "/proof/resultAuthorityTopologyHash",
+      message:
+        "Authority-transition replay semantics proof result does not replay from the embedded starting topology and transitions.",
+      expected: resultTopology?.topologyHash ?? "none",
+      actual: proof.resultAuthorityTopologyHash,
+    });
+  }
+  if (
+    input.expectedResultAuthorityTopologyHash !== undefined &&
+    proof.resultAuthorityTopologyHash !==
+      input.expectedResultAuthorityTopologyHash
+  ) {
+    pushOperationalStateAuthorityTransitionReplaySemanticsIssue(issues, {
+      code: "operational_state_authority_transition_replay_semantics_result_topology_mismatch",
+      path: "/proof/resultAuthorityTopologyHash",
+      message:
+        "Authority-transition replay semantics proof result does not match the required topology projection.",
+      expected: input.expectedResultAuthorityTopologyHash,
+      actual: proof.resultAuthorityTopologyHash,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    accepted: issues.length === 0,
+    proofId: proof.proofId,
+    proofHash: proof.proofHash,
+    manifestHash: proof.manifestHash,
+    transitionCount: proof.transitions.length,
+    ...(resultTopology !== undefined
+      ? { resultAuthorityTopologyHash: resultTopology.topologyHash }
+      : {}),
+    transitionBindings: recomputedBindings,
+    issues,
+  };
+}
+
+export function computeOperationalStateAuthorityTopologySettlementCandidateHash(
+  candidate: Omit<
+    OperationalStateAuthorityTopologySettlementCandidate,
+    "candidateHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(candidate));
+}
+
+export function buildOperationalStateAuthorityTopologySettlementCandidate(
+  input: OperationalStateAuthorityTopologySettlementCandidateInput,
+): OperationalStateAuthorityTopologySettlementCandidate {
+  const payload: Omit<
+    OperationalStateAuthorityTopologySettlementCandidate,
+    "candidateHash"
+  > = {
+    candidateId: input.candidateId,
+    branchId: input.branchId,
+    topology: input.topology,
+    topologyHash: input.topology.topologyHash,
+    authorityRecordHash: input.topology.authorityRecordHash,
+    authoritySequence: input.topology.authoritySequence,
+    evidenceRefs: operationalStateUniqueSortedStringList(
+      input.evidenceRefs ?? [],
+    ),
+    ...(input.candidateReason !== undefined
+      ? { candidateReason: input.candidateReason }
+      : {}),
+  };
+  return {
+    ...payload,
+    candidateHash:
+      computeOperationalStateAuthorityTopologySettlementCandidateHash(payload),
+  };
+}
+
+function sortedOperationalStateAuthorityTopologySettlementCandidates(
+  candidates: readonly OperationalStateAuthorityTopologySettlementCandidate[],
+): readonly OperationalStateAuthorityTopologySettlementCandidate[] {
+  return [...candidates].sort((left, right) =>
+    left.candidateId.localeCompare(right.candidateId),
+  );
+}
+
+export function computeOperationalStateAuthorityTopologySettlementCandidateSetHash(
+  candidates: readonly OperationalStateAuthorityTopologySettlementCandidate[],
+): string {
+  return fingerprint64(
+    canonicalStringify(
+      sortedOperationalStateAuthorityTopologySettlementCandidates(candidates).map(
+        (candidate) => ({
+          candidateId: candidate.candidateId,
+          branchId: candidate.branchId,
+          topologyHash: candidate.topologyHash,
+          authorityRecordHash: candidate.authorityRecordHash,
+          authoritySequence: candidate.authoritySequence,
+          evidenceRefs: candidate.evidenceRefs,
+          candidateHash: candidate.candidateHash,
+        }),
+      ),
+    ),
+  );
+}
+
+export function computeOperationalStateAuthorityTopologySettlementClaimHash(
+  input: OperationalStateAuthorityTopologySettlementClaimHashInput,
+): string {
+  return fingerprint64(
+    canonicalStringify({
+      settlementId: input.settlementId,
+      tenantId: tenantId(String(input.tenantId)),
+      authorityScope: input.authorityScope,
+      topologyId: input.topologyId,
+      subjectKind: input.subjectKind,
+      subjectId: input.subjectId,
+      subjectSequence: input.subjectSequence,
+      subjectHash: input.subjectHash,
+      selectedCandidateId: input.selectedCandidateId,
+      candidateSetHash: input.candidateSetHash,
+      settledTopologyHash: input.settledTopologyHash,
+      settledAuthorityRecordHash: input.settledAuthorityRecordHash,
+      settledAuthoritySequence: input.settledAuthoritySequence,
+    }),
+  );
+}
+
+export function computeOperationalStateAuthorityTopologySettlementProofHash(
+  proof: Omit<
+    OperationalStateAuthorityTopologySettlementProof,
+    "proofHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(proof));
+}
+
+export function buildOperationalStateAuthorityTopologySettlementProof(
+  input: OperationalStateAuthorityTopologySettlementProofInput,
+): OperationalStateAuthorityTopologySettlementProof {
+  const candidates = sortedOperationalStateAuthorityTopologySettlementCandidates(
+    input.candidates.map((candidate) =>
+      buildOperationalStateAuthorityTopologySettlementCandidate(candidate),
+    ),
+  );
+  const selectedCandidate = candidates.find(
+    (candidate) => candidate.candidateId === input.selectedCandidateId,
+  );
+  if (selectedCandidate === undefined) {
+    throw new Error(
+      "authority topology settlement proof requires a selected candidate",
+    );
+  }
+  const candidateSetHash =
+    computeOperationalStateAuthorityTopologySettlementCandidateSetHash(
+      candidates,
+    );
+  const settlementClaimHash =
+    computeOperationalStateAuthorityTopologySettlementClaimHash({
+      settlementId: input.settlementId,
+      tenantId: input.tenantId,
+      authorityScope: input.authorityScope,
+      topologyId: input.topologyId,
+      subjectKind: input.subjectKind,
+      subjectId: input.subjectId,
+      subjectSequence: input.subjectSequence,
+      subjectHash: input.subjectHash,
+      selectedCandidateId: selectedCandidate.candidateId,
+      candidateSetHash,
+      settledTopologyHash: selectedCandidate.topologyHash,
+      settledAuthorityRecordHash: selectedCandidate.authorityRecordHash,
+      settledAuthoritySequence: selectedCandidate.authoritySequence,
+    });
+  const payload: Omit<
+    OperationalStateAuthorityTopologySettlementProof,
+    "proofHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_PROOF_SCHEMA_VERSION,
+    proofId: input.proofId,
+    settlementId: input.settlementId,
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    topologyId: input.topologyId,
+    settlementAuthorityBoundary: input.settlementAuthorityBoundary,
+    subjectKind: input.subjectKind,
+    subjectId: input.subjectId,
+    subjectSequence: input.subjectSequence,
+    subjectHash: input.subjectHash,
+    candidateSetHash,
+    candidates,
+    selectedCandidateId: selectedCandidate.candidateId,
+    settledTopologyHash: selectedCandidate.topologyHash,
+    settledAuthorityRecordHash: selectedCandidate.authorityRecordHash,
+    settledAuthoritySequence: selectedCandidate.authoritySequence,
+    settlementClaimHash,
+    settlementCertificate: input.settlementCertificate,
+    settledAt: input.settledAt,
+    settledBy: input.settledBy,
+    ...(input.proofReason !== undefined ? { proofReason: input.proofReason } : {}),
+  };
+  return {
+    ...payload,
+    proofHash: computeOperationalStateAuthorityTopologySettlementProofHash(
+      payload,
+    ),
+  };
+}
+
+export function verifyOperationalStateAuthorityTopologySettlementProofHash(
+  proof: OperationalStateAuthorityTopologySettlementProof,
+): StateReviewArtifactHashValidation {
+  const { proofHash, ...payload } = proof;
+  const expectedHash =
+    computeOperationalStateAuthorityTopologySettlementProofHash(payload);
+  return {
+    valid: proofHash === expectedHash,
+    expectedHash,
+    actualHash: proofHash,
+  };
+}
+
+function pushOperationalStateAuthorityTopologySettlementIssue(
+  issues: OperationalStateAuthorityTopologySettlementIssue[],
+  issue: OperationalStateAuthorityTopologySettlementIssue,
+): void {
+  issues.push(issue);
+}
+
+export function evaluateOperationalStateAuthorityTopologySettlementProof(
+  input: OperationalStateAuthorityTopologySettlementEvaluationInput,
+): OperationalStateAuthorityTopologySettlementEvaluation {
+  const issues: OperationalStateAuthorityTopologySettlementIssue[] = [];
+  const proof = input.proof;
+  if (proof === undefined) {
+    return {
+      valid: false,
+      accepted: false,
+      candidateCount: 0,
+      issues: [
+        {
+          code: "operational_state_authority_topology_settlement_proof_missing",
+          path: "/proof",
+          message:
+            "Authority-topology branch choice requires a replayable settlement proof; local branch preference is not operational authority.",
+        },
+      ],
+    };
+  }
+
+  const proofHashValidation =
+    verifyOperationalStateAuthorityTopologySettlementProofHash(proof);
+  if (!proofHashValidation.valid) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_proof_hash_mismatch",
+      path: "/proof/proofHash",
+      message: `Authority topology settlement proof hash ${proofHashValidation.actualHash} does not match recomputed hash ${proofHashValidation.expectedHash}.`,
+      expected: proofHashValidation.expectedHash,
+      actual: proofHashValidation.actualHash,
+    });
+  }
+  if (
+    input.expectedTenantId !== undefined &&
+    proof.tenantId !== tenantId(String(input.expectedTenantId))
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_tenant_mismatch",
+      path: "/proof/tenantId",
+      message: "Authority topology settlement proof tenant mismatch.",
+      expected: String(input.expectedTenantId),
+      actual: proof.tenantId,
+    });
+  }
+  if (
+    input.expectedAuthorityScope !== undefined &&
+    proof.authorityScope !== input.expectedAuthorityScope
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_scope_mismatch",
+      path: "/proof/authorityScope",
+      message: "Authority topology settlement proof scope mismatch.",
+      expected: input.expectedAuthorityScope,
+      actual: proof.authorityScope,
+    });
+  }
+  if (
+    input.expectedTopologyId !== undefined &&
+    proof.topologyId !== input.expectedTopologyId
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_topology_id_mismatch",
+      path: "/proof/topologyId",
+      message: "Authority topology settlement proof topology id mismatch.",
+      expected: input.expectedTopologyId,
+      actual: proof.topologyId,
+    });
+  }
+  if (
+    (input.expectedSubjectKind !== undefined &&
+      proof.subjectKind !== input.expectedSubjectKind) ||
+    (input.expectedSubjectId !== undefined &&
+      proof.subjectId !== input.expectedSubjectId) ||
+    (input.expectedSubjectSequence !== undefined &&
+      proof.subjectSequence !== input.expectedSubjectSequence) ||
+    (input.expectedSubjectHash !== undefined &&
+      proof.subjectHash !== input.expectedSubjectHash)
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_subject_mismatch",
+      path: "/proof/subject",
+      message:
+        "Authority topology settlement proof does not bind to the expected recovery subject.",
+      ...(input.expectedSubjectHash !== undefined
+        ? { expected: input.expectedSubjectHash }
+        : {}),
+      actual: proof.subjectHash,
+    });
+  }
+  if (
+    input.requiredSettlementAuthorityBoundary !== undefined &&
+    proof.settlementAuthorityBoundary !==
+      input.requiredSettlementAuthorityBoundary
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_certificate_authority_boundary_mismatch",
+      path: "/proof/settlementAuthorityBoundary",
+      message:
+        "Authority topology settlement proof was admitted under the wrong settlement authority boundary.",
+      expected: input.requiredSettlementAuthorityBoundary,
+      actual: proof.settlementAuthorityBoundary,
+    });
+  }
+  if (proof.candidates.length < 2) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_candidate_count_insufficient",
+      path: "/proof/candidates",
+      message:
+        "Authority topology settlement requires at least two branch candidates; a single local branch is not a settlement.",
+      expected: 2,
+      actual: proof.candidates.length,
+    });
+  }
+
+  const seenCandidateIds = new Set<string>();
+  const seenBranchIds = new Set<string>();
+  proof.candidates.forEach((candidate, index) => {
+    const path = `/proof/candidates/${index}`;
+    if (
+      seenCandidateIds.has(candidate.candidateId) ||
+      seenBranchIds.has(candidate.branchId)
+    ) {
+      pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+        code: "operational_state_authority_topology_settlement_candidate_duplicate",
+        path,
+        message:
+          "Authority topology settlement candidates must have unique candidate and branch ids.",
+        actual: candidate.candidateId,
+      });
+    }
+    seenCandidateIds.add(candidate.candidateId);
+    seenBranchIds.add(candidate.branchId);
+    const { candidateHash, ...candidatePayload } = candidate;
+    const expectedCandidateHash =
+      computeOperationalStateAuthorityTopologySettlementCandidateHash(
+        candidatePayload,
+      );
+    if (candidateHash !== expectedCandidateHash) {
+      pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+        code: "operational_state_authority_topology_settlement_candidate_hash_mismatch",
+        path: `${path}/candidateHash`,
+        message:
+          "Authority topology settlement candidate hash does not match its branch topology and evidence.",
+        expected: expectedCandidateHash,
+        actual: candidateHash,
+      });
+    }
+    const topologyHashValidation = verifyOperationalStateAuthorityTopologyHash(
+      candidate.topology,
+    );
+    if (
+      !topologyHashValidation.valid ||
+      candidate.topologyHash !== candidate.topology.topologyHash ||
+      candidate.authorityRecordHash !== candidate.topology.authorityRecordHash ||
+      candidate.authoritySequence !== candidate.topology.authoritySequence
+    ) {
+      pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+        code: "operational_state_authority_topology_settlement_candidate_topology_hash_mismatch",
+        path: `${path}/topologyHash`,
+        message:
+          "Authority topology settlement candidate must hash-bind the exact embedded topology.",
+        expected: topologyHashValidation.expectedHash,
+        actual: candidate.topologyHash,
+      });
+    }
+    if (
+      candidate.topology.tenantId !== proof.tenantId ||
+      candidate.topology.authorityScope !== proof.authorityScope ||
+      candidate.topology.topologyId !== proof.topologyId
+    ) {
+      pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+        code: "operational_state_authority_topology_settlement_candidate_scope_mismatch",
+        path: `${path}/topology`,
+        message:
+          "Authority topology settlement candidate belongs to a different tenant, scope, or topology id.",
+      });
+    }
+  });
+
+  const recomputedCandidateSetHash =
+    computeOperationalStateAuthorityTopologySettlementCandidateSetHash(
+      proof.candidates,
+    );
+  if (proof.candidateSetHash !== recomputedCandidateSetHash) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_candidate_set_hash_mismatch",
+      path: "/proof/candidateSetHash",
+      message:
+        "Authority topology settlement proof candidate set hash does not match the embedded branch candidates.",
+      expected: recomputedCandidateSetHash,
+      actual: proof.candidateSetHash,
+    });
+  }
+  const selectedCandidate = proof.candidates.find(
+    (candidate) => candidate.candidateId === proof.selectedCandidateId,
+  );
+  if (selectedCandidate === undefined) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_selected_candidate_missing",
+      path: "/proof/selectedCandidateId",
+      message:
+        "Authority topology settlement proof selected candidate is not present in the candidate set.",
+      actual: proof.selectedCandidateId,
+    });
+  } else if (
+    proof.settledTopologyHash !== selectedCandidate.topologyHash ||
+    proof.settledAuthorityRecordHash !==
+      selectedCandidate.authorityRecordHash ||
+    proof.settledAuthoritySequence !== selectedCandidate.authoritySequence
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_selected_topology_mismatch",
+      path: "/proof/settledTopologyHash",
+      message:
+        "Authority topology settlement proof settled topology must equal the selected branch candidate.",
+      expected: selectedCandidate.topologyHash,
+      actual: proof.settledTopologyHash,
+    });
+  }
+  if (
+    input.requiredSettledTopologyHash !== undefined &&
+    proof.settledTopologyHash !== input.requiredSettledTopologyHash
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_selected_topology_mismatch",
+      path: "/proof/settledTopologyHash",
+      message:
+        "Authority topology settlement proof selected a different topology branch than the required recovered topology.",
+      expected: input.requiredSettledTopologyHash,
+      actual: proof.settledTopologyHash,
+    });
+  }
+
+  const recomputedSettlementClaimHash =
+    computeOperationalStateAuthorityTopologySettlementClaimHash({
+      settlementId: proof.settlementId,
+      tenantId: proof.tenantId,
+      authorityScope: proof.authorityScope,
+      topologyId: proof.topologyId,
+      subjectKind: proof.subjectKind,
+      subjectId: proof.subjectId,
+      subjectSequence: proof.subjectSequence,
+      subjectHash: proof.subjectHash,
+      selectedCandidateId: proof.selectedCandidateId,
+      candidateSetHash: proof.candidateSetHash,
+      settledTopologyHash: proof.settledTopologyHash,
+      settledAuthorityRecordHash: proof.settledAuthorityRecordHash,
+      settledAuthoritySequence: proof.settledAuthoritySequence,
+    });
+  if (proof.settlementClaimHash !== recomputedSettlementClaimHash) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_claim_hash_mismatch",
+      path: "/proof/settlementClaimHash",
+      message:
+        "Authority topology settlement claim hash does not match the selected branch decision.",
+      expected: recomputedSettlementClaimHash,
+      actual: proof.settlementClaimHash,
+    });
+  }
+
+  const certificateHashValidation =
+    verifyOperationalStateQuorumCertificateProofCertificateHash(
+      proof.settlementCertificate,
+    );
+  if (!certificateHashValidation.valid) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_certificate_hash_mismatch",
+      path: "/proof/settlementCertificate/quorumCertificateHash",
+      message: `Authority topology settlement certificate hash ${certificateHashValidation.actualHash} does not match recomputed hash ${certificateHashValidation.expectedHash}.`,
+      expected: certificateHashValidation.expectedHash,
+      actual: certificateHashValidation.actualHash,
+    });
+  }
+  if (
+    !proof.settlementCertificate.certified ||
+    proof.settlementCertificate.status !== "certified"
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_certificate_not_certified",
+      path: "/proof/settlementCertificate/status",
+      message:
+        "Authority topology settlement requires a certified quorum certificate over the settlement claim.",
+      expected: "certified",
+      actual: proof.settlementCertificate.status,
+    });
+  }
+  if (
+    proof.settlementCertificate.acceptedWitnessIds.length <
+      proof.settlementCertificate.minimumWitnesses ||
+    proof.settlementCertificate.acceptedWitnessIds.length <
+      proof.settlementCertificate.requiredWitnesses
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_certificate_quorum_not_met",
+      path: "/proof/settlementCertificate/acceptedWitnessIds",
+      message:
+        "Authority topology settlement certificate does not satisfy its witness quorum.",
+      expected: Math.max(
+        proof.settlementCertificate.minimumWitnesses,
+        proof.settlementCertificate.requiredWitnesses,
+      ),
+      actual: proof.settlementCertificate.acceptedWitnessIds.length,
+    });
+  }
+  if (
+    proof.settlementCertificate.tenantId !== proof.tenantId ||
+    proof.settlementCertificate.authorityScope !== proof.authorityScope ||
+    proof.settlementCertificate.authorityBoundary !==
+      proof.settlementAuthorityBoundary
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_certificate_authority_boundary_mismatch",
+      path: "/proof/settlementCertificate",
+      message:
+        "Authority topology settlement certificate must match proof tenant, scope, and settlement authority boundary.",
+    });
+  }
+  if (
+    proof.settlementCertificate.subjectKind !==
+      OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_SUBJECT_KIND ||
+    proof.settlementCertificate.subjectId !== proof.settlementId ||
+    proof.settlementCertificate.subjectSequence !==
+      proof.settledAuthoritySequence ||
+    proof.settlementCertificate.subjectHash !== proof.settlementClaimHash
+  ) {
+    pushOperationalStateAuthorityTopologySettlementIssue(issues, {
+      code: "operational_state_authority_topology_settlement_certificate_subject_mismatch",
+      path: "/proof/settlementCertificate",
+      message:
+        "Authority topology settlement certificate must certify the exact settlement claim hash.",
+      expected: proof.settlementClaimHash,
+      actual: proof.settlementCertificate.subjectHash,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    accepted: issues.length === 0,
+    proofId: proof.proofId,
+    proofHash: proof.proofHash,
+    settlementClaimHash: proof.settlementClaimHash,
+    candidateSetHash: proof.candidateSetHash,
+    candidateCount: proof.candidates.length,
+    settledTopologyHash: proof.settledTopologyHash,
+    issues,
+  };
+}
+
+export function computeOperationalStateAuthorityTransitionLedgerCompactionCheckpointHash(
+  checkpoint: Omit<
+    OperationalStateAuthorityTransitionLedgerCompactionCheckpoint,
+    "checkpointHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(checkpoint));
+}
+
+export function buildOperationalStateAuthorityTransitionLedgerCompactionCheckpoint(
+  input: OperationalStateAuthorityTransitionLedgerCompactionCheckpointInput,
+): OperationalStateAuthorityTransitionLedgerCompactionCheckpoint {
+  const payload: Omit<
+    OperationalStateAuthorityTransitionLedgerCompactionCheckpoint,
+    "checkpointHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SCHEMA_VERSION,
+    checkpointId: input.checkpointId,
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    authorityBoundary: input.authorityBoundary,
+    transitionAdmissionStoreId: input.transitionAdmissionStoreId,
+    topologyId: input.topologyId,
+    compactedThroughAdmissionSequence:
+      input.compactedThroughAdmissionSequence,
+    compactedThroughAuthoritySequence: input.compactedThroughAuthoritySequence,
+    compactedThroughAdmissionRecordHash:
+      input.compactedThroughAdmissionRecordHash,
+    compactedThroughAuthorityRecordHash: input.compactedThroughAuthorityRecordHash,
+    compactedThroughAuthorityTopologyHash:
+      input.compactedThroughAuthorityTopologyHash,
+    retainedFromAdmissionSequence: input.retainedFromAdmissionSequence,
+    retainedFromAuthoritySequence: input.retainedFromAuthoritySequence,
+    sourceReplayHash: input.sourceReplayHash,
+    checkpointedAt: input.checkpointedAt,
+    checkpointedBy: input.checkpointedBy,
+    ...(input.checkpointReason !== undefined
+      ? { checkpointReason: input.checkpointReason }
+      : {}),
+  };
+  return {
+    ...payload,
+    checkpointHash:
+      computeOperationalStateAuthorityTransitionLedgerCompactionCheckpointHash(
+        payload,
+      ),
+  };
+}
+
+export function verifyOperationalStateAuthorityTransitionLedgerCompactionCheckpointHash(
+  checkpoint: OperationalStateAuthorityTransitionLedgerCompactionCheckpoint,
+): StateReviewArtifactHashValidation {
+  const { checkpointHash, ...payload } = checkpoint;
+  const expectedHash =
+    computeOperationalStateAuthorityTransitionLedgerCompactionCheckpointHash(
+      payload,
+    );
+  return {
+    valid: checkpointHash === expectedHash,
+    expectedHash,
+    actualHash: checkpointHash,
+  };
+}
+
+export function computeOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecordHash(
+  record: Omit<
+    OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord,
+    "admissionRecordHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(record));
+}
+
+export function buildOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord(
+  input: OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecordInput,
+): OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord {
+  const checkpoint = input.checkpoint;
+  const payload: Omit<
+    OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord,
+    "admissionRecordHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_ADMISSION_SCHEMA_VERSION,
+    tenantId: tenantId(String(input.tenantId)),
+    checkpointAdmissionStoreId: input.checkpointAdmissionStoreId,
+    authorityScope: input.authorityScope,
+    authorityBoundary: input.authorityBoundary,
+    transitionAdmissionStoreId: input.transitionAdmissionStoreId,
+    topologyId: input.topologyId,
+    admissionSequence: input.admissionSequence,
+    checkpointId: checkpoint.checkpointId,
+    checkpointHash: checkpoint.checkpointHash,
+    compactedThroughAdmissionSequence:
+      checkpoint.compactedThroughAdmissionSequence,
+    compactedThroughAuthoritySequence:
+      checkpoint.compactedThroughAuthoritySequence,
+    retainedFromAdmissionSequence: checkpoint.retainedFromAdmissionSequence,
+    retainedFromAuthoritySequence: checkpoint.retainedFromAuthoritySequence,
+    ...(input.previousAdmissionRecordHash !== undefined
+      ? { previousAdmissionRecordHash: input.previousAdmissionRecordHash }
+      : {}),
+    checkpoint,
+    quorumCertificate: input.quorumCertificate,
+    admittedAt: input.admittedAt,
+    admittedBy: input.admittedBy,
+    ...(input.admissionReason !== undefined
+      ? { admissionReason: input.admissionReason }
+      : {}),
+  };
+  return {
+    ...payload,
+    admissionRecordHash:
+      computeOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecordHash(
+        payload,
+      ),
+  };
+}
+
+export function verifyOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecordHash(
+  record: OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord,
+): StateReviewArtifactHashValidation {
+  const { admissionRecordHash, ...payload } = record;
+  const expectedHash =
+    computeOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecordHash(
+      payload,
+    );
+  return {
+    valid: admissionRecordHash === expectedHash,
+    expectedHash,
+    actualHash: admissionRecordHash,
+  };
+}
+
+export function operationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionSubjectId(
+  input: Pick<
+    OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord,
+    | "checkpointAdmissionStoreId"
+    | "transitionAdmissionStoreId"
+    | "topologyId"
+    | "checkpointId"
+  >,
+): string {
+  return `${input.checkpointAdmissionStoreId}:${input.transitionAdmissionStoreId}:${input.topologyId}:${input.checkpointId}`;
+}
+
+export function replayOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecords(
+  input: OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionReplayInput,
+): OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionReplay {
+  const issues: OperationalStateAuthorityTransitionLedgerCompactionIssue[] = [];
+  const expectedTenantId = tenantId(String(input.tenantId));
+  const recordHashBySequence = new Map<number, string>();
+  const pushIssue = (
+    code: OperationalStateAuthorityTransitionLedgerCompactionIssueCode,
+    path: string,
+    message: string,
+    details: Partial<
+      Pick<
+        OperationalStateAuthorityTransitionLedgerCompactionIssue,
+        "expected" | "actual"
+      >
+    > = {},
+  ) => issues.push({ code, path, message, ...details });
+  let expectedSequence = 1;
+  let previousAdmissionRecordHash: string | undefined;
+  let latestAdmittedRecord:
+    | OperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord
+    | undefined;
+
+  input.records.forEach((record, index) => {
+    const path = `/records/${index}`;
+    const recordHashValidation =
+      verifyOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecordHash(
+        record,
+      );
+    const checkpointHashValidation =
+      verifyOperationalStateAuthorityTransitionLedgerCompactionCheckpointHash(
+        record.checkpoint,
+      );
+    const certificateHashValidation =
+      verifyOperationalStateQuorumCertificateProofCertificateHash(
+        record.quorumCertificate,
+      );
+    const previousRecordHashAtSequence = recordHashBySequence.get(
+      record.admissionSequence,
+    );
+
+    if (
+      previousRecordHashAtSequence !== undefined &&
+      previousRecordHashAtSequence !== record.admissionRecordHash
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_fork",
+        `${path}/admissionSequence`,
+        `Authority-transition ledger compaction admission sequence ${record.admissionSequence} has more than one record hash.`,
+        {
+          expected: previousRecordHashAtSequence,
+          actual: record.admissionRecordHash,
+        },
+      );
+    } else if (previousRecordHashAtSequence === undefined) {
+      recordHashBySequence.set(
+        record.admissionSequence,
+        record.admissionRecordHash,
+      );
+    }
+
+    if (
+      record.tenantId !== expectedTenantId ||
+      record.checkpoint.tenantId !== expectedTenantId ||
+      record.quorumCertificate.tenantId !== expectedTenantId
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_tenant_mismatch",
+        path,
+        "Authority-transition ledger compaction admission record, checkpoint, and certificate must match the replay tenant.",
+        { expected: expectedTenantId },
+      );
+    }
+    if (record.checkpointAdmissionStoreId !== input.checkpointAdmissionStoreId) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_store_mismatch",
+        `${path}/checkpointAdmissionStoreId`,
+        "Authority-transition ledger compaction admission record belongs to a different checkpoint-admission store.",
+        {
+          expected: input.checkpointAdmissionStoreId,
+          actual: record.checkpointAdmissionStoreId,
+        },
+      );
+    }
+    if (
+      record.transitionAdmissionStoreId !== input.transitionAdmissionStoreId ||
+      record.checkpoint.transitionAdmissionStoreId !==
+        input.transitionAdmissionStoreId
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_transition_store_mismatch",
+        `${path}/transitionAdmissionStoreId`,
+        "Authority-transition ledger compaction checkpoint must bind the transition-admission ledger being compacted.",
+        {
+          expected: input.transitionAdmissionStoreId,
+          actual: record.transitionAdmissionStoreId,
+        },
+      );
+    }
+    if (
+      record.topologyId !== input.topologyId ||
+      record.checkpoint.topologyId !== input.topologyId
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_topology_mismatch",
+        `${path}/topologyId`,
+        "Authority-transition ledger compaction admission record must bind the expected authority topology.",
+        { expected: input.topologyId, actual: record.topologyId },
+      );
+    }
+    if (
+      record.authorityScope !== input.authorityScope ||
+      record.checkpoint.authorityScope !== input.authorityScope ||
+      record.quorumCertificate.authorityScope !== input.authorityScope
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_scope_mismatch",
+        path,
+        "Authority-transition ledger compaction admission record, checkpoint, and certificate must share the replay authority scope.",
+        { expected: input.authorityScope },
+      );
+    }
+    if (
+      record.authorityBoundary !== input.authorityBoundary ||
+      record.checkpoint.authorityBoundary !== input.authorityBoundary
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_boundary_mismatch",
+        `${path}/authorityBoundary`,
+        "Authority-transition ledger compaction checkpoint must bind the authority boundary whose ledger prefix is being compacted.",
+        { expected: input.authorityBoundary, actual: record.authorityBoundary },
+      );
+    }
+    if (record.admissionSequence !== expectedSequence) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_sequence_gap",
+        `${path}/admissionSequence`,
+        "Authority-transition ledger compaction checkpoint admissions must replay as a contiguous sequence.",
+        { expected: expectedSequence, actual: record.admissionSequence },
+      );
+    }
+    if (record.previousAdmissionRecordHash !== previousAdmissionRecordHash) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_previous_hash_mismatch",
+        `${path}/previousAdmissionRecordHash`,
+        "Authority-transition ledger compaction checkpoint admission record does not chain to the previous admission record hash.",
+        {
+          expected: previousAdmissionRecordHash ?? "none",
+          actual: record.previousAdmissionRecordHash ?? "none",
+        },
+      );
+    }
+    if (
+      record.checkpointId !== record.checkpoint.checkpointId ||
+      record.checkpointHash !== record.checkpoint.checkpointHash ||
+      record.compactedThroughAdmissionSequence !==
+        record.checkpoint.compactedThroughAdmissionSequence ||
+      record.compactedThroughAuthoritySequence !==
+        record.checkpoint.compactedThroughAuthoritySequence ||
+      record.retainedFromAdmissionSequence !==
+        record.checkpoint.retainedFromAdmissionSequence ||
+      record.retainedFromAuthoritySequence !==
+        record.checkpoint.retainedFromAuthoritySequence ||
+      !checkpointHashValidation.valid
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_checkpoint_hash_mismatch",
+        `${path}/checkpointHash`,
+        "Authority-transition ledger compaction admission record must hash-bind the exact embedded checkpoint and frontiers.",
+        {
+          expected: checkpointHashValidation.expectedHash,
+          actual: record.checkpointHash,
+        },
+      );
+    }
+    if (!certificateHashValidation.valid) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_hash_mismatch",
+        `${path}/quorumCertificate/quorumCertificateHash`,
+        `Authority-transition ledger compaction checkpoint admission certificate hash ${certificateHashValidation.actualHash} does not match recomputed hash ${certificateHashValidation.expectedHash}.`,
+        {
+          expected: certificateHashValidation.expectedHash,
+          actual: certificateHashValidation.actualHash,
+        },
+      );
+    }
+    if (
+      !record.quorumCertificate.certified ||
+      record.quorumCertificate.status !== "certified"
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_not_certified",
+        `${path}/quorumCertificate/status`,
+        "Authority-transition ledger compaction checkpoint cannot be admitted by a non-certified quorum certificate.",
+        { expected: "certified", actual: record.quorumCertificate.status },
+      );
+    }
+    if (
+      record.quorumCertificate.acceptedWitnessIds.length <
+        record.quorumCertificate.minimumWitnesses ||
+      record.quorumCertificate.acceptedWitnessIds.length <
+        record.quorumCertificate.requiredWitnesses
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_quorum_not_met",
+        `${path}/quorumCertificate/acceptedWitnessIds`,
+        "Authority-transition ledger compaction checkpoint certificate does not satisfy its witness quorum.",
+        {
+          expected: Math.max(
+            record.quorumCertificate.requiredWitnesses,
+            record.quorumCertificate.minimumWitnesses,
+          ),
+          actual: record.quorumCertificate.acceptedWitnessIds.length,
+        },
+      );
+    }
+    if (
+      record.quorumCertificate.subjectKind !==
+        OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SUBJECT_KIND ||
+      record.quorumCertificate.subjectId !== record.checkpoint.checkpointId ||
+      record.quorumCertificate.subjectSequence !==
+        record.checkpoint.compactedThroughAdmissionSequence ||
+      record.quorumCertificate.subjectHash !== record.checkpoint.checkpointHash
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_subject_mismatch",
+        `${path}/quorumCertificate`,
+        "Authority-transition ledger compaction checkpoint certificate must certify the exact checkpoint hash and compacted admission frontier.",
+        {
+          expected: record.checkpoint.checkpointHash,
+          actual: record.quorumCertificate.subjectHash,
+        },
+      );
+    }
+    if (
+      input.requiredAuthorityBoundary !== undefined &&
+      record.quorumCertificate.authorityBoundary !==
+        input.requiredAuthorityBoundary
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_authority_boundary_mismatch",
+        `${path}/quorumCertificate/authorityBoundary`,
+        "Authority-transition ledger compaction checkpoint was admitted under the wrong checkpoint-admission authority boundary.",
+        {
+          expected: input.requiredAuthorityBoundary,
+          actual: record.quorumCertificate.authorityBoundary,
+        },
+      );
+    }
+    if (!recordHashValidation.valid) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_hash_mismatch",
+        `${path}/admissionRecordHash`,
+        `Authority-transition ledger compaction checkpoint admission record hash ${recordHashValidation.actualHash} does not match recomputed hash ${recordHashValidation.expectedHash}.`,
+        {
+          expected: recordHashValidation.expectedHash,
+          actual: recordHashValidation.actualHash,
+        },
+      );
+    }
+    if (
+      record.checkpoint.retainedFromAdmissionSequence !==
+        record.checkpoint.compactedThroughAdmissionSequence + 1 ||
+      record.checkpoint.retainedFromAuthoritySequence !==
+        record.checkpoint.compactedThroughAuthoritySequence + 1
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_retained_from_mismatch",
+        `${path}/checkpoint`,
+        "Authority-transition ledger compaction checkpoint retained suffixes must begin immediately after their compacted frontiers.",
+      );
+    }
+
+    expectedSequence = record.admissionSequence + 1;
+    previousAdmissionRecordHash = record.admissionRecordHash;
+    latestAdmittedRecord = record;
+  });
+
+  if (input.requiredCheckpoint !== undefined) {
+    const requiredCheckpointHashValidation =
+      verifyOperationalStateAuthorityTransitionLedgerCompactionCheckpointHash(
+        input.requiredCheckpoint,
+      );
+    if (!requiredCheckpointHashValidation.valid) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_hash_mismatch",
+        "/requiredCheckpoint/checkpointHash",
+        `Required authority-transition ledger compaction checkpoint hash ${requiredCheckpointHashValidation.actualHash} does not match recomputed hash ${requiredCheckpointHashValidation.expectedHash}.`,
+        {
+          expected: requiredCheckpointHashValidation.expectedHash,
+          actual: requiredCheckpointHashValidation.actualHash,
+        },
+      );
+    }
+    if (latestAdmittedRecord === undefined) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_not_admitted",
+        "/records",
+        "Authority-transition ledger compaction checkpoint admission replay has no records for the required checkpoint.",
+        { expected: input.requiredCheckpoint.checkpointHash },
+      );
+    } else if (
+      latestAdmittedRecord.checkpointHash !==
+      input.requiredCheckpoint.checkpointHash
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_not_admitted",
+        "/requiredCheckpoint/checkpointHash",
+        "Required authority-transition ledger compaction checkpoint is not the latest admitted checkpoint.",
+        {
+          expected: input.requiredCheckpoint.checkpointHash,
+          actual: latestAdmittedRecord.checkpointHash,
+        },
+      );
+    }
+  }
+
+  if (
+    input.requiredPruneThroughAdmissionSequence !== undefined &&
+    (latestAdmittedRecord === undefined ||
+      latestAdmittedRecord.compactedThroughAdmissionSequence <
+        input.requiredPruneThroughAdmissionSequence)
+  ) {
+    pushIssue(
+      "operational_state_authority_transition_ledger_compaction_required_prune_beyond_checkpoint",
+      "/requiredPruneThroughAdmissionSequence",
+      "Authority-transition ledger prefix cannot be pruned beyond the latest admitted compaction checkpoint.",
+      {
+        expected: latestAdmittedRecord?.compactedThroughAdmissionSequence ?? 0,
+        actual: input.requiredPruneThroughAdmissionSequence,
+      },
+    );
+  }
+
+  return {
+    valid: issues.length === 0,
+    tenantId: expectedTenantId,
+    checkpointAdmissionStoreId: input.checkpointAdmissionStoreId,
+    authorityScope: input.authorityScope,
+    authorityBoundary: input.authorityBoundary,
+    transitionAdmissionStoreId: input.transitionAdmissionStoreId,
+    topologyId: input.topologyId,
+    admittedRecordCount: input.records.length,
+    ...(latestAdmittedRecord !== undefined ? { latestAdmittedRecord } : {}),
+    ...(input.requiredCheckpoint !== undefined
+      ? { requiredCheckpoint: input.requiredCheckpoint }
+      : {}),
+    issues,
+  };
+}
+
+export function evaluateOperationalStateAuthorityTransitionLedgerCompaction(
+  input: OperationalStateAuthorityTransitionLedgerCompactionEvaluationInput,
+): OperationalStateAuthorityTransitionLedgerCompactionEvaluation {
+  const issues: OperationalStateAuthorityTransitionLedgerCompactionIssue[] = [];
+  const pushIssue = (
+    code: OperationalStateAuthorityTransitionLedgerCompactionIssueCode,
+    path: string,
+    message: string,
+    details: Partial<
+      Pick<
+        OperationalStateAuthorityTransitionLedgerCompactionIssue,
+        "expected" | "actual"
+      >
+    > = {},
+  ) => issues.push({ code, path, message, ...details });
+  const checkpoint = input.checkpoint;
+
+  if (checkpoint === undefined) {
+    pushIssue(
+      "operational_state_authority_transition_ledger_compaction_checkpoint_missing",
+      "/checkpoint",
+      "Authority-transition ledger compaction requires a replay-admitted checkpoint; a remembered summary cannot authorize pruning.",
+    );
+  } else {
+    const checkpointHashValidation =
+      verifyOperationalStateAuthorityTransitionLedgerCompactionCheckpointHash(
+        checkpoint,
+      );
+    if (!checkpointHashValidation.valid) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_hash_mismatch",
+        "/checkpoint/checkpointHash",
+        `Authority-transition ledger compaction checkpoint hash ${checkpointHashValidation.actualHash} does not match recomputed hash ${checkpointHashValidation.expectedHash}.`,
+        {
+          expected: checkpointHashValidation.expectedHash,
+          actual: checkpointHashValidation.actualHash,
+        },
+      );
+    }
+    if (
+      checkpoint.retainedFromAdmissionSequence !==
+        checkpoint.compactedThroughAdmissionSequence + 1 ||
+      checkpoint.retainedFromAuthoritySequence !==
+        checkpoint.compactedThroughAuthoritySequence + 1
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_retained_from_mismatch",
+        "/checkpoint",
+        "Authority-transition ledger compaction checkpoint retained suffixes must begin immediately after their compacted frontiers.",
+      );
+    }
+    if (
+      input.requiredPruneThroughAdmissionSequence !== undefined &&
+      checkpoint.compactedThroughAdmissionSequence <
+        input.requiredPruneThroughAdmissionSequence
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_required_prune_beyond_checkpoint",
+        "/requiredPruneThroughAdmissionSequence",
+        "Authority-transition ledger prefix cannot be pruned beyond the supplied checkpoint frontier.",
+        {
+          expected: checkpoint.compactedThroughAdmissionSequence,
+          actual: input.requiredPruneThroughAdmissionSequence,
+        },
+      );
+    }
+
+    let previousAdmissionSequence = checkpoint.compactedThroughAdmissionSequence;
+    let previousAdmissionRecordHash =
+      checkpoint.compactedThroughAdmissionRecordHash;
+    for (const [index, record] of (
+      input.retainedAdmissionRecords ?? []
+    ).entries()) {
+      const path = `/retainedAdmissionRecords/${index}`;
+      if (record.admissionSequence !== previousAdmissionSequence + 1) {
+        pushIssue(
+          "operational_state_authority_transition_ledger_compaction_retained_suffix_gap",
+          `${path}/admissionSequence`,
+          "Retained authority-transition admission suffix must be contiguous from the compacted checkpoint frontier.",
+          {
+            expected: previousAdmissionSequence + 1,
+            actual: record.admissionSequence,
+          },
+        );
+      }
+      if (record.previousAdmissionRecordHash !== previousAdmissionRecordHash) {
+        pushIssue(
+          "operational_state_authority_transition_ledger_compaction_retained_suffix_previous_hash_mismatch",
+          `${path}/previousAdmissionRecordHash`,
+          "Retained authority-transition admission suffix must hash-chain from the compacted checkpoint admission frontier.",
+          {
+            expected: previousAdmissionRecordHash,
+            actual: record.previousAdmissionRecordHash ?? "none",
+          },
+        );
+      }
+      previousAdmissionSequence = record.admissionSequence;
+      previousAdmissionRecordHash = record.admissionRecordHash;
+    }
+  }
+
+  const checkpointAdmissionReplay = input.checkpointAdmissionReplay;
+  const latestCheckpointAdmissionRecord =
+    checkpointAdmissionReplay?.latestAdmittedRecord;
+  if (input.requireCheckpointAdmission === true) {
+    if (checkpointAdmissionReplay === undefined) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_replay_missing",
+        "/checkpointAdmissionReplay",
+        "Authority-transition ledger compaction cannot become operational without replayed checkpoint-admission history.",
+      );
+    } else if (!checkpointAdmissionReplay.valid) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_replay_invalid",
+        "/checkpointAdmissionReplay",
+        "Authority-transition ledger compaction cannot consume invalid checkpoint-admission replay.",
+        {
+          actual: checkpointAdmissionReplay.issues
+            .map((issue) => issue.code)
+            .join(","),
+        },
+      );
+    } else if (
+      checkpoint !== undefined &&
+      (latestCheckpointAdmissionRecord === undefined ||
+        latestCheckpointAdmissionRecord.checkpointHash !==
+          checkpoint.checkpointHash)
+    ) {
+      pushIssue(
+        "operational_state_authority_transition_ledger_compaction_checkpoint_not_admitted",
+        "/checkpoint/checkpointHash",
+        "Authority-transition ledger compaction checkpoint is not the latest admitted checkpoint for its admission history.",
+        {
+          expected:
+            latestCheckpointAdmissionRecord?.checkpointHash ??
+            "admitted-checkpoint",
+          actual: checkpoint.checkpointHash,
+        },
+      );
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    ...(checkpoint !== undefined ? { checkpoint } : {}),
+    ...(checkpointAdmissionReplay !== undefined
+      ? { checkpointAdmissionReplay }
+      : {}),
+    ...(latestCheckpointAdmissionRecord !== undefined
+      ? { latestCheckpointAdmissionRecord }
+      : {}),
+    issues,
   };
 }
 
@@ -29580,6 +33680,97 @@ export function evaluateOperationalStateAuthorityTopologyCompaction(
     appliedTransitionCount += 1;
   });
 
+  let replaySemanticsProofEvaluation:
+    | OperationalStateAuthorityTransitionReplaySemanticsEvaluation
+    | undefined;
+  if (input.requireReplaySemanticsProof === true) {
+    replaySemanticsProofEvaluation =
+      evaluateOperationalStateAuthorityTransitionReplaySemanticsProof({
+        ...(input.replaySemanticsProof !== undefined
+          ? { proof: input.replaySemanticsProof }
+          : {}),
+        expectedTenantId: checkpoint.tenantId,
+        expectedAuthorityScope: checkpoint.authorityScope,
+        expectedTopologyId: checkpoint.topologyId,
+        expectedSubjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        expectedSubjectId: checkpoint.checkpointId,
+        expectedSubjectSequence: currentTopology.authoritySequence,
+        expectedSubjectHash: currentTopology.topologyHash,
+        ...(input.requiredReplaySemanticsManifestHash !== undefined
+          ? {
+              requiredManifestHash:
+                input.requiredReplaySemanticsManifestHash,
+            }
+          : {}),
+        expectedTransitions: input.retainedTransitions,
+        expectedResultAuthorityTopologyHash: currentTopology.topologyHash,
+      });
+    if (input.replaySemanticsProof === undefined) {
+      pushOperationalStateAuthorityTopologyCompactionIssue(issues, {
+        code: "operational_state_authority_topology_replay_semantics_proof_missing",
+        path: "/replaySemanticsProof",
+        message:
+          "Authority-topology compaction cannot let current code reinterpret retained authority history without an admitted replay-semantics proof.",
+      });
+    } else if (!replaySemanticsProofEvaluation.valid) {
+      pushOperationalStateAuthorityTopologyCompactionIssue(issues, {
+        code: "operational_state_authority_topology_replay_semantics_proof_invalid",
+        path: "/replaySemanticsProof",
+        message:
+          "Authority-topology compaction cannot recover authority from a replay-semantics proof that fails its admitted manifest, subject, or replay-result checks.",
+        actual: replaySemanticsProofEvaluation.issues
+          .map((issue) => issue.code)
+          .join(","),
+      });
+    }
+  }
+
+  let topologySettlementProofEvaluation:
+    | OperationalStateAuthorityTopologySettlementEvaluation
+    | undefined;
+  if (input.requireTopologySettlementProof === true) {
+    topologySettlementProofEvaluation =
+      evaluateOperationalStateAuthorityTopologySettlementProof({
+        ...(input.topologySettlementProof !== undefined
+          ? { proof: input.topologySettlementProof }
+          : {}),
+        expectedTenantId: checkpoint.tenantId,
+        expectedAuthorityScope: checkpoint.authorityScope,
+        expectedTopologyId: checkpoint.topologyId,
+        expectedSubjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        expectedSubjectId: checkpoint.checkpointId,
+        expectedSubjectSequence: currentTopology.authoritySequence,
+        expectedSubjectHash: currentTopology.topologyHash,
+        ...(input.requiredTopologySettlementAuthorityBoundary !== undefined
+          ? {
+              requiredSettlementAuthorityBoundary:
+                input.requiredTopologySettlementAuthorityBoundary,
+            }
+          : {}),
+        requiredSettledTopologyHash: currentTopology.topologyHash,
+      });
+    if (input.topologySettlementProof === undefined) {
+      pushOperationalStateAuthorityTopologyCompactionIssue(issues, {
+        code: "operational_state_authority_topology_settlement_proof_missing",
+        path: "/topologySettlementProof",
+        message:
+          "Authority-topology compaction cannot choose an operational topology branch without a replayable settlement proof.",
+      });
+    } else if (!topologySettlementProofEvaluation.valid) {
+      pushOperationalStateAuthorityTopologyCompactionIssue(issues, {
+        code: "operational_state_authority_topology_settlement_proof_invalid",
+        path: "/topologySettlementProof",
+        message:
+          "Authority-topology compaction cannot recover authority from a branch-settlement proof that fails candidate, subject, certificate, or selected-topology checks.",
+        actual: topologySettlementProofEvaluation.issues
+          .map((issue) => issue.code)
+          .join(","),
+      });
+    }
+  }
+
   const requiredTopology = input.requiredTopology;
   if (requiredTopology === undefined) {
     pushOperationalStateAuthorityTopologyCompactionIssue(issues, {
@@ -29633,6 +33824,12 @@ export function evaluateOperationalStateAuthorityTopologyCompaction(
       : {}),
     ...(checkpointAdmissionWitnessReplay !== undefined
       ? { checkpointAdmissionWitnessReplay }
+      : {}),
+    ...(replaySemanticsProofEvaluation !== undefined
+      ? { replaySemanticsProofEvaluation }
+      : {}),
+    ...(topologySettlementProofEvaluation !== undefined
+      ? { topologySettlementProofEvaluation }
       : {}),
     ...(latestCheckpointAdmissionRecord !== undefined
       ? { latestCheckpointAdmissionRecord }
@@ -29750,6 +33947,514 @@ export function verifyOperationalStateSignatureVerifierAdapterProofHash(
     valid: proofHash === expectedHash,
     expectedHash,
     actualHash: proofHash,
+  };
+}
+
+function sortedOperationalStateSignatureVerifierAdapterClaims(
+  claims: readonly OperationalStateSignatureVerifierAdapterClaim[],
+): readonly OperationalStateSignatureVerifierAdapterClaim[] {
+  return [...new Set(claims)].sort();
+}
+
+export function computeOperationalStateSignatureVerifierRoleMetadataHash(
+  input: OperationalStateSignatureVerifierRoleMetadataHashInput,
+): string {
+  return fingerprint64(
+    canonicalStringify({
+      tenantId: tenantId(String(input.tenantId)),
+      authorityScope: input.authorityScope,
+      verifierId: input.verifierId,
+      verifierVersion: input.verifierVersion,
+      verifierRole: input.verifierRole,
+      roleMetadataSequence: input.roleMetadataSequence,
+      allowedClaims: sortedOperationalStateSignatureVerifierAdapterClaims(
+        input.allowedClaims,
+      ),
+      validFromAuthoritySequence: input.validFromAuthoritySequence,
+      ...(input.validThroughAuthoritySequence !== undefined
+        ? { validThroughAuthoritySequence: input.validThroughAuthoritySequence }
+        : {}),
+      ...(input.verifierKeyId !== undefined
+        ? { verifierKeyId: input.verifierKeyId }
+        : {}),
+      ...(input.verifierPublicKeyFingerprint !== undefined
+        ? { verifierPublicKeyFingerprint: input.verifierPublicKeyFingerprint }
+        : {}),
+      ...(input.verifierKeyMaterialHash !== undefined
+        ? { verifierKeyMaterialHash: input.verifierKeyMaterialHash }
+        : {}),
+      ...(input.previousRoleMetadataHash !== undefined
+        ? { previousRoleMetadataHash: input.previousRoleMetadataHash }
+        : {}),
+    }),
+  );
+}
+
+export function computeOperationalStateSignatureVerifierRoleSettlementClaimHash(
+  input: OperationalStateSignatureVerifierRoleSettlementClaimHashInput,
+): string {
+  return fingerprint64(
+    canonicalStringify({
+      settlementId: input.settlementId,
+      tenantId: tenantId(String(input.tenantId)),
+      authorityScope: input.authorityScope,
+      verifierId: input.verifierId,
+      verifierVersion: input.verifierVersion,
+      roleMetadataSequence: input.roleMetadataSequence,
+      roleMetadataHash: input.roleMetadataHash,
+      transparencyLogId: input.transparencyLogId,
+      transparencyTreeHeadHash: input.transparencyTreeHeadHash,
+      transparencyTreeSize: input.transparencyTreeSize,
+      transparencyInclusionProofHash: input.transparencyInclusionProofHash,
+      transparencyConsistencyProofHash: input.transparencyConsistencyProofHash,
+    }),
+  );
+}
+
+export function computeOperationalStateSignatureVerifierRoleSettlementProofHash(
+  proof: Omit<
+    OperationalStateSignatureVerifierRoleSettlementProof,
+    "proofHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(proof));
+}
+
+export function buildOperationalStateSignatureVerifierRoleSettlementProof(
+  input: OperationalStateSignatureVerifierRoleSettlementProofInput,
+): OperationalStateSignatureVerifierRoleSettlementProof {
+  const verifierRole = input.verifierRole ?? "signature_verifier";
+  const allowedClaims = sortedOperationalStateSignatureVerifierAdapterClaims(
+    input.allowedClaims,
+  );
+  const roleMetadataHash =
+    computeOperationalStateSignatureVerifierRoleMetadataHash({
+      tenantId: input.tenantId,
+      authorityScope: input.authorityScope,
+      verifierId: input.verifierId,
+      verifierVersion: input.verifierVersion,
+      verifierRole,
+      roleMetadataSequence: input.roleMetadataSequence,
+      allowedClaims,
+      validFromAuthoritySequence: input.validFromAuthoritySequence,
+      ...(input.validThroughAuthoritySequence !== undefined
+        ? { validThroughAuthoritySequence: input.validThroughAuthoritySequence }
+        : {}),
+      ...(input.verifierKeyId !== undefined
+        ? { verifierKeyId: input.verifierKeyId }
+        : {}),
+      ...(input.verifierPublicKeyFingerprint !== undefined
+        ? { verifierPublicKeyFingerprint: input.verifierPublicKeyFingerprint }
+        : {}),
+      ...(input.verifierKeyMaterialHash !== undefined
+        ? { verifierKeyMaterialHash: input.verifierKeyMaterialHash }
+        : {}),
+      ...(input.previousRoleMetadataHash !== undefined
+        ? { previousRoleMetadataHash: input.previousRoleMetadataHash }
+        : {}),
+    });
+  const settlementClaimHash =
+    computeOperationalStateSignatureVerifierRoleSettlementClaimHash({
+      settlementId: input.settlementId,
+      tenantId: input.tenantId,
+      authorityScope: input.authorityScope,
+      verifierId: input.verifierId,
+      verifierVersion: input.verifierVersion,
+      roleMetadataSequence: input.roleMetadataSequence,
+      roleMetadataHash,
+      transparencyLogId: input.transparencyLogId,
+      transparencyTreeHeadHash: input.transparencyTreeHeadHash,
+      transparencyTreeSize: input.transparencyTreeSize,
+      transparencyInclusionProofHash: input.transparencyInclusionProofHash,
+      transparencyConsistencyProofHash: input.transparencyConsistencyProofHash,
+    });
+  const payload: Omit<
+    OperationalStateSignatureVerifierRoleSettlementProof,
+    "proofHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_SIGNATURE_VERIFIER_ROLE_SETTLEMENT_PROOF_SCHEMA_VERSION,
+    proofId: input.proofId,
+    settlementId: input.settlementId,
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    verifierId: input.verifierId,
+    verifierVersion: input.verifierVersion,
+    verifierRole,
+    roleMetadataSequence: input.roleMetadataSequence,
+    allowedClaims,
+    validFromAuthoritySequence: input.validFromAuthoritySequence,
+    ...(input.validThroughAuthoritySequence !== undefined
+      ? { validThroughAuthoritySequence: input.validThroughAuthoritySequence }
+      : {}),
+    ...(input.verifierKeyId !== undefined
+      ? { verifierKeyId: input.verifierKeyId }
+      : {}),
+    ...(input.verifierPublicKeyFingerprint !== undefined
+      ? { verifierPublicKeyFingerprint: input.verifierPublicKeyFingerprint }
+      : {}),
+    ...(input.verifierKeyMaterialHash !== undefined
+      ? { verifierKeyMaterialHash: input.verifierKeyMaterialHash }
+      : {}),
+    ...(input.previousRoleMetadataHash !== undefined
+      ? { previousRoleMetadataHash: input.previousRoleMetadataHash }
+      : {}),
+    roleMetadataHash,
+    transparencyLogId: input.transparencyLogId,
+    transparencyTreeHeadHash: input.transparencyTreeHeadHash,
+    transparencyTreeSize: input.transparencyTreeSize,
+    transparencyInclusionProofHash: input.transparencyInclusionProofHash,
+    transparencyConsistencyProofHash: input.transparencyConsistencyProofHash,
+    settlementAuthorityBoundary: input.settlementAuthorityBoundary,
+    settlementClaimHash,
+    settlementCertificate: input.settlementCertificate,
+    settledAt: input.settledAt,
+    settledBy: input.settledBy,
+    ...(input.proofReason !== undefined ? { proofReason: input.proofReason } : {}),
+  };
+  return {
+    ...payload,
+    proofHash:
+      computeOperationalStateSignatureVerifierRoleSettlementProofHash(payload),
+  };
+}
+
+export function verifyOperationalStateSignatureVerifierRoleSettlementProofHash(
+  proof: OperationalStateSignatureVerifierRoleSettlementProof,
+): StateReviewArtifactHashValidation {
+  const { proofHash, ...payload } = proof;
+  const expectedHash =
+    computeOperationalStateSignatureVerifierRoleSettlementProofHash(payload);
+  return {
+    valid: proofHash === expectedHash,
+    expectedHash,
+    actualHash: proofHash,
+  };
+}
+
+function pushOperationalStateSignatureVerifierRoleSettlementIssue(
+  issues: OperationalStateSignatureVerifierRoleSettlementIssue[],
+  issue: OperationalStateSignatureVerifierRoleSettlementIssue,
+): void {
+  issues.push(issue);
+}
+
+export function evaluateOperationalStateSignatureVerifierRoleSettlementProof(
+  input: OperationalStateSignatureVerifierRoleSettlementEvaluationInput,
+): OperationalStateSignatureVerifierRoleSettlementEvaluation {
+  const issues: OperationalStateSignatureVerifierRoleSettlementIssue[] = [];
+  const proof = input.proof;
+  if (proof === undefined) {
+    return {
+      valid: false,
+      accepted: false,
+      allowedClaims: [],
+      issues: [
+        {
+          code: "operational_state_signature_verifier_role_settlement_proof_missing",
+          path: "/proof",
+          message:
+            "Signature verifier role metadata must be settled through replayable transparency evidence; local verifier allowlists are not operational authority.",
+        },
+      ],
+    };
+  }
+
+  const proofHashValidation =
+    verifyOperationalStateSignatureVerifierRoleSettlementProofHash(proof);
+  if (!proofHashValidation.valid) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_proof_hash_mismatch",
+      path: "/proof/proofHash",
+      message: `Signature verifier role settlement proof hash ${proofHashValidation.actualHash} does not match recomputed hash ${proofHashValidation.expectedHash}.`,
+      expected: proofHashValidation.expectedHash,
+      actual: proofHashValidation.actualHash,
+    });
+  }
+  if (
+    input.expectedTenantId !== undefined &&
+    proof.tenantId !== tenantId(String(input.expectedTenantId))
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_tenant_mismatch",
+      path: "/proof/tenantId",
+      message: "Signature verifier role settlement proof tenant mismatch.",
+      expected: String(input.expectedTenantId),
+      actual: proof.tenantId,
+    });
+  }
+  if (
+    input.expectedAuthorityScope !== undefined &&
+    proof.authorityScope !== input.expectedAuthorityScope
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_scope_mismatch",
+      path: "/proof/authorityScope",
+      message: "Signature verifier role settlement proof scope mismatch.",
+      expected: input.expectedAuthorityScope,
+      actual: proof.authorityScope,
+    });
+  }
+  if (
+    (input.expectedVerifierId !== undefined &&
+      proof.verifierId !== input.expectedVerifierId) ||
+    (input.expectedVerifierVersion !== undefined &&
+      proof.verifierVersion !== input.expectedVerifierVersion)
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_verifier_mismatch",
+      path: "/proof/verifier",
+      message:
+        "Signature verifier role settlement proof does not bind the verifier id/version that produced the proof.",
+      expected: input.expectedVerifierId ?? "expected-verifier",
+      actual: proof.verifierId,
+    });
+  }
+  if (proof.verifierRole !== "signature_verifier") {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_role_mismatch",
+      path: "/proof/verifierRole",
+      message:
+        "Signature verifier role settlement proof must settle the signature-verifier role.",
+      expected: "signature_verifier",
+      actual: proof.verifierRole,
+    });
+  }
+  for (const claim of proof.allowedClaims) {
+    if (claim !== "signature_validity") {
+      pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+        code: "operational_state_signature_verifier_role_settlement_claim_overreach",
+        path: "/proof/allowedClaims",
+        message:
+          "Signature verifier role metadata may settle signature-validity authority only; key, principal, topology, quorum, or admission authority must come from replayed substrate state.",
+        expected: "signature_validity",
+        actual: claim,
+      });
+    }
+  }
+  for (const claim of input.expectedAllowedClaims ?? []) {
+    if (!proof.allowedClaims.includes(claim)) {
+      pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+        code: "operational_state_signature_verifier_role_settlement_expected_claim_missing",
+        path: "/proof/allowedClaims",
+        message:
+          "Signature verifier role settlement proof does not admit a claim made by the verifier adapter proof.",
+        expected: claim,
+        actual: proof.allowedClaims.join(","),
+      });
+    }
+  }
+  if (
+    proof.verifierPublicKeyFingerprint === undefined &&
+    proof.verifierKeyMaterialHash === undefined
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_key_material_missing",
+      path: "/proof/verifierKey",
+      message:
+        "Signature verifier role settlement proof must identify verifier role key material by fingerprint or key-material hash.",
+    });
+  }
+  if (
+    proof.transparencyLogId.length === 0 ||
+    proof.transparencyTreeHeadHash.length === 0 ||
+    proof.transparencyTreeSize < 1 ||
+    proof.transparencyInclusionProofHash.length === 0 ||
+    proof.transparencyConsistencyProofHash.length === 0
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_transparency_missing",
+      path: "/proof/transparency",
+      message:
+        "Signature verifier role settlement proof requires transparency-log id, tree head, inclusion proof, and consistency proof hashes.",
+    });
+  }
+  if (
+    input.requiredTransparencyLogId !== undefined &&
+    proof.transparencyLogId !== input.requiredTransparencyLogId
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_transparency_missing",
+      path: "/proof/transparencyLogId",
+      message:
+        "Signature verifier role settlement proof uses a different transparency log than required by the replay context.",
+      expected: input.requiredTransparencyLogId,
+      actual: proof.transparencyLogId,
+    });
+  }
+  if (
+    input.requiredAuthoritySequence !== undefined &&
+    (input.requiredAuthoritySequence < proof.validFromAuthoritySequence ||
+      (proof.validThroughAuthoritySequence !== undefined &&
+        input.requiredAuthoritySequence > proof.validThroughAuthoritySequence))
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_currentness_mismatch",
+      path: "/proof/validAuthoritySequence",
+      message:
+        "Signature verifier role settlement proof is not current for the required authority sequence.",
+      expected: input.requiredAuthoritySequence,
+      actual: proof.validThroughAuthoritySequence ?? proof.validFromAuthoritySequence,
+    });
+  }
+
+  const recomputedRoleMetadataHash =
+    computeOperationalStateSignatureVerifierRoleMetadataHash({
+      tenantId: proof.tenantId,
+      authorityScope: proof.authorityScope,
+      verifierId: proof.verifierId,
+      verifierVersion: proof.verifierVersion,
+      verifierRole: proof.verifierRole,
+      roleMetadataSequence: proof.roleMetadataSequence,
+      allowedClaims: proof.allowedClaims,
+      validFromAuthoritySequence: proof.validFromAuthoritySequence,
+      ...(proof.validThroughAuthoritySequence !== undefined
+        ? { validThroughAuthoritySequence: proof.validThroughAuthoritySequence }
+        : {}),
+      ...(proof.verifierKeyId !== undefined
+        ? { verifierKeyId: proof.verifierKeyId }
+        : {}),
+      ...(proof.verifierPublicKeyFingerprint !== undefined
+        ? { verifierPublicKeyFingerprint: proof.verifierPublicKeyFingerprint }
+        : {}),
+      ...(proof.verifierKeyMaterialHash !== undefined
+        ? { verifierKeyMaterialHash: proof.verifierKeyMaterialHash }
+        : {}),
+      ...(proof.previousRoleMetadataHash !== undefined
+        ? { previousRoleMetadataHash: proof.previousRoleMetadataHash }
+        : {}),
+    });
+  if (proof.roleMetadataHash !== recomputedRoleMetadataHash) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_metadata_hash_mismatch",
+      path: "/proof/roleMetadataHash",
+      message:
+        "Signature verifier role metadata hash does not match settled verifier role fields.",
+      expected: recomputedRoleMetadataHash,
+      actual: proof.roleMetadataHash,
+    });
+  }
+  const recomputedSettlementClaimHash =
+    computeOperationalStateSignatureVerifierRoleSettlementClaimHash({
+      settlementId: proof.settlementId,
+      tenantId: proof.tenantId,
+      authorityScope: proof.authorityScope,
+      verifierId: proof.verifierId,
+      verifierVersion: proof.verifierVersion,
+      roleMetadataSequence: proof.roleMetadataSequence,
+      roleMetadataHash: proof.roleMetadataHash,
+      transparencyLogId: proof.transparencyLogId,
+      transparencyTreeHeadHash: proof.transparencyTreeHeadHash,
+      transparencyTreeSize: proof.transparencyTreeSize,
+      transparencyInclusionProofHash: proof.transparencyInclusionProofHash,
+      transparencyConsistencyProofHash: proof.transparencyConsistencyProofHash,
+    });
+  if (proof.settlementClaimHash !== recomputedSettlementClaimHash) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_claim_hash_mismatch",
+      path: "/proof/settlementClaimHash",
+      message:
+        "Signature verifier role settlement claim hash does not match metadata and transparency evidence.",
+      expected: recomputedSettlementClaimHash,
+      actual: proof.settlementClaimHash,
+    });
+  }
+
+  const certificateHashValidation =
+    verifyOperationalStateQuorumCertificateProofCertificateHash(
+      proof.settlementCertificate,
+    );
+  if (!certificateHashValidation.valid) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_certificate_hash_mismatch",
+      path: "/proof/settlementCertificate/quorumCertificateHash",
+      message: `Signature verifier role settlement certificate hash ${certificateHashValidation.actualHash} does not match recomputed hash ${certificateHashValidation.expectedHash}.`,
+      expected: certificateHashValidation.expectedHash,
+      actual: certificateHashValidation.actualHash,
+    });
+  }
+  if (
+    !proof.settlementCertificate.certified ||
+    proof.settlementCertificate.status !== "certified"
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_certificate_not_certified",
+      path: "/proof/settlementCertificate/status",
+      message:
+        "Signature verifier role settlement requires a certified quorum certificate over the role metadata claim.",
+      expected: "certified",
+      actual: proof.settlementCertificate.status,
+    });
+  }
+  if (
+    proof.settlementCertificate.acceptedWitnessIds.length <
+      proof.settlementCertificate.minimumWitnesses ||
+    proof.settlementCertificate.acceptedWitnessIds.length <
+      proof.settlementCertificate.requiredWitnesses
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_certificate_quorum_not_met",
+      path: "/proof/settlementCertificate/acceptedWitnessIds",
+      message:
+        "Signature verifier role settlement certificate does not satisfy its witness quorum.",
+      expected: Math.max(
+        proof.settlementCertificate.minimumWitnesses,
+        proof.settlementCertificate.requiredWitnesses,
+      ),
+      actual: proof.settlementCertificate.acceptedWitnessIds.length,
+    });
+  }
+  if (
+    proof.settlementCertificate.tenantId !== proof.tenantId ||
+    proof.settlementCertificate.authorityScope !== proof.authorityScope ||
+    proof.settlementCertificate.authorityBoundary !==
+      proof.settlementAuthorityBoundary ||
+    (input.requiredSettlementAuthorityBoundary !== undefined &&
+      proof.settlementAuthorityBoundary !==
+        input.requiredSettlementAuthorityBoundary)
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_certificate_authority_boundary_mismatch",
+      path: "/proof/settlementCertificate",
+      message:
+        "Signature verifier role settlement certificate must match tenant, scope, and settlement authority boundary.",
+      ...(input.requiredSettlementAuthorityBoundary !== undefined
+        ? { expected: input.requiredSettlementAuthorityBoundary }
+        : {}),
+      actual: proof.settlementCertificate.authorityBoundary,
+    });
+  }
+  if (
+    proof.settlementCertificate.subjectKind !==
+      OPERATIONAL_STATE_SIGNATURE_VERIFIER_ROLE_SETTLEMENT_SUBJECT_KIND ||
+    proof.settlementCertificate.subjectId !== proof.settlementId ||
+    proof.settlementCertificate.subjectSequence !==
+      proof.roleMetadataSequence ||
+    proof.settlementCertificate.subjectHash !== proof.settlementClaimHash
+  ) {
+    pushOperationalStateSignatureVerifierRoleSettlementIssue(issues, {
+      code: "operational_state_signature_verifier_role_settlement_certificate_subject_mismatch",
+      path: "/proof/settlementCertificate",
+      message:
+        "Signature verifier role settlement certificate must certify the exact role settlement claim hash.",
+      expected: proof.settlementClaimHash,
+      actual: proof.settlementCertificate.subjectHash,
+    });
+  }
+
+  return {
+    valid: issues.length === 0,
+    accepted: issues.length === 0,
+    proofId: proof.proofId,
+    proofHash: proof.proofHash,
+    verifierId: proof.verifierId,
+    verifierVersion: proof.verifierVersion,
+    roleMetadataHash: proof.roleMetadataHash,
+    settlementClaimHash: proof.settlementClaimHash,
+    transparencyLogId: proof.transparencyLogId,
+    transparencyTreeHeadHash: proof.transparencyTreeHeadHash,
+    allowedClaims: proof.allowedClaims,
+    issues,
   };
 }
 
@@ -32127,6 +36832,67 @@ export function evaluateOperationalStateSignatureVerifierAdapterProof(
     }
   }
 
+  let verifierRoleSettlementProofEvaluation:
+    | OperationalStateSignatureVerifierRoleSettlementEvaluation
+    | undefined;
+  if (input.requireVerifierRoleSettlementProof === true) {
+    verifierRoleSettlementProofEvaluation =
+      evaluateOperationalStateSignatureVerifierRoleSettlementProof({
+        ...(input.verifierRoleSettlementProof !== undefined
+          ? { proof: input.verifierRoleSettlementProof }
+          : {}),
+        ...(proof !== undefined
+          ? {
+              expectedTenantId: proof.tenantId,
+              expectedAuthorityScope: proof.authorityScope,
+              expectedVerifierId: proof.verifierId,
+              expectedVerifierVersion: proof.verifierVersion,
+              expectedAllowedClaims: proof.adapterClaims,
+            }
+          : input.expectedTenantId !== undefined ||
+              input.expectedAuthorityScope !== undefined
+            ? {
+                ...(input.expectedTenantId !== undefined
+                  ? { expectedTenantId: input.expectedTenantId }
+                  : {}),
+                ...(input.expectedAuthorityScope !== undefined
+                  ? { expectedAuthorityScope: input.expectedAuthorityScope }
+                  : {}),
+              }
+            : {}),
+        ...(input.requiredVerifierRoleSettlementAuthorityBoundary !== undefined
+          ? {
+              requiredSettlementAuthorityBoundary:
+                input.requiredVerifierRoleSettlementAuthorityBoundary,
+            }
+          : {}),
+        ...(input.requiredVerifierTransparencyLogId !== undefined
+          ? { requiredTransparencyLogId: input.requiredVerifierTransparencyLogId }
+          : {}),
+        ...(keyBinding !== undefined
+          ? { requiredAuthoritySequence: keyBinding.authoritySequence }
+          : {}),
+      });
+    if (input.verifierRoleSettlementProof === undefined) {
+      pushOperationalStateSignatureVerifierAdapterIssue(issues, {
+        code: "operational_state_signature_verifier_role_settlement_proof_missing",
+        path: "/verifierRoleSettlementProof",
+        message:
+          "Signature verifier adapter proof cannot become operational state from a local verifier allowlist; verifier role metadata must replay from settlement proof.",
+      });
+    } else if (!verifierRoleSettlementProofEvaluation.valid) {
+      pushOperationalStateSignatureVerifierAdapterIssue(issues, {
+        code: "operational_state_signature_verifier_role_settlement_proof_invalid",
+        path: "/verifierRoleSettlementProof",
+        message:
+          "Signature verifier role settlement proof failed verifier, role, transparency, currentness, or certificate checks.",
+        actual: verifierRoleSettlementProofEvaluation.issues
+          .map((issue) => issue.code)
+          .join(","),
+      });
+    }
+  }
+
   if (keyBinding !== undefined && proof !== undefined) {
     if (proof.tenantId !== keyBinding.tenantId) {
       pushOperationalStateSignatureVerifierAdapterIssue(issues, {
@@ -32543,6 +37309,9 @@ export function evaluateOperationalStateSignatureVerifierAdapterProof(
     accepted: issues.length === 0,
     ...(keyBinding !== undefined ? { keyBinding } : {}),
     ...(proof !== undefined ? { proof } : {}),
+    ...(verifierRoleSettlementProofEvaluation !== undefined
+      ? { verifierRoleSettlementProofEvaluation }
+      : {}),
     ...(proofAdmissionReplay !== undefined ? { proofAdmissionReplay } : {}),
     ...(requiredProofAdmissionRecord !== undefined
       ? { requiredProofAdmissionRecord }
@@ -32698,6 +37467,778 @@ export function operationalStateAuthorityEpochSealFinalizerProofAdmissionSubject
   >,
 ): string {
   return `${input.finalizerProofAdmissionStoreId}:${input.sealId}`;
+}
+
+function operationalStateAuthorityEpochSealFinalizerProofAdmissionRecordSortKey(
+  record: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord,
+): string {
+  return [
+    record.finalizerProof.tenantId,
+    record.finalizerProof.authorityScope,
+    record.finalizerProof.authorityBoundary,
+    record.finalizerProof.sealedSubjectKind,
+    record.finalizerProof.sealedSubjectId,
+    String(record.finalizerProof.sealedSubjectSequence),
+    record.finalizerProof.finalizerProofHash,
+    record.admissionRecordHash,
+  ].join("\u0000");
+}
+
+function sortOperationalStateAuthorityEpochSealFinalizerProofAdmissionRecords(
+  first: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord,
+  second: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord,
+): readonly [
+  OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord,
+  OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord,
+] {
+  return operationalStateAuthorityEpochSealFinalizerProofAdmissionRecordSortKey(
+    first,
+  ) <=
+    operationalStateAuthorityEpochSealFinalizerProofAdmissionRecordSortKey(
+      second,
+    )
+    ? [first, second]
+    : [second, first];
+}
+
+function operationalStateAuthorityEpochSealFinalityConflictKinds(
+  first: OperationalStateAuthorityEpochSealFinalizerProof,
+  second: OperationalStateAuthorityEpochSealFinalizerProof,
+): readonly OperationalStateAuthorityEpochSealFinalityConflictKind[] {
+  const conflictKinds: OperationalStateAuthorityEpochSealFinalityConflictKind[] =
+    [];
+  if (
+    first.sealedAuthorityTopologyHash !==
+    second.sealedAuthorityTopologyHash
+  ) {
+    conflictKinds.push("sealed_authority_topology_conflict");
+  }
+  if (
+    first.sealedQuorumCertificateHash !==
+    second.sealedQuorumCertificateHash
+  ) {
+    conflictKinds.push("sealed_quorum_certificate_conflict");
+  }
+  if (
+    (first.authorityTransitionHash ?? "") !==
+    (second.authorityTransitionHash ?? "")
+  ) {
+    conflictKinds.push("authority_transition_conflict");
+  }
+  return conflictKinds;
+}
+
+function operationalStateAuthorityEpochSealFinalitySubjectMatches(
+  first: OperationalStateAuthorityEpochSealFinalizerProof,
+  second: OperationalStateAuthorityEpochSealFinalizerProof,
+): boolean {
+  return (
+    first.tenantId === second.tenantId &&
+    first.authorityScope === second.authorityScope &&
+    first.authorityBoundary === second.authorityBoundary &&
+    first.sealedSubjectKind === second.sealedSubjectKind &&
+    first.sealedSubjectId === second.sealedSubjectId &&
+    first.sealedSubjectSequence === second.sealedSubjectSequence
+  );
+}
+
+function operationalStateAuthorityEpochSealSharedAcceptedWitnessIds(
+  first: OperationalStateQuorumCertificateProofCertificate,
+  second: OperationalStateQuorumCertificateProofCertificate,
+): readonly string[] {
+  const secondWitnesses = new Set(second.acceptedWitnessIds);
+  return [...new Set(first.acceptedWitnessIds)]
+    .filter((witnessId) => secondWitnesses.has(witnessId))
+    .sort();
+}
+
+export function computeOperationalStateAuthorityEpochSealFinalityConflictHash(
+  input: Pick<
+    OperationalStateAuthorityEpochSealAccountableFinalityEvidence,
+    | "tenantId"
+    | "authorityScope"
+    | "authorityBoundary"
+    | "finalizerProofAdmissionAuthorityBoundary"
+    | "sealedSubjectKind"
+    | "sealedSubjectId"
+    | "sealedSubjectSequence"
+    | "firstFinalizerProofHash"
+    | "secondFinalizerProofHash"
+    | "firstAdmissionRecordHash"
+    | "secondAdmissionRecordHash"
+    | "firstAdmissionCertificateHash"
+    | "secondAdmissionCertificateHash"
+    | "sharedAcceptedWitnessIds"
+    | "conflictKinds"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(input));
+}
+
+export function computeOperationalStateAuthorityEpochSealAccountableFinalityEvidenceHash(
+  evidence: Omit<
+    OperationalStateAuthorityEpochSealAccountableFinalityEvidence,
+    "evidenceHash"
+  >,
+): string {
+  return fingerprint64(canonicalStringify(evidence));
+}
+
+export function buildOperationalStateAuthorityEpochSealAccountableFinalityEvidence(
+  input: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceInput,
+): OperationalStateAuthorityEpochSealAccountableFinalityEvidence {
+  const [firstRecord, secondRecord] =
+    sortOperationalStateAuthorityEpochSealFinalizerProofAdmissionRecords(
+      input.firstFinalizerProofAdmissionRecord,
+      input.secondFinalizerProofAdmissionRecord,
+    );
+  const firstProof = firstRecord.finalizerProof;
+  const secondProof = secondRecord.finalizerProof;
+  const conflictKinds =
+    operationalStateAuthorityEpochSealFinalityConflictKinds(
+      firstProof,
+      secondProof,
+    );
+  const sharedAcceptedWitnessIds =
+    operationalStateAuthorityEpochSealSharedAcceptedWitnessIds(
+      firstRecord.admissionCertificate,
+      secondRecord.admissionCertificate,
+    );
+  const conflictPayload = {
+    tenantId: tenantId(String(input.tenantId)),
+    authorityScope: input.authorityScope,
+    authorityBoundary: input.authorityBoundary,
+    finalizerProofAdmissionAuthorityBoundary:
+      input.finalizerProofAdmissionAuthorityBoundary,
+    sealedSubjectKind: firstProof.sealedSubjectKind,
+    sealedSubjectId: firstProof.sealedSubjectId,
+    sealedSubjectSequence: firstProof.sealedSubjectSequence,
+    firstFinalizerProofHash: firstRecord.finalizerProofHash,
+    secondFinalizerProofHash: secondRecord.finalizerProofHash,
+    firstAdmissionRecordHash: firstRecord.admissionRecordHash,
+    secondAdmissionRecordHash: secondRecord.admissionRecordHash,
+    firstAdmissionCertificateHash:
+      firstRecord.admissionCertificate.quorumCertificateHash,
+    secondAdmissionCertificateHash:
+      secondRecord.admissionCertificate.quorumCertificateHash,
+    sharedAcceptedWitnessIds,
+    conflictKinds,
+  };
+  const payload: Omit<
+    OperationalStateAuthorityEpochSealAccountableFinalityEvidence,
+    "evidenceHash"
+  > = {
+    schemaVersion:
+      OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_ACCOUNTABLE_FINALITY_EVIDENCE_SCHEMA_VERSION,
+    evidenceId: input.evidenceId,
+    ...conflictPayload,
+    firstFinalizerProofAdmissionRecord: firstRecord,
+    secondFinalizerProofAdmissionRecord: secondRecord,
+    firstSealPayloadHash: firstProof.sealPayloadHash,
+    secondSealPayloadHash: secondProof.sealPayloadHash,
+    conflictHash:
+      computeOperationalStateAuthorityEpochSealFinalityConflictHash(
+        conflictPayload,
+      ),
+    recordedAt: input.recordedAt,
+    recordedBy: input.recordedBy,
+    ...(input.evidenceReason !== undefined
+      ? { evidenceReason: input.evidenceReason }
+      : {}),
+  };
+  return {
+    ...payload,
+    evidenceHash:
+      computeOperationalStateAuthorityEpochSealAccountableFinalityEvidenceHash(
+        payload,
+      ),
+  };
+}
+
+export function verifyOperationalStateAuthorityEpochSealAccountableFinalityEvidenceHash(
+  evidence: OperationalStateAuthorityEpochSealAccountableFinalityEvidence,
+): StateReviewArtifactHashValidation {
+  const { evidenceHash, ...payload } = evidence;
+  const expectedHash =
+    computeOperationalStateAuthorityEpochSealAccountableFinalityEvidenceHash(
+      payload,
+    );
+  return {
+    valid: evidenceHash === expectedHash,
+    expectedHash,
+    actualHash: evidenceHash,
+  };
+}
+
+function pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+  issues: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue[],
+  issue: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue,
+): void {
+  issues.push(issue);
+}
+
+function evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidenceAdmissionRecord(
+  input: {
+    readonly evidence: OperationalStateAuthorityEpochSealAccountableFinalityEvidence;
+    readonly record: OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord;
+    readonly path: string;
+    readonly expectedFinalizerProofHash: string;
+    readonly expectedAdmissionRecordHash: string;
+    readonly expectedAdmissionCertificateHash: string;
+    readonly issues: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue[];
+  },
+): void {
+  const { evidence, record, path, issues } = input;
+  const proofHashValidation =
+    verifyOperationalStateAuthorityEpochSealFinalizerProofHash(
+      record.finalizerProof,
+    );
+  if (!proofHashValidation.valid) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_proof_hash_mismatch",
+        path: `${path}/finalizerProof/finalizerProofHash`,
+        message:
+          "Accountable finality evidence cannot use a finalizer proof whose hash does not replay.",
+        expected: proofHashValidation.expectedHash,
+        actual: proofHashValidation.actualHash,
+      },
+    );
+  }
+  const recordHashValidation =
+    verifyOperationalStateAuthorityEpochSealFinalizerProofAdmissionRecordHash(
+      record,
+    );
+  if (!recordHashValidation.valid) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_record_hash_mismatch",
+        path: `${path}/admissionRecordHash`,
+        message:
+          "Accountable finality evidence cannot use a finalizer-proof admission record whose hash does not replay.",
+        expected: recordHashValidation.expectedHash,
+        actual: recordHashValidation.actualHash,
+      },
+    );
+  }
+  const certificateHashValidation =
+    verifyOperationalStateQuorumCertificateProofCertificateHash(
+      record.admissionCertificate,
+    );
+  if (!certificateHashValidation.valid) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_hash_mismatch",
+        path: `${path}/admissionCertificate/quorumCertificateHash`,
+        message:
+          "Accountable finality evidence cannot use a finalizer-proof admission certificate whose hash does not replay.",
+        expected: certificateHashValidation.expectedHash,
+        actual: certificateHashValidation.actualHash,
+      },
+    );
+  }
+  if (record.finalizerProofHash !== input.expectedFinalizerProofHash) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_proof_hash_mismatch",
+        path: `${path}/finalizerProofHash`,
+        message:
+          "Accountable finality evidence record hash pointer must bind the embedded finalizer proof.",
+        expected: input.expectedFinalizerProofHash,
+        actual: record.finalizerProofHash,
+      },
+    );
+  }
+  if (record.admissionRecordHash !== input.expectedAdmissionRecordHash) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_record_hash_mismatch",
+        path: `${path}/admissionRecordHash`,
+        message:
+          "Accountable finality evidence admission record pointer must match the embedded record.",
+        expected: input.expectedAdmissionRecordHash,
+        actual: record.admissionRecordHash,
+      },
+    );
+  }
+  if (
+    record.admissionCertificate.quorumCertificateHash !==
+    input.expectedAdmissionCertificateHash
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_hash_mismatch",
+        path: `${path}/admissionCertificate/quorumCertificateHash`,
+        message:
+          "Accountable finality evidence certificate pointer must match the embedded certificate.",
+        expected: input.expectedAdmissionCertificateHash,
+        actual: record.admissionCertificate.quorumCertificateHash,
+      },
+    );
+  }
+  if (
+    record.tenantId !== evidence.tenantId ||
+    record.finalizerProof.tenantId !== evidence.tenantId ||
+    record.admissionCertificate.tenantId !== evidence.tenantId
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_tenant_mismatch",
+        path: `${path}/tenantId`,
+        message:
+          "Accountable finality evidence records, proofs, and certificates must share the evidence tenant.",
+        expected: evidence.tenantId,
+        actual: record.tenantId,
+      },
+    );
+  }
+  if (
+    record.authorityScope !== evidence.authorityScope ||
+    record.finalizerProof.authorityScope !== evidence.authorityScope ||
+    record.admissionCertificate.authorityScope !== evidence.authorityScope
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_scope_mismatch",
+        path: `${path}/authorityScope`,
+        message:
+          "Accountable finality evidence records, proofs, and certificates must share the evidence authority scope.",
+        expected: evidence.authorityScope,
+        actual: record.authorityScope,
+      },
+    );
+  }
+  if (record.finalizerProof.authorityBoundary !== evidence.authorityBoundary) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_boundary_mismatch",
+        path: `${path}/finalizerProof/authorityBoundary`,
+        message:
+          "Accountable finality evidence can only compare finalizer proofs over the same finalized authority boundary.",
+        expected: evidence.authorityBoundary,
+        actual: record.finalizerProof.authorityBoundary,
+      },
+    );
+  }
+  if (
+    record.admissionCertificate.authorityBoundary !==
+    evidence.finalizerProofAdmissionAuthorityBoundary
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_boundary_mismatch",
+        path: `${path}/admissionCertificate/authorityBoundary`,
+        message:
+          "Accountable finality evidence can only use certificates from the finalizer-proof admission authority boundary.",
+        expected: evidence.finalizerProofAdmissionAuthorityBoundary,
+        actual: record.admissionCertificate.authorityBoundary,
+      },
+    );
+  }
+  if (
+    record.admissionCertificate.subjectKind !==
+      OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_SUBJECT_KIND ||
+    record.admissionCertificate.subjectId !== record.finalizerProof.sealId ||
+    record.admissionCertificate.subjectSequence !==
+      record.admissionSequence ||
+    record.admissionCertificate.subjectHash !==
+      record.finalizerProof.finalizerProofHash
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_subject_mismatch",
+        path: `${path}/admissionCertificate`,
+        message:
+          "Accountable finality evidence requires certificates that certify the exact finalizer proof being disputed.",
+        expected: record.finalizerProof.finalizerProofHash,
+        actual: record.admissionCertificate.subjectHash,
+      },
+    );
+  }
+  if (
+    record.admissionCertificate.status !== "certified" ||
+    !record.admissionCertificate.certified
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_not_certified",
+        path: `${path}/admissionCertificate/status`,
+        message:
+          "Accountable finality evidence requires certified finalizer-proof admission certificates.",
+        expected: "certified",
+        actual: record.admissionCertificate.status,
+      },
+    );
+  }
+  if (
+    record.admissionCertificate.acceptedWitnessIds.length <
+    record.admissionCertificate.requiredWitnesses
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_quorum_not_met",
+        path: `${path}/admissionCertificate/acceptedWitnessIds`,
+        message:
+          "Accountable finality evidence requires finalizer-proof admission certificates that meet their quorum threshold.",
+        expected: record.admissionCertificate.requiredWitnesses,
+        actual: record.admissionCertificate.acceptedWitnessIds.length,
+      },
+    );
+  }
+}
+
+export function evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence(
+  input: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceEvaluationInput,
+): OperationalStateAuthorityEpochSealAccountableFinalityEvidenceEvaluation {
+  const issues: OperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue[] =
+    [];
+  const evidence = input.evidence;
+  if (evidence === undefined) {
+    return {
+      valid: false,
+      obstructsOperationalFinality: false,
+      sharedAcceptedWitnessIds: [],
+      conflictKinds: [],
+      issues: [
+        {
+          code: "operational_state_authority_epoch_seal_accountable_finality_evidence_missing",
+          path: "/evidence",
+          message:
+            "Finality conflicts cannot obstruct operational state without replayable accountable finality evidence.",
+        },
+      ],
+    };
+  }
+
+  const firstRecord = evidence.firstFinalizerProofAdmissionRecord;
+  const secondRecord = evidence.secondFinalizerProofAdmissionRecord;
+  const firstProof = firstRecord.finalizerProof;
+  const secondProof = secondRecord.finalizerProof;
+  const hashValidation =
+    verifyOperationalStateAuthorityEpochSealAccountableFinalityEvidenceHash(
+      evidence,
+    );
+  if (!hashValidation.valid) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_hash_mismatch",
+        path: "/evidenceHash",
+        message:
+          "Accountable finality evidence hash must replay from the embedded conflict records.",
+        expected: hashValidation.expectedHash,
+        actual: hashValidation.actualHash,
+      },
+    );
+  }
+
+  const expectedTenantId =
+    input.expectedTenantId !== undefined
+      ? tenantId(String(input.expectedTenantId))
+      : undefined;
+  if (expectedTenantId !== undefined && evidence.tenantId !== expectedTenantId) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_tenant_mismatch",
+        path: "/expectedTenantId",
+        message:
+          "Accountable finality evidence tenant must match replay context.",
+        expected: expectedTenantId,
+        actual: evidence.tenantId,
+      },
+    );
+  }
+  if (
+    input.expectedAuthorityScope !== undefined &&
+    evidence.authorityScope !== input.expectedAuthorityScope
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_scope_mismatch",
+        path: "/expectedAuthorityScope",
+        message:
+          "Accountable finality evidence authority scope must match replay context.",
+        expected: input.expectedAuthorityScope,
+        actual: evidence.authorityScope,
+      },
+    );
+  }
+  if (
+    input.expectedAuthorityBoundary !== undefined &&
+    evidence.authorityBoundary !== input.expectedAuthorityBoundary
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_boundary_mismatch",
+        path: "/expectedAuthorityBoundary",
+        message:
+          "Accountable finality evidence authority boundary must match replay context.",
+        expected: input.expectedAuthorityBoundary,
+        actual: evidence.authorityBoundary,
+      },
+    );
+  }
+  if (
+    input.expectedFinalizerProofAdmissionAuthorityBoundary !== undefined &&
+    evidence.finalizerProofAdmissionAuthorityBoundary !==
+      input.expectedFinalizerProofAdmissionAuthorityBoundary
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_boundary_mismatch",
+        path: "/expectedFinalizerProofAdmissionAuthorityBoundary",
+        message:
+          "Accountable finality evidence finalizer-proof admission authority boundary must match replay context.",
+        expected: input.expectedFinalizerProofAdmissionAuthorityBoundary,
+        actual: evidence.finalizerProofAdmissionAuthorityBoundary,
+      },
+    );
+  }
+
+  evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidenceAdmissionRecord(
+    {
+      evidence,
+      record: firstRecord,
+      path: "/firstFinalizerProofAdmissionRecord",
+      expectedFinalizerProofHash: evidence.firstFinalizerProofHash,
+      expectedAdmissionRecordHash: evidence.firstAdmissionRecordHash,
+      expectedAdmissionCertificateHash: evidence.firstAdmissionCertificateHash,
+      issues,
+    },
+  );
+  evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidenceAdmissionRecord(
+    {
+      evidence,
+      record: secondRecord,
+      path: "/secondFinalizerProofAdmissionRecord",
+      expectedFinalizerProofHash: evidence.secondFinalizerProofHash,
+      expectedAdmissionRecordHash: evidence.secondAdmissionRecordHash,
+      expectedAdmissionCertificateHash:
+        evidence.secondAdmissionCertificateHash,
+      issues,
+    },
+  );
+
+  const subjectMatches =
+    operationalStateAuthorityEpochSealFinalitySubjectMatches(
+      firstProof,
+      secondProof,
+    );
+  if (!subjectMatches) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_subject_mismatch",
+        path: "/sealedSubjectId",
+        message:
+          "Accountable finality evidence must compare two finalizer proofs over the same sealed operational subject frontier.",
+        expected: `${firstProof.sealedSubjectKind}:${firstProof.sealedSubjectId}:${firstProof.sealedSubjectSequence}`,
+        actual: `${secondProof.sealedSubjectKind}:${secondProof.sealedSubjectId}:${secondProof.sealedSubjectSequence}`,
+      },
+    );
+  }
+  if (
+    evidence.sealedSubjectKind !== firstProof.sealedSubjectKind ||
+    evidence.sealedSubjectId !== firstProof.sealedSubjectId ||
+    evidence.sealedSubjectSequence !== firstProof.sealedSubjectSequence
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_subject_mismatch",
+        path: "/sealedSubjectId",
+        message:
+          "Accountable finality evidence subject fields must replay from the compared finalizer proofs.",
+        expected: `${firstProof.sealedSubjectKind}:${firstProof.sealedSubjectId}:${firstProof.sealedSubjectSequence}`,
+        actual: `${evidence.sealedSubjectKind}:${evidence.sealedSubjectId}:${evidence.sealedSubjectSequence}`,
+      },
+    );
+  }
+  if (
+    input.expectedSealedSubjectKind !== undefined &&
+    evidence.sealedSubjectKind !== input.expectedSealedSubjectKind
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_subject_mismatch",
+        path: "/expectedSealedSubjectKind",
+        message:
+          "Accountable finality evidence sealed subject kind must match replay context.",
+        expected: input.expectedSealedSubjectKind,
+        actual: evidence.sealedSubjectKind,
+      },
+    );
+  }
+  if (
+    input.expectedSealedSubjectId !== undefined &&
+    evidence.sealedSubjectId !== input.expectedSealedSubjectId
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_subject_mismatch",
+        path: "/expectedSealedSubjectId",
+        message:
+          "Accountable finality evidence sealed subject id must match replay context.",
+        expected: input.expectedSealedSubjectId,
+        actual: evidence.sealedSubjectId,
+      },
+    );
+  }
+  if (
+    input.expectedSealedSubjectSequence !== undefined &&
+    evidence.sealedSubjectSequence !== input.expectedSealedSubjectSequence
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_subject_mismatch",
+        path: "/expectedSealedSubjectSequence",
+        message:
+          "Accountable finality evidence sealed subject sequence must match replay context.",
+        expected: input.expectedSealedSubjectSequence,
+        actual: evidence.sealedSubjectSequence,
+      },
+    );
+  }
+  if (
+    input.expectedFinalizerProofHash !== undefined &&
+    evidence.firstFinalizerProofHash !== input.expectedFinalizerProofHash &&
+    evidence.secondFinalizerProofHash !== input.expectedFinalizerProofHash
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_proof_hash_mismatch",
+        path: "/expectedFinalizerProofHash",
+        message:
+          "Accountable finality evidence must reference the finalizer proof currently being evaluated.",
+        expected: input.expectedFinalizerProofHash,
+        actual: `${evidence.firstFinalizerProofHash},${evidence.secondFinalizerProofHash}`,
+      },
+    );
+  }
+
+  const conflictKinds =
+    operationalStateAuthorityEpochSealFinalityConflictKinds(
+      firstProof,
+      secondProof,
+    );
+  if (conflictKinds.length === 0) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_no_conflict",
+        path: "/conflictKinds",
+        message:
+          "Accountable finality evidence must identify a divergent finality outcome, not duplicate the same finalized state.",
+      },
+    );
+  }
+  if (canonicalStringify(evidence.conflictKinds) !== canonicalStringify(conflictKinds)) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_conflict_hash_mismatch",
+        path: "/conflictKinds",
+        message:
+          "Accountable finality evidence conflict kinds must replay from the compared finalizer proofs.",
+        expected: conflictKinds.join(","),
+        actual: evidence.conflictKinds.join(","),
+      },
+    );
+  }
+  const sharedAcceptedWitnessIds =
+    operationalStateAuthorityEpochSealSharedAcceptedWitnessIds(
+      firstRecord.admissionCertificate,
+      secondRecord.admissionCertificate,
+    );
+  if (sharedAcceptedWitnessIds.length === 0) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_shared_witness_missing",
+        path: "/sharedAcceptedWitnessIds",
+        message:
+          "Accountable finality evidence requires at least one shared accepted witness across conflicting finalizer-proof certificates.",
+      },
+    );
+  }
+  if (
+    canonicalStringify(evidence.sharedAcceptedWitnessIds) !==
+    canonicalStringify(sharedAcceptedWitnessIds)
+  ) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_shared_witness_mismatch",
+        path: "/sharedAcceptedWitnessIds",
+        message:
+          "Accountable finality evidence shared witnesses must replay from the admission certificates.",
+        expected: sharedAcceptedWitnessIds.join(","),
+        actual: evidence.sharedAcceptedWitnessIds.join(","),
+      },
+    );
+  }
+  const expectedConflictHash =
+    computeOperationalStateAuthorityEpochSealFinalityConflictHash({
+      tenantId: evidence.tenantId,
+      authorityScope: evidence.authorityScope,
+      authorityBoundary: evidence.authorityBoundary,
+      finalizerProofAdmissionAuthorityBoundary:
+        evidence.finalizerProofAdmissionAuthorityBoundary,
+      sealedSubjectKind: evidence.sealedSubjectKind,
+      sealedSubjectId: evidence.sealedSubjectId,
+      sealedSubjectSequence: evidence.sealedSubjectSequence,
+      firstFinalizerProofHash: evidence.firstFinalizerProofHash,
+      secondFinalizerProofHash: evidence.secondFinalizerProofHash,
+      firstAdmissionRecordHash: evidence.firstAdmissionRecordHash,
+      secondAdmissionRecordHash: evidence.secondAdmissionRecordHash,
+      firstAdmissionCertificateHash: evidence.firstAdmissionCertificateHash,
+      secondAdmissionCertificateHash: evidence.secondAdmissionCertificateHash,
+      sharedAcceptedWitnessIds,
+      conflictKinds,
+    });
+  if (evidence.conflictHash !== expectedConflictHash) {
+    pushOperationalStateAuthorityEpochSealAccountableFinalityEvidenceIssue(
+      issues,
+      {
+        code: "operational_state_authority_epoch_seal_accountable_finality_evidence_conflict_hash_mismatch",
+        path: "/conflictHash",
+        message:
+          "Accountable finality evidence conflict hash must replay from the admitted conflicting finalizer-proof records.",
+        expected: expectedConflictHash,
+        actual: evidence.conflictHash,
+      },
+    );
+  }
+
+  return {
+    valid: issues.length === 0,
+    obstructsOperationalFinality: issues.length === 0,
+    evidence,
+    sharedAcceptedWitnessIds,
+    conflictKinds,
+    issues,
+  };
 }
 
 export function buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecord(
@@ -35266,6 +40807,46 @@ export function evaluateOperationalStateAuthorityEpochSealFinalizer(
     });
   }
 
+  const accountableFinalityEvidenceEvaluation =
+    input.accountableFinalityEvidence !== undefined
+      ? evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+          evidence: input.accountableFinalityEvidence,
+          expectedTenantId: finalizerProof.tenantId,
+          expectedAuthorityScope: finalizerProof.authorityScope,
+          expectedAuthorityBoundary: finalizerProof.authorityBoundary,
+          expectedSealedSubjectKind: finalizerProof.sealedSubjectKind,
+          expectedSealedSubjectId: finalizerProof.sealedSubjectId,
+          expectedSealedSubjectSequence: finalizerProof.sealedSubjectSequence,
+          expectedFinalizerProofHash: finalizerProof.finalizerProofHash,
+        })
+      : undefined;
+  if (
+    accountableFinalityEvidenceEvaluation !== undefined &&
+    !accountableFinalityEvidenceEvaluation.valid
+  ) {
+    pushOperationalStateAuthorityEpochSealFinalizerIssue(issues, {
+      code: "operational_state_authority_epoch_seal_finalizer_accountable_finality_evidence_invalid",
+      path: "/accountableFinalityEvidence",
+      message:
+        "Authority epoch seal finalizer cannot consume invalid accountable finality evidence.",
+      actual: accountableFinalityEvidenceEvaluation.issues
+        .map((issue) => issue.code)
+        .join(","),
+    });
+  } else if (
+    accountableFinalityEvidenceEvaluation?.obstructsOperationalFinality === true
+  ) {
+    pushOperationalStateAuthorityEpochSealFinalizerIssue(issues, {
+      code: "operational_state_authority_epoch_seal_finalizer_accountable_finality_conflict",
+      path: "/accountableFinalityEvidence",
+      message:
+        "Authority epoch seal finalizer proof is obstructed by replayable accountable finality evidence for a conflicting admitted quorum.",
+      actual:
+        accountableFinalityEvidenceEvaluation.conflictKinds.join(",") ??
+        "accountable-finality-conflict",
+    });
+  }
+
   const finalizerProofAdmissionReplay = input.finalizerProofAdmissionReplay;
   const requiredFinalizerProofAdmissionRecord =
     finalizerProofAdmissionReplay?.requiredFinalizerProofAdmissionRecord;
@@ -35515,6 +41096,9 @@ export function evaluateOperationalStateAuthorityEpochSealFinalizer(
     accepted: issues.length === 0 && verifierEvaluation.accepted,
     finalizerProof,
     verifierEvaluation,
+    ...(accountableFinalityEvidenceEvaluation !== undefined
+      ? { accountableFinalityEvidenceEvaluation }
+      : {}),
     ...(finalizerProofAdmissionReplay !== undefined
       ? { finalizerProofAdmissionReplay }
       : {}),
@@ -35813,6 +41397,41 @@ export function evaluateOperationalStateRecoveryCutAgainstView(
     });
   });
 
+  let quorumIntersectionProofEvaluation:
+    | OperationalStateCompositionalQuorumIntersectionProofEvaluation
+    | undefined;
+  if (options.requireCompositionalQuorumIntersectionProof === true) {
+    quorumIntersectionProofEvaluation =
+      evaluateOperationalStateCompositionalQuorumIntersectionProof({
+        ...(options.quorumIntersectionProof !== undefined
+          ? { proof: options.quorumIntersectionProof }
+          : {}),
+        expectedTenantId: cut.tenantId,
+        expectedAuthorityScope: cut.authorityScope,
+        expectedSubjectKind: OPERATIONAL_STATE_RECOVERY_CUT_SUBJECT_KIND,
+        expectedSubjectId: cut.cutId,
+        expectedSubjectHash: cut.cutHash,
+      });
+    if (options.quorumIntersectionProof === undefined) {
+      issues.push({
+        code: "operational_state_recovery_quorum_intersection_proof_missing",
+        path: "/recoveryCut/quorumIntersectionProof",
+        message:
+          "Recovery cut cannot compose independently admitted authority histories without a quorum-intersection proof.",
+      });
+    } else if (!quorumIntersectionProofEvaluation.valid) {
+      issues.push({
+        code: "operational_state_recovery_quorum_intersection_proof_invalid",
+        path: "/recoveryCut/quorumIntersectionProof",
+        message:
+          "Recovery cut cannot consume an invalid compositional quorum-intersection proof.",
+        actual: quorumIntersectionProofEvaluation.issues
+          .map((issue) => issue.code)
+          .join(","),
+      });
+    }
+  }
+
   return {
     valid: issues.length === 0,
     cutId: cut.cutId,
@@ -35821,6 +41440,9 @@ export function evaluateOperationalStateRecoveryCutAgainstView(
     requiredLaneCount,
     projectionLaneCount,
     excludedPrivateLaneCount,
+    ...(quorumIntersectionProofEvaluation !== undefined
+      ? { quorumIntersectionProofEvaluation }
+      : {}),
     issues,
   };
 }
@@ -77927,6 +83549,8 @@ export function reviewProposedActionAgainstCurrentState(
     })) ?? [];
   const pruningPolicyAdmissionEvaluation =
     options.requirePruningPolicyAdmission === true ||
+    options.requirePruningPolicyPrivacyPreservingPolicyProof === true ||
+    options.pruningPolicyPrivacyPreservingPolicyProof !== undefined ||
     options.requirePruningPolicyAdmissionWitnessQuorum === true ||
     options.requirePruningPolicyAdmissionWitnessAuthorityTopology === true ||
     options.requirePruningPolicyAdmissionWitnessAuthorityTransitionAdmission ===
@@ -77946,6 +83570,28 @@ export function reviewProposedActionAgainstCurrentState(
             : {}),
           ...(options.pruningPolicyAdmissionReplay !== undefined
             ? { admissionReplay: options.pruningPolicyAdmissionReplay }
+            : {}),
+          ...(options.pruningPolicyPrivacyPreservingPolicyProof !== undefined
+            ? {
+                privacyPreservingPolicyProof:
+                  options.pruningPolicyPrivacyPreservingPolicyProof,
+              }
+            : {}),
+          ...(options.requirePruningPolicyPrivacyPreservingPolicyProof !==
+          undefined
+            ? {
+                requirePrivacyPreservingPolicyProof:
+                  options.requirePruningPolicyPrivacyPreservingPolicyProof,
+              }
+            : {}),
+          ...(options
+            .allowedPruningPolicyPrivacyPreservingPolicyProofVerifierIds !==
+          undefined
+            ? {
+                allowedPrivacyPreservingPolicyProofVerifierIds:
+                  options
+                    .allowedPruningPolicyPrivacyPreservingPolicyProofVerifierIds,
+              }
             : {}),
           ...(options.requirePruningPolicyAdmissionWitnessQuorum !== undefined
             ? {

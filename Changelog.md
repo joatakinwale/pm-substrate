@@ -1,5 +1,86 @@
 # Changelog
 
+## 2026-06-27 - Operational state accountable finality evidence
+
+- Added `research/daily-arrowsmith-agent-state/v228-operational-state-authority-epoch-seal-accountable-finality-evidence-2026-06-27.md`, closing SQ175 and replacing it with SQ185 finality-evidence gossip/custody/currentness follow-up pressure.
+- Added `OperationalStateAuthorityEpochSealAccountableFinalityEvidence` plus deterministic conflict and evidence hashing in `@pm/agent-state`.
+- Added accountable finality evidence evaluation that binds two finalizer-proof admission records, finalizer proof hashes, admission record hashes, admission certificate hashes, sealed subject identity, shared accepted witnesses, conflict kinds, conflict hash, and evidence hash.
+- Extended authority epoch seal finalizer evaluation with `accountableFinalityEvidence`, so replayable conflicting admitted finalizer quorums obstruct otherwise valid seal finality.
+- Added migration `0145_agent_state_authority_epoch_seal_accountable_finality_evidence.sql` with append-only evidence storage binding conflict identity, shared accepted witnesses, evidence body, and evidence hash.
+- Added focused tests proving valid obstruction evidence plus disjoint-witness, no-conflict, wrong-certificate-subject, and wrong-boundary rejection.
+- Claim boundary: v228 prevents known conflicting admitted finalizer quorums from remaining private disputes, but evidence gossip/custody/currentness, runtime adoption in every finalizer path, withheld-evidence discovery, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, privacy-proof verifier authority, SoD verifier authority, compaction-checkpoint witness/currentness, quorum-subsumption beyond pairwise intersection, semantics-migration/state-transformer admission, settlement-authority admission/currentness, transparency-head currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state signature-verifier role settlement proof
+
+- Added `research/daily-arrowsmith-agent-state/v227-operational-state-signature-verifier-role-settlement-proof-2026-06-27.md`, closing SQ174 and replacing it with SQ184 transparency-head currentness follow-up pressure.
+- Added `OperationalStateSignatureVerifierRoleSettlementProof` plus deterministic role metadata, settlement-claim, and proof hashing in `@pm/agent-state`.
+- Added verifier-role settlement evaluation that binds verifier id/version, role, allowed claims, verifier key material identifiers, validity authority frontier, transparency-log inclusion/consistency evidence, settlement authority boundary, and quorum certificate.
+- Extended signature-verifier proof evaluation with `requireVerifierRoleSettlementProof`, `verifierRoleSettlementProof`, `requiredVerifierRoleSettlementAuthorityBoundary`, and `requiredVerifierTransparencyLogId`, so strict verifier proof acceptance no longer depends on local `allowedVerifierIds`.
+- Added migration `0144_agent_state_signature_verifier_role_settlement_proofs.sql` with append-only proof storage binding verifier role metadata, transparency evidence, settlement certificate, proof body, and proof hash.
+- Added focused tests proving valid verifier-role settlement plus missing proof, wrong verifier, overbroad role claims, and wrong certificate subject rejection.
+- Claim boundary: v227 prevents strict signature-verifier proof acceptance from relying on local verifier allowlists, but transparency-head currentness/gossip, settlement-authority admission/currentness, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, privacy-proof verifier authority, SoD verifier authority, compaction-checkpoint witness/currentness, quorum-subsumption beyond pairwise intersection, semantics-migration/state-transformer admission, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-topology settlement proof
+
+- Added `research/daily-arrowsmith-agent-state/v226-operational-state-authority-topology-settlement-proof-2026-06-27.md`, closing SQ173 and replacing it with SQ183 settlement-authority admission/currentness follow-up pressure.
+- Added `OperationalStateAuthorityTopologySettlementCandidate` and `OperationalStateAuthorityTopologySettlementProof` types plus deterministic candidate, candidate-set, settlement-claim, and proof hashing in `@pm/agent-state`.
+- Added topology-settlement proof evaluation that hash-binds competing authority-topology branch candidates, the selected branch, recovery subject, settled topology hash, settled authority frontier, settlement authority boundary, and quorum certificate.
+- Extended authority-topology compaction with `requireTopologySettlementProof`, `topologySettlementProof`, and `requiredTopologySettlementAuthorityBoundary`, so strict compacted authority recovery rejects branch choice by memory, ordering, or adapter preference.
+- Added migration `0143_agent_state_authority_topology_settlement_proofs.sql` with append-only proof storage binding tenant, scope, topology, recovery subject, candidate set, selected branch, settlement certificate, proof body, and proof hash.
+- Added focused tests proving valid topology settlement plus missing proof, rival selected branch, and wrong certificate subject rejection.
+- Claim boundary: v226 prevents strict authority-topology compaction from choosing between competing replay-valid branches without a settlement proof, but settlement-authority admission/currentness, verifier-role metadata/key-transparency settlement, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, privacy-proof verifier authority, SoD verifier authority, compaction-checkpoint witness/currentness, quorum-subsumption beyond pairwise intersection, semantics-migration/state-transformer admission, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-transition replay semantics proof
+
+- Added `research/daily-arrowsmith-agent-state/v225-operational-state-authority-transition-replay-semantics-proof-2026-06-27.md`, closing SQ172 and replacing it with SQ182 semantics-migration follow-up pressure.
+- Added `OperationalStateAuthorityTransitionReplaySemanticsManifest` and `OperationalStateAuthorityTransitionReplaySemanticsProof` types plus deterministic rule, manifest, and proof hashing in `@pm/agent-state`.
+- Added replay-semantics proof evaluation that hash-binds transition algebra id/version, manifest validity frontier, manifest rules, per-transition rule bindings, record schema versions, retained authority-transition hashes, starting topology, checkpoint replay subject, and recovered topology hash.
+- Extended authority-topology compaction with `requireReplaySemanticsProof`, `replaySemanticsProof`, and `requiredReplaySemanticsManifestHash`, so strict compacted authority recovery rejects missing, stale, mismatched, or false replay semantics.
+- Added migration `0142_agent_state_authority_transition_replay_semantics_proofs.sql` with append-only proof storage binding tenant, scope, topology, replay subject, manifest, transition bindings, result topology, proof body, and proof hash.
+- Added focused tests proving valid replay-semantics proof plus missing proof, stale manifest, manifest sequence mismatch, and hash-valid false-result rejection.
+- Claim boundary: v225 prevents silent current-code reinterpretation of retained authority-transition history during strict authority-topology compaction, but topology-settlement branch authority, verifier-role metadata/key-transparency settlement, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, privacy-proof verifier authority, SoD verifier authority, compaction-checkpoint witness/currentness, quorum-subsumption beyond pairwise intersection, semantics-migration/state-transformer admission, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state compositional quorum-intersection proof
+
+- Added `research/daily-arrowsmith-agent-state/v224-operational-state-compositional-quorum-intersection-proof-2026-06-27.md`, closing SQ171 and replacing it with SQ181 follow-up pressure.
+- Added `OperationalStateCompositionalQuorumIntersectionProof` claim/intersection/evaluation types and deterministic hash/build/verify helpers in `@pm/agent-state`.
+- Added replay evaluation for compositional quorum intersection, requiring embedded authority topologies and quorum certificates to recompute sufficient active accepted-witness intersection before independent authority histories can compose.
+- Extended recovery-cut evaluation with `requireCompositionalQuorumIntersectionProof` and `quorumIntersectionProof`, so recovered operational state can require the composition proof to bind to the exact recovery cut hash.
+- Added rejection paths for missing recovery proof, disjoint certified quorums, suspended shared witnesses, duplicate witness ids, topology/certificate hash mismatch, false stored intersections, and wrong recovery-cut subject binding.
+- Added migration `0141_agent_state_compositional_quorum_intersection_proofs.sql` with append-only proof storage binding tenant, authority scope, subject, intersection mode, pairwise/global intersections, proof body, and proof hash.
+- Added focused tests proving valid active intersection plus missing proof, disjoint quorum, suspended shared witness, and hash-valid false-intersection rejection.
+- Claim boundary: v224 closes the first pairwise/global active-intersection composition primitive, but replay-semantics versioning, topology-settlement branch authority, verifier-role metadata/key-transparency settlement, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, privacy-proof verifier authority, SoD verifier authority, compaction-checkpoint witness/currentness, quorum-subsumption beyond pairwise intersection, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-transition ledger compaction admission
+
+- Added `research/daily-arrowsmith-agent-state/v223-operational-state-authority-transition-ledger-compaction-admission-2026-06-27.md`, closing SQ170 and replacing it with SQ180 follow-up pressure.
+- Added `OperationalStateAuthorityTransitionLedgerCompactionCheckpoint` and checkpoint-admission record hash/build/verify helpers in `@pm/agent-state`.
+- Added replay and evaluation gates for authority-transition/admission ledger compaction, requiring latest replayed checkpoint-admission history before compacted ledger prefixes can become operational.
+- Added rejection paths for missing admission replay, checkpoint/admission hash tampering, stale required checkpoints, wrong checkpoint-admission authority boundaries, prune-beyond-frontier attempts, and retained suffix gaps or broken previous-hash continuity.
+- Added migration `0140_agent_state_authority_transition_ledger_compaction_checkpoint_admissions.sql` with append-only checkpoint-admission storage binding source replay hash, compacted frontiers, retained suffix starts, tenant/scope/boundary/store/topology, checkpoint body, quorum certificate, and admission record hash.
+- Added focused tests proving valid admitted compaction plus unadmitted checkpoint, stale checkpoint, tampered checkpoint, wrong boundary, prune-beyond-frontier, and retained-suffix rejection.
+- Claim boundary: v223 closes the first generic recursive compaction-admission primitive for authority-transition/admission ledgers, but compaction-checkpoint witness/currentness across split stores, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, verifier-role metadata/key-transparency settlement, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, privacy-proof verifier authority, SoD verifier authority, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state separation-of-duty proof
+
+- Added `research/daily-arrowsmith-agent-state/v222-operational-state-separation-of-duty-proof-2026-06-27.md`, closing SQ169 and replacing it with SQ179 follow-up pressure.
+- Added `OperationalStateSeparationOfDutyProof` hash/build/verify helpers in `@pm/agent-state`.
+- Extended storage mutation guard evaluation with strict separation-of-duty proof requirements.
+- Added rejection paths for missing proofs, invalid verifier results, proof hash tampering, tenant/scope/subject/authorization mismatch, admission paths that do not include replayed witness authority, missing executor identity, overlapping admission/execution authority ids, and adapter claim overreach.
+- Added migration `0139_agent_state_separation_of_duty_proofs.sql` with append-only proof storage that requires valid, disjoint, conflict-free proof rows.
+- Added focused tests proving valid disjoint protected mutation plus missing-proof, overlapping-authority, subject-mismatch, and claim-overreach rejection.
+- Claim boundary: v222 closes the first storage mutation guard separation-of-duty proof envelope, but SoD verifier-authority admission/key-transparency, proof revocation/currentness, proof-ledger replay APIs, cross-domain runtime adoption, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, privacy-proof verifier authority, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state privacy-preserving policy proof
+
+- Added `research/daily-arrowsmith-agent-state/v221-operational-state-privacy-preserving-policy-proof-2026-06-27.md`, closing SQ168 and replacing it with SQ178 follow-up pressure.
+- Added `OperationalStatePrivacyPreservingPolicyProof` hash/build/verify helpers in `@pm/agent-state`.
+- Extended pruning-policy admission evaluation and blocking action review with strict privacy-preserving policy-proof requirements.
+- Added rejection paths for missing proofs, invalid verifier results, proof hash tampering, tenant/scope/policy/subject mismatch, unapproved verifier ids, private input refs, missing verifier material, and adapter claim overreach.
+- Added migration `0138_agent_state_privacy_preserving_policy_proofs.sql` with append-only proof storage that rejects non-empty private input refs.
+- Added focused tests proving valid hidden-witness policy proof admission plus missing-proof, private-input, subject-mismatch, unapproved-verifier, and claim-overreach rejection.
+- Claim boundary: v221 closes the first pruning-policy privacy-proof envelope, but verifier-authority admission/key-transparency, proof revocation/currentness, proof-ledger replay APIs, cross-domain runtime adoption, separation-of-duty proof primitives, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record authority, and live Postgres privilege/restart proof remain open.
+
 ## 2026-06-27 - Operational state authority bootstrap settlement
 
 - Added `research/daily-arrowsmith-agent-state/v220-operational-state-authority-bootstrap-settlement-2026-06-27.md`, closing SQ167 and replacing it with SQ177 follow-up pressure.

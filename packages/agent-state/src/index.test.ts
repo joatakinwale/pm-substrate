@@ -34,17 +34,26 @@ import {
   buildActionOutcomeTerminalIndex,
   buildOperationalStateAuthorityBootstrapCertificate,
   buildOperationalStateAuthorityBootstrapSettlementRecord,
+  buildOperationalStateAuthorityEpochSealAccountableFinalityEvidence,
   buildOperationalStateAuthorityEpochSealFinalizerProof,
   buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord,
   buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecord,
   buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionRecord,
   buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord,
+  buildOperationalStateCompositionalQuorumIntersectionProof,
   buildOperationalStateAuthorityTopologyCompactionCheckpoint,
   buildOperationalStateAuthorityTopologyCompactionCheckpointAdmissionRecord,
   buildOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecord,
   buildOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecord,
   buildOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord,
+  buildOperationalStateAuthorityTransitionLedgerCompactionCheckpoint,
+  buildOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord,
   buildOperationalStateAuthorityTransitionRecord,
+  buildOperationalStateAuthorityTopologySettlementCandidate,
+  buildOperationalStateAuthorityTopologySettlementProof,
+  buildCurrentOperationalStateAuthorityTransitionReplaySemanticsManifest,
+  buildOperationalStateAuthorityTransitionReplaySemanticsManifest,
+  buildOperationalStateAuthorityTransitionReplaySemanticsProof,
   buildOperationalStateHistoryRoot,
   buildOperationalStateHistoryRootConsistencyProof,
   buildOperationalStateHistoryRootObservation,
@@ -57,6 +66,7 @@ import {
   buildOperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecord,
   buildOperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord,
   buildOperationalStatePruningPolicyArtifact,
+  buildOperationalStatePrivacyPreservingPolicyProof,
   buildOperationalStateRecoveryCut,
   buildOperationalStateRecoveryCutAdmissionRecord,
   buildOperationalStateRecoveryCutAdmissionWitnessRecord,
@@ -64,10 +74,12 @@ import {
   buildOperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord,
   buildOperationalStateSignatureKeyBinding,
   buildOperationalStateSignatureVerifierAdapterProof,
+  buildOperationalStateSignatureVerifierRoleSettlementProof,
   buildOperationalStateSignatureVerifierAdapterProofAdmissionRecord,
   buildOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecord,
   buildOperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionRecord,
   buildOperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord,
+  buildOperationalStateSeparationOfDutyProof,
   buildOperationalStateStorageMutationGuardAuthorizationAdmissionRecord,
   buildOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecord,
   buildOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmissionRecord,
@@ -106,21 +118,29 @@ import {
   computeOperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecordHash,
   computeOperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionWitnessRecordHash,
   computeOperationalStatePruningPolicyArtifactHash,
+  computeOperationalStatePrivacyPreservingPolicyProofHash,
   computeOperationalStateRecoveryCutAdmissionRecordHash,
   computeOperationalStateRecoveryCutAdmissionWitnessRecordHash,
   computeOperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionRecordHash,
   computeOperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionWitnessRecordHash,
   computeOperationalStateRecoveryCutHash,
   computeOperationalStateAuthorityEpochSealPayloadHash,
+  computeOperationalStateAuthorityTopologySettlementCandidateSetHash,
+  computeOperationalStateAuthorityTopologySettlementClaimHash,
+  computeOperationalStateAuthorityTransitionReplaySemanticsProofHash,
   computeOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecordHash,
   computeOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionRecordHash,
   computeOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionWitnessRecordHash,
   computeOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecordHash,
   computeOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecordHash,
   computeOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessRecordHash,
+  computeOperationalStateCompositionalQuorumIntersectionProofHash,
   computeOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecordHash,
   computeOperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionRecordHash,
   computeOperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionWitnessRecordHash,
+  computeOperationalStateSignatureVerifierRoleMetadataHash,
+  computeOperationalStateSignatureVerifierRoleSettlementClaimHash,
+  computeOperationalStateSeparationOfDutyProofHash,
   computeOperationalStateQuorumCertificateProofRecordAdmissionWitnessRecordHash,
   computeOperationalStateQuorumCertificateProofRecordAdmissionWitnessAuthorityTransitionAdmissionRecordHash,
   computeOperationalStateQuorumCertificateProofRecordAdmissionWitnessAuthorityTransitionAdmissionWitnessRecordHash,
@@ -158,13 +178,19 @@ import {
   evaluateProjectionReplayCertificateStoreRootWitnessSettlementStoreHeadWitnessReplayCompactionPruningAdmission,
   evaluateStateReviewInvariantPolicy,
   evaluateObservationContract,
+  evaluateOperationalStateCompositionalQuorumIntersectionProof,
+  evaluateOperationalStateAuthorityTopologySettlementProof,
   evaluateOperationalStateAuthorityTopologyCompaction,
+  evaluateOperationalStateAuthorityTransitionReplaySemanticsProof,
+  evaluateOperationalStateAuthorityTransitionLedgerCompaction,
+  evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence,
   evaluateOperationalStateAuthorityEpochSealFinalizer,
   evaluateOperationalStateRecoveryCutTransparency,
   evaluateOperationalStateRecoveryCutAdmission,
   evaluateOperationalStateRecoveryCut,
   evaluateOperationalStatePruningPolicyAdmission,
   evaluateOperationalStateSignatureVerifierAdapterProof,
+  evaluateOperationalStateSignatureVerifierRoleSettlementProof,
   evaluateOperationalStateRecoveryCutAgainstPruningPolicy,
   evaluateOperationalStateStorageMutationGuard,
   evaluateOperationalStateTombstoneHistoryCompaction,
@@ -316,6 +342,7 @@ import {
   replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecords,
   replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecords,
   replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessRecords,
+  replayOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecords,
   replayOperationalStateSignatureVerifierAdapterProofAdmissionRecords,
   replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecords,
   replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionRecords,
@@ -327,6 +354,8 @@ import {
   OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+  OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_SUBJECT_KIND,
+  OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SUBJECT_KIND,
   OPERATIONAL_STATE_HISTORY_ROOT_SETTLEMENT_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_HISTORY_ROOT_SETTLEMENT_SUBJECT_KIND,
   OPERATIONAL_STATE_QUORUM_CERTIFICATE_PROOF_RECORD_ADMISSION_RECORD_SUBJECT_KIND,
@@ -336,9 +365,11 @@ import {
   OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_RECOVERY_CUT_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_RECOVERY_CUT_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND,
+  OPERATIONAL_STATE_RECOVERY_CUT_SUBJECT_KIND,
   OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_SIGNATURE_VERIFIER_ADAPTER_PROOF_SUBJECT_KIND,
+  OPERATIONAL_STATE_SIGNATURE_VERIFIER_ROLE_SETTLEMENT_SUBJECT_KIND,
   OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_RECORD_SUBJECT_KIND,
   OPERATIONAL_STATE_TOMBSTONE_HISTORY_COMPACTION_CHECKPOINT_ADMISSION_RECORD_SUBJECT_KIND,
@@ -19107,6 +19138,299 @@ describe("@pm/agent-state read-set validation", () => {
     );
   });
 
+  it("requires compositional quorum intersection before recovery composes independent authority topologies", () => {
+    const view = baseView();
+    const recoveryCut = buildOperationalStateRecoveryCut({
+      cutId: "recovery_cut_composed_authority",
+      tenantId: view.tenantId,
+      subject: view.subject,
+      recoveredAt: timestamp("2026-06-03T14:09:30.000Z"),
+      recoveredBy: "agent:amnesiac-resume",
+      authorityScope: view.authorityRule,
+      lanes: [
+        {
+          laneId: "projection:arrowhedge_cop:AAPL",
+          laneKind: "projection",
+          authorityScope: view.authorityRule,
+          source: "current_admissible_projection",
+          required: true,
+          replayRule: "derive-current-view-from-required-transition-history",
+          sequence: 12,
+          projectionHash: "hash:projection:composition-current",
+          dependencies: [
+            {
+              laneId: "transition-history:projection",
+              minimumSequence: 12,
+              requiredHistoryHash: "hash:history:projection",
+            },
+          ],
+        },
+        {
+          laneId: "transition-history:projection",
+          laneKind: "transition_history",
+          authorityScope: view.authorityRule,
+          source: "admitted_transition_history",
+          required: true,
+          replayRule: "replay-projection-history-from-admitted-events",
+          sequence: 12,
+          historyHash: "hash:history:projection",
+          dependencies: [],
+        },
+      ],
+    });
+    const recoveredView = { ...view, recoveryCut };
+
+    const buildTopology = (
+      topologyId: string,
+      principalIds: readonly string[],
+      suspendedPrincipalIds: readonly string[] = [],
+    ) => {
+      const setQuorum = buildOperationalStateAuthorityTransitionRecord({
+        tenantId: view.tenantId,
+        topologyId,
+        authorityScope: view.authorityRule,
+        authoritySequence: 1,
+        transitionKind: "set_quorum",
+        recordedAt: timestamp("2026-06-03T14:12:00.000Z"),
+        recordedBy: "authority:composition-test",
+        effectiveFromSubjectSequence: 1,
+        requiredWitnesses: 2,
+        minimumWitnesses: 2,
+      });
+      let topology = operationalStateAuthorityTopologyFromTransition(setQuorum);
+      let authoritySequence = 1;
+      for (const principalId of principalIds) {
+        authoritySequence += 1;
+        topology = operationalStateAuthorityTopologyFromTransition(
+          buildOperationalStateAuthorityTransitionRecord({
+            tenantId: view.tenantId,
+            topologyId,
+            authorityScope: view.authorityRule,
+            authoritySequence,
+            previousAuthorityRecordHash: topology.authorityRecordHash,
+            transitionKind: "admit_principal",
+            recordedAt: timestamp("2026-06-03T14:12:01.000Z"),
+            recordedBy: "authority:composition-test",
+            effectiveFromSubjectSequence: 1,
+            principalId,
+            signatureKeyId: `key:${principalId}:v1`,
+          }),
+          topology,
+        );
+      }
+      for (const principalId of suspendedPrincipalIds) {
+        authoritySequence += 1;
+        topology = operationalStateAuthorityTopologyFromTransition(
+          buildOperationalStateAuthorityTransitionRecord({
+            tenantId: view.tenantId,
+            topologyId,
+            authorityScope: view.authorityRule,
+            authoritySequence,
+            previousAuthorityRecordHash: topology.authorityRecordHash,
+            transitionKind: "suspend_principal",
+            recordedAt: timestamp("2026-06-03T14:12:02.000Z"),
+            recordedBy: "authority:composition-test",
+            effectiveFromSubjectSequence: 1,
+            principalId,
+            reason: "witness no longer composes authority",
+          }),
+          topology,
+        );
+      }
+      return topology;
+    };
+
+    const buildClaim = (
+      claimId: string,
+      topology: ReturnType<typeof buildTopology>,
+      acceptedWitnessIds: readonly string[],
+    ) => {
+      const authorityBoundary = `boundary:${topology.topologyId}`;
+      return {
+        claimId,
+        laneId: `lane:${claimId}`,
+        authorityScope: view.authorityRule,
+        authorityBoundary,
+        topologyId: topology.topologyId,
+        authorityTopology: topology,
+        quorumCertificate: buildOperationalStateQuorumCertificateProofCertificate({
+          tenantId: view.tenantId,
+          authorityScope: view.authorityRule,
+          authorityBoundary,
+          subjectKind: "operational_state_authority_composition_claim",
+          subjectId: topology.topologyId,
+          subjectSequence: topology.authoritySequence,
+          subjectHash: topology.topologyHash,
+          status: "certified",
+          certified: true,
+          acceptedWitnessIds,
+          authorityTopologyHash: topology.topologyHash,
+          requiredWitnesses: 2,
+          minimumWitnesses: 2,
+          certifiedAt: timestamp("2026-06-03T14:12:03.000Z"),
+          certifiedBy: "authority:composition-test",
+        }),
+      };
+    };
+
+    const buildProof = (
+      claims: readonly ReturnType<typeof buildClaim>[],
+      proofId = "quorum-intersection:recovery-cut:1",
+    ) =>
+      buildOperationalStateCompositionalQuorumIntersectionProof({
+        proofId,
+        tenantId: view.tenantId,
+        authorityScope: view.authorityRule,
+        subjectKind: OPERATIONAL_STATE_RECOVERY_CUT_SUBJECT_KIND,
+        subjectId: recoveryCut.cutId,
+        subjectSequence: 1,
+        subjectHash: recoveryCut.cutHash,
+        intersectionMode: "pairwise_active_intersection",
+        requiredIntersectionWitnesses: 1,
+        claims,
+        evaluatedAt: timestamp("2026-06-03T14:12:04.000Z"),
+        evaluatedBy: "authority:composition-test",
+        proofReason:
+          "recover current operational state from admitted authority histories",
+      });
+
+    const topologyA = buildTopology("topology:composition:a", [
+      "witness:shared",
+      "witness:a",
+    ]);
+    const topologyB = buildTopology("topology:composition:b", [
+      "witness:shared",
+      "witness:b",
+    ]);
+    const validProof = buildProof([
+      buildClaim("claim:a", topologyA, ["witness:shared", "witness:a"]),
+      buildClaim("claim:b", topologyB, ["witness:shared", "witness:b"]),
+    ]);
+
+    const validProofEvaluation =
+      evaluateOperationalStateCompositionalQuorumIntersectionProof({
+        proof: validProof,
+        expectedTenantId: view.tenantId,
+        expectedAuthorityScope: view.authorityRule,
+        expectedSubjectKind: OPERATIONAL_STATE_RECOVERY_CUT_SUBJECT_KIND,
+        expectedSubjectId: recoveryCut.cutId,
+        expectedSubjectHash: recoveryCut.cutHash,
+      });
+    expect(validProofEvaluation.valid).toBe(true);
+    expect(validProofEvaluation.pairwiseIntersections).toEqual([
+      expect.objectContaining({
+        leftClaimId: "claim:a",
+        rightClaimId: "claim:b",
+        activeIntersectionWitnessIds: ["witness:shared"],
+        intersectionSize: 1,
+      }),
+    ]);
+    expect(
+      evaluateOperationalStateRecoveryCut(recoveredView, {
+        requireCompositionalQuorumIntersectionProof: true,
+        quorumIntersectionProof: validProof,
+      }).valid,
+    ).toBe(true);
+
+    expect(
+      evaluateOperationalStateRecoveryCut(recoveredView, {
+        requireCompositionalQuorumIntersectionProof: true,
+      }).issues.map((issue) => issue.code),
+    ).toEqual(
+      expect.arrayContaining([
+        "operational_state_recovery_quorum_intersection_proof_missing",
+      ]),
+    );
+
+    const disjointTopologyB = buildTopology("topology:composition:disjoint", [
+      "witness:b",
+      "witness:c",
+    ]);
+    const disjointProof = buildProof(
+      [
+        buildClaim("claim:a", topologyA, ["witness:shared", "witness:a"]),
+        buildClaim("claim:b", disjointTopologyB, ["witness:b", "witness:c"]),
+      ],
+      "quorum-intersection:recovery-cut:disjoint",
+    );
+    const disjointEvaluation =
+      evaluateOperationalStateCompositionalQuorumIntersectionProof({
+        proof: disjointProof,
+      });
+    expect(disjointEvaluation.valid).toBe(false);
+    expect(disjointEvaluation.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        "operational_state_compositional_quorum_intersection_pairwise_missing",
+      ]),
+    );
+    expect(
+      evaluateOperationalStateRecoveryCut(recoveredView, {
+        requireCompositionalQuorumIntersectionProof: true,
+        quorumIntersectionProof: disjointProof,
+      }).issues.map((issue) => issue.code),
+    ).toEqual(
+      expect.arrayContaining([
+        "operational_state_recovery_quorum_intersection_proof_invalid",
+      ]),
+    );
+
+    const suspendedTopologyB = buildTopology(
+      "topology:composition:suspended",
+      ["witness:shared", "witness:b"],
+      ["witness:shared"],
+    );
+    const suspendedProof = buildProof(
+      [
+        buildClaim("claim:a", topologyA, ["witness:shared", "witness:a"]),
+        buildClaim("claim:b", suspendedTopologyB, [
+          "witness:shared",
+          "witness:b",
+        ]),
+      ],
+      "quorum-intersection:recovery-cut:suspended",
+    );
+    expect(
+      evaluateOperationalStateCompositionalQuorumIntersectionProof({
+        proof: suspendedProof,
+      }).issues.map((issue) => issue.code),
+    ).toEqual(
+      expect.arrayContaining([
+        "operational_state_compositional_quorum_intersection_witness_not_active",
+        "operational_state_compositional_quorum_intersection_pairwise_missing",
+      ]),
+    );
+
+    const hashValidTamperedPayload = {
+      ...validProof,
+      pairwiseIntersections: validProof.pairwiseIntersections.map(
+        (intersection) => ({
+          ...intersection,
+          activeIntersectionWitnessIds: [],
+          intersectionSize: 0,
+        }),
+      ),
+    };
+    const { proofHash: _previousProofHash, ...tamperedPayload } =
+      hashValidTamperedPayload;
+    expect(_previousProofHash).toBe(validProof.proofHash);
+    const hashValidTamperedProof = {
+      ...tamperedPayload,
+      proofHash:
+        computeOperationalStateCompositionalQuorumIntersectionProofHash(
+          tamperedPayload,
+        ),
+    };
+    expect(
+      evaluateOperationalStateCompositionalQuorumIntersectionProof({
+        proof: hashValidTamperedProof,
+      }).issues.map((issue) => issue.code),
+    ).toEqual(
+      expect.arrayContaining([
+        "operational_state_compositional_quorum_intersection_pairwise_intersection_mismatch",
+      ]),
+    );
+  });
+
   it("requires witnessed store roots before a recovery cut can authorize recovered state", () => {
     const view = baseView();
     const projectionRoot = buildOperationalStateHistoryRoot({
@@ -22180,6 +22504,229 @@ describe("@pm/agent-state read-set validation", () => {
     });
   });
 
+  it("requires pruning policy admission privacy proofs to hide private delegation material", () => {
+    const view = baseView();
+    const policyStoreId = "operational-state-policy-store";
+    const compilation = compileOperationalStatePruningPolicy({
+      policyId: "policy:operational-state:pruning:private-proof",
+      tenantId: view.tenantId,
+      authorityScope: view.authorityRule,
+      subject: view.subject,
+      baseStoreId: "aapl-operational-state",
+      stages: OPERATIONAL_STATE_PRUNING_POLICY_REQUIRED_STAGES,
+    });
+    const artifact = buildOperationalStatePruningPolicyArtifact({
+      compilation,
+      compiledAt: timestamp("2026-06-04T12:00:00.000Z"),
+      compiledBy: "compiler:operational-state-policy",
+      compilerVersion: "v1",
+    });
+    const record = buildOperationalStatePruningPolicyAdmissionRecord({
+      tenantId: view.tenantId,
+      policyStoreId,
+      authorityScope: view.authorityRule,
+      policySequence: 1,
+      artifact,
+      admittedAt: timestamp("2026-06-04T12:00:00.100Z"),
+      admittedBy: "policy-authority:substrate",
+      admissionReason: "privacy-preserving-policy-authorization",
+    });
+    const replay = replayOperationalStatePruningPolicyAdmissionRecords({
+      tenantId: view.tenantId,
+      policyStoreId,
+      authorityScope: view.authorityRule,
+      records: [record],
+      requiredCompilation: compilation,
+    });
+    const privacyProof = buildOperationalStatePrivacyPreservingPolicyProof({
+      proofId: "privacy-proof:policy-admission:1",
+      tenantId: view.tenantId,
+      policyStoreId,
+      authorityScope: view.authorityRule,
+      authorityBoundary:
+        "operational_state_pruning_policy_privacy_proof_verifier",
+      subjectKind: OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_RECORD_SUBJECT_KIND,
+      subjectId: policyStoreId,
+      subjectSequence: record.policySequence,
+      subjectHash: record.policyRecordHash,
+      policyId: record.policyId,
+      policyHash: record.policyHash,
+      policyRecordHash: record.policyRecordHash,
+      proofSystem: "zero_knowledge_policy_proof",
+      proofSystemVersion: "zk-policy-proof-v1",
+      verifierId: "policy-proof-verifier:zk",
+      verifierVersion: "v1",
+      verificationKeyHash: "verification-key-hash:policy-proof:v1",
+      publicStatementHash: "public-statement-hash:policy-admission:1",
+      predicateCommitmentHash: "predicate-commitment-hash:pruning-policy",
+      hiddenWitnessCommitmentHash:
+        "hidden-witness-commitment-hash:delegation-chain",
+      proofTranscriptHash: "proof-transcript-hash:policy-admission:1",
+      challengeNonce: "challenge:policy-admission:1",
+      verifiedAt: timestamp("2026-06-04T12:00:01.000Z"),
+      result: "valid",
+      disclosedClaimHashes: ["claim-hash:policy-predicate-satisfied"],
+      adapterClaims: [
+        "policy_predicate_satisfied",
+        "credential_commitment_verified",
+        "proof_challenge_bound",
+      ],
+    });
+    const { policyProofHash: _policyProofHash, ...privacyProofPayload } =
+      privacyProof;
+    const recoveryCut = buildOperationalStateRecoveryCut({
+      cutId: "recovery_cut_private_policy_proof",
+      tenantId: view.tenantId,
+      subject: view.subject,
+      recoveredAt: timestamp("2026-06-04T12:00:02.000Z"),
+      recoveredBy: "agent:amnesiac-resume",
+      authorityScope: view.authorityRule,
+      lanes: recoveryLanesFromPruningPolicy(compilation),
+    });
+    const recoveredView = { ...view, recoveryCut };
+
+    expect(
+      computeOperationalStatePrivacyPreservingPolicyProofHash(
+        privacyProofPayload,
+      ),
+    ).toBe(privacyProof.policyProofHash);
+    expect(
+      evaluateOperationalStatePruningPolicyAdmission({
+        compilation,
+        admissionReplay: replay,
+        privacyPreservingPolicyProof: privacyProof,
+        requirePrivacyPreservingPolicyProof: true,
+        allowedPrivacyPreservingPolicyProofVerifierIds: [
+          "policy-proof-verifier:zk",
+        ],
+      }),
+    ).toMatchObject({
+      valid: true,
+      accepted: true,
+      privacyPreservingPolicyProof: {
+        policyRecordHash: record.policyRecordHash,
+        privateInputRefs: [],
+      },
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStatePruningPolicyAdmission({
+        compilation,
+        admissionReplay: replay,
+        requirePrivacyPreservingPolicyProof: true,
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_pruning_policy_privacy_proof_missing",
+      }),
+    );
+    expect(
+      evaluateOperationalStatePruningPolicyAdmission({
+        compilation,
+        admissionReplay: replay,
+        privacyPreservingPolicyProof:
+          buildOperationalStatePrivacyPreservingPolicyProof({
+            ...privacyProof,
+            privateInputRefs: ["raw-delegation-chain:finance-principal"],
+          }),
+        requirePrivacyPreservingPolicyProof: true,
+        allowedPrivacyPreservingPolicyProofVerifierIds: [
+          "policy-proof-verifier:zk",
+        ],
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_pruning_policy_privacy_proof_private_input_disclosed",
+      }),
+    );
+    expect(
+      evaluateOperationalStatePruningPolicyAdmission({
+        compilation,
+        admissionReplay: replay,
+        privacyPreservingPolicyProof:
+          buildOperationalStatePrivacyPreservingPolicyProof({
+            ...privacyProof,
+            subjectHash: "policy-record-hash:fork",
+            policyRecordHash: "policy-record-hash:fork",
+          }),
+        requirePrivacyPreservingPolicyProof: true,
+        allowedPrivacyPreservingPolicyProofVerifierIds: [
+          "policy-proof-verifier:zk",
+        ],
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_pruning_policy_privacy_proof_subject_mismatch",
+      }),
+    );
+    expect(
+      evaluateOperationalStatePruningPolicyAdmission({
+        compilation,
+        admissionReplay: replay,
+        privacyPreservingPolicyProof:
+          buildOperationalStatePrivacyPreservingPolicyProof({
+            ...privacyProof,
+            verifierId: "policy-proof-verifier:unadmitted",
+          }),
+        requirePrivacyPreservingPolicyProof: true,
+        allowedPrivacyPreservingPolicyProofVerifierIds: [
+          "policy-proof-verifier:zk",
+        ],
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_pruning_policy_privacy_proof_verifier_not_allowed",
+      }),
+    );
+    expect(
+      evaluateOperationalStatePruningPolicyAdmission({
+        compilation,
+        admissionReplay: replay,
+        privacyPreservingPolicyProof:
+          buildOperationalStatePrivacyPreservingPolicyProof({
+            ...privacyProof,
+            adapterClaims: [
+              "policy_predicate_satisfied",
+              "authority_transition_admitted",
+            ],
+          }),
+        requirePrivacyPreservingPolicyProof: true,
+        allowedPrivacyPreservingPolicyProofVerifierIds: [
+          "policy-proof-verifier:zk",
+        ],
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_pruning_policy_privacy_proof_claim_overreach",
+      }),
+    );
+    expect(
+      reviewProposedActionAgainstCurrentState(
+        actionFrom(recoveredView),
+        recoveredView,
+        {
+          enforcementMode: "blocking",
+          requirePruningPolicyCompliance: true,
+          pruningPolicyCompilation: compilation,
+          pruningPolicyAdmissionReplay: replay,
+          pruningPolicyPrivacyPreservingPolicyProof: privacyProof,
+          requirePruningPolicyPrivacyPreservingPolicyProof: true,
+          allowedPruningPolicyPrivacyPreservingPolicyProofVerifierIds: [
+            "policy-proof-verifier:zk",
+          ],
+        },
+      ),
+    ).toMatchObject({
+      valid: true,
+      execution: {
+        allowed: true,
+        blocking: false,
+        reason: "blocking_policy_passed",
+      },
+      warnings: [],
+    });
+  });
+
   it("binds pruning policy admission witness certificates to replayed active witness authority", () => {
     const view = baseView();
     const policyAdmissionWitnessBoundary =
@@ -24525,6 +25072,301 @@ describe("@pm/agent-state read-set validation", () => {
       },
       issues: [],
     });
+  });
+
+  it("requires storage mutation guard separation-of-duty proofs before protected execution", () => {
+    const view = baseView();
+    const guardAdmissionWitnessBoundary =
+      "operational_state_storage_mutation_guard_authorization_admission_witness";
+    const guardAuthorizationAdmissionWitnessStoreId =
+      "storage-mutation-guard-authorization-admission-witness-store";
+    const separationOfDutyBoundary =
+      "operational_state_storage_mutation_guard_separation_of_duty";
+    const authorization =
+      buildOperationalStateStorageMutationGuardAuthorization({
+        tenantId: view.tenantId,
+        guardId: "guard:settlement-head-witness:delete",
+        protectedSchema: "agent_state",
+        protectedTable:
+          "projection_replay_settlement_head_witness_observations",
+        operation: "DELETE",
+        authorizedThroughSequence: 7,
+        pruningTombstoneTable:
+          "projection_replay_settlement_head_witness_pruning_tombstones",
+        pruningTombstoneSequence: 3,
+        pruningTombstoneRecordHash: "hash:tombstone:3",
+        pruningAdmissionHash: "hash:pruning-admission:3",
+        recordedAt: timestamp("2026-06-04T13:00:00.000Z"),
+      });
+    const admissionRecord =
+      buildOperationalStateStorageMutationGuardAuthorizationAdmissionRecord({
+        tenantId: view.tenantId,
+        guardId: authorization.guardId,
+        protectedSchema: authorization.protectedSchema,
+        protectedTable: authorization.protectedTable,
+        operation: authorization.operation,
+        admissionSequence: 1,
+        authorization,
+        admissionProcedureId:
+          "agent_state.admit_storage_mutation_guard_authorization",
+        admissionRole: "pm_substrate_storage_mutation_guard_admitter",
+        admittedAt: timestamp("2026-06-04T13:00:00.050Z"),
+        admittedBy: "role:pm_substrate_storage_mutation_guard_admitter",
+      });
+    const replay =
+      replayOperationalStateStorageMutationGuardAuthorizationAdmissionRecords({
+        tenantId: view.tenantId,
+        guardId: authorization.guardId,
+        protectedSchema: authorization.protectedSchema,
+        protectedTable: authorization.protectedTable,
+        operation: authorization.operation,
+        records: [admissionRecord],
+        requiredAuthorization: authorization,
+        requiredAdmissionProcedureId:
+          "agent_state.admit_storage_mutation_guard_authorization",
+        requiredAdmissionRole: "pm_substrate_storage_mutation_guard_admitter",
+      });
+    const admissionCertificate =
+      buildOperationalStateQuorumCertificateProofCertificate({
+        tenantId: view.tenantId,
+        authorityScope: view.authorityRule,
+        authorityBoundary: guardAdmissionWitnessBoundary,
+        subjectKind:
+          OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_RECORD_SUBJECT_KIND,
+        subjectId:
+          operationalStateStorageMutationGuardAuthorizationAdmissionSubjectId(
+            admissionRecord,
+          ),
+        subjectSequence: admissionRecord.admissionSequence,
+        subjectHash: admissionRecord.admissionRecordHash,
+        status: "certified",
+        certified: true,
+        acceptedWitnessIds: [
+          "guard-admission-witness:a",
+          "guard-admission-witness:b",
+        ],
+        requiredWitnesses: 2,
+        minimumWitnesses: 2,
+        authorityTopologyHash: "topology:storage-guard-admission:v1",
+        certifiedAt: timestamp("2026-06-04T13:00:01.000Z"),
+        certifiedBy: "guard-admission-witness-quorum",
+      });
+    const witnessRecord =
+      buildOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecord(
+        {
+          tenantId: view.tenantId,
+          guardAuthorizationAdmissionWitnessStoreId,
+          authorityScope: view.authorityRule,
+          guardId: authorization.guardId,
+          protectedSchema: authorization.protectedSchema,
+          protectedTable: authorization.protectedTable,
+          operation: authorization.operation,
+          witnessSequence: 1,
+          admissionSequence: admissionRecord.admissionSequence,
+          authorizationHash: authorization.authorizationHash,
+          admissionRecordHash: admissionRecord.admissionRecordHash,
+          admissionCertificate,
+          witnessedAt: timestamp("2026-06-04T13:00:01.050Z"),
+          witnessedBy: "guard-admission-witness-quorum",
+        },
+      );
+    const witnessReplay =
+      replayOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecords(
+        {
+          tenantId: view.tenantId,
+          guardAuthorizationAdmissionWitnessStoreId,
+          authorityScope: view.authorityRule,
+          guardId: authorization.guardId,
+          protectedSchema: authorization.protectedSchema,
+          protectedTable: authorization.protectedTable,
+          operation: authorization.operation,
+          records: [witnessRecord],
+          admissionReplay: replay,
+          requiredAdmissionRecord: admissionRecord,
+          requiredAuthorityBoundary: guardAdmissionWitnessBoundary,
+        },
+      );
+    const separationOfDutyProof = buildOperationalStateSeparationOfDutyProof({
+      proofId: "sod-proof:storage-mutation:1",
+      tenantId: view.tenantId,
+      authorityScope: view.authorityRule,
+      authorityBoundary: separationOfDutyBoundary,
+      subjectKind:
+        OPERATIONAL_STATE_STORAGE_MUTATION_GUARD_AUTHORIZATION_ADMISSION_RECORD_SUBJECT_KIND,
+      subjectId:
+        operationalStateStorageMutationGuardAuthorizationAdmissionSubjectId(
+          admissionRecord,
+        ),
+      subjectSequence: admissionRecord.admissionSequence,
+      subjectHash: admissionRecord.admissionRecordHash,
+      guardId: authorization.guardId,
+      protectedSchema: authorization.protectedSchema,
+      protectedTable: authorization.protectedTable,
+      operation: authorization.operation,
+      targetSequence: 6,
+      authorizationHash: authorization.authorizationHash,
+      admissionRecordHash: admissionRecord.admissionRecordHash,
+      admissionRole: admissionRecord.admissionRole,
+      executionRole: "pm_substrate_storage_mutation_guard_executor",
+      admissionAuthorityIds: admissionCertificate.acceptedWitnessIds,
+      executionAuthorityIds: ["storage-mutation-executor:compactor"],
+      disjoint: true,
+      proofRule: "dynamic_separation_of_duty",
+      proofReason: "guard authorization admission and execution are separate",
+      evaluatedAt: timestamp("2026-06-04T13:00:02.000Z"),
+      evaluatedBy: "sod-verifier:storage-mutation",
+      verifierId: "sod-verifier:storage-mutation",
+      result: "valid",
+      adapterClaims: [
+        "admission_execution_disjoint",
+        "executor_bound_to_request",
+        "admission_path_bound_to_record",
+      ],
+    });
+    const {
+      separationOfDutyProofHash: _separationOfDutyProofHash,
+      ...separationOfDutyPayload
+    } = separationOfDutyProof;
+
+    expect(
+      computeOperationalStateSeparationOfDutyProofHash(
+        separationOfDutyPayload,
+      ),
+    ).toBe(separationOfDutyProof.separationOfDutyProofHash);
+    expect(
+      evaluateOperationalStateStorageMutationGuard({
+        request: {
+          tenantId: view.tenantId,
+          guardId: authorization.guardId,
+          protectedSchema: authorization.protectedSchema,
+          protectedTable: authorization.protectedTable,
+          operation: authorization.operation,
+          targetSequence: 6,
+          authorizationHash: authorization.authorizationHash,
+        },
+        authorizations: [authorization],
+        requireAuthorizationAdmissionWitnessQuorum: true,
+        authorizationAdmissionReplay: replay,
+        authorizationAdmissionWitnessReplay: witnessReplay,
+        separationOfDutyProof,
+        requireSeparationOfDutyProof: true,
+      }),
+    ).toMatchObject({
+      valid: true,
+      separationOfDutyProof: {
+        admissionRecordHash: admissionRecord.admissionRecordHash,
+        disjoint: true,
+        conflictAuthorityIds: [],
+      },
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateStorageMutationGuard({
+        request: {
+          tenantId: view.tenantId,
+          guardId: authorization.guardId,
+          protectedSchema: authorization.protectedSchema,
+          protectedTable: authorization.protectedTable,
+          operation: authorization.operation,
+          targetSequence: 6,
+          authorizationHash: authorization.authorizationHash,
+        },
+        authorizations: [authorization],
+        requireAuthorizationAdmissionWitnessQuorum: true,
+        authorizationAdmissionReplay: replay,
+        authorizationAdmissionWitnessReplay: witnessReplay,
+        requireSeparationOfDutyProof: true,
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_storage_mutation_separation_of_duty_proof_missing",
+      }),
+    );
+    expect(
+      evaluateOperationalStateStorageMutationGuard({
+        request: {
+          tenantId: view.tenantId,
+          guardId: authorization.guardId,
+          protectedSchema: authorization.protectedSchema,
+          protectedTable: authorization.protectedTable,
+          operation: authorization.operation,
+          targetSequence: 6,
+          authorizationHash: authorization.authorizationHash,
+        },
+        authorizations: [authorization],
+        requireAuthorizationAdmissionWitnessQuorum: true,
+        authorizationAdmissionReplay: replay,
+        authorizationAdmissionWitnessReplay: witnessReplay,
+        separationOfDutyProof: buildOperationalStateSeparationOfDutyProof({
+          ...separationOfDutyProof,
+          executionAuthorityIds: [
+            "guard-admission-witness:a",
+            "storage-mutation-executor:compactor",
+          ],
+        }),
+        requireSeparationOfDutyProof: true,
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_storage_mutation_separation_of_duty_proof_conflict",
+      }),
+    );
+    expect(
+      evaluateOperationalStateStorageMutationGuard({
+        request: {
+          tenantId: view.tenantId,
+          guardId: authorization.guardId,
+          protectedSchema: authorization.protectedSchema,
+          protectedTable: authorization.protectedTable,
+          operation: authorization.operation,
+          targetSequence: 6,
+          authorizationHash: authorization.authorizationHash,
+        },
+        authorizations: [authorization],
+        requireAuthorizationAdmissionWitnessQuorum: true,
+        authorizationAdmissionReplay: replay,
+        authorizationAdmissionWitnessReplay: witnessReplay,
+        separationOfDutyProof: buildOperationalStateSeparationOfDutyProof({
+          ...separationOfDutyProof,
+          subjectHash: "admission-record-hash:fork",
+          admissionRecordHash: "admission-record-hash:fork",
+        }),
+        requireSeparationOfDutyProof: true,
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_storage_mutation_separation_of_duty_proof_subject_mismatch",
+      }),
+    );
+    expect(
+      evaluateOperationalStateStorageMutationGuard({
+        request: {
+          tenantId: view.tenantId,
+          guardId: authorization.guardId,
+          protectedSchema: authorization.protectedSchema,
+          protectedTable: authorization.protectedTable,
+          operation: authorization.operation,
+          targetSequence: 6,
+          authorizationHash: authorization.authorizationHash,
+        },
+        authorizations: [authorization],
+        requireAuthorizationAdmissionWitnessQuorum: true,
+        authorizationAdmissionReplay: replay,
+        authorizationAdmissionWitnessReplay: witnessReplay,
+        separationOfDutyProof: buildOperationalStateSeparationOfDutyProof({
+          ...separationOfDutyProof,
+          adapterClaims: [
+            "admission_execution_disjoint",
+            "protected_mutation_authorized",
+          ],
+        }),
+        requireSeparationOfDutyProof: true,
+      }).issues,
+    ).toContainEqual(
+      expect.objectContaining({
+        code: "operational_state_storage_mutation_separation_of_duty_proof_claim_overreach",
+      }),
+    );
   });
 
   it("binds storage mutation guard admission witness certificates to replayed active witness authority", () => {
@@ -43737,6 +44579,629 @@ describe("@pm/agent-state read-set validation", () => {
     ]);
   });
 
+  it("requires admitted replay semantics before authority topology compaction can reinterpret retained authority history", () => {
+    const topologyId = "ops-authority-topology";
+    const authorityScope = "agent-state:ops";
+    const setQuorum = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 1,
+      transitionKind: "set_quorum",
+      recordedAt: timestamp("2026-06-27T16:05:00.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 1,
+      requiredWitnesses: 1,
+      minimumWitnesses: 1,
+    });
+    const admitObserverA = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 2,
+      previousAuthorityRecordHash: setQuorum.authorityRecordHash,
+      transitionKind: "admit_principal",
+      recordedAt: timestamp("2026-06-27T16:06:00.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 2,
+      principalId: "observer:a",
+      signatureKeyId: "observer:a:key:v1",
+    });
+    const compactedTopology = operationalStateAuthorityTopologyFromTransition(
+      admitObserverA,
+      operationalStateAuthorityTopologyFromTransition(setQuorum),
+    );
+    const checkpoint =
+      buildOperationalStateAuthorityTopologyCompactionCheckpoint({
+        checkpointId: "authority-topology-checkpoint:semantics:2",
+        tenantId: t,
+        topologyId,
+        authorityScope,
+        compactedThroughAuthoritySequence: 2,
+        compactedTopology,
+        retainedFromAuthoritySequence: 3,
+        checkpointedAt: timestamp("2026-06-27T16:07:00.000Z"),
+        checkpointedBy: "authority-compactor",
+      });
+    const admitObserverB = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 3,
+      previousAuthorityRecordHash: compactedTopology.authorityRecordHash,
+      transitionKind: "admit_principal",
+      recordedAt: timestamp("2026-06-27T16:08:00.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 3,
+      principalId: "observer:b",
+      signatureKeyId: "observer:b:key:v1",
+    });
+    const rotateObserverA = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 4,
+      previousAuthorityRecordHash: admitObserverB.authorityRecordHash,
+      transitionKind: "rotate_signature_key",
+      recordedAt: timestamp("2026-06-27T16:09:00.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 4,
+      principalId: "observer:a",
+      signatureKeyId: "observer:a:key:v2",
+    });
+    const requiredTopology = operationalStateAuthorityTopologyFromTransition(
+      rotateObserverA,
+      operationalStateAuthorityTopologyFromTransition(
+        admitObserverB,
+        compactedTopology,
+      ),
+    );
+    const currentManifest =
+      buildCurrentOperationalStateAuthorityTransitionReplaySemanticsManifest({
+        manifestId: "authority-transition-semantics:ops:v1",
+        tenantId: t,
+        topologyId,
+        authorityScope,
+        validFromAuthoritySequence: checkpoint.retainedFromAuthoritySequence,
+        admittedAt: timestamp("2026-06-27T16:10:00.000Z"),
+        admittedBy: "authority:semantics-admission",
+      });
+    const proof = buildOperationalStateAuthorityTransitionReplaySemanticsProof({
+      proofId: "authority-transition-semantics-proof:ops:4",
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      subjectKind:
+        OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+      subjectId: checkpoint.checkpointId,
+      subjectSequence: requiredTopology.authoritySequence,
+      subjectHash: requiredTopology.topologyHash,
+      manifest: currentManifest,
+      startingTopology: compactedTopology,
+      transitions: [admitObserverB, rotateObserverA],
+      replayedAt: timestamp("2026-06-27T16:11:00.000Z"),
+      replayedBy: "authority:semantics-replay",
+    });
+
+    expect(
+      evaluateOperationalStateAuthorityTransitionReplaySemanticsProof({
+        proof,
+        requiredManifestHash: currentManifest.manifestHash,
+        expectedTenantId: t,
+        expectedAuthorityScope: authorityScope,
+        expectedTopologyId: topologyId,
+        expectedSubjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        expectedSubjectId: checkpoint.checkpointId,
+        expectedSubjectSequence: requiredTopology.authoritySequence,
+        expectedSubjectHash: requiredTopology.topologyHash,
+        expectedTransitions: [admitObserverB, rotateObserverA],
+        expectedResultAuthorityTopologyHash: requiredTopology.topologyHash,
+      }),
+    ).toMatchObject({
+      valid: true,
+      accepted: true,
+      manifestHash: currentManifest.manifestHash,
+      transitionCount: 2,
+      transitionBindings: [
+        expect.objectContaining({
+          transitionKind: "admit_principal",
+          ruleHash: expect.any(String),
+        }),
+        expect.objectContaining({
+          transitionKind: "rotate_signature_key",
+          ruleHash: expect.any(String),
+        }),
+      ],
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateAuthorityTopologyCompaction({
+        checkpoint,
+        retainedTransitions: [admitObserverB, rotateObserverA],
+        requiredTopology,
+        requireReplaySemanticsProof: true,
+        replaySemanticsProof: proof,
+        requiredReplaySemanticsManifestHash: currentManifest.manifestHash,
+      }),
+    ).toMatchObject({
+      valid: true,
+      replaySemanticsProofEvaluation: {
+        valid: true,
+        manifestHash: currentManifest.manifestHash,
+        resultAuthorityTopologyHash: requiredTopology.topologyHash,
+      },
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateAuthorityTopologyCompaction({
+        checkpoint,
+        retainedTransitions: [admitObserverB, rotateObserverA],
+        requiredTopology,
+        requireReplaySemanticsProof: true,
+        requiredReplaySemanticsManifestHash: currentManifest.manifestHash,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_topology_replay_semantics_proof_missing",
+    );
+
+    const staleManifest =
+      buildOperationalStateAuthorityTransitionReplaySemanticsManifest({
+        manifestId: "authority-transition-semantics:ops:v0",
+        tenantId: t,
+        topologyId,
+        authorityScope,
+        semanticsId:
+          "@pm/agent-state/operationalStateAuthorityTopologyFromTransition",
+        semanticsVersion: "v0-stale",
+        validFromAuthoritySequence: checkpoint.retainedFromAuthoritySequence,
+        rules: [
+          {
+            transitionKind: "admit_principal",
+            effectSummary:
+              "Create or reactivate the principal as active, preserving or assigning signatureKeyId.",
+          },
+          {
+            transitionKind: "rotate_signature_key",
+            effectSummary:
+              "Stale semantics: rotation may be interpreted by a superseded implementation.",
+          },
+        ],
+        admittedAt: timestamp("2026-06-27T16:12:00.000Z"),
+        admittedBy: "authority:semantics-admission",
+      });
+    const staleProof =
+      buildOperationalStateAuthorityTransitionReplaySemanticsProof({
+        proofId: "authority-transition-semantics-proof:ops:stale",
+        tenantId: t,
+        topologyId,
+        authorityScope,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: requiredTopology.authoritySequence,
+        subjectHash: requiredTopology.topologyHash,
+        manifest: staleManifest,
+        startingTopology: compactedTopology,
+        transitions: [admitObserverB, rotateObserverA],
+        replayedAt: timestamp("2026-06-27T16:13:00.000Z"),
+        replayedBy: "authority:semantics-replay",
+      });
+    const staleEvaluation = evaluateOperationalStateAuthorityTopologyCompaction({
+      checkpoint,
+      retainedTransitions: [admitObserverB, rotateObserverA],
+      requiredTopology,
+      requireReplaySemanticsProof: true,
+      replaySemanticsProof: staleProof,
+      requiredReplaySemanticsManifestHash: currentManifest.manifestHash,
+    });
+
+    expect(staleEvaluation.valid).toBe(false);
+    expect(staleEvaluation.issues.map((issue) => issue.code)).toContain(
+      "operational_state_authority_topology_replay_semantics_proof_invalid",
+    );
+    expect(
+      staleEvaluation.replaySemanticsProofEvaluation?.issues.map(
+        (issue) => issue.code,
+      ),
+    ).toContain(
+      "operational_state_authority_transition_replay_semantics_required_manifest_mismatch",
+    );
+
+    const futureManifest =
+      buildCurrentOperationalStateAuthorityTransitionReplaySemanticsManifest({
+        manifestId: "authority-transition-semantics:ops:v1:future",
+        tenantId: t,
+        topologyId,
+        authorityScope,
+        validFromAuthoritySequence: rotateObserverA.authoritySequence,
+        admittedAt: timestamp("2026-06-27T16:13:30.000Z"),
+        admittedBy: "authority:semantics-admission",
+      });
+    const futureProof =
+      buildOperationalStateAuthorityTransitionReplaySemanticsProof({
+        proofId: "authority-transition-semantics-proof:ops:future",
+        tenantId: t,
+        topologyId,
+        authorityScope,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: requiredTopology.authoritySequence,
+        subjectHash: requiredTopology.topologyHash,
+        manifest: futureManifest,
+        startingTopology: compactedTopology,
+        transitions: [admitObserverB, rotateObserverA],
+        replayedAt: timestamp("2026-06-27T16:13:45.000Z"),
+        replayedBy: "authority:semantics-replay",
+      });
+    expect(
+      evaluateOperationalStateAuthorityTransitionReplaySemanticsProof({
+        proof: futureProof,
+        requiredManifestHash: futureManifest.manifestHash,
+        expectedTransitions: [admitObserverB, rotateObserverA],
+        expectedResultAuthorityTopologyHash: requiredTopology.topologyHash,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_transition_replay_semantics_manifest_sequence_mismatch",
+    );
+
+    const { proofHash: _proofHash, ...falseReplayPayload } = {
+      ...proof,
+      resultAuthorityTopologyHash: compactedTopology.topologyHash,
+      resultAuthorityRecordHash: compactedTopology.authorityRecordHash,
+    };
+    const falseReplayProof = {
+      ...falseReplayPayload,
+      proofHash:
+        computeOperationalStateAuthorityTransitionReplaySemanticsProofHash(
+          falseReplayPayload,
+        ),
+    };
+
+    expect(
+      evaluateOperationalStateAuthorityTransitionReplaySemanticsProof({
+        proof: falseReplayProof,
+        requiredManifestHash: currentManifest.manifestHash,
+        expectedTransitions: [admitObserverB, rotateObserverA],
+        expectedResultAuthorityTopologyHash: requiredTopology.topologyHash,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_transition_replay_semantics_result_topology_mismatch",
+    );
+  });
+
+  it("requires topology settlement proof before authority topology compaction can choose between competing branches", () => {
+    const topologyId = "ops-authority-topology";
+    const authorityScope = "agent-state:ops";
+    const settlementAuthorityBoundary =
+      "authority_topology_branch_settlement_quorum";
+    const setQuorum = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 1,
+      transitionKind: "set_quorum",
+      recordedAt: timestamp("2026-06-27T16:14:00.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 1,
+      requiredWitnesses: 2,
+      minimumWitnesses: 2,
+    });
+    const admitObserverA = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 2,
+      previousAuthorityRecordHash: setQuorum.authorityRecordHash,
+      transitionKind: "admit_principal",
+      recordedAt: timestamp("2026-06-27T16:15:00.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 2,
+      principalId: "observer:a",
+      signatureKeyId: "observer:a:key:v1",
+    });
+    const compactedTopology = operationalStateAuthorityTopologyFromTransition(
+      admitObserverA,
+      operationalStateAuthorityTopologyFromTransition(setQuorum),
+    );
+    const checkpoint =
+      buildOperationalStateAuthorityTopologyCompactionCheckpoint({
+        checkpointId: "authority-topology-checkpoint:settlement:2",
+        tenantId: t,
+        topologyId,
+        authorityScope,
+        compactedThroughAuthoritySequence: 2,
+        compactedTopology,
+        retainedFromAuthoritySequence: 3,
+        checkpointedAt: timestamp("2026-06-27T16:16:00.000Z"),
+        checkpointedBy: "authority-compactor",
+      });
+    const admitObserverB = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 3,
+      previousAuthorityRecordHash: compactedTopology.authorityRecordHash,
+      transitionKind: "admit_principal",
+      recordedAt: timestamp("2026-06-27T16:17:00.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 3,
+      principalId: "observer:b",
+      signatureKeyId: "observer:b:key:v1",
+    });
+    const admitObserverC = buildOperationalStateAuthorityTransitionRecord({
+      tenantId: t,
+      topologyId,
+      authorityScope,
+      authoritySequence: 3,
+      previousAuthorityRecordHash: compactedTopology.authorityRecordHash,
+      transitionKind: "admit_principal",
+      recordedAt: timestamp("2026-06-27T16:17:30.000Z"),
+      recordedBy: "authority-admin",
+      effectiveFromSubjectSequence: 3,
+      principalId: "observer:c",
+      signatureKeyId: "observer:c:key:v1",
+    });
+    const requiredTopology = operationalStateAuthorityTopologyFromTransition(
+      admitObserverB,
+      compactedTopology,
+    );
+    const rivalTopology = operationalStateAuthorityTopologyFromTransition(
+      admitObserverC,
+      compactedTopology,
+    );
+    const selectedCandidate =
+      buildOperationalStateAuthorityTopologySettlementCandidate({
+        candidateId: "authority-topology-branch:observer-b",
+        branchId: "branch:observer-b",
+        topology: requiredTopology,
+        evidenceRefs: [admitObserverB.authorityRecordHash],
+      });
+    const rivalCandidate =
+      buildOperationalStateAuthorityTopologySettlementCandidate({
+        candidateId: "authority-topology-branch:observer-c",
+        branchId: "branch:observer-c",
+        topology: rivalTopology,
+        evidenceRefs: [admitObserverC.authorityRecordHash],
+      });
+    const settlementId = "authority-topology-settlement:ops:3";
+    const candidateSetHash =
+      computeOperationalStateAuthorityTopologySettlementCandidateSetHash([
+        selectedCandidate,
+        rivalCandidate,
+      ]);
+    const settlementClaimHash =
+      computeOperationalStateAuthorityTopologySettlementClaimHash({
+        settlementId,
+        tenantId: t,
+        authorityScope,
+        topologyId,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: requiredTopology.authoritySequence,
+        subjectHash: requiredTopology.topologyHash,
+        selectedCandidateId: selectedCandidate.candidateId,
+        candidateSetHash,
+        settledTopologyHash: selectedCandidate.topologyHash,
+        settledAuthorityRecordHash: selectedCandidate.authorityRecordHash,
+        settledAuthoritySequence: selectedCandidate.authoritySequence,
+      });
+    const settlementCertificate =
+      buildOperationalStateQuorumCertificateProofCertificate({
+        tenantId: t,
+        authorityScope,
+        authorityBoundary: settlementAuthorityBoundary,
+        subjectKind: OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_SUBJECT_KIND,
+        subjectId: settlementId,
+        subjectSequence: requiredTopology.authoritySequence,
+        subjectHash: settlementClaimHash,
+        status: "certified",
+        certified: true,
+        acceptedWitnessIds: ["topology-settler:a", "topology-settler:b"],
+        authorityTopologyHash: "hash:authority-topology-settlement-authority",
+        requiredWitnesses: 2,
+        certifiedAt: timestamp("2026-06-27T16:18:00.000Z"),
+        certifiedBy: "authority:topology-settlement",
+      });
+    const settlementProof =
+      buildOperationalStateAuthorityTopologySettlementProof({
+        proofId: "authority-topology-settlement-proof:ops:3",
+        settlementId,
+        tenantId: t,
+        authorityScope,
+        topologyId,
+        settlementAuthorityBoundary,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: requiredTopology.authoritySequence,
+        subjectHash: requiredTopology.topologyHash,
+        candidates: [selectedCandidate, rivalCandidate],
+        selectedCandidateId: selectedCandidate.candidateId,
+        settlementCertificate,
+        settledAt: timestamp("2026-06-27T16:18:30.000Z"),
+        settledBy: "authority:topology-settlement",
+      });
+
+    expect(
+      evaluateOperationalStateAuthorityTopologySettlementProof({
+        proof: settlementProof,
+        expectedTenantId: t,
+        expectedAuthorityScope: authorityScope,
+        expectedTopologyId: topologyId,
+        expectedSubjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        expectedSubjectId: checkpoint.checkpointId,
+        expectedSubjectSequence: requiredTopology.authoritySequence,
+        expectedSubjectHash: requiredTopology.topologyHash,
+        requiredSettlementAuthorityBoundary: settlementAuthorityBoundary,
+        requiredSettledTopologyHash: requiredTopology.topologyHash,
+      }),
+    ).toMatchObject({
+      valid: true,
+      accepted: true,
+      candidateCount: 2,
+      settledTopologyHash: requiredTopology.topologyHash,
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateAuthorityTopologyCompaction({
+        checkpoint,
+        retainedTransitions: [admitObserverB],
+        requiredTopology,
+        requireTopologySettlementProof: true,
+        topologySettlementProof: settlementProof,
+        requiredTopologySettlementAuthorityBoundary:
+          settlementAuthorityBoundary,
+      }),
+    ).toMatchObject({
+      valid: true,
+      appliedTransitionCount: 1,
+      topologySettlementProofEvaluation: {
+        valid: true,
+        settledTopologyHash: requiredTopology.topologyHash,
+      },
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateAuthorityTopologyCompaction({
+        checkpoint,
+        retainedTransitions: [admitObserverB],
+        requiredTopology,
+        requireTopologySettlementProof: true,
+        requiredTopologySettlementAuthorityBoundary:
+          settlementAuthorityBoundary,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_topology_settlement_proof_missing",
+    );
+
+    const rivalClaimHash =
+      computeOperationalStateAuthorityTopologySettlementClaimHash({
+        settlementId: "authority-topology-settlement:ops:3:rival",
+        tenantId: t,
+        authorityScope,
+        topologyId,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: rivalTopology.authoritySequence,
+        subjectHash: rivalTopology.topologyHash,
+        selectedCandidateId: rivalCandidate.candidateId,
+        candidateSetHash,
+        settledTopologyHash: rivalCandidate.topologyHash,
+        settledAuthorityRecordHash: rivalCandidate.authorityRecordHash,
+        settledAuthoritySequence: rivalCandidate.authoritySequence,
+      });
+    const rivalProof =
+      buildOperationalStateAuthorityTopologySettlementProof({
+        proofId: "authority-topology-settlement-proof:ops:3:rival",
+        settlementId: "authority-topology-settlement:ops:3:rival",
+        tenantId: t,
+        authorityScope,
+        topologyId,
+        settlementAuthorityBoundary,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: rivalTopology.authoritySequence,
+        subjectHash: rivalTopology.topologyHash,
+        candidates: [selectedCandidate, rivalCandidate],
+        selectedCandidateId: rivalCandidate.candidateId,
+        settlementCertificate:
+          buildOperationalStateQuorumCertificateProofCertificate({
+            tenantId: t,
+            authorityScope,
+            authorityBoundary: settlementAuthorityBoundary,
+            subjectKind:
+              OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_SUBJECT_KIND,
+            subjectId: "authority-topology-settlement:ops:3:rival",
+            subjectSequence: rivalTopology.authoritySequence,
+            subjectHash: rivalClaimHash,
+            status: "certified",
+            certified: true,
+            acceptedWitnessIds: ["topology-settler:a", "topology-settler:b"],
+            authorityTopologyHash:
+              "hash:authority-topology-settlement-authority",
+            requiredWitnesses: 2,
+          }),
+        settledAt: timestamp("2026-06-27T16:19:00.000Z"),
+        settledBy: "authority:topology-settlement",
+      });
+    const rivalEvaluation = evaluateOperationalStateAuthorityTopologyCompaction({
+      checkpoint,
+      retainedTransitions: [admitObserverB],
+      requiredTopology,
+      requireTopologySettlementProof: true,
+      topologySettlementProof: rivalProof,
+      requiredTopologySettlementAuthorityBoundary:
+        settlementAuthorityBoundary,
+    });
+
+    expect(rivalEvaluation.valid).toBe(false);
+    expect(rivalEvaluation.issues.map((issue) => issue.code)).toContain(
+      "operational_state_authority_topology_settlement_proof_invalid",
+    );
+    expect(
+      rivalEvaluation.topologySettlementProofEvaluation?.issues.map(
+        (issue) => issue.code,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "operational_state_authority_topology_settlement_subject_mismatch",
+        "operational_state_authority_topology_settlement_selected_topology_mismatch",
+      ]),
+    );
+
+    const wrongCertificateProof =
+      buildOperationalStateAuthorityTopologySettlementProof({
+        proofId: "authority-topology-settlement-proof:ops:3:wrong-cert",
+        settlementId,
+        tenantId: t,
+        authorityScope,
+        topologyId,
+        settlementAuthorityBoundary,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: requiredTopology.authoritySequence,
+        subjectHash: requiredTopology.topologyHash,
+        candidates: [selectedCandidate, rivalCandidate],
+        selectedCandidateId: selectedCandidate.candidateId,
+        settlementCertificate:
+          buildOperationalStateQuorumCertificateProofCertificate({
+            tenantId: t,
+            authorityScope,
+            authorityBoundary: settlementAuthorityBoundary,
+            subjectKind:
+              OPERATIONAL_STATE_AUTHORITY_TOPOLOGY_SETTLEMENT_SUBJECT_KIND,
+            subjectId: settlementId,
+            subjectSequence: requiredTopology.authoritySequence,
+            subjectHash: "private-memory-branch-choice",
+            status: "certified",
+            certified: true,
+            acceptedWitnessIds: ["topology-settler:a", "topology-settler:b"],
+            authorityTopologyHash:
+              "hash:authority-topology-settlement-authority",
+            requiredWitnesses: 2,
+          }),
+        settledAt: timestamp("2026-06-27T16:19:30.000Z"),
+        settledBy: "authority:topology-settlement",
+      });
+
+    expect(
+      evaluateOperationalStateAuthorityTopologySettlementProof({
+        proof: wrongCertificateProof,
+        requiredSettlementAuthorityBoundary: settlementAuthorityBoundary,
+        requiredSettledTopologyHash: requiredTopology.topologyHash,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_topology_settlement_certificate_subject_mismatch",
+    );
+  });
+
   it("refuses authority topology recovery without a checkpoint", () => {
     const retainedTransition = buildOperationalStateAuthorityTransitionRecord({
       tenantId: t,
@@ -45956,6 +47421,252 @@ describe("@pm/agent-state read-set validation", () => {
     });
   });
 
+  it("requires verifier role settlement before local verifier allowlists can authorize signature proofs", () => {
+    const authorityScope = "agent-state:ops";
+    const settlementAuthorityBoundary =
+      "signature_verifier_role_settlement_quorum";
+    const transparencyLogId = "signature-verifier-role-transparency-log";
+    const keyBinding = buildOperationalStateSignatureKeyBinding({
+      tenantId: t,
+      authorityScope,
+      principalId: "observer:a",
+      keyId: "observer:a:key:v1",
+      algorithm: "ed25519",
+      keyStatus: "active",
+      authoritySequence: 12,
+      authorityTopologyHash: "topology:hash:v12",
+      publicKeyFingerprint: "fp:observer:a:key:v1",
+      keyMaterialHash: "key-material:observer:a:key:v1",
+    });
+    const proof = buildOperationalStateSignatureVerifierAdapterProof({
+      verificationId: "verification:observer:a:payload:settled-verifier",
+      tenantId: t,
+      authorityScope,
+      verifierId: "kms-ed25519",
+      verifierVersion: "2026-06-27",
+      verifiedAt: timestamp("2026-06-27T17:00:10.000Z"),
+      principalId: "observer:a",
+      keyId: "observer:a:key:v1",
+      algorithm: "ed25519",
+      payloadHash: "payload:hash:settled-verifier",
+      signatureHash: "signature:hash:settled-verifier",
+      keyBindingHash: keyBinding.keyBindingHash,
+      publicKeyFingerprint: "fp:observer:a:key:v1",
+      keyMaterialHash: "key-material:observer:a:key:v1",
+      result: "valid",
+      adapterClaims: ["signature_validity"],
+    });
+    const buildRoleSettlementProof = (input: {
+      readonly proofId: string;
+      readonly settlementId: string;
+      readonly verifierId?: string;
+      readonly verifierVersion?: string;
+      readonly allowedClaims?: readonly [
+        "signature_validity",
+        ...("key_currentness" | "principal_authority")[],
+      ];
+      readonly certificateSubjectHash?: string;
+    }) => {
+      const verifierId = input.verifierId ?? proof.verifierId;
+      const verifierVersion = input.verifierVersion ?? proof.verifierVersion;
+      const allowedClaims = input.allowedClaims ?? ["signature_validity"];
+      const roleMetadataSequence = 7;
+      const roleMetadataHash =
+        computeOperationalStateSignatureVerifierRoleMetadataHash({
+          tenantId: t,
+          authorityScope,
+          verifierId,
+          verifierVersion,
+          verifierRole: "signature_verifier",
+          roleMetadataSequence,
+          allowedClaims,
+          validFromAuthoritySequence: 1,
+          validThroughAuthoritySequence: 20,
+          verifierKeyId: "verifier:kms-ed25519:key:v1",
+          verifierPublicKeyFingerprint: "fp:verifier:kms-ed25519:key:v1",
+          verifierKeyMaterialHash: "key-material:verifier:kms-ed25519:key:v1",
+        });
+      const settlementClaimHash =
+        computeOperationalStateSignatureVerifierRoleSettlementClaimHash({
+          settlementId: input.settlementId,
+          tenantId: t,
+          authorityScope,
+          verifierId,
+          verifierVersion,
+          roleMetadataSequence,
+          roleMetadataHash,
+          transparencyLogId,
+          transparencyTreeHeadHash: "tree-head:signature-verifier-roles:7",
+          transparencyTreeSize: 42,
+          transparencyInclusionProofHash:
+            "inclusion:signature-verifier-role:kms-ed25519:7",
+          transparencyConsistencyProofHash:
+            "consistency:signature-verifier-roles:6-7",
+        });
+      return buildOperationalStateSignatureVerifierRoleSettlementProof({
+        proofId: input.proofId,
+        settlementId: input.settlementId,
+        tenantId: t,
+        authorityScope,
+        verifierId,
+        verifierVersion,
+        verifierRole: "signature_verifier",
+        roleMetadataSequence,
+        allowedClaims,
+        validFromAuthoritySequence: 1,
+        validThroughAuthoritySequence: 20,
+        verifierKeyId: "verifier:kms-ed25519:key:v1",
+        verifierPublicKeyFingerprint: "fp:verifier:kms-ed25519:key:v1",
+        verifierKeyMaterialHash: "key-material:verifier:kms-ed25519:key:v1",
+        transparencyLogId,
+        transparencyTreeHeadHash: "tree-head:signature-verifier-roles:7",
+        transparencyTreeSize: 42,
+        transparencyInclusionProofHash:
+          "inclusion:signature-verifier-role:kms-ed25519:7",
+        transparencyConsistencyProofHash:
+          "consistency:signature-verifier-roles:6-7",
+        settlementAuthorityBoundary,
+        settlementCertificate:
+          buildOperationalStateQuorumCertificateProofCertificate({
+            tenantId: t,
+            authorityScope,
+            authorityBoundary: settlementAuthorityBoundary,
+            subjectKind:
+              OPERATIONAL_STATE_SIGNATURE_VERIFIER_ROLE_SETTLEMENT_SUBJECT_KIND,
+            subjectId: input.settlementId,
+            subjectSequence: roleMetadataSequence,
+            subjectHash: input.certificateSubjectHash ?? settlementClaimHash,
+            status: "certified",
+            certified: true,
+            acceptedWitnessIds: [
+              "verifier-role-settler:a",
+              "verifier-role-settler:b",
+            ],
+            requiredWitnesses: 2,
+            minimumWitnesses: 2,
+          }),
+        settledAt: timestamp("2026-06-27T17:00:11.000Z"),
+        settledBy: "signature-verifier-role-settlement-controller",
+      });
+    };
+    const roleSettlementProof = buildRoleSettlementProof({
+      proofId: "signature-verifier-role-settlement-proof:kms-ed25519:7",
+      settlementId: "signature-verifier-role-settlement:kms-ed25519:7",
+    });
+
+    expect(
+      evaluateOperationalStateSignatureVerifierRoleSettlementProof({
+        proof: roleSettlementProof,
+        expectedTenantId: t,
+        expectedAuthorityScope: authorityScope,
+        expectedVerifierId: proof.verifierId,
+        expectedVerifierVersion: proof.verifierVersion,
+        expectedAllowedClaims: proof.adapterClaims,
+        requiredSettlementAuthorityBoundary: settlementAuthorityBoundary,
+        requiredTransparencyLogId: transparencyLogId,
+        requiredAuthoritySequence: keyBinding.authoritySequence,
+      }),
+    ).toMatchObject({
+      valid: true,
+      accepted: true,
+      verifierId: proof.verifierId,
+      allowedClaims: ["signature_validity"],
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateSignatureVerifierAdapterProof({
+        keyBinding,
+        proof,
+        expectedTenantId: t,
+        expectedAuthorityScope: authorityScope,
+        expectedPrincipalId: "observer:a",
+        expectedKeyId: "observer:a:key:v1",
+        expectedAlgorithm: "ed25519",
+        expectedPayloadHash: "payload:hash:settled-verifier",
+        expectedSignatureHash: "signature:hash:settled-verifier",
+        requireVerifierRoleSettlementProof: true,
+        verifierRoleSettlementProof: roleSettlementProof,
+        requiredVerifierRoleSettlementAuthorityBoundary:
+          settlementAuthorityBoundary,
+        requiredVerifierTransparencyLogId: transparencyLogId,
+      }),
+    ).toMatchObject({
+      valid: true,
+      accepted: true,
+      verifierRoleSettlementProofEvaluation: {
+        valid: true,
+        verifierId: proof.verifierId,
+      },
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateSignatureVerifierAdapterProof({
+        keyBinding,
+        proof,
+        expectedPayloadHash: "payload:hash:settled-verifier",
+        expectedSignatureHash: "signature:hash:settled-verifier",
+        requireVerifierRoleSettlementProof: true,
+        requiredVerifierRoleSettlementAuthorityBoundary:
+          settlementAuthorityBoundary,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_signature_verifier_role_settlement_proof_missing",
+    );
+
+    const wrongVerifierSettlementProof = buildRoleSettlementProof({
+      proofId: "signature-verifier-role-settlement-proof:local-cache:7",
+      settlementId: "signature-verifier-role-settlement:local-cache:7",
+      verifierId: "local-cache-verifier",
+    });
+    expect(
+      evaluateOperationalStateSignatureVerifierAdapterProof({
+        keyBinding,
+        proof,
+        expectedPayloadHash: "payload:hash:settled-verifier",
+        expectedSignatureHash: "signature:hash:settled-verifier",
+        requireVerifierRoleSettlementProof: true,
+        verifierRoleSettlementProof: wrongVerifierSettlementProof,
+        requiredVerifierRoleSettlementAuthorityBoundary:
+          settlementAuthorityBoundary,
+      }).verifierRoleSettlementProofEvaluation?.issues.map(
+        (issue) => issue.code,
+      ),
+    ).toContain(
+      "operational_state_signature_verifier_role_settlement_verifier_mismatch",
+    );
+
+    const overbroadSettlementProof = buildRoleSettlementProof({
+      proofId: "signature-verifier-role-settlement-proof:overbroad:7",
+      settlementId: "signature-verifier-role-settlement:overbroad:7",
+      allowedClaims: ["signature_validity", "principal_authority"],
+    });
+    expect(
+      evaluateOperationalStateSignatureVerifierRoleSettlementProof({
+        proof: overbroadSettlementProof,
+        expectedAllowedClaims: proof.adapterClaims,
+        requiredSettlementAuthorityBoundary: settlementAuthorityBoundary,
+        requiredAuthoritySequence: keyBinding.authoritySequence,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_signature_verifier_role_settlement_claim_overreach",
+    );
+
+    const wrongCertificateProof = buildRoleSettlementProof({
+      proofId: "signature-verifier-role-settlement-proof:wrong-cert:7",
+      settlementId: "signature-verifier-role-settlement:wrong-cert:7",
+      certificateSubjectHash: "private-local-verifier-allowlist",
+    });
+    expect(
+      evaluateOperationalStateSignatureVerifierRoleSettlementProof({
+        proof: wrongCertificateProof,
+        requiredSettlementAuthorityBoundary: settlementAuthorityBoundary,
+        requiredAuthoritySequence: keyBinding.authoritySequence,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_signature_verifier_role_settlement_certificate_subject_mismatch",
+    );
+  });
+
   it("rejects verifier adapter proofs that smuggle authority or currentness claims", () => {
     const keyBinding = buildOperationalStateSignatureKeyBinding({
       tenantId: t,
@@ -48131,6 +49842,357 @@ describe("@pm/agent-state read-set validation", () => {
         issues: [],
       },
     });
+  });
+
+  it("turns conflicting admitted authority epoch seal finalizer quorums into accountable finality obstruction evidence", () => {
+    const authorityScope = "agent-state:ops";
+    const authorityBoundary = "operational_state_authority_topology";
+    const finalizerProofAdmissionStoreId =
+      "authority-epoch-seal-finalizer-proof-admissions:ops";
+    const finalizerProofAdmissionBoundary =
+      "operational_state_authority_epoch_seal_finalizer_proof_admission";
+    const baseSealPayload = {
+      tenantId: t,
+      authorityScope,
+      authorityBoundary,
+      sealedSubjectKind: "pruning_tombstone_store_head",
+      sealedSubjectId: "history-store-head:pruning-store:head",
+      sealedSubjectSequence: 44,
+      finalizerPrincipalId: "finalizer:ops",
+    };
+    const buildFinalizerAdmissionRecord = (input: {
+      readonly sealId: string;
+      readonly admissionSequence: number;
+      readonly sealedAuthorityTopologyHash: string;
+      readonly sealedQuorumCertificateHash: string;
+      readonly authorityTransitionHash: string;
+      readonly finalizedAt: string;
+      readonly signatureHash: string;
+      readonly acceptedWitnessIds: readonly string[];
+      readonly previousAdmissionRecordHash?: string;
+      readonly certificateAuthorityBoundary?: string;
+      readonly certificateSubjectHash?: string;
+    }) => {
+      const sealPayload = {
+        ...baseSealPayload,
+        sealId: input.sealId,
+        sealedAuthorityTopologyHash: input.sealedAuthorityTopologyHash,
+        sealedQuorumCertificateHash: input.sealedQuorumCertificateHash,
+        authorityTransitionHash: input.authorityTransitionHash,
+        finalizedAt: timestamp(input.finalizedAt),
+      };
+      const keyBinding = buildOperationalStateSignatureKeyBinding({
+        tenantId: t,
+        authorityScope,
+        principalId: "finalizer:ops",
+        keyId: `finalizer:ops:key:${input.admissionSequence}`,
+        algorithm: "ed25519",
+        keyStatus: "active",
+        authoritySequence: 40 + input.admissionSequence,
+        authorityTopologyHash: input.sealedAuthorityTopologyHash,
+        publicKeyFingerprint: `fp:finalizer:ops:key:${input.admissionSequence}`,
+        keyMaterialHash: `key-material:finalizer:ops:key:${input.admissionSequence}`,
+      });
+      const verifierProof = buildOperationalStateSignatureVerifierAdapterProof({
+        verificationId: `verification:seal-finalizer:accountable:${input.admissionSequence}`,
+        tenantId: t,
+        authorityScope,
+        verifierId: "kms-ed25519",
+        verifierVersion: "2026-06-27",
+        verifiedAt: timestamp(input.finalizedAt),
+        principalId: "finalizer:ops",
+        keyId: keyBinding.keyId,
+        algorithm: "ed25519",
+        payloadHash:
+          computeOperationalStateAuthorityEpochSealPayloadHash(sealPayload),
+        signatureHash: input.signatureHash,
+        keyBindingHash: keyBinding.keyBindingHash,
+        publicKeyFingerprint: keyBinding.publicKeyFingerprint,
+        keyMaterialHash: keyBinding.keyMaterialHash,
+        result: "valid",
+        adapterClaims: ["signature_validity"],
+      });
+      const finalizerProof =
+        buildOperationalStateAuthorityEpochSealFinalizerProof({
+          ...sealPayload,
+          finalizerKeyBinding: keyBinding,
+          verifierProof,
+        });
+      const admissionCertificate =
+        buildOperationalStateQuorumCertificateProofCertificate({
+          tenantId: t,
+          authorityScope,
+          authorityBoundary:
+            input.certificateAuthorityBoundary ??
+            finalizerProofAdmissionBoundary,
+          subjectKind:
+            OPERATIONAL_STATE_AUTHORITY_EPOCH_SEAL_FINALIZER_PROOF_SUBJECT_KIND,
+          subjectId: finalizerProof.sealId,
+          subjectSequence: input.admissionSequence,
+          subjectHash:
+            input.certificateSubjectHash ?? finalizerProof.finalizerProofHash,
+          status: "certified",
+          certified: true,
+          acceptedWitnessIds: input.acceptedWitnessIds,
+          requiredWitnesses: 2,
+          minimumWitnesses: 2,
+          certifiedAt: timestamp(input.finalizedAt),
+          certifiedBy: "finalizer-proof-admission-controller",
+        });
+      return buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord(
+        {
+          tenantId: t,
+          finalizerProofAdmissionStoreId,
+          authorityScope,
+          admissionSequence: input.admissionSequence,
+          finalizerProof,
+          admissionCertificate,
+          ...(input.previousAdmissionRecordHash !== undefined
+            ? {
+                previousAdmissionRecordHash:
+                  input.previousAdmissionRecordHash,
+              }
+            : {}),
+          admittedAt: timestamp(input.finalizedAt),
+          admittedBy: "finalizer-proof-admission-controller",
+        },
+      );
+    };
+
+    const firstRecord = buildFinalizerAdmissionRecord({
+      sealId: "authority-epoch-seal:ops:accountable:a",
+      admissionSequence: 1,
+      sealedAuthorityTopologyHash: "topology:hash:accountable:a",
+      sealedQuorumCertificateHash: "qc:hash:accountable:a",
+      authorityTransitionHash: "authority-transition:accountable:a",
+      finalizedAt: "2026-06-27T17:11:00.000Z",
+      signatureHash: "signature:seal-finalizer:accountable:a",
+      acceptedWitnessIds: [
+        "finalizer-proof-admission:a",
+        "finalizer-proof-admission:b",
+      ],
+    });
+    const secondRecord = buildFinalizerAdmissionRecord({
+      sealId: "authority-epoch-seal:ops:accountable:b",
+      admissionSequence: 2,
+      sealedAuthorityTopologyHash: "topology:hash:accountable:b",
+      sealedQuorumCertificateHash: "qc:hash:accountable:b",
+      authorityTransitionHash: "authority-transition:accountable:b",
+      finalizedAt: "2026-06-27T17:11:10.000Z",
+      signatureHash: "signature:seal-finalizer:accountable:b",
+      acceptedWitnessIds: [
+        "finalizer-proof-admission:b",
+        "finalizer-proof-admission:c",
+      ],
+      previousAdmissionRecordHash: firstRecord.admissionRecordHash,
+    });
+    const evidence =
+      buildOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidenceId: "accountable-finality-evidence:authority-epoch-seal:ops",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        finalizerProofAdmissionAuthorityBoundary:
+          finalizerProofAdmissionBoundary,
+        firstFinalizerProofAdmissionRecord: firstRecord,
+        secondFinalizerProofAdmissionRecord: secondRecord,
+        recordedAt: timestamp("2026-06-27T17:11:20.000Z"),
+        recordedBy: "authority-epoch-seal-finality-monitor",
+        evidenceReason: "conflicting-admitted-finalizer-quorums",
+      });
+
+    expect(
+      evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidence,
+        expectedTenantId: t,
+        expectedAuthorityScope: authorityScope,
+        expectedAuthorityBoundary: authorityBoundary,
+        expectedFinalizerProofAdmissionAuthorityBoundary:
+          finalizerProofAdmissionBoundary,
+        expectedSealedSubjectKind: "pruning_tombstone_store_head",
+        expectedSealedSubjectId: "history-store-head:pruning-store:head",
+        expectedSealedSubjectSequence: 44,
+        expectedFinalizerProofHash: firstRecord.finalizerProofHash,
+      }),
+    ).toMatchObject({
+      valid: true,
+      obstructsOperationalFinality: true,
+      sharedAcceptedWitnessIds: ["finalizer-proof-admission:b"],
+      conflictKinds: expect.arrayContaining([
+        "sealed_authority_topology_conflict",
+        "sealed_quorum_certificate_conflict",
+        "authority_transition_conflict",
+      ]),
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateAuthorityEpochSealFinalizer({
+        finalizerProof: firstRecord.finalizerProof,
+        expectedTenantId: t,
+        expectedAuthorityScope: authorityScope,
+        expectedAuthorityBoundary: authorityBoundary,
+        expectedSealedSubjectKind: "pruning_tombstone_store_head",
+        expectedSealedSubjectId: "history-store-head:pruning-store:head",
+        expectedSealedSubjectSequence: 44,
+        expectedFinalizerPrincipalId: "finalizer:ops",
+        expectedSignatureHash: "signature:seal-finalizer:accountable:a",
+        allowedVerifierIds: ["kms-ed25519"],
+        accountableFinalityEvidence: evidence,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_epoch_seal_finalizer_accountable_finality_conflict",
+    );
+
+    const disjointWitnessRecord = buildFinalizerAdmissionRecord({
+      sealId: "authority-epoch-seal:ops:accountable:disjoint",
+      admissionSequence: 3,
+      sealedAuthorityTopologyHash: "topology:hash:accountable:disjoint",
+      sealedQuorumCertificateHash: "qc:hash:accountable:disjoint",
+      authorityTransitionHash: "authority-transition:accountable:disjoint",
+      finalizedAt: "2026-06-27T17:11:30.000Z",
+      signatureHash: "signature:seal-finalizer:accountable:disjoint",
+      acceptedWitnessIds: [
+        "finalizer-proof-admission:c",
+        "finalizer-proof-admission:d",
+      ],
+      previousAdmissionRecordHash: secondRecord.admissionRecordHash,
+    });
+    const disjointEvidence =
+      buildOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidenceId:
+          "accountable-finality-evidence:authority-epoch-seal:disjoint",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        finalizerProofAdmissionAuthorityBoundary:
+          finalizerProofAdmissionBoundary,
+        firstFinalizerProofAdmissionRecord: firstRecord,
+        secondFinalizerProofAdmissionRecord: disjointWitnessRecord,
+        recordedAt: timestamp("2026-06-27T17:11:40.000Z"),
+        recordedBy: "authority-epoch-seal-finality-monitor",
+      });
+
+    expect(
+      evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidence: disjointEvidence,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_epoch_seal_accountable_finality_evidence_shared_witness_missing",
+    );
+
+    const duplicateFinalityRecord = buildFinalizerAdmissionRecord({
+      sealId: "authority-epoch-seal:ops:accountable:duplicate",
+      admissionSequence: 4,
+      sealedAuthorityTopologyHash: "topology:hash:accountable:a",
+      sealedQuorumCertificateHash: "qc:hash:accountable:a",
+      authorityTransitionHash: "authority-transition:accountable:a",
+      finalizedAt: "2026-06-27T17:11:50.000Z",
+      signatureHash: "signature:seal-finalizer:accountable:duplicate",
+      acceptedWitnessIds: [
+        "finalizer-proof-admission:a",
+        "finalizer-proof-admission:b",
+      ],
+      previousAdmissionRecordHash: disjointWitnessRecord.admissionRecordHash,
+    });
+    const duplicateEvidence =
+      buildOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidenceId:
+          "accountable-finality-evidence:authority-epoch-seal:duplicate",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        finalizerProofAdmissionAuthorityBoundary:
+          finalizerProofAdmissionBoundary,
+        firstFinalizerProofAdmissionRecord: firstRecord,
+        secondFinalizerProofAdmissionRecord: duplicateFinalityRecord,
+        recordedAt: timestamp("2026-06-27T17:12:00.000Z"),
+        recordedBy: "authority-epoch-seal-finality-monitor",
+      });
+
+    expect(
+      evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidence: duplicateEvidence,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_epoch_seal_accountable_finality_evidence_no_conflict",
+    );
+
+    const wrongSubjectRecord = buildFinalizerAdmissionRecord({
+      sealId: "authority-epoch-seal:ops:accountable:wrong-subject",
+      admissionSequence: 5,
+      sealedAuthorityTopologyHash: "topology:hash:accountable:wrong-subject",
+      sealedQuorumCertificateHash: "qc:hash:accountable:wrong-subject",
+      authorityTransitionHash: "authority-transition:accountable:wrong-subject",
+      finalizedAt: "2026-06-27T17:12:10.000Z",
+      signatureHash: "signature:seal-finalizer:accountable:wrong-subject",
+      acceptedWitnessIds: [
+        "finalizer-proof-admission:a",
+        "finalizer-proof-admission:b",
+      ],
+      certificateSubjectHash: "hash:private-memory-finalizer-proof",
+      previousAdmissionRecordHash: duplicateFinalityRecord.admissionRecordHash,
+    });
+    const wrongSubjectEvidence =
+      buildOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidenceId:
+          "accountable-finality-evidence:authority-epoch-seal:wrong-subject",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        finalizerProofAdmissionAuthorityBoundary:
+          finalizerProofAdmissionBoundary,
+        firstFinalizerProofAdmissionRecord: firstRecord,
+        secondFinalizerProofAdmissionRecord: wrongSubjectRecord,
+        recordedAt: timestamp("2026-06-27T17:12:20.000Z"),
+        recordedBy: "authority-epoch-seal-finality-monitor",
+      });
+
+    expect(
+      evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidence: wrongSubjectEvidence,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_epoch_seal_accountable_finality_evidence_certificate_subject_mismatch",
+    );
+
+    const wrongBoundaryRecord = buildFinalizerAdmissionRecord({
+      sealId: "authority-epoch-seal:ops:accountable:wrong-boundary",
+      admissionSequence: 6,
+      sealedAuthorityTopologyHash: "topology:hash:accountable:wrong-boundary",
+      sealedQuorumCertificateHash: "qc:hash:accountable:wrong-boundary",
+      authorityTransitionHash: "authority-transition:accountable:wrong-boundary",
+      finalizedAt: "2026-06-27T17:12:30.000Z",
+      signatureHash: "signature:seal-finalizer:accountable:wrong-boundary",
+      acceptedWitnessIds: [
+        "finalizer-proof-admission:a",
+        "finalizer-proof-admission:b",
+      ],
+      certificateAuthorityBoundary:
+        "operational_state_authority_epoch_seal_private_memory",
+      previousAdmissionRecordHash: wrongSubjectRecord.admissionRecordHash,
+    });
+    const wrongBoundaryEvidence =
+      buildOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidenceId:
+          "accountable-finality-evidence:authority-epoch-seal:wrong-boundary",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        finalizerProofAdmissionAuthorityBoundary:
+          finalizerProofAdmissionBoundary,
+        firstFinalizerProofAdmissionRecord: firstRecord,
+        secondFinalizerProofAdmissionRecord: wrongBoundaryRecord,
+        recordedAt: timestamp("2026-06-27T17:12:40.000Z"),
+        recordedBy: "authority-epoch-seal-finality-monitor",
+      });
+
+    expect(
+      evaluateOperationalStateAuthorityEpochSealAccountableFinalityEvidence({
+        evidence: wrongBoundaryEvidence,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_epoch_seal_accountable_finality_evidence_boundary_mismatch",
+    );
   });
 
   it("requires authority epoch seal finalizer proofs to replay from admitted proof history", () => {
@@ -50809,6 +52871,380 @@ describe("@pm/agent-state read-set validation", () => {
         "operational_state_authority_epoch_seal_finalizer_proof_admission_record_proof_hash_mismatch",
         "operational_state_authority_epoch_seal_finalizer_proof_admission_record_hash_mismatch",
         "operational_state_authority_epoch_seal_finalizer_proof_not_admitted",
+      ]),
+    );
+  });
+
+  it("admits authority-transition ledger compaction only through replayed checkpoint authority", () => {
+    const authorityScope = "agent-state:ops";
+    const authorityBoundary =
+      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission";
+    const checkpointAdmissionBoundary =
+      "authority_transition_ledger_compaction_checkpoint_admission_quorum";
+    const transitionAdmissionStoreId =
+      "agent_state.authority_epoch_finalizer_witness_transition_admissions";
+    const checkpointAdmissionStoreId =
+      "agent_state.authority_transition_ledger_compaction_checkpoint_admissions";
+    const topologyId = "authority-transition-ledger:finalizer-witness";
+    const checkpoint =
+      buildOperationalStateAuthorityTransitionLedgerCompactionCheckpoint({
+        checkpointId: "authority-transition-ledger-checkpoint:finalizer:1",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        transitionAdmissionStoreId,
+        topologyId,
+        compactedThroughAdmissionSequence: 3,
+        compactedThroughAuthoritySequence: 3,
+        compactedThroughAdmissionRecordHash:
+          "admission-record-hash:finalizer-transition:3",
+        compactedThroughAuthorityRecordHash:
+          "authority-record-hash:finalizer-transition:3",
+        compactedThroughAuthorityTopologyHash:
+          "authority-topology-hash:finalizer-transition:3",
+        retainedFromAdmissionSequence: 4,
+        retainedFromAuthoritySequence: 4,
+        sourceReplayHash: "source-replay:finalizer-transition-ledger:3",
+        checkpointedAt: timestamp("2026-06-27T18:00:00.000Z"),
+        checkpointedBy: "authority-transition-ledger-compactor",
+      });
+    const quorumCertificate =
+      buildOperationalStateQuorumCertificateProofCertificate({
+        tenantId: t,
+        authorityScope,
+        authorityBoundary: checkpointAdmissionBoundary,
+        subjectKind:
+          OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+        subjectId: checkpoint.checkpointId,
+        subjectSequence: checkpoint.compactedThroughAdmissionSequence,
+        subjectHash: checkpoint.checkpointHash,
+        status: "certified",
+        certified: true,
+        acceptedWitnessIds: ["ledger-compactor:a", "ledger-compactor:b"],
+        authorityTopologyHash:
+          "authority-topology:ledger-compaction-admission:1",
+        requiredWitnesses: 2,
+      });
+    const admissionRecord =
+      buildOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          admissionSequence: 1,
+          checkpoint,
+          quorumCertificate,
+          admittedAt: timestamp("2026-06-27T18:01:00.000Z"),
+          admittedBy: "authority-transition-ledger-checkpoint-admitter",
+        },
+      );
+    const admissionReplay =
+      replayOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          records: [admissionRecord],
+          requiredCheckpoint: checkpoint,
+          requiredAuthorityBoundary: checkpointAdmissionBoundary,
+          requiredPruneThroughAdmissionSequence: 3,
+        },
+      );
+
+    expect(admissionReplay).toMatchObject({
+      valid: true,
+      latestAdmittedRecord: expect.objectContaining({
+        checkpointHash: checkpoint.checkpointHash,
+      }),
+      issues: [],
+    });
+    expect(
+      evaluateOperationalStateAuthorityTransitionLedgerCompaction({
+        checkpoint,
+        requireCheckpointAdmission: true,
+        checkpointAdmissionReplay: admissionReplay,
+        requiredPruneThroughAdmissionSequence: 3,
+        retainedAdmissionRecords: [
+          {
+            admissionSequence: 4,
+            previousAdmissionRecordHash:
+              checkpoint.compactedThroughAdmissionRecordHash,
+            admissionRecordHash: "admission-record-hash:finalizer-transition:4",
+          },
+        ],
+      }),
+    ).toMatchObject({
+      valid: true,
+      issues: [],
+    });
+
+    expect(
+      evaluateOperationalStateAuthorityTransitionLedgerCompaction({
+        checkpoint,
+        requireCheckpointAdmission: true,
+        requiredPruneThroughAdmissionSequence: 3,
+      }).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_transition_ledger_compaction_checkpoint_admission_replay_missing",
+    );
+  });
+
+  it("rejects stale, tampered, wrong-boundary, and gapful authority-transition ledger compaction", () => {
+    const authorityScope = "agent-state:ops";
+    const authorityBoundary =
+      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission";
+    const checkpointAdmissionBoundary =
+      "authority_transition_ledger_compaction_checkpoint_admission_quorum";
+    const transitionAdmissionStoreId =
+      "agent_state.authority_epoch_finalizer_witness_transition_admissions";
+    const checkpointAdmissionStoreId =
+      "agent_state.authority_transition_ledger_compaction_checkpoint_admissions";
+    const topologyId = "authority-transition-ledger:finalizer-witness";
+    const checkpoint1 =
+      buildOperationalStateAuthorityTransitionLedgerCompactionCheckpoint({
+        checkpointId: "authority-transition-ledger-checkpoint:finalizer:1",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        transitionAdmissionStoreId,
+        topologyId,
+        compactedThroughAdmissionSequence: 3,
+        compactedThroughAuthoritySequence: 3,
+        compactedThroughAdmissionRecordHash:
+          "admission-record-hash:finalizer-transition:3",
+        compactedThroughAuthorityRecordHash:
+          "authority-record-hash:finalizer-transition:3",
+        compactedThroughAuthorityTopologyHash:
+          "authority-topology-hash:finalizer-transition:3",
+        retainedFromAdmissionSequence: 4,
+        retainedFromAuthoritySequence: 4,
+        sourceReplayHash: "source-replay:finalizer-transition-ledger:3",
+        checkpointedAt: timestamp("2026-06-27T18:10:00.000Z"),
+        checkpointedBy: "authority-transition-ledger-compactor",
+      });
+    const checkpoint2 =
+      buildOperationalStateAuthorityTransitionLedgerCompactionCheckpoint({
+        checkpointId: "authority-transition-ledger-checkpoint:finalizer:2",
+        tenantId: t,
+        authorityScope,
+        authorityBoundary,
+        transitionAdmissionStoreId,
+        topologyId,
+        compactedThroughAdmissionSequence: 5,
+        compactedThroughAuthoritySequence: 5,
+        compactedThroughAdmissionRecordHash:
+          "admission-record-hash:finalizer-transition:5",
+        compactedThroughAuthorityRecordHash:
+          "authority-record-hash:finalizer-transition:5",
+        compactedThroughAuthorityTopologyHash:
+          "authority-topology-hash:finalizer-transition:5",
+        retainedFromAdmissionSequence: 6,
+        retainedFromAuthoritySequence: 6,
+        sourceReplayHash: "source-replay:finalizer-transition-ledger:5",
+        checkpointedAt: timestamp("2026-06-27T18:11:00.000Z"),
+        checkpointedBy: "authority-transition-ledger-compactor",
+      });
+    const admissionRecord1 =
+      buildOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          admissionSequence: 1,
+          checkpoint: checkpoint1,
+          quorumCertificate:
+            buildOperationalStateQuorumCertificateProofCertificate({
+              tenantId: t,
+              authorityScope,
+              authorityBoundary: checkpointAdmissionBoundary,
+              subjectKind:
+                OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+              subjectId: checkpoint1.checkpointId,
+              subjectSequence: checkpoint1.compactedThroughAdmissionSequence,
+              subjectHash: checkpoint1.checkpointHash,
+              status: "certified",
+              certified: true,
+              acceptedWitnessIds: ["ledger-compactor:a", "ledger-compactor:b"],
+              authorityTopologyHash:
+                "authority-topology:ledger-compaction-admission:1",
+              requiredWitnesses: 2,
+            }),
+          admittedAt: timestamp("2026-06-27T18:12:00.000Z"),
+          admittedBy: "authority-transition-ledger-checkpoint-admitter",
+        },
+      );
+    const admissionRecord2 =
+      buildOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          admissionSequence: 2,
+          previousAdmissionRecordHash: admissionRecord1.admissionRecordHash,
+          checkpoint: checkpoint2,
+          quorumCertificate:
+            buildOperationalStateQuorumCertificateProofCertificate({
+              tenantId: t,
+              authorityScope,
+              authorityBoundary: checkpointAdmissionBoundary,
+              subjectKind:
+                OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+              subjectId: checkpoint2.checkpointId,
+              subjectSequence: checkpoint2.compactedThroughAdmissionSequence,
+              subjectHash: checkpoint2.checkpointHash,
+              status: "certified",
+              certified: true,
+              acceptedWitnessIds: ["ledger-compactor:a", "ledger-compactor:b"],
+              authorityTopologyHash:
+                "authority-topology:ledger-compaction-admission:1",
+              requiredWitnesses: 2,
+            }),
+          admittedAt: timestamp("2026-06-27T18:13:00.000Z"),
+          admittedBy: "authority-transition-ledger-checkpoint-admitter",
+        },
+      );
+
+    expect(
+      replayOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          records: [admissionRecord1, admissionRecord2],
+          requiredCheckpoint: checkpoint1,
+          requiredAuthorityBoundary: checkpointAdmissionBoundary,
+        },
+      ).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_transition_ledger_compaction_checkpoint_not_admitted",
+    );
+
+    expect(
+      replayOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          records: [
+            {
+              ...admissionRecord1,
+              checkpointHash:
+                "hash:tampered-authority-transition-ledger-checkpoint",
+            },
+          ],
+          requiredCheckpoint: checkpoint1,
+          requiredAuthorityBoundary: checkpointAdmissionBoundary,
+        },
+      ).issues.map((issue) => issue.code),
+    ).toEqual(
+      expect.arrayContaining([
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_checkpoint_hash_mismatch",
+        "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_hash_mismatch",
+        "operational_state_authority_transition_ledger_compaction_checkpoint_not_admitted",
+      ]),
+    );
+
+    const wrongBoundaryAdmission =
+      buildOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecord(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          admissionSequence: 1,
+          checkpoint: checkpoint1,
+          quorumCertificate:
+            buildOperationalStateQuorumCertificateProofCertificate({
+              tenantId: t,
+              authorityScope,
+              authorityBoundary:
+                "wrong_authority_transition_ledger_compaction_boundary",
+              subjectKind:
+                OPERATIONAL_STATE_AUTHORITY_TRANSITION_LEDGER_COMPACTION_CHECKPOINT_SUBJECT_KIND,
+              subjectId: checkpoint1.checkpointId,
+              subjectSequence: checkpoint1.compactedThroughAdmissionSequence,
+              subjectHash: checkpoint1.checkpointHash,
+              status: "certified",
+              certified: true,
+              acceptedWitnessIds: ["ledger-compactor:a", "ledger-compactor:b"],
+              authorityTopologyHash:
+                "authority-topology:ledger-compaction-admission:1",
+              requiredWitnesses: 2,
+            }),
+          admittedAt: timestamp("2026-06-27T18:14:00.000Z"),
+          admittedBy: "authority-transition-ledger-checkpoint-admitter",
+        },
+      );
+    expect(
+      replayOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecords(
+        {
+          tenantId: t,
+          checkpointAdmissionStoreId,
+          authorityScope,
+          authorityBoundary,
+          transitionAdmissionStoreId,
+          topologyId,
+          records: [wrongBoundaryAdmission],
+          requiredCheckpoint: checkpoint1,
+          requiredAuthorityBoundary: checkpointAdmissionBoundary,
+        },
+      ).issues.map((issue) => issue.code),
+    ).toContain(
+      "operational_state_authority_transition_ledger_compaction_checkpoint_admission_record_certificate_authority_boundary_mismatch",
+    );
+
+    expect(
+      evaluateOperationalStateAuthorityTransitionLedgerCompaction({
+        checkpoint: checkpoint1,
+        requireCheckpointAdmission: true,
+        checkpointAdmissionReplay:
+          replayOperationalStateAuthorityTransitionLedgerCompactionCheckpointAdmissionRecords(
+            {
+              tenantId: t,
+              checkpointAdmissionStoreId,
+              authorityScope,
+              authorityBoundary,
+              transitionAdmissionStoreId,
+              topologyId,
+              records: [admissionRecord1],
+              requiredCheckpoint: checkpoint1,
+              requiredAuthorityBoundary: checkpointAdmissionBoundary,
+            },
+          ),
+        requiredPruneThroughAdmissionSequence: 4,
+        retainedAdmissionRecords: [
+          {
+            admissionSequence: 5,
+            previousAdmissionRecordHash: "hash:not-checkpoint-frontier",
+            admissionRecordHash: "admission-record-hash:finalizer-transition:5",
+          },
+        ],
+      }).issues.map((issue) => issue.code),
+    ).toEqual(
+      expect.arrayContaining([
+        "operational_state_authority_transition_ledger_compaction_required_prune_beyond_checkpoint",
+        "operational_state_authority_transition_ledger_compaction_retained_suffix_gap",
+        "operational_state_authority_transition_ledger_compaction_retained_suffix_previous_hash_mismatch",
       ]),
     );
   });
