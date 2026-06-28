@@ -1,5 +1,1043 @@
 # Changelog
 
+## 2026-06-27 - Operational state authority bootstrap settlement
+
+- Added `research/daily-arrowsmith-agent-state/v220-operational-state-authority-bootstrap-settlement-2026-06-27.md`, closing SQ167 and replacing it with SQ177 follow-up pressure.
+- Added generic `OperationalStateAuthorityBootstrapSettlementRecord` hash/build/verify helpers and `replayOperationalStateAuthorityBootstrapSettlementRecords()` in `@pm/agent-state`.
+- Extended finalizer-proof admission witness authority-transition admission replay with `bootstrapSettlementReplay` and `requireBootstrapSettlement`.
+- Added strict genesis replay checks so a root bootstrap certificate cannot authorize the first finalizer transition-admission record unless it replays from same-key-conflict-free settlement history.
+- Added migration `0137_agent_state_authority_bootstrap_settlement_records.sql` with append-only bootstrap settlement storage.
+- Added focused tests for valid settlement, missing settlement replay, unsettled bootstrap certificate replay, and conflicting same-key root certificates.
+- Claim boundary: v220 closes root-of-authority settlement/meta-admission for the first finalizer nested transition-admission genesis path, but privacy-preserving policy proofs, separation-of-duty proof objects, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, verifier-role metadata/key-transparency settlement, accountable finality evidence, bootstrap-settlement split-history transparency, bootstrap-settlement record signer/witness/quorum authority, runtime adoption across every authority-transition admission lane, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority bootstrap certificate
+
+- Added `research/daily-arrowsmith-agent-state/v219-operational-state-authority-bootstrap-certificate-2026-06-27.md`, closing SQ166 and replacing it with SQ176 follow-up pressure.
+- Added generic `OperationalStateAuthorityBootstrapCertificate` hash/build/verify helpers in `@pm/agent-state`.
+- Extended finalizer-proof admission witness authority-transition admission replay with `bootstrapCertificate` and `requireBootstrapCertificate`.
+- Added strict genesis replay checks so `authority-bootstrap` cannot authorize the first finalizer transition-admission record without a matching root certificate over the exact tenant, scope, boundary, store, topology, bootstrap topology hash, root evidence refs, signature identity, first admission hash, first authority transition hash, and first derived topology hash.
+- Added migration `0136_agent_state_authority_bootstrap_certificates.sql` with append-only bootstrap certificate storage.
+- Added focused tests for valid bootstrap proof, missing certificate, missing root evidence, missing signature material, and mismatched root id.
+- Claim boundary: v219 closes the immediate private-bootstrap path for finalizer nested transition-admission genesis, but root-of-authority settlement/meta-admission, conflicting bootstrap certificate transparency, runtime adoption across every authority-transition admission lane, nested witness signatures/key-status/finality, privacy-preserving policy-proof objects, separation-of-duty proof objects, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, verifier-role metadata/key-transparency settlement, accountable finality evidence, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state finalizer nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v218-operational-state-finalizer-proof-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ165 and replacing it with SQ166/SQ175 follow-up pressure.
+- Extended finalizer transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended finalizer proof witness-authority transition-admission replay, finalizer proof admission witness replay, and final authority epoch seal evaluation with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched finalizer transition-admission witness authority-transition admission history.
+- Added migration `0135_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused finalizer tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, proof-admission witness replay refusal, and forged valid-looking finalizer refusal.
+- Claim boundary: v218 closes finalizer nested witness-authority transition-history accountability, but bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, separation-of-duty proof objects, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, verifier-role metadata/key-transparency settlement, accountable finality evidence, runtime finalizer-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state signature-verifier nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v217-operational-state-signature-verifier-proof-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ164 and replacing it with SQ165/SQ174 follow-up pressure.
+- Extended signature-verifier transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended signature-verifier proof witness-authority transition-admission replay, proof admission witness replay, and final verifier proof evaluation with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched signature-verifier transition-admission witness authority-transition admission history.
+- Added migration `0134_agent_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused signature-verifier tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, proof-admission witness replay refusal, and forged valid-looking verifier-proof refusal.
+- Claim boundary: v217 closes signature-verifier nested witness-authority transition-history accountability, but finalizer equivalent, bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, separation-of-duty proof objects, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, verifier-role metadata/key-transparency settlement, runtime verifier-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-topology nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v216-operational-state-authority-topology-checkpoint-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ163 and replacing it with SQ164/SQ173 follow-up pressure.
+- Extended authority-topology transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended authority-topology checkpoint witness-authority transition-admission replay, checkpoint admission witness replay, and authority-topology compaction evaluation with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched authority-topology transition-admission witness authority-transition admission history.
+- Added migration `0133_agent_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused authority-topology tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, checkpoint witness replay refusal, and forged valid-looking compacted-recovery refusal.
+- Claim boundary: v216 closes authority-topology nested witness-authority transition-history accountability, but signature-verifier/finalizer equivalents, bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, separation-of-duty proof objects, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, topology-settlement branch authority, runtime authority-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state proof-record nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v215-operational-state-proof-record-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ162 and replacing it with SQ163/SQ172 follow-up pressure.
+- Extended proof-record transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended proof-record witness-authority transition-admission replay, proof-record admission witness replay, and quorum-certificate proof replay with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched proof-record transition-admission witness authority-transition admission history.
+- Added migration `0132_agent_state_proof_record_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused proof-record tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, proof-record admission witness replay refusal, and forged valid-looking proof-record replay refusal.
+- Claim boundary: v215 closes proof-record nested witness-authority transition-history accountability, but authority-topology/signature-verifier/finalizer equivalents, bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, separation-of-duty proof objects, recursive compaction-admission, compositional quorum-intersection proof, replay-semantics versioning, runtime proof-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state witness-ledger nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v214-operational-state-witness-ledger-checkpoint-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ161 and replacing it with SQ162/SQ171 follow-up pressure.
+- Extended witness-ledger transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended witness-ledger checkpoint witness-authority transition-admission replay, checkpoint admission witness replay, and witness-ledger compaction evaluation with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched witness-ledger transition-admission witness authority-transition admission history.
+- Added migration `0131_agent_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused witness-ledger tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, checkpoint witness replay refusal, and forged valid-looking compacted-recovery refusal.
+- Claim boundary: v214 closes witness-ledger nested witness-authority transition-history accountability, but proof-record/authority-topology/signature-verifier/finalizer equivalents, bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, separation-of-duty proof objects, recursive compaction-admission, compositional quorum-intersection proof, runtime witness-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state tombstone-history nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v213-operational-state-tombstone-history-checkpoint-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ160 and replacing it with SQ161/SQ170 follow-up pressure.
+- Extended tombstone-history transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended tombstone-history checkpoint witness-authority transition-admission replay, checkpoint admission witness replay, and tombstone-history compaction evaluation with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched tombstone-history transition-admission witness authority-transition admission history.
+- Added migration `0130_agent_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused tombstone-history tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, checkpoint witness replay refusal, and forged valid-looking compacted-recovery refusal.
+- Claim boundary: v213 closes tombstone-history nested witness-authority transition-history accountability, but witness-ledger/proof-record/authority-topology/signature-verifier/finalizer equivalents, bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, separation-of-duty proof objects, recursive compaction-admission, runtime tombstone-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state storage guard nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v212-operational-state-storage-mutation-guard-authorization-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ159 and replacing it with SQ160/SQ169 follow-up pressure.
+- Extended storage mutation guard transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended storage mutation guard witness-authority transition-admission replay, guard authorization admission witness replay, and storage mutation guard evaluation with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched storage mutation guard transition-admission witness authority-transition admission history.
+- Added migration `0129_agent_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused storage mutation guard tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, guard witness replay refusal, and forged valid-looking protected-mutation refusal.
+- Claim boundary: v212 closes storage mutation guard nested witness-authority transition-history accountability, but tombstone/witness-ledger/proof-record/authority-topology/signature-verifier/finalizer equivalents, bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, separation-of-duty proof objects, runtime storage-guard adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state pruning-policy nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v211-operational-state-pruning-policy-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ158 and replacing it with SQ159/SQ168 follow-up pressure.
+- Extended pruning-policy transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended pruning-policy witness-authority transition-admission replay, pruning-policy admission witness replay, pruning-policy admission evaluation, and blocking action review with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched pruning-policy transition-admission witness authority-transition admission history.
+- Added migration `0128_agent_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused pruning-policy tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, pruning-policy witness replay refusal, and forged valid-looking admission refusal.
+- Claim boundary: v211 closes pruning-policy nested witness-authority transition-history accountability, but guard/tombstone/witness-ledger/proof-record/authority-topology/signature-verifier/finalizer equivalents, bootstrap/root authority, root-of-authority recursion, privacy-preserving policy-proof objects, runtime policy-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state history-root settlement nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v210-operational-state-history-root-settlement-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ157 and replacing it with SQ158/SQ167 follow-up pressure.
+- Extended history-root settlement transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended history-root settlement witness-authority transition-admission replay, root-settlement replay, recovery transparency evaluation, and blocking action review with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched history-root settlement transition-admission witness authority-transition admission history.
+- Added migration `0127_agent_state_history_root_settlement_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused history-root settlement tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, root-settlement replay refusal, and forged valid-looking recovery transparency refusal.
+- Claim boundary: v210 closes history-root settlement nested witness-authority transition-history accountability, but pruning/guard/tombstone/witness-ledger/proof-record/authority-topology/signature-verifier/finalizer equivalents, bootstrap/root authority, root-of-authority recursion, runtime history-root settlement-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state recovery-cut nested witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v209-operational-state-recovery-cut-admission-witness-authority-transition-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ156 and replacing it with SQ157/SQ166 follow-up pressure.
+- Extended recovery-cut transition-admission witness replay with nested `witnessAuthorityTransitionAdmissionReplay` support so the witness topology used by nested certificates must replay from admitted authority-transition history.
+- Extended recovery-cut witness-authority transition-admission replay, recovery-cut admission witness replay, recovery-cut admission evaluation, and blocking action review with strict nested authority-transition admission requirements.
+- Added issue codes and replay checks for missing, invalid, and topology-mismatched recovery-cut transition-admission witness authority-transition admission history.
+- Added migration `0126_agent_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql` with append-only nested transition-admission witness authority-transition admission rows.
+- Extended focused recovery-cut tests for valid admitted nested topology history, missing nested history, mismatched nested replay, parent replay refusal, recovery-cut witness replay refusal, and forged valid-looking replay refusal.
+- Claim boundary: v209 closes recovery-cut nested witness-authority transition-history accountability, but history-root/pruning/guard/tombstone/witness-ledger/proof-record/authority-topology/signature-verifier/finalizer equivalents, bootstrap/root authority, runtime recovery-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state finalizer transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v208-operational-state-authority-epoch-seal-finalizer-proof-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ155 with topology-bound finalizer-proof transition-admission witness certificates and replacing it with SQ156/SQ165 follow-up pressure.
+- Extended finalizer-proof transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended finalizer-proof witness-authority transition-admission replay, finalizer-proof admission witness replay, and authority epoch seal finalizer evaluation with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0125_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v208 closes finalizer transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime finalizer/seal-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state signature-verifier transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v207-operational-state-signature-verifier-proof-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ154 with topology-bound signature-verifier proof transition-admission witness certificates and replacing it with SQ155/SQ164 follow-up pressure.
+- Extended signature-verifier proof transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended signature-verifier proof witness-authority transition-admission replay, proof admission witness replay, and signature-verifier proof evaluation with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0124_agent_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v207 closes signature-verifier transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime verifier-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-topology transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v206-operational-state-authority-topology-checkpoint-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ153 with topology-bound authority-topology checkpoint transition-admission witness certificates and replacing it with SQ154/SQ163 follow-up pressure.
+- Extended authority-topology checkpoint transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended authority-topology checkpoint witness-authority transition-admission replay, checkpoint admission witness replay, and authority-topology compaction evaluation with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0123_agent_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v206 closes authority-topology transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime authority-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state proof-record transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v205-operational-state-proof-record-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ152 with topology-bound proof-record transition-admission witness certificates and replacing it with SQ153/SQ162 follow-up pressure.
+- Extended proof-record transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended proof-record witness-authority transition-admission replay, proof-record admission witness replay, and strict quorum-certificate proof replay with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0122_agent_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v205 closes proof-record transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime proof-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state witness-ledger transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v204-operational-state-witness-ledger-checkpoint-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ151 with topology-bound witness-ledger checkpoint transition-admission witness certificates and replacing it with SQ152/SQ161 follow-up pressure.
+- Extended witness-ledger checkpoint transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended witness-ledger checkpoint witness-authority transition-admission replay, checkpoint admission witness replay, and witness-ledger compaction evaluation with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0121_agent_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v204 closes witness-ledger transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime witness-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state tombstone-history transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v203-operational-state-tombstone-history-checkpoint-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ150 with topology-bound tombstone-history checkpoint transition-admission witness certificates and replacing it with SQ151/SQ160 follow-up pressure.
+- Extended tombstone-history checkpoint transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended tombstone-history checkpoint witness-authority transition-admission replay, checkpoint admission witness replay, and tombstone-history compaction evaluation with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0120_agent_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v203 closes tombstone-history transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime tombstone-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state storage mutation guard transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v202-operational-state-storage-mutation-guard-authorization-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ149 with topology-bound storage mutation guard transition-admission witness certificates and replacing it with SQ150/SQ159 follow-up pressure.
+- Extended storage mutation guard transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended storage mutation guard witness-authority transition-admission replay, storage mutation guard authorization admission witness replay, and storage mutation guard evaluation with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0119_agent_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v202 closes storage mutation guard transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime guard-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state pruning-policy transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v201-operational-state-pruning-policy-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ148 with topology-bound pruning-policy transition-admission witness certificates and replacing it with SQ149/SQ158 follow-up pressure.
+- Extended pruning-policy transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended pruning-policy witness-authority transition-admission replay, pruning-policy admission witness replay, pruning-policy admission evaluation, and blocking action review with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0118_agent_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v201 closes pruning-policy transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime policy-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state history-root settlement transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v200-operational-state-history-root-settlement-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ147 with topology-bound history-root settlement transition-admission witness certificates and replacing it with SQ148/SQ157 follow-up pressure.
+- Extended history-root settlement transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended history-root settlement authority-transition admission replay, root settlement replay, recovery transparency evaluation, and blocking action review with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0117_agent_state_history_root_settlement_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v200 closes history-root settlement transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime transparency-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state recovery-cut transition-admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v199-operational-state-recovery-cut-admission-witness-authority-transition-admission-witness-authority-topology-2026-06-27.md`, closing SQ146 with topology-bound recovery-cut transition-admission witness certificates and replacing it with SQ147/SQ156 follow-up pressure.
+- Extended recovery-cut transition-admission witness replay with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology` so nested witness certificates bind to a replayed topology.
+- Extended recovery-cut witness-authority transition-admission replay, recovery-cut witness replay, recovery-cut admission evaluation, and blocking action review with strict nested witness-authority-topology requirements.
+- Added issue codes and replay checks for missing/tampered/mismatched nested topology, certificate/topology mismatch, duplicate witnesses, unknown witnesses, inactive witnesses, and nested topology quorum failure.
+- Added migration `0116_agent_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transitions.sql` with append-only transition-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound nested certificates, missing topology, certificate-local witness rows, unknown witnesses, duplicate witnesses, suspended witnesses, and wrong topology hash refusal.
+- Claim boundary: v199 closes recovery-cut transition-admission witness certificate authority topology, but nested witness-authority transition admission, nested witness signatures/key-status/finality, genesis/bootstrap authority, runtime recovery-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state finalizer-proof admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v198-operational-state-finalizer-proof-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ145 with witnessed finalizer-proof admission witness authority-transition admission records and replacing it with SQ146/SQ155 follow-up pressure.
+- Added `OperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so finalizer-proof admission witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for finalizer-proof admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecords()` and `evaluateOperationalStateAuthorityEpochSealFinalizer()` with transition-admission witness strictness.
+- Added migration `0115_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v198 closes finalizer-proof admission witness-authority transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime finalizer/seal-store adoption, compaction/currentness, live finalizer/KMS adoption, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state signature-verifier proof admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v197-operational-state-signature-verifier-proof-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ144 with witnessed signature-verifier proof admission witness authority-transition admission records and replacing it with SQ145/SQ154 follow-up pressure.
+- Added `OperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so signature-verifier proof admission witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for signature-verifier proof admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecords()` and `evaluateOperationalStateSignatureVerifierAdapterProof()` with transition-admission witness strictness.
+- Added migration `0114_agent_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v197 closes signature-verifier proof admission witness-authority transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime verifier-store adoption, compaction/currentness, live verifier adapter/KMS adoption, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-topology checkpoint admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v196-operational-state-authority-topology-checkpoint-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ143 with witnessed authority-topology checkpoint admission witness authority-transition admission records and replacing it with SQ144/SQ153 follow-up pressure.
+- Added `OperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so checkpoint-admission witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for authority-topology checkpoint admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecords()` and `evaluateOperationalStateAuthorityTopologyCompaction()` with transition-admission witness strictness.
+- Added migration `0113_agent_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v196 closes authority-topology checkpoint witness-authority transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime authority-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state proof-record admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v195-operational-state-proof-record-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ142 with witnessed proof-record admission witness authority-transition admission records and replacing it with SQ143/SQ152 follow-up pressure.
+- Added `OperationalStateQuorumCertificateProofRecordAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so proof-record admission witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for proof-record admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateQuorumCertificateProofRecordAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateQuorumCertificateProofRecordAdmissionWitnessRecords()` and `replayOperationalStateQuorumCertificateProofRecords()` with transition-admission witness strictness.
+- Added migration `0112_agent_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v195 closes proof-record admission witness-authority transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime proof-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state witness-ledger checkpoint admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v194-operational-state-witness-ledger-checkpoint-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ141 with witnessed witness-ledger checkpoint admission witness authority-transition admission records and replacing it with SQ142/SQ151 follow-up pressure.
+- Added `OperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so checkpoint-admission witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for witness-ledger checkpoint admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessRecords()` and `evaluateOperationalStateWitnessLedgerCompaction()` with transition-admission witness strictness.
+- Added migration `0111_agent_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v194 closes witness-ledger checkpoint witness-authority transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime witness-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state tombstone-history checkpoint admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v193-operational-state-tombstone-history-checkpoint-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ140 with witnessed tombstone-history checkpoint admission witness authority-transition admission records and replacing it with SQ141/SQ150 follow-up pressure.
+- Added `OperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so checkpoint-admission witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for tombstone-history checkpoint admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessRecords()` and `evaluateOperationalStateTombstoneHistoryCompaction()` with transition-admission witness strictness.
+- Added migration `0110_agent_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v193 closes tombstone-history checkpoint witness-authority transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime tombstone-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state storage mutation guard authorization admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v192-operational-state-storage-mutation-guard-authorization-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ139 with witnessed storage mutation guard authorization admission witness authority-transition admission records and replacing it with SQ140/SQ149 follow-up pressure.
+- Added `OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so guard-admission witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for storage mutation guard authorization admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecords()` and `evaluateOperationalStateStorageMutationGuard()` with transition-admission witness strictness.
+- Added migration `0109_agent_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v192 closes storage mutation guard transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime database-trigger adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state pruning-policy admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v191-operational-state-pruning-policy-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ138 with witnessed pruning-policy admission witness authority-transition admission records and replacing it with SQ139/SQ148 follow-up pressure.
+- Added `OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so pruning-policy witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for pruning-policy admission witness authority-transition admission witness records.
+- Extended `replayOperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStatePruningPolicyAdmissionWitnessRecords()`, `evaluateOperationalStatePruningPolicyAdmission()`, and action review with transition-admission witness strictness.
+- Added migration `0108_agent_state_pruning_policy_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, forged valid-looking missing nested witness refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v191 closes pruning-policy transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime policy-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state history-root settlement authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v190-operational-state-history-root-settlement-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ137 with witnessed history-root settlement authority-transition admission records and replacing it with SQ138/SQ147 follow-up pressure.
+- Added `OperationalStateHistoryRootSettlementAuthorityTransitionAdmissionWitnessRecord` and replay types so settlement-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for history-root settlement authority-transition admission witness records.
+- Extended `replayOperationalStateHistoryRootSettlementAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateHistoryRootSettlementRecords()`, `evaluateOperationalStateRecoveryCutTransparency()`, and action review with transition-admission witness strictness.
+- Added migration `0107_agent_state_history_root_settlement_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v190 closes history-root settlement transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime transparency-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state recovery-cut admission witness authority-transition admission witness records
+
+- Added `research/daily-arrowsmith-agent-state/v189-operational-state-recovery-cut-admission-witness-authority-transition-admission-witness-records-2026-06-27.md`, closing SQ136 with witnessed recovery-cut admission witness authority-transition admission records and replacing it with SQ137/SQ146 follow-up pressure.
+- Added `OperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord` and replay types so recovery-cut witness-authority transition-admission rows can be accounted for by a separate hash-linked witness ledger over exact admission record hashes.
+- Added deterministic hash/build/verify/replay functions for recovery-cut admission witness authority-transition admission witness records.
+- Extended `replayOperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionRecords()` with `admissionWitnessReplay` and `requireAdmissionWitness`.
+- Extended `replayOperationalStateRecoveryCutAdmissionWitnessRecords()`, `evaluateOperationalStateRecoveryCutAdmission()`, and action review with transition-admission witness strictness.
+- Added migration `0106_agent_state_recovery_cut_admission_witness_authority_transition_admission_witness_records.sql` with append-only transition-admission witness rows.
+- Extended focused agent-state tests for valid witnessed transition-admission rows, missing transition-admission witness refusal, missing strict witness layer refusal, and wrong witness certificate subject refusal.
+- Claim boundary: v189 closes recovery-cut transition-admission record accountability, but transition-admission witness authority topology/signature/finality, genesis/bootstrap authority, runtime recovery-store adoption, compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state finalizer-proof admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v188-operational-state-finalizer-proof-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ135 with admitted finalizer-proof admission witness authority-transition history and replacing it with SQ136/SQ145 follow-up pressure.
+- Added `OperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so finalizer-proof admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for finalizer-proof admission witness authority-transition admission records.
+- Extended `replayOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateAuthorityEpochSealFinalizer()` with finalizer-proof admission witness authority transition-admission strictness so seal finality can refuse witness topology that is not backed by admitted authority-transition history.
+- Added migration `0105_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admissions.sql` with append-only finalizer-proof admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v188 closes finalizer-proof admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime seal-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state signature-verifier proof admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v187-operational-state-signature-verifier-proof-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ134 with admitted signature-verifier proof admission witness authority-transition history and replacing it with SQ135/SQ144 follow-up pressure.
+- Added `OperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so verifier proof-admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for signature-verifier proof admission witness authority-transition admission records.
+- Extended `replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateSignatureVerifierAdapterProof()` with proof-admission witness authority transition-admission strictness so operational signature state can refuse witness topology that is not backed by admitted authority-transition history.
+- Added migration `0104_agent_state_signature_verifier_proof_admission_witness_authority_transition_admissions.sql` with append-only verifier proof-admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v187 closes signature-verifier proof admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime verifier-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-topology checkpoint admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v186-operational-state-authority-topology-checkpoint-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ133 with admitted authority-topology checkpoint admission witness authority-transition history and replacing it with SQ134/SQ143 follow-up pressure.
+- Added `OperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so checkpoint-admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for authority-topology checkpoint admission witness authority-transition admission records.
+- Extended `replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateAuthorityTopologyCompaction()` with checkpoint-admission witness authority transition-admission strictness so compacted authority-topology recovery can refuse witness topology that is not backed by admitted authority-transition history.
+- Added migration `0103_agent_state_authority_topology_checkpoint_admission_witness_authority_transition_admissions.sql` with append-only checkpoint-admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v186 closes authority-topology checkpoint admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime authority-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state proof-record admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v185-operational-state-proof-record-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ132 with admitted proof-record admission witness authority-transition history and replacing it with SQ133/SQ142 follow-up pressure.
+- Added `OperationalStateQuorumCertificateProofRecordAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so proof-record admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for proof-record admission witness authority-transition admission records.
+- Extended `replayOperationalStateQuorumCertificateProofRecordAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `replayOperationalStateQuorumCertificateProofRecords()` with proof-record admission witness authority transition-admission strictness so recovered certified currentness can refuse witness topology that is not backed by admitted authority-transition history.
+- Added migration `0102_agent_state_quorum_certificate_proof_record_admission_witness_authority_transition_admissions.sql` with append-only proof-record admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v185 closes proof-record admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime proof-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state witness-ledger checkpoint admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v184-operational-state-witness-ledger-checkpoint-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ131 with admitted witness-ledger checkpoint admission witness authority-transition history and replacing it with SQ132/SQ141 follow-up pressure.
+- Added `OperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so checkpoint-admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for witness-ledger checkpoint admission witness authority-transition admission records.
+- Extended `replayOperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateWitnessLedgerCompaction()` with checkpoint-admission witness authority transition-admission strictness so compacted witness-ledger recovery can refuse witness topology that is not backed by admitted authority-transition history.
+- Added migration `0101_agent_state_witness_ledger_checkpoint_admission_witness_authority_transition_admissions.sql` with append-only checkpoint-admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v184 closes witness-ledger checkpoint admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime witness-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state tombstone-history checkpoint admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v183-operational-state-tombstone-history-checkpoint-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ130 with admitted tombstone-history checkpoint admission witness authority-transition history and replacing it with SQ131/SQ140 follow-up pressure.
+- Added `OperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so checkpoint-admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for tombstone-history checkpoint admission witness authority-transition admission records.
+- Extended `replayOperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateTombstoneHistoryCompaction()` with checkpoint-admission witness authority transition-admission strictness so compacted recovery can refuse witness topology that is not backed by admitted authority-transition history.
+- Added migration `0100_agent_state_tombstone_history_checkpoint_admission_witness_authority_transition_admissions.sql` with append-only checkpoint-admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v183 closes tombstone-history checkpoint admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime tombstone-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state storage mutation guard admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v182-operational-state-storage-mutation-guard-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ129 with admitted storage mutation guard authorization admission witness authority-transition history and replacing it with SQ130/SQ139 follow-up pressure.
+- Added `OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so guard-admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for storage mutation guard authorization admission witness authority-transition admission records.
+- Extended `replayOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateStorageMutationGuard()` with witness-authority transition-admission strictness so protected mutation can refuse guard-admission witness topology that is not backed by admitted authority-transition history.
+- Added migration `0099_agent_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admissions.sql` with append-only guard-admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v182 closes storage mutation guard authorization admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime database-trigger adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state pruning-policy admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v181-operational-state-pruning-policy-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ128 with admitted pruning-policy admission witness authority-transition history and replacing it with SQ129/SQ138 follow-up pressure.
+- Added `OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so pruning-policy admission witness authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for pruning-policy admission witness authority-transition admission records.
+- Extended `replayOperationalStatePruningPolicyAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStatePruningPolicyAdmission()` and action review with witness-authority transition-admission strictness so recovered state can refuse policy-admission witness topology that is not backed by admitted authority-transition history.
+- Added migration `0098_agent_state_pruning_policy_admission_witness_authority_transition_admissions.sql` with append-only pruning-policy admission witness authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v181 closes pruning-policy admission witness authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime policy-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state history-root settlement authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v180-operational-state-history-root-settlement-authority-transition-admission-2026-06-27.md`, closing SQ127 with admitted history-root settlement authority-transition history and replacing it with SQ128/SQ137 follow-up pressure.
+- Added `OperationalStateHistoryRootSettlementAuthorityTransitionAdmissionRecord` and replay types so history-root settlement authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for history-root settlement authority-transition admission records.
+- Extended `replayOperationalStateHistoryRootSettlementRecords()` with `settlementAuthorityTransitionAdmissionReplay` and `requireSettlementAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateRecoveryCutTransparency()` and action review with root-settlement authority transition-admission strictness so recovered state can refuse settlement topology that is not backed by admitted authority-transition history.
+- Added migration `0097_agent_state_history_root_settlement_authority_transition_admissions.sql` with append-only history-root settlement authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v180 closes history-root settlement authority-transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime transparency-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state recovery-cut admission witness authority-transition admission
+
+- Added `research/daily-arrowsmith-agent-state/v179-operational-state-recovery-cut-admission-witness-authority-transition-admission-2026-06-27.md`, closing SQ126 with admitted recovery-cut admission witness authority-transition history and replacing it with SQ127/SQ136 follow-up pressure.
+- Added `OperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionRecord` and replay types so recovery-cut witness-authority topology can be recovered from admitted transition history instead of supplied from memory or adapters.
+- Added deterministic hash/build/verify/replay functions for recovery-cut admission witness authority-transition admission records.
+- Extended `replayOperationalStateRecoveryCutAdmissionWitnessRecords()` with `witnessAuthorityTransitionAdmissionReplay` and `requireWitnessAuthorityTransitionAdmission`.
+- Extended `evaluateOperationalStateRecoveryCutAdmission()` and action review with transition-admission strictness so recovered state can refuse witness topology that is not backed by admitted authority-transition history.
+- Added migration `0096_agent_state_recovery_cut_admission_witness_authority_transition_admissions.sql` with append-only recovery-cut witness-authority transition-admission rows.
+- Extended focused agent-state tests for valid transition-admitted topology, missing transition-admission refusal, missing latest transition refusal, unknown prior witness refusal, duplicate prior witness refusal, and wrong prior topology refusal.
+- Claim boundary: v179 closes recovery-cut witness-authority transition accountability after bootstrap, but genesis/bootstrap authority, transition-admission witnessing/finality, signature/key status, runtime recovery-store adoption, authority compaction/currentness, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state finalizer-proof admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v178-operational-state-finalizer-proof-admission-witness-authority-topology-2026-06-27.md`, closing SQ125 with replayed authority epoch seal finalizer-proof admission witness authority topology and replacing it with SQ126/SQ135 follow-up pressure.
+- Extended `OperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecords()` so finalizer-proof admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed finalizer-proof admission witness authority topology.
+- Extended `evaluateOperationalStateAuthorityEpochSealFinalizer()` with `requireFinalizerProofAdmissionWitnessAuthorityTopology` so strict seal finality refuses finalizer-proof admission witness certificates that are not topology-accountable.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0095_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions.sql` with append-only finalizer-proof admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound finalizer-proof admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v178 closes finalizer-proof admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime seal-store adoption, authority compaction, live KMS/HSM finalizer adapters, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state signature-verifier proof admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v177-operational-state-signature-verifier-proof-admission-witness-authority-topology-2026-06-27.md`, closing SQ124 with replayed signature-verifier proof admission witness authority topology and replacing it with SQ125/SQ134 follow-up pressure.
+- Extended `OperationalStateSignatureVerifierAdapterProofAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecords()` so verifier proof-admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed proof-admission witness authority topology.
+- Extended `evaluateOperationalStateSignatureVerifierAdapterProof()` with `requireProofAdmissionWitnessAuthorityTopology` so strict operational signature state refuses verifier proof-admission witness certificates that are not topology-accountable.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0094_agent_state_signature_verifier_proof_admission_witness_authority_transitions.sql` with append-only signature-verifier proof admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound verifier proof-admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v177 closes signature-verifier proof admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime verifier-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state authority-topology checkpoint admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v176-operational-state-authority-topology-checkpoint-admission-witness-authority-topology-2026-06-27.md`, closing SQ123 with replayed authority-topology checkpoint admission witness authority topology and replacing it with SQ124/SQ133 follow-up pressure.
+- Extended `OperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecords()` so topology checkpoint-admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed checkpoint-admission witness authority topology.
+- Extended `evaluateOperationalStateAuthorityTopologyCompaction()` with `requireCheckpointAdmissionWitnessAuthorityTopology` so strict compacted topology recovery refuses witness certificates that are not topology-accountable.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0093_agent_state_authority_topology_checkpoint_admission_witness_authority_transitions.sql` with append-only authority-topology checkpoint admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound authority-topology checkpoint admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v176 closes authority-topology checkpoint admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime authority-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state proof-record admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v175-operational-state-proof-record-admission-witness-authority-topology-2026-06-27.md`, closing SQ122 with replayed proof-record admission witness authority topology and replacing it with SQ123/SQ132 follow-up pressure.
+- Extended `OperationalStateQuorumCertificateProofRecordAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateQuorumCertificateProofRecordAdmissionWitnessRecords()` so proof-record admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed proof-admission witness authority topology.
+- Extended `replayOperationalStateQuorumCertificateProofRecords()` with `requireProofRecordAdmissionWitnessAuthorityTopology` so strict recovered certified currentness refuses witness certificates that are not topology-accountable.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0092_agent_state_quorum_certificate_proof_record_admission_witness_authority_transitions.sql` with append-only proof-record admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound proof-record admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v175 closes proof-record admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime proof-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state witness-ledger checkpoint admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v174-operational-state-witness-ledger-checkpoint-admission-witness-authority-topology-2026-06-27.md`, closing SQ121 with replayed witness-ledger checkpoint admission witness authority topology and replacing it with SQ122/SQ131 follow-up pressure.
+- Extended `OperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessRecords()` so checkpoint-admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed checkpoint-admission witness authority topology.
+- Extended `evaluateOperationalStateWitnessLedgerCompaction()` with `requireCheckpointAdmissionWitnessAuthorityTopology` so strict compacted witness-ledger recovery refuses witness certificates that are not topology-accountable.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0091_agent_state_witness_ledger_checkpoint_admission_witness_authority_transitions.sql` with append-only witness-ledger checkpoint admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound checkpoint-admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v174 closes witness-ledger checkpoint admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime witness-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state tombstone-history checkpoint admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v173-operational-state-tombstone-history-checkpoint-admission-witness-authority-topology-2026-06-27.md`, closing SQ120 with replayed tombstone-history checkpoint admission witness authority topology and replacing it with SQ121/SQ130 follow-up pressure.
+- Extended `OperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessRecords()` so checkpoint-admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed checkpoint-admission witness authority topology.
+- Extended `evaluateOperationalStateTombstoneHistoryCompaction()` with `requireCheckpointAdmissionWitnessAuthorityTopology` so strict compacted tombstone-history recovery refuses witness certificates that are not topology-accountable.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0090_agent_state_tombstone_history_checkpoint_admission_witness_authority_transitions.sql` with append-only tombstone-history checkpoint admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound checkpoint-admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v173 closes tombstone-history checkpoint admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime tombstone-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state storage mutation guard authorization admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v172-operational-state-storage-mutation-guard-admission-witness-authority-topology-2026-06-27.md`, closing SQ119 with replayed storage mutation guard authorization admission witness authority topology and replacing it with SQ120/SQ129 follow-up pressure.
+- Extended `OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecords()` so guard-admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed guard-admission witness authority topology.
+- Extended `evaluateOperationalStateStorageMutationGuard()` with `requireAuthorizationAdmissionWitnessAuthorityTopology` so strict protected storage mutation refuses witness certificates that are not topology-accountable.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0089_agent_state_storage_mutation_guard_authorization_admission_witness_authority_transitions.sql` with append-only guard-admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound guard-admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v172 closes storage mutation guard admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, trigger-side certificate verification, runtime pruning-transaction adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state pruning-policy admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v171-operational-state-pruning-policy-admission-witness-authority-topology-2026-06-27.md`, closing SQ118 with replayed pruning-policy admission witness authority topology and replacing it with SQ119/SQ128 follow-up pressure.
+- Extended `OperationalStatePruningPolicyAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStatePruningPolicyAdmissionWitnessRecords()` so policy-admission witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed policy-admission witness authority topology.
+- Extended `evaluateOperationalStatePruningPolicyAdmission()` and `reviewProposedActionAgainstCurrentState()` with strict pruning-policy admission witness authority topology requirements.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0088_agent_state_pruning_policy_admission_witness_authority_transitions.sql` with append-only pruning-policy admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound policy-admission witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v171 closes pruning-policy admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime policy-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state history-root settlement authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v170-operational-state-history-root-settlement-authority-topology-2026-06-27.md`, closing SQ117 with replayed history-root settlement authority topology and replacing it with SQ118/SQ127 follow-up pressure.
+- Extended `OperationalStateHistoryRootSettlementReplayInput` with `settlementAuthorityTopology` and `requireSettlementAuthorityTopology`.
+- Strengthened `replayOperationalStateHistoryRootSettlementRecords()` so settlement certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed settlement authority topology.
+- Extended `evaluateOperationalStateRecoveryCutTransparency()` and `reviewProposedActionAgainstCurrentState()` with strict history-root settlement authority topology requirements.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0087_agent_state_history_root_settlement_authority_transitions.sql` with append-only history-root settlement authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound settlement replay, missing topology refusal, unknown witness refusal, suspended witness refusal, duplicate witness refusal, and topology-mismatch refusal.
+- Claim boundary: v170 closes history-root settlement signer/topology authority, but topology-transition admission/witnessing, settlement witness signature/key status, runtime settlement-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state recovery-cut admission witness authority topology
+
+- Added `research/daily-arrowsmith-agent-state/v169-operational-state-recovery-cut-admission-witness-authority-topology-2026-06-27.md`, closing SQ116 with replayed recovery-cut admission witness authority topology and replacing it with SQ117/SQ126 follow-up pressure.
+- Extended `OperationalStateRecoveryCutAdmissionWitnessReplayInput` with `witnessAuthorityTopology` and `requireWitnessAuthorityTopology`.
+- Strengthened `replayOperationalStateRecoveryCutAdmissionWitnessRecords()` so recovery-cut witness certificates can require topology-hash binding and satisfy quorum only with unique active principals from replayed authority topology.
+- Extended `evaluateOperationalStateRecoveryCutAdmission()` and `reviewProposedActionAgainstCurrentState()` with strict recovery-cut admission witness authority topology requirements.
+- Added issue handling for missing/tampered/mismatched topology, certificate topology mismatch, missing topology quorum thresholds, duplicate witness ids, unknown witnesses, inactive witnesses, and topology-quorum failure.
+- Added migration `0086_agent_state_recovery_cut_admission_witness_authority_transitions.sql` with append-only recovery-cut admission witness authority-transition rows.
+- Extended focused agent-state tests for valid topology-bound recovery-cut witness replay, missing topology refusal, unknown witness refusal, suspended witness refusal, and topology-mismatch refusal.
+- Claim boundary: v169 closes recovery-cut admission witness signer/topology authority, but topology-transition admission/witnessing, witness signature/key status, runtime recovery-store adoption, authority compaction, and live Postgres privilege/restart proof remain open.
+
+## 2026-06-27 - Operational state finalizer-proof admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v168-operational-state-finalizer-proof-admission-witness-accountability-2026-06-27.md`, closing SQ115 with quorum-certified authority epoch seal finalizer-proof admission witness records and replacing it with SQ116/SQ125 follow-up pressure.
+- Added `OperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecord()`, `computeOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecordHash()`, `operationalStateAuthorityEpochSealFinalizerProofAdmissionSubjectId()`, and `replayOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStateAuthorityEpochSealFinalizer()` with `requireFinalizerProofAdmissionWitnessQuorum` so strict seal finality cannot consume self-authored finalizer-proof admission rows.
+- Added migration `0085_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_records.sql` with append-only finalizer-proof admission witness rows and public DML revocation for finalizer-proof admission/witness rows.
+- Extended focused agent-state tests for valid witness-certified finalizer-proof admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v168 closes finalizer-proof admission row accountability, but finalizer-proof admission witness authority topology, witness signatures/key status, runtime seal-store adoption, witness compaction, live KMS/HSM adapters, and live Postgres recovery/privilege tests remain open.
+
+## 2026-06-27 - Operational state signature-verifier proof admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v167-operational-state-signature-verifier-proof-admission-witness-accountability-2026-06-27.md`, closing SQ114 with quorum-certified signature-verifier proof admission witness records and replacing it with SQ115/SQ124 follow-up pressure.
+- Added `OperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecord()`, `computeOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecordHash()`, `operationalStateSignatureVerifierAdapterProofAdmissionSubjectId()`, and `replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStateSignatureVerifierAdapterProof()` with `requireProofAdmissionWitnessQuorum` so strict operational signature state cannot consume self-authored verifier proof-admission rows.
+- Added migration `0084_agent_state_signature_verifier_adapter_proof_admission_witness_records.sql` with append-only verifier proof-admission witness rows and public DML revocation for verifier proof-admission/witness rows.
+- Extended focused agent-state tests for valid witness-certified verifier proof admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v167 closes signature-verifier proof-admission row accountability, but proof-admission witness authority topology, witness signatures/key status, runtime verifier-store adoption, witness compaction, live KMS/HSM adapters, and live Postgres recovery/privilege tests remain open.
+
+## 2026-06-27 - Operational state authority-topology checkpoint admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v166-operational-state-authority-topology-checkpoint-admission-witness-accountability-2026-06-27.md`, closing SQ113 with quorum-certified authority-topology checkpoint admission witness records and replacing it with SQ114/SQ123 follow-up pressure.
+- Added `OperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecord()`, `computeOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecordHash()`, `operationalStateAuthorityTopologyCompactionCheckpointAdmissionSubjectId()`, and `replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStateAuthorityTopologyCompaction()` with `requireCheckpointAdmissionWitnessQuorum` so strict compacted topology recovery cannot consume self-authored authority-topology checkpoint-admission rows.
+- Added migration `0083_agent_state_authority_topology_compaction_checkpoint_admission_witness_records.sql` with append-only topology checkpoint-admission witness rows and public DML revocation for topology checkpoint-admission/witness rows.
+- Extended focused agent-state tests for valid witness-certified authority-topology checkpoint admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v166 closes authority-topology checkpoint-admission row accountability, but checkpoint-admission witness authority topology, witness signatures/key status, runtime authority-store adoption, witness compaction, and live Postgres recovery/privilege tests remain open.
+
+## 2026-06-27 - Operational state proof-record admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v165-operational-state-proof-record-admission-witness-accountability-2026-06-27.md`, closing SQ112 with quorum-certified proof-record admission witness records and replacing it with SQ113/SQ122 follow-up pressure.
+- Added `OperationalStateQuorumCertificateProofRecordAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateQuorumCertificateProofRecordAdmissionWitnessRecord()`, `operationalStateQuorumCertificateProofRecordAdmissionSubjectId()`, and `replayOperationalStateQuorumCertificateProofRecordAdmissionWitnessRecords()`.
+- Extended `replayOperationalStateQuorumCertificateProofRecords()` with `requireProofRecordAdmissionWitnessQuorum` so strict recovered certified currentness cannot consume self-authored proof-record admission rows.
+- Added migration `0082_agent_state_quorum_certificate_proof_record_admission_witness_records.sql` with append-only proof-record admission witness rows and public DML revocation for proof-record admission/witness rows.
+- Extended focused agent-state tests for valid witness-certified proof-record admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v165 closes proof-record admission row accountability, but proof-record admission witness authority topology, witness signatures/key status, runtime proof-store adoption, witness compaction, and live Postgres recovery/privilege tests remain open.
+
+## 2026-06-27 - Operational state witness-ledger checkpoint admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v164-operational-state-witness-ledger-checkpoint-admission-witness-accountability-2026-06-27.md`, closing SQ111 with quorum-certified witness-ledger checkpoint admission witness records and replacing it with SQ112/SQ121 follow-up pressure.
+- Added `OperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessRecord()`, `operationalStateWitnessLedgerCompactionCheckpointAdmissionSubjectId()`, and `replayOperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStateWitnessLedgerCompaction()` with `requireCheckpointAdmissionWitnessQuorum` so strict compacted witness recovery cannot consume self-authored witness-ledger checkpoint-admission rows.
+- Added migration `0081_agent_state_witness_ledger_compaction_checkpoint_admission_witness_records.sql` with append-only checkpoint-admission witness rows and public DML revocation for checkpoint-admission/witness rows.
+- Extended focused agent-state tests for valid witness-certified witness-ledger checkpoint admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v164 closes witness-ledger checkpoint-admission row accountability, but checkpoint-admission witness authority topology, witness signatures/key status, runtime store adoption, witness compaction, and live Postgres recovery/privilege tests remain open.
+
+## 2026-06-27 - Operational state tombstone-history checkpoint admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v163-operational-state-tombstone-history-checkpoint-admission-witness-accountability-2026-06-27.md`, closing SQ110 with quorum-certified tombstone-history checkpoint admission witness records and replacing it with SQ111/SQ120 follow-up pressure.
+- Added `OperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessRecord()`, `operationalStateTombstoneHistoryCompactionCheckpointAdmissionSubjectId()`, and `replayOperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStateTombstoneHistoryCompaction()` with `requireCheckpointAdmissionWitnessQuorum` so strict compacted recovery cannot consume self-authored tombstone-history checkpoint-admission rows.
+- Added migration `0080_agent_state_tombstone_history_compaction_checkpoint_admission_witness_records.sql` with append-only checkpoint-admission witness rows and public DML revocation for checkpoint-admission/witness rows.
+- Extended focused agent-state tests for valid witness-certified checkpoint admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v163 closes tombstone-history checkpoint-admission row accountability, but checkpoint-admission witness authority topology, witness signatures/key status, runtime store adoption, witness compaction, and live Postgres recovery/privilege tests remain open.
+
+## 2026-06-27 - Operational state storage mutation guard authorization admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v162-operational-state-storage-mutation-guard-authorization-admission-witness-accountability-2026-06-27.md`, closing SQ109 with quorum-certified guard-admission witness records and replacing it with SQ110/SQ119 follow-up pressure.
+- Added `OperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecord()`, `operationalStateStorageMutationGuardAuthorizationAdmissionSubjectId()`, and `replayOperationalStateStorageMutationGuardAuthorizationAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStateStorageMutationGuard()` with `requireAuthorizationAdmissionWitnessQuorum` so strict protected UPDATE/DELETE cannot consume self-authored guard-admission rows.
+- Added migration `0079_agent_state_storage_mutation_guard_authorization_admission_witness_records.sql` with append-only guard-admission witness rows, public DML revocation, and a SQL guard trigger that requires the latest admission record to be witnessed.
+- Extended focused agent-state tests for valid witness-certified guard admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v162 closes storage mutation guard-admission row accountability, but guard-admission witness authority topology, witness signatures/key status, trigger-side certificate verification, runtime adoption, and witness compaction remain open.
+
+## 2026-06-27 - Operational state pruning-policy admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v161-operational-state-pruning-policy-admission-witness-accountability-2026-06-27.md`, closing SQ108 with quorum-certified pruning-policy admission witness records and replacing it with SQ109/SQ118 follow-up pressure.
+- Added `OperationalStatePruningPolicyAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStatePruningPolicyAdmissionWitnessRecord()` and `replayOperationalStatePruningPolicyAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStatePruningPolicyAdmission()` and action review with `requirePruningPolicyAdmissionWitnessQuorum` so strict recovered state cannot consume self-authored pruning-policy admission rows.
+- Added migration `0078_agent_state_pruning_policy_admission_witness_records.sql` with append-only policy admission witness rows and public DML revocation for policy admission/witness rows.
+- Extended focused agent-state tests for valid witness-certified policy admission, missing witness replay refusal, wrong-subject certificate refusal, and under-quorum witness refusal.
+- Claim boundary: v161 closes pruning-policy admission row accountability, but policy-admission witness authority topology, runtime policy-store adoption, policy-store head transparency, and witness compaction remain open.
+
+## 2026-06-27 - Operational state history-root settlement records
+
+- Added `research/daily-arrowsmith-agent-state/v160-operational-state-history-root-settlement-records-2026-06-27.md`, closing SQ107 with quorum-certified history-root settlement records and replacing it with SQ108/SQ117 follow-up pressure.
+- Added `OperationalStateHistoryRootSettlementRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic settlement-record hashing plus `buildOperationalStateHistoryRootSettlementRecord()` and `replayOperationalStateHistoryRootSettlementRecords()`.
+- Extended `evaluateOperationalStateRecoveryCutTransparency()` and action review with `requireRecoveryTransparencyRootSettlement` so strict recovered state cannot consume one signed observer's root as settled currentness.
+- Added migration `0077_agent_state_history_root_settlement_records.sql` with append-only root settlement rows and public DML revocation for settlement/signature-proof rows.
+- Extended focused agent-state tests for valid signed-and-settled recovery roots, missing settlement replay refusal, stale settlement refusal, wrong-boundary certificate refusal, and tampered settlement refusal.
+- Claim boundary: v160 closes signed-observation root settlement, but history-root settlement authority topology, recovery-cut admission witness authority topology, live settlement-store adoption, and settlement compaction remain open.
+
+## 2026-06-27 - Operational state recovery-cut admission witness accountability
+
+- Added `research/daily-arrowsmith-agent-state/v159-operational-state-recovery-cut-admission-witness-accountability-2026-06-27.md`, closing SQ106 with quorum-certified recovery-cut admission witness records and replacing it with SQ107/SQ116 follow-up pressure.
+- Added `OperationalStateRecoveryCutAdmissionWitnessRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness-record hashing plus `buildOperationalStateRecoveryCutAdmissionWitnessRecord()` and `replayOperationalStateRecoveryCutAdmissionWitnessRecords()`.
+- Extended `evaluateOperationalStateRecoveryCutAdmission()` and action review with `requireRecoveryCutAdmissionWitnessQuorum` so strict recovered state cannot consume self-authored recovery-cut admission rows.
+- Added migration `0076_agent_state_recovery_cut_admission_witness_records.sql` with append-only recovery-cut admission witness rows and public DML revocation for witness/admission rows.
+- Extended focused agent-state tests for valid witness-certified recovered state, missing witness replay refusal, stale witness refusal, wrong-boundary certificate refusal, and tampered witness refusal.
+- Claim boundary: v159 closes recovery-cut admission accountability, but signed history-root observation quorum/settlement, recovery-cut admission witness authority topology, live witness-store adoption, and admission compaction remain open.
+
+## 2026-06-27 - Operational state authority epoch seal finalizer-proof admissions
+
+- Added `research/daily-arrowsmith-agent-state/v158-operational-state-authority-epoch-seal-finalizer-proof-admissions-2026-06-27.md`, closing SQ105 with quorum-certified finalizer-proof admissions and replacing it with SQ106/SQ115 follow-up pressure.
+- Added `OperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic finalizer-proof admission hashing plus `buildOperationalStateAuthorityEpochSealFinalizerProofAdmissionRecord()` and `replayOperationalStateAuthorityEpochSealFinalizerProofAdmissionRecords()`.
+- Extended `evaluateOperationalStateAuthorityEpochSealFinalizer()` with `requireFinalizerProofAdmission` so strict seal finality cannot consume self-authored authority epoch seal finalizer proof rows.
+- Added optional nested verifier-proof admission pass-through via `requireVerifierProofAdmission` and `verifierProofAdmissionReplay`.
+- Added migration `0075_agent_state_authority_epoch_seal_finalizer_proof_admissions.sql` with append-only finalizer-proof admission rows and public DML revocation for proof/admission rows.
+- Extended focused agent-state tests for valid quorum-admitted finalizer proof replay, missing admission replay refusal, stale proof refusal, wrong-boundary admission refusal, and tampered admission refusal.
+- Claim boundary: v158 closes finalizer-proof admission, but recovery-cut admission accountability, finalizer-proof admission signer/quorum accountability, runtime seal adoption, live KMS/HSM adapters, and admission compaction remain open.
+
+## 2026-06-27 - Operational state signature-verifier proof admissions
+
+- Added `research/daily-arrowsmith-agent-state/v157-operational-state-signature-verifier-proof-admissions-2026-06-27.md`, closing SQ104 with quorum-certified verifier-proof admissions and replacing it with SQ105/SQ114 follow-up pressure.
+- Added `OperationalStateSignatureVerifierAdapterProofAdmissionRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic verifier-proof admission hashing plus `buildOperationalStateSignatureVerifierAdapterProofAdmissionRecord()` and `replayOperationalStateSignatureVerifierAdapterProofAdmissionRecords()`.
+- Extended `evaluateOperationalStateSignatureVerifierAdapterProof()` with `requireProofAdmission` so strict signature state cannot consume self-authored verifier adapter proof rows.
+- Added migration `0074_agent_state_signature_verifier_adapter_proof_admissions.sql` with append-only verifier-proof admission rows and public DML revocation for proof/admission rows.
+- Extended focused agent-state tests for valid quorum-admitted verifier proof replay, missing admission replay refusal, stale proof refusal, wrong-boundary admission refusal, and tampered admission refusal.
+- Claim boundary: v157 closes verifier-proof admission, but finalizer-proof admission, verifier-proof admission signer/quorum accountability, runtime strict-signature adoption, live KMS/HSM adapters, and admission compaction remain open.
+
+## 2026-06-27 - Operational state authority-topology compaction checkpoint admissions
+
+- Added `research/daily-arrowsmith-agent-state/v156-operational-state-authority-topology-compaction-checkpoint-admissions-2026-06-27.md`, closing SQ103 with quorum-certified topology checkpoint admissions and replacing it with SQ104/SQ113 follow-up pressure.
+- Added `OperationalStateAuthorityTopologyCompactionCheckpointAdmissionRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic topology checkpoint-admission hashing plus `buildOperationalStateAuthorityTopologyCompactionCheckpointAdmissionRecord()` and `replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionRecords()`.
+- Extended `evaluateOperationalStateAuthorityTopologyCompaction()` with `requireCheckpointAdmission` so strict compacted topology recovery cannot consume self-authored topology checkpoint replay seeds.
+- Added migration `0073_agent_state_authority_topology_compaction_checkpoint_admissions.sql` with append-only topology checkpoint-admission rows and public DML revocation for checkpoint/admission rows.
+- Extended focused agent-state tests for valid quorum-admitted topology checkpoint replay, missing admission replay refusal, stale checkpoint refusal, wrong-boundary admission refusal, and tampered admission refusal.
+- Claim boundary: v156 closes authority-topology checkpoint admission, but verifier-proof admission, topology checkpoint-admission signer/quorum accountability, runtime authority-store adoption, live Postgres compaction tests, and admission compaction remain open.
+
+## 2026-06-27 - Operational state quorum-certificate proof-record admissions
+
+- Added `research/daily-arrowsmith-agent-state/v155-operational-state-quorum-certificate-proof-record-admissions-2026-06-27.md`, closing SQ102 with quorum-certified proof-record admissions and replacing it with SQ103/SQ112 follow-up pressure.
+- Added `OperationalStateQuorumCertificateProofRecordAdmissionRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic proof-record admission hashing plus `buildOperationalStateQuorumCertificateProofRecordAdmissionRecord()` and `replayOperationalStateQuorumCertificateProofRecordAdmissionRecords()`.
+- Extended `replayOperationalStateQuorumCertificateProofRecords()` with `requireProofRecordAdmission` so strict recovered certified currentness cannot consume self-authored proof-record summaries.
+- Added migration `0072_agent_state_quorum_certificate_proof_record_admissions.sql` with append-only proof-record admission rows and public DML revocation for proof/admission rows.
+- Extended focused agent-state tests for valid admitted proof-record replay, missing admission replay refusal, stale proof-record refusal, wrong-boundary admission refusal, and tampered admission refusal.
+- Claim boundary: v155 closes generic proof-record admission, but authority-topology checkpoint admission, proof-record admission signer/quorum accountability, runtime proof-store adoption, live Postgres proof recovery tests, and admission compaction remain open.
+
+## 2026-06-27 - Operational state witness-ledger compaction checkpoint admissions
+
+- Added `research/daily-arrowsmith-agent-state/v154-operational-state-witness-ledger-compaction-checkpoint-admissions-2026-06-27.md`, closing SQ101 with quorum-certified witness checkpoint admissions and replacing it with SQ102/SQ111 follow-up pressure.
+- Added `OperationalStateWitnessLedgerCompactionCheckpointAdmissionRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic witness checkpoint-admission hashing plus `buildOperationalStateWitnessLedgerCompactionCheckpointAdmissionRecord()` and `replayOperationalStateWitnessLedgerCompactionCheckpointAdmissionRecords()`.
+- Extended `evaluateOperationalStateWitnessLedgerCompaction()` with `requireCheckpointAdmission` so strict compacted witness recovery cannot consume self-authored checkpoint replay seeds.
+- Added migration `0071_agent_state_witness_ledger_compaction_checkpoint_admissions.sql` with append-only witness checkpoint-admission rows and public DML revocation.
+- Extended focused agent-state tests for valid quorum-admitted witness checkpoint replay, missing admission replay refusal, stale checkpoint refusal, wrong-boundary certificate refusal, and tampered admission refusal.
+- Claim boundary: v154 closes witness-ledger checkpoint admission, but generic proof-record authority, witness-checkpoint admission signer/quorum accountability, runtime store adoption, live Postgres compaction tests, and admission compaction remain open.
+
+## 2026-06-27 - Operational state tombstone-history compaction checkpoint admissions
+
+- Added `research/daily-arrowsmith-agent-state/v153-operational-state-tombstone-history-compaction-checkpoint-admissions-2026-06-27.md`, closing SQ100 with quorum-certified checkpoint admissions and replacing it with SQ101/SQ110 follow-up pressure.
+- Added `OperationalStateTombstoneHistoryCompactionCheckpointAdmissionRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic checkpoint-admission hashing plus `buildOperationalStateTombstoneHistoryCompactionCheckpointAdmissionRecord()` and `replayOperationalStateTombstoneHistoryCompactionCheckpointAdmissionRecords()`.
+- Extended `evaluateOperationalStateTombstoneHistoryCompaction()` with `requireCheckpointAdmission` so strict compacted recovery cannot consume self-authored checkpoint replay seeds.
+- Added migration `0070_agent_state_tombstone_history_compaction_checkpoint_admissions.sql` with append-only checkpoint-admission rows and public DML revocation.
+- Extended focused agent-state tests for valid quorum-admitted checkpoint replay, missing admission replay refusal, stale checkpoint refusal, wrong-boundary certificate refusal, and tampered admission refusal.
+- Claim boundary: v153 closes tombstone-history checkpoint admission, but witness-ledger checkpoint authority, generic proof-record authority, checkpoint-admission signer/quorum accountability, runtime store adoption, and live Postgres compaction tests remain open.
+
+## 2026-06-27 - Operational state storage mutation guard authorization admissions
+
+- Added `research/daily-arrowsmith-agent-state/v152-operational-state-storage-mutation-guard-authorization-admissions-2026-06-27.md`, closing SQ99 with replay-current guard authorization admissions and replacing it with SQ100/SQ109 follow-up pressure.
+- Added `OperationalStateStorageMutationGuardAuthorizationAdmissionRecord`, replay, and issue handling in `@pm/agent-state`.
+- Added deterministic guard-authorization admission hashing plus `buildOperationalStateStorageMutationGuardAuthorizationAdmissionRecord()` and `replayOperationalStateStorageMutationGuardAuthorizationAdmissionRecords()`.
+- Extended `evaluateOperationalStateStorageMutationGuard()` with `requireAuthorizationAdmission` so direct/fake authorization rows cannot satisfy strict protected UPDATE/DELETE checks.
+- Added migration `0069_agent_state_storage_mutation_guard_authorization_admissions.sql` with append-only admission rows, public DML revocation for guard authorization/admission tables, and updated trigger enforcement requiring latest admitted authorization.
+- Extended focused agent-state tests for valid admitted authorization replay, direct unadmitted row refusal, stale authorization refusal, wrong-role refusal, and tampered embedded authorization refusal.
+- Claim boundary: v152 closes guard-authorization admission, but guard-admission signer/quorum authority, runtime role deployment, live privilege tests, automatic trigger adoption, and SQ109 guard-admission accountability remain open.
+
+## 2026-06-27 - Operational state pruning policy admission records
+
+- Added `research/daily-arrowsmith-agent-state/v151-operational-state-pruning-policy-admission-records-2026-06-27.md`, closing SQ98 with durable replay-current pruning-policy admission and replacing it with SQ99/SQ108 follow-up pressure.
+- Added `OperationalStatePruningPolicyArtifact`, `OperationalStatePruningPolicyAdmissionRecord`, replay, evaluation, and issue types in `@pm/agent-state`.
+- Added deterministic pruning-policy artifact/admission hashing plus `buildOperationalStatePruningPolicyArtifact()`, `buildOperationalStatePruningPolicyAdmissionRecord()`, `replayOperationalStatePruningPolicyAdmissionRecords()`, and `evaluateOperationalStatePruningPolicyAdmission()`.
+- Added blocking action-review enforcement through `requirePruningPolicyAdmission` so private or superseded compiled policies cannot authorize recovered operational state.
+- Added migration `0068_agent_state_pruning_policy_admission_records.sql` with append-only durable policy admission rows.
+- Extended focused agent-state tests for valid admitted policy replay, missing admission replay refusal, stale superseded policy refusal, same-sequence fork obstruction, and tampered artifact refusal.
+- Claim boundary: v151 closes durable policy currentness, but policy-admission authority, signatures/quorum, runtime policy-store adoption, policy-store head transparency, and SQ108 policy-row accountability remain open.
+
+## 2026-06-27 - Operational state history-root observer signature proofs
+
+- Added `research/daily-arrowsmith-agent-state/v150-operational-state-history-root-observer-signature-proofs-2026-06-27.md`, closing SQ97 with signed/accountable history-root transparency observations and replacing it with SQ98/SQ107 follow-up pressure.
+- Added `OperationalStateHistoryRootObserverSignatureProof`, payload, evaluation, and issue types in `@pm/agent-state`.
+- Added deterministic observer-signature payload/proof hashing plus `computeOperationalStateHistoryRootObserverSignaturePayloadHash()`, `buildOperationalStateHistoryRootObserverSignatureProof()`, and `evaluateOperationalStateHistoryRootObserverSignature()`.
+- Extended `replayOperationalStateHistoryRootObservations()` with signed-observer enforcement so unsigned, unauthorized, stale-key, or verifier-smuggled observations are rejected before they can enter accepted roots.
+- Added strict recovery transparency enforcement through `requireRecoveryTransparencyObserverSignatures`.
+- Added migration `0067_agent_state_history_root_observer_signature_proofs.sql` with append-only durable observer signature proof rows.
+- Extended focused agent-state tests for valid signed observer replay, unsigned strict replay refusal, unsigned replay rejection under strict recovery transparency, unauthorized signed fork not producing split obstruction, and verifier authority-smuggling refusal.
+- Claim boundary: v150 closes observer accountability for history-root transparency, but signed-observation quorum/settlement, runtime observer-topology adoption, live proof loading, and SQ107 signed-observation sufficiency remain open.
+
+## 2026-06-27 - Operational state recovery cut admission records
+
+- Added `research/daily-arrowsmith-agent-state/v149-operational-state-recovery-cut-admission-records-2026-06-27.md`, closing SQ96 with durable recovery-cut admission records and replacing it with SQ97/SQ106 follow-up pressure.
+- Added `OperationalStateRecoveryCutAdmissionRecord`, replay, evaluation, and issue types in `@pm/agent-state`.
+- Added deterministic admission-record hashing plus `buildOperationalStateRecoveryCutAdmissionRecord()`, `replayOperationalStateRecoveryCutAdmissionRecords()`, and `evaluateOperationalStateRecoveryCutAdmission()`.
+- Added blocking action-review enforcement through `requireRecoveryCutAdmission` and warning source `operational_recovery_admission`.
+- Added migration `0066_agent_state_recovery_cut_admission_records.sql` with append-only durable admission rows bound to recovery-cut hash and current-state view identity hash.
+- Extended focused agent-state tests for valid durable admission, missing admission replay refusal, different-cut replay refusal, same-sequence fork obstruction, tampered-record refusal, and stale current-state view identity refusal.
+- Claim boundary: v149 closes generic recovery-cut admission shape, but recovery-cut admission witness/quorum authority, live runtime recovery-store adoption, admission compaction, and SQ106 accountable admission rows remain open.
+
+## 2026-06-27 - Operational state authority epoch seal finalizer proofs
+
+- Added `research/daily-arrowsmith-agent-state/v148-operational-state-authority-epoch-seal-finalizer-proof-2026-06-27.md`, closing SQ95 with replay-current finalizer signatures over exact authority epoch seal payloads and replacing it with SQ96/SQ105 follow-up pressure.
+- Added `OperationalStateAuthorityEpochSealPayload`, `OperationalStateAuthorityEpochSealFinalizerProof`, evaluation, role, and issue types in `@pm/agent-state`.
+- Added deterministic seal-payload/finalizer-proof hashing plus `computeOperationalStateAuthorityEpochSealPayloadHash()`, `buildOperationalStateAuthorityEpochSealFinalizerProof()`, and `evaluateOperationalStateAuthorityEpochSealFinalizer()`.
+- Added migration `0065_agent_state_authority_epoch_seal_finalizer_proofs.sql` with append-only durable proof rows for seal finalizer signatures.
+- Extended focused agent-state tests for valid replay-current finalizer proof acceptance, unsigned-seal refusal, stale/smuggled verifier proof refusal, topology mismatch refusal, tampered seal-payload refusal, and transition-hash drift refusal.
+- Claim boundary: v148 closes generic finalizer attribution for authority epoch seals, but finalizer-proof admission authority, runtime seal adoption, verifier-proof admission, finalizer topology/quorum policy, live KMS/HSM adapters, and SQ105 finalizer-proof admission remain open.
+
+## 2026-06-27 - Operational state signature-verifier adapter proofs
+
+- Added `research/daily-arrowsmith-agent-state/v147-operational-state-signature-verifier-adapter-proof-2026-06-27.md`, closing SQ94 with constrained production verifier-adapter proof replay and replacing it with SQ95/SQ104 follow-up pressure.
+- Added `OperationalStateSignatureKeyBinding`, `OperationalStateSignatureVerifierAdapterProof`, evaluation, result, claim, and issue types in `@pm/agent-state`.
+- Added deterministic key-binding/proof hashing plus `buildOperationalStateSignatureKeyBinding()`, `buildOperationalStateSignatureVerifierAdapterProof()`, and `evaluateOperationalStateSignatureVerifierAdapterProof()`.
+- Added migration `0064_agent_state_signature_verifier_adapter_proofs.sql` with append-only durable proof rows for constrained signature verifier adapters.
+- Extended focused agent-state tests for valid verifier-proof acceptance, adapter currentness/authority claim rejection, inactive-key refusal, key-material mismatch refusal, tampered-proof refusal, and stale-payload refusal.
+- Claim boundary: v147 closes generic production verifier-adapter proof shape, but proof admission authority, verifier registry/currentness, runtime strict-signature adoption, live KMS/HSM adapters, and SQ104 verifier-proof admission remain open.
+
+## 2026-06-27 - Operational state authority-topology compaction
+
+- Added `research/daily-arrowsmith-agent-state/v146-operational-state-authority-topology-compaction-2026-06-27.md`, closing SQ93 with generic authority-topology compaction recovery and replacing it with SQ94/SQ103 follow-up pressure.
+- Added `OperationalStateAuthorityTransitionRecord`, `OperationalStateAuthorityTopology`, `OperationalStateAuthorityTopologyCompactionCheckpoint`, evaluation, and issue types in `@pm/agent-state`.
+- Added deterministic transition/topology/checkpoint hashing plus `buildOperationalStateAuthorityTransitionRecord()`, `operationalStateAuthorityTopologyFromTransition()`, `buildOperationalStateAuthorityTopologyCompactionCheckpoint()`, and `evaluateOperationalStateAuthorityTopologyCompaction()`.
+- Added migration `0063_agent_state_authority_topology_compaction_checkpoints.sql` with append-only durable checkpoint rows for compacted authority topologies.
+- Extended focused agent-state tests for valid checkpoint-plus-retained-authority-suffix topology recovery, missing checkpoint refusal, retained suffix gap refusal, previous-hash refusal, tampered checkpoint refusal, and stale required-topology refusal.
+- Claim boundary: v146 closes generic authority-topology compaction recovery, but checkpoint authority/witness admission, automatic runtime authority-store adoption, live Postgres recovery, production verifier adapters, and SQ103 checkpoint authority remain open.
+
+## 2026-06-27 - Operational state quorum-certificate proof records
+
+- Added `research/daily-arrowsmith-agent-state/v145-operational-state-quorum-certificate-proof-records-2026-06-27.md`, closing SQ92 with generic quorum-certificate proof-record recovery and replacing it with SQ93/SQ102 follow-up pressure.
+- Added `OperationalStateQuorumCertificateProofCertificate`, accepted evidence, authority seal, proof record, replay, and issue types in `@pm/agent-state`.
+- Added deterministic certificate/record hashing plus `buildOperationalStateQuorumCertificateProofCertificate()`, `buildOperationalStateQuorumCertificateProofRecord()`, and `replayOperationalStateQuorumCertificateProofRecords()`.
+- Added migration `0062_agent_state_quorum_certificate_proof_records.sql` with append-only durable proof-record rows for authority-scoped quorum certificates.
+- Extended focused agent-state tests for valid v135-shaped proof-record recovery, uncertified certificate refusal, witness-evidence mismatch refusal, forged-seal refusal, broken-chain refusal, and stale required-certificate refusal.
+- Claim boundary: v145 closes generic quorum-certificate proof-record recovery, but proof-record authority admission, automatic runtime proof-store adoption, proof-record compaction, live Postgres recovery, and SQ93 authority-store compaction remain open.
+
+## 2026-06-27 - Operational state witness-ledger compaction
+
+- Added `research/daily-arrowsmith-agent-state/v144-operational-state-witness-ledger-compaction-2026-06-27.md`, closing SQ91 with generic compacted witness-ledger currentness and replacing it with SQ92/SQ101 follow-up pressure.
+- Added `OperationalStateAdmissibleHead`, `OperationalStateWitnessLedgerRecord`, `OperationalStateWitnessLedgerHead`, `OperationalStateWitnessLedgerCompactionCheckpoint`, evaluation, and issue types in `@pm/agent-state`.
+- Added deterministic record/head/checkpoint hashing plus `buildOperationalStateWitnessLedgerRecord()`, `operationalStateWitnessLedgerHeadFromRecord()`, `buildOperationalStateWitnessLedgerCompactionCheckpoint()`, and `evaluateOperationalStateWitnessLedgerCompaction()`.
+- Added migration `0061_agent_state_witness_ledger_compaction_checkpoints.sql` with append-only durable checkpoint rows for compacted witness ledgers.
+- Extended focused agent-state tests for valid checkpoint-plus-retained-suffix accepted-head recovery, missing checkpoint refusal, retained suffix gap refusal, previous-hash refusal, tampered checkpoint refusal, and stale required-head refusal.
+- Claim boundary: v144 closes generic witness-ledger compaction currentness, but checkpoint authority/witness admission, automatic runtime witness-store adoption, live Postgres recovery, and SQ92 durable quorum-certificate proof records remain open.
+
+## 2026-06-27 - Operational state tombstone-history compaction
+
+- Added `research/daily-arrowsmith-agent-state/v143-operational-state-tombstone-history-compaction-2026-06-27.md`, closing SQ90 with generic compacted tombstone-history currentness and replacing it with SQ91/SQ100 follow-up pressure.
+- Added `OperationalStateTombstoneHistoryRecord`, `OperationalStateTombstoneHistoryStoreHead`, `OperationalStateTombstoneHistoryCompactionCheckpoint`, evaluation, and issue types in `@pm/agent-state`.
+- Added deterministic record/head/checkpoint hashing plus `buildOperationalStateTombstoneHistoryRecord()`, `operationalStateTombstoneHistoryStoreHeadFromRecord()`, `buildOperationalStateTombstoneHistoryCompactionCheckpoint()`, and `evaluateOperationalStateTombstoneHistoryCompaction()`.
+- Added migration `0060_agent_state_tombstone_history_compaction_checkpoints.sql` with append-only durable checkpoint rows for compacted pruning tombstone histories.
+- Extended focused agent-state tests for valid checkpoint-plus-retained-suffix recovery, missing checkpoint refusal, retained suffix gap refusal, previous-hash refusal, tampered checkpoint refusal, and stale required-head refusal.
+- Claim boundary: v143 closes generic tombstone-history compaction currentness, but checkpoint authority/witness admission, automatic runtime tombstone-store adoption, live Postgres recovery, and SQ91 witness-ledger retention remain open.
+
+## 2026-06-27 - Operational state storage mutation guard
+
+- Added `research/daily-arrowsmith-agent-state/v142-operational-state-storage-mutation-guard-2026-06-27.md`, closing SQ89 with a database-bound storage mutation guard and replacing it with SQ90/SQ99 follow-up pressure.
+- Added `OperationalStateStorageMutationGuardSpec`, guard compilation, mutation authorization, and evaluation types in `@pm/agent-state`.
+- Added deterministic guard/authorization hashing, `compileOperationalStateStorageMutationGuard()`, `buildOperationalStateStorageMutationGuardAuthorization()`, and `evaluateOperationalStateStorageMutationGuard()` so protected DELETE/UPDATE operations require tombstone-derived authority.
+- Added migration `0059_agent_state_storage_mutation_guards.sql` with append-only guard authorization rows and a reusable PostgreSQL trigger function for enforcing mutation authorization at the storage boundary.
+- Extended focused agent-state tests for compiled trigger SQL, unsafe identifier rejection, missing authorization blocking, stale authorization blocking, table mismatch blocking, and tampered authorization-hash blocking.
+- Claim boundary: v142 closes generic storage-mutation guard expression, but automatic trigger adoption in all Postgres pruning paths, role-separated/stored-procedure authorization insertion, live Postgres integration, durable policy admission/currentness, and SQ90 tombstone-history compaction remain open.
+
+## 2026-06-27 - Operational state pruning-policy compiler
+
+- Added `research/daily-arrowsmith-agent-state/v141-operational-state-pruning-policy-compiler-2026-06-27.md`, closing SQ88 with a generic pruning-policy compiler and replacing it with SQ89/SQ98 follow-up pressure.
+- Added `OperationalStatePruningPolicyStage`, policy spec, compiled obligation, compilation, and evaluation types in `@pm/agent-state`.
+- Added `OPERATIONAL_STATE_PRUNING_POLICY_REQUIRED_STAGES` and `compileOperationalStatePruningPolicy()` so the canonical transition-history/checkpoint/admission/tombstone/currentness/witness/authority/quorum/seal/recovery ladder compiles into replay-lane obligations.
+- Added `evaluateOperationalStateRecoveryCutAgainstPruningPolicy()` and blocking action-review enforcement through `requirePruningPolicyCompliance`.
+- Extended focused agent-state tests for valid compiled recovery lanes, missing-stage compilation failure, and hash-valid recovery cuts that omit compiled lanes.
+- Claim boundary: v141 closes pure pruning/recovery ladder compilation, but durable policy stores, policy-version currentness, automatic store adoption, runtime/Axis adoption, storage-level SQL guards, and proof-carrying compiler artifacts remain open.
+
+## 2026-06-27 - Operational state history-root transparency
+
+- Added `research/daily-arrowsmith-agent-state/v140-operational-state-history-root-transparency-2026-06-27.md`, closing SQ87 with generic store-root transparency and replacing it with SQ88/SQ97 follow-up pressure.
+- Added `OperationalStateHistoryRoot`, consistency-proof, and root-observation types plus deterministic root/proof/observation hashing in `@pm/agent-state`.
+- Added `replayOperationalStateHistoryRootObservations()` so same-sequence divergent roots become split-history obstructions, root regressions fail, and advances require consistency proof.
+- Added `evaluateOperationalStateRecoveryCutTransparency()` and blocking action-review enforcement through `requireRecoveryTransparency`.
+- Extended focused agent-state tests for valid witnessed recovery-cut store roots, split-history obstruction, missing consistency-proof obstruction, and mismatched or store-id-less lane roots.
+- Claim boundary: v140 closes pure split-history detection for recovery-cut store roots, but durable transparency observation stores, observer signatures/quorum topology, automatic store-root emission, runtime/Axis adoption, storage-level guards, and generic pruning-policy compilation remain open.
+
+## 2026-06-27 - Operational state recovery cut kernel
+
+- Added `research/daily-arrowsmith-agent-state/v139-operational-state-recovery-cut-kernel-2026-06-27.md`, closing SQ86 with a generic recovery-cut kernel and replacing it with SQ87/SQ96 follow-up pressure.
+- Added `OperationalStateRecoveryCut` types, lane-source taxonomy, dependencies, deterministic cut hashing, and recovery-cut evaluation in `@pm/agent-state`.
+- Extended `CurrentStateView` with optional `recoveryCut` and added blocking action-review enforcement through `requireRecoveryCut`.
+- Recovery cuts now reject required private/cached lanes, missing dependencies, stale or mismatched dependency hashes, projection lanes without closure, and tampered cut hashes before recovered state can authorize action.
+- Extended focused agent-state tests for a valid nested target-layer-style recovery cut, private-memory rejection, missing dependency obstruction, and tampered-cut rejection.
+- Claim boundary: v139 closes generic recovery-cut expression and action-review enforcement, but durable recovery-cut admission/witnessing, split-history transparency, runtime/Axis adoption, live Postgres restart proof, storage-level guards, generic pruning-policy compilation, durable target QC proof records, and finalizer signatures remain open.
+
+## 2026-06-27 - History-store head pruning tombstone-store head pruning tombstone-store head witness authority epoch seal
+
+- Added `research/daily-arrowsmith-agent-state/v138-history-store-head-pruning-tombstone-store-head-pruning-tombstone-store-head-witness-authority-epoch-seal-2026-06-27.md`, closing SQ85 with target authority epoch seals and replacing it with SQ86.
+- Added target-layer `seal_authority_epoch` transitions, seal payload fields, `authorityEpochSeals` projection, and retroactive-transition obstruction in `@pm/agent-state`.
+- Preserved the pre-seal `effectiveAuthorityHash` for store-backed quorum certification while allowing `latestAuthorityHash` to advance through the seal transition.
+- Updated migration `0058` so Postgres authority replay persists sealed sequence, sealed topology hash, and sealed quorum certificate hash.
+- Extended focused agent-state tests for valid seal replay, forged-seal rejection, sealed store-backed certification, and post-seal same-epoch key-rotation rejection.
+- Claim boundary: v138 closes target finality for certified v133 required-head authority, but generic recovery, durable target QC proof records, finalizer signatures on seals, production verifier adapters, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, storage-level SQL hardening, generic pruning-policy compilation, and authority-store compaction remain open.
+
+## 2026-06-27 - History-store head pruning tombstone-store head pruning tombstone-store head witness signature key status
+
+- Added `research/daily-arrowsmith-agent-state/v137-history-store-head-pruning-tombstone-store-head-pruning-tombstone-store-head-witness-signature-key-status-2026-06-27.md`, closing SQ84 with target witness key-status replay and replacing it with SQ85.
+- Added v134 witness signatures, v135 authority-transition key metadata, `rotate_signature_key`/`revoke_signature_key` replay, and v137 principal key-currentness projection in `@pm/agent-state`.
+- Extended the store-backed v136 certifier so replayed v135/v137 key status is injected into witness replay before quorum evaluation.
+- Updated migrations `0057` and `0058` so Postgres replay can preserve witness signatures and authority key-transition fields.
+- Extended focused agent-state tests for unsigned witness rejection, stale old-key rejection after rotation, revoked-key rejection, and current rotated-key certification.
+- Claim boundary: v137 closes key-status replay for v134 witness evidence, but epoch seals/finality, durable QC proof records, production verifier adapters, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, storage-level SQL hardening, generic recovery, generic pruning-policy compilation, and authority-store compaction remain open.
+
+## 2026-06-27 - Durable history-store head pruning tombstone-store head pruning tombstone-store head witness authority store
+
+- Added `research/daily-arrowsmith-agent-state/v136-history-store-head-pruning-tombstone-store-head-pruning-tombstone-store-head-witness-authority-store-2026-06-27.md`, closing SQ83 with durable v135 topology authority stores and replacing it with SQ84.
+- Added v136 authority-transition store contracts, in-memory/Postgres stores, append-time topology replay validation, and a store-backed v135 quorum certifier in `@pm/agent-state`.
+- Added migration `0058_agent_state_history_store_head_pruning_tombstone_store_head_pruning_tombstone_store_head_witness_authority.sql` for hash-linked v135 witness-topology authority transitions.
+- Extended focused agent-state tests for recovered store topology, store-backed certification, strict continuity with a store-backed certificate, empty-store obstruction, missing-witness topology rejection, and invalid append rejection.
+- Claim boundary: v136 closes durable topology recovery for the v134 recovered required head, but key-status replay, finality seals, durable QC proof records, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, storage-level SQL hardening, generic recovery, generic pruning-policy compilation, and authority-store compaction remain open.
+
+## 2026-06-27 - History-store head pruning tombstone-store head pruning tombstone-store head witness quorum topology
+
+- Added `research/daily-arrowsmith-agent-state/v135-history-store-head-pruning-tombstone-store-head-pruning-tombstone-store-head-witness-quorum-topology-2026-06-27.md`, closing SQ82 with replayed v134-witness topology and replacing it with SQ83.
+- Added v135 authority-transition types, deterministic authority hashing/replay, eligible witness topology projection, quorum certificate evaluation, and quorum certificate hashing in `@pm/agent-state`.
+- Extended strict history-store-head pruning tombstone-store head witness compaction continuity so callers can require a certified v135 quorum certificate before a recovered v133 required head can authorize pruned recovery.
+- Extended focused agent-state tests for one-witness non-certification, two-witness certification, unauthorized witness rejection, tampered topology rejection, missing/non-certified certificate rejection, and certificate head mismatch.
+- Claim boundary: v135 closes single-observer certification for the v134 recovered required head, but durable topology stores, key-status replay, finality seals, durable QC proof records, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, storage-level SQL hardening, generic recovery, and generic pruning-policy compilation remain open.
+
+## 2026-06-27 - Durable history-store head pruning tombstone-store head pruning tombstone-store head witness ledger
+
+- Added `research/daily-arrowsmith-agent-state/v134-history-store-head-pruning-tombstone-store-head-pruning-tombstone-store-head-witness-ledger-2026-06-27.md`, closing SQ81 with durable required-head recovery and replacing it with SQ82.
+- Added v133 head consistency-proof verification, observation evaluation, witness record hashing/replay, in-memory/Postgres witness ledgers, and a ledger-backed witness facade in `@pm/agent-state`.
+- Added migration `0057_agent_state_history_store_head_pruning_tombstone_store_head_pruning_tombstone_store_head_witness.sql` for hash-linked v133 head witness observations.
+- Extended focused agent-state tests so an amnesiac replay recovers the required head, strict continuity consumes the recovered head, tampered witness records fail replay, and same-sequence forks remain durable obstructions.
+- Claim boundary: v134 recovers the required v133 head from a durable witness ledger, but quorum topology, durable topology stores, key-status replay, finality seals, witness-ledger compaction, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, storage-level SQL hardening, generic recovery, and generic pruning-policy compilation remain open.
+
+## 2026-06-27 - History-store head pruning tombstone-store head pruning tombstone currentness
+
+- Added `research/daily-arrowsmith-agent-state/v133-history-store-head-pruning-tombstone-store-head-pruning-tombstone-currentness-2026-06-27.md`, closing SQ80 with target pruning tombstone-store head currentness and replacing it with SQ81.
+- Added `ProjectionReplayPruningTombstoneHistoryStoreHeadPruningTombstoneStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead`, deterministic head hashing, and record-to-head derivation in `@pm/agent-state`.
+- Extended target pruned-store continuity so callers can require an exact v133 tombstone-store head before replayed v132 tombstone history can authorize pruned target recovery.
+- Continuity now obstructs missing local tombstone history, stale local history, unwitnessed local advances, same-sequence forks, and hash-invalid required heads.
+- Extended focused agent-state tests for the valid required-head path and all SQ80 currentness obstruction cases.
+- Claim boundary: v133 compares local tombstone replay with a required head, but durable witness recovery, quorum certification, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, storage-level SQL hardening, generic recovery, and generic pruning-policy compilation remain open.
+
+## 2026-06-27 - History-store head pruning tombstone-store head pruning tombstone store API
+
+- Added `research/daily-arrowsmith-agent-state/v132-history-store-head-pruning-tombstone-store-head-pruning-tombstone-store-api-2026-06-27.md`, closing SQ79 with target tombstone-gated pruning APIs and replacing it with SQ80.
+- Added target-layer pruning tombstone record types, deterministic tombstone hashing/replay, pruned-store continuity checks, in-memory/Postgres tombstone record stores, and migration `0056_agent_state_history_store_head_pruning_tombstone_store_head_pruning_tombstones.sql`.
+- Added tombstone-gated prune APIs for target history-store-head pruning tombstone-store head witness, authority/key/seal, and quorum-certificate stores.
+- Store pruning now consumes a replay-valid tombstone record before deleting target rows, and retained suffix continuity replays after deletion.
+- Extended focused agent-state tests so forged tombstones cannot prune, valid tombstones delete only admitted prefixes, retained suffixes replay after pruning, and out-of-band retained-suffix truncation obstructs continuity.
+- Claim boundary: v132 makes target row absence replayable, but currentness/witnessing for the v132 tombstone ledger, runtime/Axis adoption, live Postgres restart proof, storage-level SQL hardening, split-history monitoring, generic recovery, and generic pruning-policy compilation remain open.
+
+## 2026-06-27 - History-store head pruning tombstone-store head compaction pruning admission
+
+- Added `research/daily-arrowsmith-agent-state/v131-history-store-head-pruning-tombstone-store-head-compaction-pruning-admission-2026-06-27.md`, closing SQ78 with target compaction pruning admission and replacing it with SQ79.
+- Added target-layer pruning-admission types, deterministic pruning-admission hashing, and `evaluateProjectionReplayPruningTombstoneHistoryStoreHeadPruningTombstoneStoreHeadWitnessReplayCompactionPruningAdmission` in `@pm/agent-state`.
+- Pruning admission now requires the v130 checkpoint admission record to be present in replay-valid durable checkpoint-admission history before deletion intent can be admitted.
+- Pruning admission also replays retained target witness, authority/key/seal, and quorum-certificate proof-record suffixes from the recovered admitted checkpoint frontier.
+- Extended focused agent-state tests so missing durable records, conflicting durable histories, compacted witness records in the retained suffix, compacted authority transitions in the retained suffix, and compacted QC records in the retained suffix all obstruct pruning admission.
+- Claim boundary: v131 admits target prefix deletion intent, but actual tombstone-gated row deletion, pruning-history currentness, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, generic recovery, and generic pruning-policy compilation remain open.
+
+## 2026-06-27 - Durable history-store head pruning tombstone-store head checkpoint-admission store
+
+- Added `research/daily-arrowsmith-agent-state/v130-history-store-head-pruning-tombstone-store-head-durable-checkpoint-admission-store-2026-06-27.md`, closing SQ77 with durable checkpoint-admission records and replacing it with SQ78.
+- Added target-layer checkpoint-admission record types, deterministic record hashing, and replay for history-store-head pruning tombstone-store head replay compaction checkpoints in `@pm/agent-state`.
+- Added in-memory and Postgres-backed checkpoint-admission record stores plus migration `0055_agent_state_history_store_head_pruning_tombstone_store_head_checkpoint_admissions.sql`.
+- Record replay now checks tenant, sequence, previous-record hash, checkpoint hash, admission hash, strict admission re-evaluation, record hash, checkpoint-id conflicts, and compacted-frontier conflicts.
+- Extended focused agent-state tests so compacted replay consumes the checkpoint admission recovered from durable record history, while tampered and conflicting admission records fail replay.
+- Claim boundary: v130 makes target checkpoint authority recoverable from durable replay history, but pruning admission, tombstone-gated deletion, pruning-history currentness, runtime/Axis adoption, live Postgres restart proof, split-history monitoring, and a generic recovery kernel remain open.
+
+## 2026-06-26 - History-store head pruning tombstone-store head proof-preserving compaction
+
+- Added `research/daily-arrowsmith-agent-state/v129-history-store-head-pruning-tombstone-store-head-proof-preserving-compaction-2026-06-26.md`, closing SQ76 with admitted compaction checkpoints and replacing it with SQ77.
+- Added target-layer replay compaction checkpoint and checkpoint-admission primitives for history-store-head pruning tombstone-store head witness, authority/key/seal, and quorum-certificate-record histories in `@pm/agent-state`.
+- Added deterministic checkpoint/admission hashing and strict witness-signed checkpoint admission over the exact checkpoint hash.
+- Target witness replay can now seed expected sequence, previous hash, and accepted heads from an admitted checkpoint; target authority replay can seed topology, principals, key/seal state, and authority hash frontier; target QC-record replay can recover latest certified proof state from an admitted checkpoint.
+- Extended focused agent-state tests to prove suffix-only replay fails, checkpoint-without-admission fails, admitted checkpoint recovery succeeds, authority seal suffix recovery succeeds, QC latest-record recovery succeeds, and tampered checkpoint hashes are rejected.
+- Claim boundary: v129 makes retained suffix replay proof-preserving after prefix compaction for this layer, but durable checkpoint-admission record stores, pruning admission/tombstones, runtime/Axis adoption, live restart proof, and a generic recovery kernel remain open.
+
+## 2026-06-26 - Durable history-store head pruning tombstone-store head quorum-certificate records
+
+- Added `research/daily-arrowsmith-agent-state/v128-history-store-head-pruning-tombstone-store-head-quorum-certificate-record-2026-06-26.md`, closing SQ75 with durable certified-currentness proof records and replacing it with SQ76.
+- Added `ProjectionReplayPruningTombstoneHistoryStoreHeadPruningTombstoneStoreHeadWitnessQuorumCertificateRecord` and witness-evidence types in `@pm/agent-state`.
+- Added deterministic QC proof-record hashing, accepted witness evidence extraction, and record-chain replay.
+- Added in-memory and Postgres-backed proof-record stores that reject append unless the full proof-record chain replays under strict signature/key-status policy.
+- Added migration `0054_agent_state_history_store_head_pruning_tombstone_store_head_witness_quorum_certificates.sql`.
+- Replay now rejects uncertified certificates, certificate-hash mismatches, record-hash mismatches, witness-evidence mismatches, unsigned evidence under strict policy, and forged authority-epoch seal linkage.
+- Extended focused agent-state tests to prove valid proof replay, tampered-evidence rejection, forged-seal rejection, and unsigned-evidence append rejection.
+- Claim boundary: v128 makes certified history-store-head pruning tombstone-store head currentness recoverable from durable proof records, but proof-preserving compaction/pruning, runtime/Axis adoption, live Postgres restart proof, generic nested currentness abstraction, and production crypto adapters remain open.
+
+## 2026-06-26 - History-store head pruning tombstone-store head witness authority epoch seal
+
+- Added `research/daily-arrowsmith-agent-state/v127-history-store-head-pruning-tombstone-store-head-witness-authority-epoch-seal-2026-06-26.md`, closing SQ74 with non-retroactive authority epoch seals for certified required-head currentness and replacing it with SQ75.
+- Added `seal_authority_epoch` transitions to history-store-head pruning tombstone-store head witness authority replay in `@pm/agent-state`.
+- Added seal fields to transition hashing, Postgres persistence, and migration `0053_agent_state_history_store_head_pruning_tombstone_store_head_witness_authority.sql`.
+- Authority replay now projects `effectiveAuthorityHash`, `sealedThroughPruningTombstoneSequence`, and `authorityEpochSeals`, while rejecting forged seals and later topology/key-status transitions effective inside a sealed epoch.
+- Quorum certificates now preserve the effective authority topology hash instead of being rewritten by later seal hash-chain progress.
+- Extended focused agent-state tests to prove valid seal replay, sealed quorum evaluation, forged-seal rejection, and store append rejection for post-seal retroactive key rotation.
+- Claim boundary: v127 prevents later authority/key-status replay from retroactively governing already certified required heads, but durable QC proof records, proof-preserving compaction/pruning, runtime/Axis adoption, live restart proof, and production crypto adapters remain open.
+
+## 2026-06-26 - History-store head pruning tombstone-store head witness signature key status
+
+- Added `research/daily-arrowsmith-agent-state/v126-history-store-head-pruning-tombstone-store-head-witness-signature-key-status-2026-06-26.md`, closing SQ73 with signed v123 witness evidence and v125 key-status replay, then replacing it with SQ74.
+- Added signatures to history-store-head pruning tombstone-store head witness observations, records, replay, and Postgres persistence in `@pm/agent-state`.
+- Added admitted signature-key metadata to v125 authority transitions and Postgres persistence.
+- Added `rotate_signature_key` and `revoke_signature_key` transitions for this layer, with replayed principal key-currentness projection.
+- Store-backed certification now injects replayed v125 topology/key status into strict witness replay and quorum evaluation before witness rows can count.
+- Extended focused agent-state tests to prove unsigned rows fail, old-key rows fail after rotation, revoked-key rows fail, and current rotated-key rows certify.
+- Claim boundary: v126 prevents forged, unsigned, stale-key, revoked-key, wrong-payload, or verifier-rejected v123 witness rows from certifying currentness, but non-retroactive epoch seals, durable QC records, proof-preserving compaction/pruning, runtime/Axis adoption, live restart proof, and production crypto adapters remain open.
+
+## 2026-06-26 - Durable history-store head pruning tombstone-store head witness authority store
+
+- Added `research/daily-arrowsmith-agent-state/v125-history-store-head-pruning-tombstone-store-head-witness-authority-store-2026-06-26.md`, closing SQ72 with durable v124 authority-transition storage and replacing it with SQ73.
+- Added history-store-head pruning tombstone-store head witness authority store contracts in `@pm/agent-state`.
+- Added in-memory and Postgres-backed v124 authority-transition stores with append-time replay validation.
+- Added migration `0053_agent_state_history_store_head_pruning_tombstone_store_head_witness_authority.sql`.
+- Added `StoreBackedProjectionReplayPruningTombstoneHistoryStoreHeadPruningTombstoneStoreHeadWitnessQuorumCertifier`, which derives v124 topology from durable authority history and v123 witness replay before certification.
+- Extended focused agent-state tests to prove empty durable topology cannot certify, tampered stored authority history fails replay, one stored witness cannot satisfy a two-witness quorum, and two stored witnesses can certify.
+- Claim boundary: v125 prevents store-backed certification from depending on in-memory topology arrays, but signature-bound identity, key-status replay, epoch seals, durable QC records, runtime/Axis adoption, live restart proof, and production crypto adapters remain open.
+
+## 2026-06-26 - History-store head pruning tombstone-store head witness quorum topology
+
+- Added `research/daily-arrowsmith-agent-state/v124-history-store-head-pruning-tombstone-store-head-witness-quorum-topology-2026-06-26.md`, closing SQ71 with v123 witness quorum topology and replacing it with SQ72.
+- Added history-store-head pruning tombstone-store head witness authority transition, topology, principal-state, quorum policy, and quorum certificate types in `@pm/agent-state`.
+- Added deterministic authority-transition and quorum-certificate hashing plus topology replay for quorum policy and witness membership.
+- Added quorum evaluation over replayed v123 witness records so only replay-eligible observers accepting the exact head can certify currentness.
+- Extended history-store-head replay compaction pruned-store continuity with optional strict `requiredPruningTombstoneStoreHeadQuorumCertificate` enforcement.
+- Extended focused agent-state tests to prove one observer cannot certify, missing or non-certified certificates fail strict continuity, two admitted observers certify, strict continuity can derive the required head from the certificate, and unauthorized observers cannot count.
+- Claim boundary: v124 prevents a single observer from certifying v123 currentness in strict mode, but durable authority-transition stores, store-backed certification, signature-bound identity, key-status replay, epoch seals, durable QC records, runtime/Axis adoption, live restart proof, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head pruning tombstone-store head witness ledger
+
+- Added `research/daily-arrowsmith-agent-state/v123-pruning-tombstone-history-store-head-pruning-tombstone-store-head-witness-ledger-2026-06-26.md`, closing SQ70 with durable witness-ledger recovery for the v122 required head and replacing it with SQ71.
+- Added history-store-head pruning tombstone-store head witness observation, decision, record, replay, and ledger types in `@pm/agent-state`.
+- Added consistency-proof verification that derives observed v122 heads from replayed v121 pruning tombstone records.
+- Added in-memory and Postgres-backed witness ledgers plus migration `0052_agent_state_history_store_head_pruning_tombstone_store_head_witness.sql`.
+- Added a ledger-backed witness facade so an amnesiac process can recover the latest accepted required head from admitted witness history.
+- Extended focused agent-state tests to prove recovered-head continuity, tampered witness-record rejection, and same-sequence fork obstruction.
+- Claim boundary: v123 recovers the required head from witness replay, but witness authority topology, signature-bound identity, quorum certification, runtime/Axis adoption, live Postgres restart proof, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head pruning tombstone currentness
+
+- Added `research/daily-arrowsmith-agent-state/v122-pruning-tombstone-history-store-head-pruning-tombstone-currentness-2026-06-26.md`, closing SQ69 with history-store-head pruning tombstone currentness and replacing it with SQ70.
+- Added `ProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionPruningTombstoneStoreHead` in `@pm/agent-state`.
+- Added deterministic v121 tombstone-store head hashing and record-to-head derivation.
+- Extended history-store-head replay compaction pruned-store continuity with `requiredPruningTombstoneStoreHead` and a replay-derived `pruningTombstoneStoreHead`.
+- Continuity now rejects missing local tombstone history, stale local history, unwitnessed local advance, same-sequence forked history, and hash-invalid required heads before pruned row absence can authorize projection recovery.
+- Extended focused agent-state tests to prove valid required-head recovery and all currentness obstruction paths.
+- Claim boundary: v122 makes this tombstone ledger currentness-checkable, but durable witness/quorum recovery of the required head, runtime/Axis adoption, live Postgres restart proof, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head pruning tombstone store API
+
+- Added `research/daily-arrowsmith-agent-state/v121-pruning-tombstone-history-store-head-pruning-tombstone-store-api-2026-06-26.md`, closing SQ68 with history-store-head pruning tombstone records and replacing it with SQ69.
+- Added history-store-head replay compaction pruning tombstone record, frontier, replay, continuity, and store types in `@pm/agent-state`.
+- Added deterministic tombstone record hashing and replay over sequence continuity, previous hash, pruning admission binding, checkpoint-admission binding, frontier derivation, frontier regression, and record hash.
+- Added in-memory and Postgres-backed pruning tombstone record stores plus migration `0051_agent_state_projection_replay_pruning_tombstone_history_store_head_pruning_tombstones.sql`.
+- Added tombstone-gated prune APIs for pruning tombstone history-store head witness, authority/key/seal, and quorum-certificate stores.
+- Added pruned-store continuity checks that replay retained suffixes after physical deletion and detect out-of-band retained-suffix truncation.
+- Extended focused agent-state tests to prove admitted record append/replay, tamper rejection, guarded physical pruning, post-prune continuity, and silent truncation detection.
+- Claim boundary: actual row deletion is now replayable for this layer, but currentness/witnessing for the new pruning tombstone ledger, runtime/Axis adoption, live Postgres restart proof, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head compaction pruning admission
+
+- Added `research/daily-arrowsmith-agent-state/v120-pruning-tombstone-history-store-head-compaction-pruning-admission-2026-06-26.md`, closing SQ67 with history-store-head compaction pruning admission and replacing it with SQ68.
+- Added history-store-head replay compaction pruning admission lane, status, issue, and admission types in `@pm/agent-state`.
+- Added deterministic pruning-admission hashing plus pruning admission evaluation that requires replay-valid durable v119 checkpoint-admission record history.
+- Pruning admission now validates retained history-store-head witness, authority/key/seal, and quorum-certificate-record suffixes by replaying each selected lane from the admitted checkpoint frontier.
+- Extended focused agent-state tests to prove admitted pruning plus missing-record, invalid-record-history, invalid-witness-suffix, invalid-authority-suffix, and invalid-quorum-certificate-suffix obstructions.
+- Claim boundary: pure pruning admission now exists for this layer, but tombstone-gated physical pruning APIs, durable pruning tombstone records, pruned-store continuity, runtime/Axis adoption, live Postgres recovery, SQL hardening, and production crypto adapters remain open.
+
+## 2026-06-26 - Durable pruning tombstone history-store head checkpoint admission store
+
+- Added `research/daily-arrowsmith-agent-state/v119-pruning-tombstone-history-store-head-durable-checkpoint-admission-store-2026-06-26.md`, closing SQ66 with durable checkpoint-admission records for pruning tombstone history-store head compaction and replacing it with SQ67.
+- Added `ProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpointAdmissionRecord` types, deterministic record hashing, and record-chain replay in `@pm/agent-state`.
+- Added replay checks for tenant, sequence, previous-record hash, checkpoint hash, admission hash, strict admission re-evaluation, record hash, checkpoint-id conflicts, and compacted-frontier conflicts.
+- Added in-memory and Postgres-backed checkpoint-admission record stores plus migration `0050_agent_state_projection_replay_pruning_tombstone_history_store_head_checkpoint_admissions.sql`.
+- Extended focused agent-state tests so compacted replay consumes the admission certificate recovered from the durable record store, while tampered records and conflicting checkpoint records fail.
+- Claim boundary: v119 makes compacted history-store-head checkpoint authority recoverable from durable replay history, but pruning admission, tombstone-gated physical deletion, runtime/Axis adoption, live Postgres recovery, cross-agent monitoring, and production crypto adapters remain open.
+
+## 2026-06-26 - Pruning tombstone history-store head proof-preserving compaction
+
+- Added `research/daily-arrowsmith-agent-state/v118-pruning-tombstone-history-store-head-proof-preserving-compaction-2026-06-26.md`, closing SQ65 with admitted replay compaction checkpoints for pruning tombstone history-store head recovery and replacing it with SQ66.
+- Added `ProjectionReplayPruningTombstoneHistoryStoreHeadWitnessReplayCompactionCheckpoint` and checkpoint-admission certificate types in `@pm/agent-state`.
+- Added deterministic history-store head checkpoint hashing, checkpoint-admission witness payload hashing, admission hashing, and strict admission replay validation.
+- Extended history-store head witness, authority/key/seal, and quorum-certificate-record replay to seed from a compacted checkpoint only when a witness-signed admission certificate replays as admitted.
+- Extended focused agent-state tests to prove suffix-only replay rejection, missing checkpoint-admission rejection, admitted checkpoint recovery, and tampered checkpoint rejection.
+- Claim boundary: v118 makes retained history-store-head suffix replay depend on admitted checkpoint authority, but durable checkpoint-admission records, pruning/tombstone deletion, runtime/Axis adoption, live restart proof, and production crypto remain open.
+
 ## 2026-06-26 - Pruning tombstone history-store head quorum-certificate record
 
 - Added `research/daily-arrowsmith-agent-state/v117-pruning-tombstone-history-store-head-quorum-certificate-record-2026-06-26.md`, closing SQ64 with durable QC proof records for certified pruning tombstone history-store heads and replacing it with SQ65.
