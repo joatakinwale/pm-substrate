@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@stevie/shared": ["../../packages/shared/src"],
+      "@stevie/shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["src/**/*", "../../packages/shared/src/**/*"]
+}

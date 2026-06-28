@@ -1,0 +1,131 @@
+name: Build Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-backend.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/build-backend.yml'
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        # Keep publishing through the package-owner PAT so the GHCR package
+        # remains in the user scope Coolify already pulls from.
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Compute image prefix
+        run: |
+          owner="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          echo "IMAGE_PREFIX=${{ env.REGISTRY }}/${owner}/stevie" >> "$GITHUB_ENV"
+
+      - name: Generate short SHA
+        id: short-sha
+        run: echo "sha=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-backend:${{ steps.short-sha.outputs.sha }}
+            ${{ env.IMAGE_PREFIX }}-backend:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=Stevie Social backend (FastAPI)
+          platforms: linux/amd64
+
+  deploy:
+    needs: build-backend
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    env:
+      COOLIFY_APP_UUID: ${{ secrets.COOLIFY_APP_UUID_BACKEND }}
+
+    steps:
+      - name: Generate deployment tag
+        id: deploy-tag
+        run: |
+          TAG="${GITHUB_SHA::8}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Deploying version: ${TAG}"
+
+      # Fail-fast pre-flight: confirms COOLIFY_BASE_URL points at the
+      # actual Coolify orchestrator (not a deployment-target host) and
+      # that COOLIFY_APP_UUID_BACKEND is one this token can see. Without
+      # this, the PATCH/GET below silently 404 with {"detail":"Not
+      # Found"} and the workflow turns green on a no-op deploy. Coolify
+      # Cloud's API lives at https://app.coolify.io — the deployment
+      # server's own hostname (e.g. api.testingjoat.work) does NOT
+      # expose this REST API and will always 404 here.
+      - name: Verify Coolify app is reachable
+        run: |
+          curl -ksS --http1.1 --fail-with-body -X GET \
+            "${{ secrets.COOLIFY_BASE_URL }}/api/v1/applications/${{ env.COOLIFY_APP_UUID }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -o /tmp/coolify-app.json \
+            -w "HTTP %{http_code}\n"
+          # Print the app name + status so it's visible in run logs
+          # without dumping the full payload (which can include secrets).
+          jq -r '"app: \(.name // "?")  status: \(.status // "?")"' \
+            /tmp/coolify-app.json || cat /tmp/coolify-app.json
+
+      - name: Update Coolify image tag
+        run: |
+          curl -ksS --http1.1 --fail-with-body -X PATCH \
+            "${{ secrets.COOLIFY_BASE_URL }}/api/v1/applications/${{ env.COOLIFY_APP_UUID }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"docker_registry_image_tag": "${{ steps.deploy-tag.outputs.tag }}"}' \
+            -w "\nHTTP %{http_code}\n"
+
+      - name: Trigger Coolify deployment
+        run: |
+          curl -ksS --http1.1 --fail-with-body -X GET \
+            "${{ secrets.COOLIFY_BASE_URL }}/api/v1/deploy?uuid=${{ env.COOLIFY_APP_UUID }}&force=true" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}" \
+            -w "\nHTTP %{http_code}\n"
+
+  notify:
+    needs: [build-backend, deploy]
+    runs-on: ubuntu-latest
+    if: ${{ always() && github.event_name == 'push' }}
+    steps:
+      - name: Send Mattermost notification
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            STATUS="✅ SUCCESS"
+          else
+            STATUS="❌ FAILED"
+          fi
+
+          MESSAGE="**Backend Deploy ${STATUS}** | Commit: \`${GITHUB_SHA::8}\` | Branch: ${{ github.ref_name }} | Author: ${{ github.actor }}"
+
+          curl -i -X POST "${{ secrets.MATTERMOST_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \"${MESSAGE}\"}" || echo "Notification failed but continuing"

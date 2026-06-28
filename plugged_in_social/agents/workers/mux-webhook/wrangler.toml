@@ -1,0 +1,44 @@
+# Mux Webhook — Cloudflare Worker
+#
+# Mux posts webhook events here directly (HMAC-SHA256 signed). The Worker
+# verifies the signature, validates the event type, and forwards the
+# cleaned payload to FastAPI POST /api/internal/video/events which
+# performs the DB UPDATE under RLS.
+#
+# Why a fetch handler (not a queue): Mux retries non-2xx for ~24h, so
+# wrapping in a queue would be redundant. Mux → Worker → backend
+# internal endpoint, three hops, signature verified at the edge.
+#
+# This Worker also owns the Mux-only path of thumbnail generation —
+# when video.asset.ready arrives we synthesize the Mux image URL inline
+# and pass it through. Mux is the single source of truth for thumbnails.
+
+name = "stevie-mux-webhook"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL set per-env via secrets; never hard-coded.
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-mux-webhook-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-mux-webhook-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+# Secrets to set per-env via `wrangler secret put`:
+#   MUX_WEBHOOK_SIGNING_SECRET — Mux webhook signing secret from the Mux
+#                                dashboard. Used to verify the
+#                                ``Mux-Signature: t=<ts>,v1=<sig>`` header.
+#   WEBHOOK_SECRET             — must match backend's WEBHOOK_SECRET env var
+#   BACKEND_BASE_URL           — e.g. https://api.stevie.social

@@ -1,0 +1,81 @@
+# SSE Pub/Sub — Cloudflare Worker + Durable Object
+#
+# Replaces backend/app/services/realtime.py's Redis pub/sub channel.
+# FastAPI POSTs events to /publish/{org_id} (server-side, X-Webhook-Secret).
+# Browsers GET /subscribe/{org_id} (SSE or WebSocket) to receive them.
+#
+# Each org_id maps to one Durable Object instance (via idFromName(org_id)).
+# That DO holds the active client connections for that org and fans out
+# every published event to them. There is no Redis on either side.
+#
+# Why a Durable Object (not just KV / a queue): pub/sub demands an
+# *online* coordinator that knows which sockets are currently open. KV is
+# eventually consistent and can't push. Queues are pull-style. A DO is the
+# only CF primitive that gives us a single coherent process per org with
+# persistent in-memory connections — exactly what Redis pub/sub gave us.
+
+name = "stevie-sse-pubsub"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL set per-env via secrets; never hard-coded.
+
+# Durable Object class binding. ORG_CHANNEL is a namespace; we look up an
+# instance with env.ORG_CHANNEL.idFromName(org_id) inside the Worker.
+[[durable_objects.bindings]]
+name = "ORG_CHANNEL"
+class_name = "OrgChannel"
+
+# Migration: declares the OrgChannel class as a SQLite-backed DO. We don't
+# actually persist any state today (connections are ephemeral) but new DO
+# classes default to SQLite storage, so we declare it explicitly to keep
+# wrangler from complaining and to leave the door open for cheap state
+# (e.g. last-event-id for resumable streams) without another migration.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OrgChannel"]
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-sse-pubsub-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.durable_objects.bindings]]
+name = "ORG_CHANNEL"
+class_name = "OrgChannel"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["OrgChannel"]
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-sse-pubsub-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[[env.staging.durable_objects.bindings]]
+name = "ORG_CHANNEL"
+class_name = "OrgChannel"
+
+[[env.staging.migrations]]
+tag = "v1"
+new_sqlite_classes = ["OrgChannel"]
+
+# Secrets to set per-env via `wrangler secret put`:
+#   WEBHOOK_SECRET     — must match backend's WEBHOOK_SECRET env var.
+#                        Required on POST /publish/{org_id}.
+#   BACKEND_BASE_URL   — e.g. https://api.stevie.social. Required by the
+#                        shared Worker env guard.
+#   SUPABASE_URL       — e.g. https://<project>.supabase.co. Used to fetch
+#                        JWKS for browser /subscribe JWT verification.
+#   SUPABASE_JWT_SECRET — optional; only needed for legacy HS256 Supabase JWTs.
+#   ALLOWED_ORIGINS    — optional comma-separated browser origins allowed to
+#                        open /subscribe. Unset reflects request Origin after
+#                        JWT auth.

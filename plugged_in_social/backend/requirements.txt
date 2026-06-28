@@ -1,0 +1,52 @@
+# Framework
+fastapi>=0.115.6
+uvicorn[standard]>=0.34.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.36
+alembic>=1.14.1
+asyncpg>=0.30.0
+psycopg[binary]>=3.2.0
+
+# Config
+pydantic>=2.10.4
+pydantic-settings>=2.7.1
+python-dotenv>=1.0.1
+email-validator>=2.2.0
+
+# Auth / Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.2.1
+
+# Cloudflare R2 (S3-compatible)
+boto3>=1.35.86
+
+# Payments (Phase 2)
+stripe>=11.4.1
+
+# Redis — used by slowapi rate limiter (NOT a task broker; Celery
+# was removed in the Cloudflare Queues migration).
+redis>=5.2.1
+
+# Utilities
+httpx>=0.28.1
+python-multipart>=0.0.20
+python-slugify>=8.0.4
+# Signed timed tokens — used for OAuth state + PKCE verifier cookies in
+# app/api/social_oauth.py. Also a transitive dep of Starlette's
+# SessionMiddleware, but we pin it explicitly since we import from it.
+itsdangerous>=2.2.0
+
+# Rate limiting (MED-2)
+slowapi>=0.1.9
+
+# Report generation (Phase 7 — PDF client reports)
+weasyprint>=62.3
+Jinja2>=3.1.4
+
+# AI content generation (Phase 7)
+anthropic>=0.40.0
+
+# Email delivery (Resend — transactional + marketing)
+resend>=2.5.0

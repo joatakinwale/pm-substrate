@@ -1,0 +1,69 @@
+# Automation Runner — Cloudflare Worker
+#
+# Replaces backend/app/tasks/automation_tasks.py::run_automation.
+# Receives a queue message containing {automation_id, trigger_event,
+# trigger_data, org_id}, then POSTs it to the FastAPI internal endpoint
+# /api/internal/automations/{automation_id}/execute. FastAPI runs all 8
+# step types itself (send_email, add_tag, remove_tag, wait, create_task,
+# update_field, send_notification, webhook) under RLS — the Worker is the
+# queue consumer + retry orchestrator only.
+#
+# Why this split: porting all 8 step types to TypeScript is high-risk and
+# the step logic already exists in Python with full DB / model / service
+# access. The Worker just needs to be the queue consumer + ack/retry
+# decision tree, identical in shape to stripe-sync and ai-content.
+#
+# max_retries=3 (lower than the others). Re-running an automation has
+# observable side effects: a second send_email step fires a duplicate
+# email, a second create_task creates a duplicate row, etc. We trade
+# fewer retries for fewer dupes — anything not recovering after 3 tries
+# is more likely a logic bug than a transient blip and belongs in the DLQ.
+
+name = "stevie-automation-runner"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL set per-env via secrets; never hard-coded.
+
+# Queue this Worker consumes from. The producer (FastAPI) sends to the same name.
+[[queues.consumers]]
+queue = "stevie-automation-runner"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-automation-runner-dlq"
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-automation-runner-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.queues.consumers]]
+queue = "stevie-automation-runner-production"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-automation-runner-production-dlq"
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-automation-runner-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[[env.staging.queues.consumers]]
+queue = "stevie-automation-runner-staging"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-automation-runner-staging-dlq"
+
+# Secrets to set per-env via `wrangler secret put`:
+#   WEBHOOK_SECRET      — must match backend's WEBHOOK_SECRET env var
+#   BACKEND_BASE_URL    — e.g. https://api.stevie.social

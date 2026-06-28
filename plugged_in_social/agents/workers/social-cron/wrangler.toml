@@ -1,0 +1,74 @@
+# Social Cron — Cloudflare Worker (scheduled handler)
+#
+# Owns two scheduled jobs:
+#   - publish_scheduled_posts: hourly sweep of due rows, fan-out to
+#     social-publisher Worker via the queue-producer
+#   - refresh_engagement_metrics: half-hourly cross-org metrics pull
+#
+# Two cron triggers in ONE Worker — the per-environment cost is the same and
+# both triggers share a single backend client, so consolidating keeps the
+# infra surface flat. The handler dispatches on ``controller.cron`` to pick
+# which schedule fired.
+#
+# Flow:
+#   - Hourly (0 * * * *):
+#       1. POST /internal/social/scheduled/sweep on FastAPI. Backend flips
+#          due posts from 'scheduled' → 'publishing' and returns the list
+#          of {post_id, org_id} pairs.
+#       2. For each entry, POST a social.post.publish message to the
+#          queue-producer Worker's /enqueue/stevie-social-publisher route.
+#          The social-publisher Worker does the actual platform call.
+#   - Every 30 minutes (*/30 * * * *):
+#       1. POST /internal/social/metrics/refresh on FastAPI. Backend runs
+#          the cross-org sweep in-process (no fanout — one platform API
+#          call per post would just serialize behind rate limiters anyway)
+#          and returns a count summary.
+#
+# Why every 5 minutes for the sweep: hourly (the original CF default we
+# tried) drifted publish-times into the next hour, which is a noticeable
+# user-facing regression. */5 keeps a 5-minute worst case while staying
+# well within Cloudflare's per-Worker cron limits. Drop to */1 if a
+# customer complains about the 5-min window.
+#
+# This Worker is NOT a queue consumer — there's no [[queues.consumers]]
+# block. It's a thin orchestrator over HTTP hops.
+
+name = "stevie-social-cron"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL and QUEUE_PRODUCER_URL set per-env via secrets; never hard-coded.
+
+# Cron Triggers — two schedules sharing one Worker. The handler
+# dispatches on controller.cron to pick the right path.
+[triggers]
+crons = ["*/5 * * * *", "*/30 * * * *"]
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-social-cron-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[env.production.triggers]
+crons = ["*/5 * * * *", "*/30 * * * *"]
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-social-cron-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[env.staging.triggers]
+crons = ["*/5 * * * *", "*/30 * * * *"]
+
+# Secrets to set per-env via `wrangler secret put`:
+#   WEBHOOK_SECRET      — must match backend's WEBHOOK_SECRET env var
+#   BACKEND_BASE_URL    — e.g. https://api.stevie.social
+#   QUEUE_PRODUCER_URL  — base URL of the stevie-queue-producer Worker,
+#                         e.g. https://stevie-queue-producer.workers.dev

@@ -1,0 +1,71 @@
+# Report Builder — Cloudflare Worker
+#
+# Replaces backend/app/tasks/report_tasks.py::generate_report_pdf as a
+# *queue trigger*. WeasyPrint stays on FastAPI — porting the PDF render
+# pipeline to a Cloudflare Browser Rendering or third-party PDF service is
+# its own design tax we deliberately decline. The Worker is a thin queue
+# consumer: validate the message, POST FastAPI's internal render endpoint,
+# ack on success / retry on 5xx.
+#
+# Why a queue (vs FastAPI rendering inline at producer time): a single
+# render takes 5–30s. Doing it in the request handler that just inserted
+# the ClientReport would block the cron sweep and burn a request slot per
+# render. Queue + Worker → the producer returns instantly and renders
+# happen out-of-band with retries owned by CF Queues, not by the producer's
+# request lifecycle.
+#
+# max_batch_size=1 is intentional: each render is slow and CPU-bound on
+# the FastAPI side; processing a 5-message batch in series multiplies the
+# Worker's request lifetime past the default 30s by a comfortable margin.
+# Letting CF Queues fan out one consumer instance per message keeps the
+# fetch timeout headroom honest.
+
+name = "stevie-report-builder"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL set per-env via secrets; never hard-coded.
+
+# Queue this Worker consumes from. The producer (FastAPI via the
+# queue-producer Worker) sends to the same name.
+[[queues.consumers]]
+queue = "stevie-report-builder"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-report-builder-dlq"
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-report-builder-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.queues.consumers]]
+queue = "stevie-report-builder-production"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-report-builder-production-dlq"
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-report-builder-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[[env.staging.queues.consumers]]
+queue = "stevie-report-builder-staging"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-report-builder-staging-dlq"
+
+# Secrets to set per-env via `wrangler secret put`:
+#   WEBHOOK_SECRET      — must match backend's WEBHOOK_SECRET env var
+#   BACKEND_BASE_URL    — e.g. https://api.stevie.social

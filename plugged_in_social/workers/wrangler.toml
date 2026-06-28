@@ -1,0 +1,179 @@
+# ═══════════════════════════════════════════════════════════
+# Stevie Social — Cloudflare Workers Configuration
+# ═══════════════════════════════════════════════════════════
+# Each worker is deployed independently via `wrangler deploy`
+# Workers handle edge tasks that don't need the full FastAPI backend.
+#
+# Architecture:
+#   Browser ←→ Cloudflare Workers ←→ R2 / Images / Stream / Origin
+#
+# This file defines ALL workers. Deploy individually:
+#   cd workers && wrangler deploy --config wrangler.toml --env <worker-name>
+# ═══════════════════════════════════════════════════════════
+
+name = "stevie-workers"
+compatibility_date = "2026-03-01"
+
+# ─────────────────────────────────────────────────────────
+# 1. UPLOAD WORKER — Presigned URL generation & upload proxy
+# ─────────────────────────────────────────────────────────
+# Route: upload.stevie.social/*
+# Purpose:
+#   - Generates presigned R2 upload URLs
+#   - Validates file type/size before upload
+#   - Forwards image uploads to CF Images Direct Upload API
+#   - Forwards video uploads to CF Stream TUS endpoint
+#   - Notifies FastAPI origin after successful upload (webhook)
+#
+# Why a Worker instead of FastAPI?
+#   - Browser uploads go direct to Cloudflare edge (faster)
+#   - No bandwidth through your Coolify VPS
+#   - Workers have native R2 bindings (no boto3 needed)
+
+[env.upload]
+name = "stevie-upload"
+main = "src/upload.ts"
+routes = [{ pattern = "upload.stevie.social/*", zone_name = "stevie.social" }]
+
+[env.upload.vars]
+ORIGIN_URL = "https://api.stevie.social"
+MAX_IMAGE_SIZE = "10485760"    # 10MB
+MAX_VIDEO_SIZE = "524288000"   # 500MB
+ALLOWED_IMAGE_TYPES = "image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+ALLOWED_VIDEO_TYPES = "video/mp4,video/quicktime,video/webm"
+
+[[env.upload.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "stevie-social"
+
+# ─────────────────────────────────────────────────────────
+# 2. CACHE WORKER — Edge caching for public content
+# ─────────────────────────────────────────────────────────
+# Route: stevie.social/* (public pages & blog)
+# Purpose:
+#   - Caches published pages and blog posts at the edge
+#   - Serves stale-while-revalidate for fast TTFB
+#   - Purges cache when Kelsie publishes/edits content
+#   - Adds security headers (CSP, HSTS, etc.)
+#
+# Why a Worker instead of just Cloudflare CDN?
+#   - Custom cache keys per org (multi-tenant)
+#   - Selective purge by slug (not full zone purge)
+#   - ISR-like behavior without Next.js ISR complexity
+
+[env.cache]
+name = "stevie-cache"
+main = "src/cache.ts"
+routes = [{ pattern = "stevie.social/*", zone_name = "stevie.social" }]
+
+[env.cache.vars]
+ORIGIN_URL = "https://api.stevie.social"
+CACHE_TTL_PAGES = "3600"         # 1 hour for pages
+CACHE_TTL_BLOG = "86400"         # 24 hours for published blog posts
+CACHE_TTL_API = "300"            # 5 minutes for API responses
+
+# ─────────────────────────────────────────────────────────
+# 3. WEBHOOK WORKER — Stateless inbound webhook handler
+# ─────────────────────────────────────────────────────────
+# Route: hooks.stevie.social/*
+# Purpose:
+#   - Receives Aurinko booking / calendar / contacts webhooks
+#   - Receives Cloudflare Stream ready/complete webhooks
+#   - Validates webhook signatures
+#   - Transforms payload and forwards to FastAPI origin
+#   - Returns 200 immediately (Workers are fast, no cold start)
+#
+# Why a Worker instead of FastAPI directly?
+#   - Instant response (Aurinko retries on slow responses)
+#   - Signature validation at edge before hitting origin
+#   - Queue webhook payload for async processing
+
+[env.webhooks]
+name = "stevie-webhooks"
+main = "src/webhooks.ts"
+routes = [{ pattern = "hooks.stevie.social/*", zone_name = "stevie.social" }]
+
+[env.webhooks.vars]
+ORIGIN_URL = "https://api.stevie.social"
+# Set the Worker-↔-FastAPI shared secret as an encrypted secret, NOT in
+# vars (which is plaintext):
+#   wrangler secret put WEBHOOK_SECRET --env webhooks
+# The value must match the WEBHOOK_SECRET env var on the FastAPI backend.
+# Separately, third-party signing secrets must also be set as Worker secrets:
+#   wrangler secret put RESEND_WEBHOOK_SECRET --env webhooks   # whsec_... from Resend dashboard
+#   wrangler secret put AURINKO_SIGNING_SECRET --env webhooks  # from Aurinko portal (if/when wired)
+#
+# Provider endpoints (all handled by src/webhooks.ts):
+#   POST hooks.stevie.social/resend   → validates Svix signature, proxies to /internal/webhooks/resend
+#   POST hooks.stevie.social/aurinko  → (pending) validates Aurinko sig, proxies to /internal/webhooks/aurinko
+#                                       Today the FastAPI handler verifies the signature directly.
+#   POST hooks.stevie.social/stream-ready → (pending) validates CF Stream sig, proxies
+
+# ─────────────────────────────────────────────────────────
+# 4. CRON WORKER — Scheduled tasks (optional)
+# ─────────────────────────────────────────────────────────
+# Purpose:
+#   - Runs lightweight scheduled jobs on Cloudflare's edge
+#   - No cron daemon needed on Coolify VPS
+#   - Each trigger hits a specific FastAPI endpoint
+#
+# Jobs:
+#   a) Every 15 min: Check for scheduled blog posts to publish
+#   b) Every hour: Sync Umami analytics into analytics_daily table
+#   c) Daily at 2am: Compute contact engagement scores
+#   d) Daily at 3am: Clean up orphaned media assets (soft-deleted >30 days)
+#   e) Weekly Monday 9am: Generate weekly metrics summary
+#
+# How it works:
+#   Worker's scheduled() handler fires → hits FastAPI /internal/cron/<job>
+#   FastAPI does the actual work against Postgres. The Worker is just the trigger.
+#
+# Why optional?
+#   - You can also run these as Coolify cron jobs or systemd timers
+#   - Workers Cron is nice because: no VPS resource usage, built-in
+#     monitoring in CF dashboard, retries on failure, no infra to manage
+
+[env.cron]
+name = "stevie-cron"
+main = "src/cron.ts"
+
+[env.cron.vars]
+ORIGIN_URL = "https://api.stevie.social"
+# DO NOT put CRON_SECRET here — `vars` is stored in plaintext. Set it
+# as an encrypted Worker secret instead:
+#   wrangler secret put CRON_SECRET --env cron
+# The value must match the CRON_SECRET env var on the FastAPI backend.
+
+[env.cron.triggers]
+crons = [
+    "*/15 * * * *",   # Every 15 min — publish scheduled blog posts
+    "0 * * * *",      # Every hour — sync analytics from Umami
+    "0 2 * * *",      # Daily 2am — recompute engagement scores
+    "0 3 * * *",      # Daily 3am — cleanup orphaned media
+    "0 9 * * 1",      # Monday 9am — weekly metrics digest
+]
+
+# ─────────────────────────────────────────────────────────
+# 5. IMAGE TRANSFORM WORKER — On-the-fly image optimization
+# ─────────────────────────────────────────────────────────
+# Route: media.stevie.social/*
+# Purpose:
+#   - Sits in front of R2 public bucket
+#   - Applies Cloudflare Image Resizing on the fly
+#   - URL pattern: media.stevie.social/<key>?w=800&q=80&f=webp
+#   - Falls back to original if no transform params
+#   - Caches transformed variants at edge
+#
+# Why a Worker instead of just CF Images?
+#   - R2 objects can be transformed without re-uploading to Images
+#   - More flexible URL patterns
+#   - Can add watermarks, blur, etc. per request
+
+[env.image-transform]
+name = "stevie-image-transform"
+main = "src/image-transform.ts"
+routes = [{ pattern = "media.stevie.social/*", zone_name = "stevie.social" }]
+
+[[env.image-transform.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "stevie-social"

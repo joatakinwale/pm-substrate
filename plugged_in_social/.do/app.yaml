@@ -1,0 +1,163 @@
+# ═══════════════════════════════════════════════════════════
+# Stevie Social — DigitalOcean App Platform Specification
+# ═══════════════════════════════════════════════════════════
+# Deploy: doctl apps create --spec .do/app.yaml
+# Update: doctl apps update <app-id> --spec .do/app.yaml
+#
+# Architecture:
+#   frontend (Next.js) → DigitalOcean App Platform (Static/SSR)
+#   backend (FastAPI)  → DigitalOcean App Platform (Service)
+#   database           → Supabase (external managed PostgreSQL)
+#   storage            → Cloudflare R2 (external)
+#   workers            → Cloudflare Workers (external)
+# ═══════════════════════════════════════════════════════════
+
+name: PluggedInSocial
+region: nyc
+
+# ─── Frontend: Next.js 15 ─────────────────────────────────
+services:
+  - name: frontend
+    github:
+      repo: your-org/PluggedInSocial  # Update with actual repo
+      branch: main
+      deploy_on_push: true
+    source_dir: frontend
+    build_command: npm run build
+    run_command: npm start
+    environment_slug: node-js
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    routes:
+      - path: /
+    envs:
+      - key: NEXT_PUBLIC_API_URL
+        value: ${backend.PUBLIC_URL}
+        scope: BUILD_TIME
+      - key: NEXT_PUBLIC_SITE_URL
+        value: ${APP_URL}
+        scope: BUILD_TIME
+      - key: NODE_ENV
+        value: production
+        scope: RUN_AND_BUILD_TIME
+
+  # ─── Backend: FastAPI ──────────────────────────────────
+  - name: backend
+    github:
+      repo: your-org/PluggedInSocial  # Update with actual repo
+      branch: main
+      deploy_on_push: true
+    source_dir: backend
+    dockerfile_path: backend/Dockerfile
+    http_port: 8000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    routes:
+      - path: /api
+        preserve_path_prefix: true
+      # Internal endpoints for Cloudflare Worker → origin traffic
+      # (cron scheduler, webhook forwarder). These are protected by the
+      # shared CRON_SECRET / WEBHOOK_SECRET headers. For defense-in-depth,
+      # restrict /internal/* to Cloudflare egress IPs via Cloudflare
+      # Access rules on the hostname, or put these paths behind a
+      # separate internal-only service in a future iteration.
+      - path: /internal
+        preserve_path_prefix: true
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 10
+      period_seconds: 30
+    envs:
+      - key: APP_ENV
+        value: production
+        scope: RUN_TIME
+      - key: DEBUG
+        value: "false"
+        scope: RUN_TIME
+      # ── Database ──
+      - key: DATABASE_URL
+        value: "${db.DATABASE_URL}"
+        scope: RUN_TIME
+        type: SECRET
+      - key: DATABASE_URL_SYNC
+        type: SECRET
+        scope: RUN_TIME
+      # ── App signing / CORS ──
+      # SECRET_KEY must be >= 32 chars and not the .env.example default
+      # or app startup will hard-fail (see assert_production_safe()).
+      - key: SECRET_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: ALLOWED_ORIGINS
+        value: "${APP_URL}"
+        scope: RUN_TIME
+      # ── Internal-endpoint shared secrets ──
+      # These are independent from SECRET_KEY so a leak of either does
+      # not compromise the other. Rotate individually.
+      # Must match the CRON_SECRET binding on the stevie-cron Worker
+      # and the WEBHOOK_SECRET binding on stevie-webhooks.
+      - key: CRON_SECRET
+        type: SECRET
+        scope: RUN_TIME
+      - key: WEBHOOK_SECRET
+        type: SECRET
+        scope: RUN_TIME
+      # ── Supabase Auth ──
+      - key: SUPABASE_URL
+        type: SECRET
+        scope: RUN_TIME
+      - key: SUPABASE_ANON_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: SUPABASE_JWT_SECRET
+        type: SECRET
+        scope: RUN_TIME
+      # ── Custom JWT fallback (used only when SUPABASE_JWT_SECRET empty) ──
+      - key: JWT_SECRET_KEY
+        type: SECRET
+        scope: RUN_TIME
+      # ── Task queue ──
+      - key: REDIS_URL
+        type: SECRET
+        scope: RUN_TIME
+      # ── Cloudflare (media + edge) ──
+      - key: CF_ACCOUNT_ID
+        type: SECRET
+        scope: RUN_TIME
+      - key: CF_API_TOKEN
+        type: SECRET
+        scope: RUN_TIME
+      - key: R2_ACCESS_KEY_ID
+        type: SECRET
+        scope: RUN_TIME
+      - key: R2_SECRET_ACCESS_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: R2_ENDPOINT
+        type: SECRET
+        scope: RUN_TIME
+      - key: R2_BUCKET_NAME
+        type: SECRET
+        scope: RUN_TIME
+      - key: R2_PUBLIC_URL
+        type: SECRET
+        scope: RUN_TIME
+      # ── Stripe (Phase 2 billing) ──
+      - key: STRIPE_SECRET_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: STRIPE_PUBLISHABLE_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: STRIPE_WEBHOOK_SECRET
+        type: SECRET
+        scope: RUN_TIME
+
+# ─── Alerts ──────────────────────────────────────────────
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED

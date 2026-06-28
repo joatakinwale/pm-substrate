@@ -1,0 +1,66 @@
+# Email Sender — Cloudflare Worker
+#
+# Consumes two message types off the ``stevie-email-sender`` queue:
+#   email.notification   — one-shot transactional send (payment reminders,
+#                          magic-links, onboarding, proposals).
+#   email.campaign.send  — bulk campaign fan-out (one message per recipient
+#                          batch, audience-matched upstream).
+#
+# Both branches send via Resend. The message ``type`` field selects which
+# branch runs.
+#
+# Why one queue (not two): both messages have the same retry profile (Resend
+# rate limits, transient TLS) and the same fan-in target (Resend). Splitting
+# would just double the DLQ surface for no operational gain.
+
+name = "stevie-email-sender"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL set per-env via secrets; never hard-coded.
+
+# Queue this Worker consumes from. The producer (FastAPI) sends to the same name.
+[[queues.consumers]]
+queue = "stevie-email-sender"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "stevie-email-sender-dlq"
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-email-sender-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.queues.consumers]]
+queue = "stevie-email-sender-production"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "stevie-email-sender-production-dlq"
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-email-sender-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[[env.staging.queues.consumers]]
+queue = "stevie-email-sender-staging"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "stevie-email-sender-staging-dlq"
+
+# Secrets to set per-env via `wrangler secret put`:
+#   RESEND_API_KEY      — same key currently in backend/.env
+#   WEBHOOK_SECRET      — must match backend's WEBHOOK_SECRET env var
+#   BACKEND_BASE_URL    — e.g. https://api.stevie.social
+#   RESEND_FROM_EMAIL   — default sender, e.g. "Stevie <hello@stevie.social>"
+#   RESEND_REPLY_TO     — optional default reply-to address

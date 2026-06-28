@@ -1,0 +1,72 @@
+# Social Publisher — Cloudflare Worker
+#
+# Replaces backend/app/tasks/social_tasks.py::publish_post.
+# Receives a queue message containing {post_id, org_id}, then POSTs it to
+# the FastAPI internal endpoint /api/internal/social/posts/{post_id}/publish.
+# FastAPI dispatches to the right platform publisher (Meta/LinkedIn/X/etc),
+# refreshes OAuth tokens if needed, persists the result on the SocialPost
+# row, and logs an Activity entry — all under RLS. The Worker is the queue
+# consumer + retry orchestrator only.
+#
+# Why this split: porting the platform-specific publishers and OAuth
+# refresh logic to TypeScript is high-risk and the publisher code already
+# exists in Python with platform SDKs (Meta Graph, LinkedIn, X, TikTok,
+# YouTube, Pinterest). The Worker just needs to be the queue consumer +
+# ack/retry decision tree, identical in shape to automation-runner.
+#
+# max_retries=3 (lower than stripe-sync's 5). Re-running a publish has
+# observable side effects: a duplicate publish posts the same content
+# twice to the user's social account. We trade fewer retries for fewer
+# dupes — anything not recovering after 3 tries is more likely a logic
+# bug or a hard platform rejection than a transient blip and belongs in
+# the DLQ for operator review.
+
+name = "stevie-social-publisher"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL set per-env via secrets; never hard-coded.
+
+# Queue this Worker consumes from. The producer (FastAPI or social-cron)
+# sends to the same name.
+[[queues.consumers]]
+queue = "stevie-social-publisher"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-social-publisher-dlq"
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-social-publisher-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.queues.consumers]]
+queue = "stevie-social-publisher-production"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-social-publisher-production-dlq"
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-social-publisher-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[[env.staging.queues.consumers]]
+queue = "stevie-social-publisher-staging"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "stevie-social-publisher-staging-dlq"
+
+# Secrets to set per-env via `wrangler secret put`:
+#   WEBHOOK_SECRET      — must match backend's WEBHOOK_SECRET env var
+#   BACKEND_BASE_URL    — e.g. https://api.stevie.social

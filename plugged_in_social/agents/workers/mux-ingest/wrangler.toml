@@ -1,0 +1,68 @@
+# Mux Ingest — Cloudflare Worker
+#
+# Replaces backend/app/tasks/video_tasks.py::ingest_to_mux.
+# Receives a queue message containing {asset_id, r2_key, org_id}, presigns a
+# GET URL on R2, calls Mux's POST /video/v1/assets to create the asset, then
+# POSTs back to FastAPI's internal endpoint to record the new mux_asset_id.
+#
+# Why a queue (not direct API): the public upload endpoint flips the
+# MediaAsset row to ``processing`` and enqueues here, so an upload spike
+# cannot saturate Mux nor block the user-facing request. The downstream
+# ``video.asset.ready`` webhook (handled by stevie-mux-webhook) flips
+# ``processing`` → ``ready`` once Mux has transcoded.
+
+name = "stevie-mux-ingest"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+# BACKEND_BASE_URL set per-env via secrets; never hard-coded.
+
+# Queue this Worker consumes from. Producer (FastAPI) sends to the same name.
+[[queues.consumers]]
+queue = "stevie-mux-ingest"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "stevie-mux-ingest-dlq"
+
+# ── Production env ──────────────────────────────────────────────────
+[env.production]
+name = "stevie-mux-ingest-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.queues.consumers]]
+queue = "stevie-mux-ingest-production"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "stevie-mux-ingest-production-dlq"
+
+# ── Staging env ─────────────────────────────────────────────────────
+[env.staging]
+name = "stevie-mux-ingest-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[[env.staging.queues.consumers]]
+queue = "stevie-mux-ingest-staging"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "stevie-mux-ingest-staging-dlq"
+
+# Secrets to set per-env via `wrangler secret put`:
+#   MUX_TOKEN_ID         — Mux access token id (NOT a secret on its own,
+#                          but stored alongside the secret for symmetry)
+#   MUX_TOKEN_SECRET     — Mux access token secret
+#   WEBHOOK_SECRET       — must match backend's WEBHOOK_SECRET env var
+#   BACKEND_BASE_URL     — e.g. https://api.stevie.social
+#   R2_ACCESS_KEY_ID     — R2 access key for presigning input URLs
+#   R2_SECRET_ACCESS_KEY — R2 secret key
+#   R2_ENDPOINT          — e.g. https://<account-id>.r2.cloudflarestorage.com
+#   R2_BUCKET_NAME       — R2 bucket holding the source video objects

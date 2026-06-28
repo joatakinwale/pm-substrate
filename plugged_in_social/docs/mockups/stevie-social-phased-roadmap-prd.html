@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stevie Social — Phased Development Roadmap PRD</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sg:#089140; --or:#ff5229; --sb:#7ac9e8; --ch:#edff6b; --lv:#d1bff2;
+  --bg:#0b0b10; --card:#131318; --bdr:#232330; --txt:#e2e8f0; --dim:#94a3b8; --mut:#64748b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Plus Jakarta Sans',system-ui,sans-serif; background:var(--bg); color:var(--txt); line-height:1.7; }
+
+/* HEADER */
+.hdr { padding:28px 40px; border-bottom:1px solid var(--bdr); display:flex; justify-content:space-between; align-items:flex-end; }
+.hdr-brand { font-family:'Archivo Black',sans-serif; font-size:22px; letter-spacing:-.5px; }
+.hdr-brand span { color:var(--sg); }
+.hdr-sub { font-size:12px; color:var(--mut); margin-top:4px; }
+.hdr-right { display:flex; gap:10px; align-items:center; }
+.hdr-tag { padding:4px 12px; border:1px solid var(--bdr); border-radius:4px; font-size:10px; font-weight:600; letter-spacing:.3px; color:var(--mut); }
+
+/* NAV */
+.nav { display:flex; gap:0; border-bottom:1px solid var(--bdr); overflow-x:auto; position:sticky; top:0; z-index:99; background:var(--bg); }
+.nav-btn { background:none; border:none; border-bottom:2px solid transparent; padding:14px 20px; font-size:12px; font-weight:500; color:var(--mut); cursor:pointer; white-space:nowrap; font-family:inherit; transition:all .15s; }
+.nav-btn:hover { color:var(--txt); }
+.nav-btn.on { color:var(--sg); border-bottom-color:var(--sg); font-weight:700; }
+
+/* LAYOUT */
+.wrap { max-width:1200px; margin:0 auto; padding:36px 40px; }
+.pnl { display:none; } .pnl.on { display:block; animation:fi .25s ease; }
+@keyframes fi { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+/* TYPO */
+.h1 { font-family:'Archivo Black',sans-serif; font-size:28px; letter-spacing:-.5px; margin-bottom:8px; }
+.h2 { font-family:'Archivo Black',sans-serif; font-size:20px; letter-spacing:-.3px; margin-bottom:6px; margin-top:36px; }
+.h3 { font-family:'Archivo Black',sans-serif; font-size:15px; margin-bottom:10px; margin-top:24px; }
+.sub { color:var(--dim); font-size:13px; margin-bottom:28px; max-width:720px; line-height:1.8; }
+.divider { width:48px; height:3px; background:var(--sg); border-radius:2px; margin-bottom:20px; }
+p { font-size:13px; color:var(--dim); line-height:1.8; margin-bottom:14px; }
+
+/* BADGES */
+.tag { display:inline-block; padding:3px 10px; border-radius:4px; font-size:10px; font-weight:600; letter-spacing:.3px; }
+.tag-green { background:#08914018; color:var(--sg); }
+.tag-orange { background:#ff522918; color:var(--or); }
+.tag-blue { background:#7ac9e818; color:var(--sb); }
+.tag-yellow { background:#edff6b18; color:#b8c920; }
+.tag-purple { background:#d1bff218; color:#a78bfa; }
+.tag-red { background:#ef444418; color:#ef4444; }
+.tag-dim { background:#94a3b818; color:var(--dim); }
+
+/* CARDS */
+.card { background:var(--card); border:1px solid var(--bdr); border-radius:10px; padding:20px; margin-bottom:14px; transition:border-color .2s; }
+.card:hover { border-color:#3a3a4a; }
+
+/* GRIDS */
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+.g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+
+/* TABLES */
+.tbl { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:20px; }
+.tbl th { text-align:left; padding:10px 14px; font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); border-bottom:1px solid var(--bdr); font-weight:600; }
+.tbl td { padding:12px 14px; border-bottom:1px solid #1a1a24; vertical-align:top; color:var(--dim); }
+.tbl tr:hover td { background:#16161e; }
+
+/* TIMELINE */
+.timeline { position:relative; padding-left:28px; margin-top:20px; }
+.timeline::before { content:''; position:absolute; left:8px; top:0; bottom:0; width:2px; background:var(--bdr); }
+.tl-item { position:relative; margin-bottom:28px; }
+.tl-dot { position:absolute; left:-24px; top:4px; width:14px; height:14px; border-radius:50%; border:2px solid var(--bg); }
+.tl-head { font-weight:700; font-size:14px; margin-bottom:4px; }
+.tl-meta { font-size:11px; color:var(--mut); margin-bottom:8px; }
+
+/* PHASE CARDS */
+.phase-card { background:var(--card); border:1px solid var(--bdr); border-radius:12px; overflow:hidden; margin-bottom:20px; }
+.phase-header { padding:18px 22px; border-bottom:1px solid var(--bdr); display:flex; justify-content:space-between; align-items:center; }
+.phase-title { font-family:'Archivo Black',sans-serif; font-size:16px; display:flex; align-items:center; gap:10px; }
+.phase-body { padding:20px 22px; }
+.phase-section { margin-bottom:20px; }
+.phase-section-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--mut); margin-bottom:10px; }
+
+/* CHECKLIST */
+.checklist { list-style:none; padding:0; }
+.checklist li { padding:6px 0; font-size:12px; color:var(--dim); border-bottom:1px solid #1a1a24; display:flex; gap:8px; align-items:flex-start; }
+.checklist li .chk { font-weight:700; flex-shrink:0; width:16px; }
+
+/* DEPENDENCY ARROWS */
+.dep-flow { display:flex; align-items:center; gap:0; margin:16px 0; flex-wrap:wrap; }
+.dep-box { background:var(--card); border:1px solid var(--bdr); border-radius:8px; padding:10px 16px; font-size:11px; font-weight:600; }
+.dep-arrow { color:var(--sg); font-weight:700; font-size:16px; padding:0 8px; }
+
+/* KPI TABLE */
+.kpi-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #1a1a24; font-size:12px; }
+.kpi-label { color:var(--dim); }
+.kpi-target { font-weight:700; }
+
+/* STATUS INDICATOR */
+.status { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:600; }
+.status-dot { width:8px; height:8px; border-radius:50%; }
+
+/* PROGRESS BAR */
+.progress-bar { height:6px; background:#1a1a24; border-radius:3px; overflow:hidden; margin-top:6px; }
+.progress-fill { height:100%; border-radius:3px; }
+
+@media (max-width:900px) { .g2,.g3,.g4 { grid-template-columns:1fr; } .wrap { padding:20px; } }
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <div class="hdr-brand">stevie <span>social</span></div>
+    <div class="hdr-sub">Phased Development Roadmap PRD — JOAT Labs + Stevie Social</div>
+  </div>
+  <div class="hdr-right">
+    <span class="hdr-tag">PRD v1.0</span>
+    <span class="hdr-tag">April 2026</span>
+  </div>
+</div>
+
+<div class="nav" id="nav"></div>
+<div class="wrap" id="wrap"></div>
+
+<script>
+const C = { sg:'#089140', or:'#ff5229', sb:'#7ac9e8', ch:'#edff6b', lv:'#d1bff2' };
+const tag = (c,t) => `<span class="tag" style="background:${c}18;color:${c}">${t}</span>`;
+
+const panels = [
+  { id:'overview', label:'Overview' },
+  { id:'current', label:'Current State' },
+  { id:'phase1', label:'Phase 1' },
+  { id:'phase2', label:'Phase 2' },
+  { id:'phase3', label:'Phase 3' },
+  { id:'phase4', label:'Phase 4' },
+  { id:'phase5', label:'Phase 5' },
+  { id:'phase6', label:'Phase 6' },
+  { id:'phase7', label:'Phase 7' },
+  { id:'metrics', label:'Success Metrics' },
+  { id:'risks', label:'Risks & Dependencies' },
+  { id:'open', label:'Open Questions' },
+];
+
+// NAV
+document.getElementById('nav').innerHTML = panels.map((p,i) =>
+  `<button class="nav-btn${i===0?' on':''}" onclick="show('${p.id}')">${p.label}</button>`
+).join('');
+
+function show(id) {
+  document.querySelectorAll('.nav-btn').forEach((b,i) => b.classList.toggle('on', panels[i].id===id));
+  document.querySelectorAll('.pnl').forEach(p => p.classList.toggle('on', p.id===id));
+}
+
+// ─── OVERVIEW PANEL ───
+function renderOverview() {
+  return `
+<div class="h1">Stevie Social Platform — Phased Development Roadmap</div>
+<div class="divider"></div>
+<div class="sub">
+  A comprehensive product requirements document for building Stevie Social's all-in-one agency platform. This PRD transforms the existing strategy guide, mockups, and technical specifications into an actionable, phased development plan with clear requirements, acceptance criteria, dependencies, and success metrics for each phase.
+</div>
+
+<div class="h2">Problem Statement</div>
+<p>Stevie Social currently operates across 14 separate tools — Squarespace, Calendly, QuickBooks, Stripe, ClickUp, Flodesk, Typeform, Zapier, Metricool, Dropbox, Descript, Loom, ChatGPT, and manual processes — to manage their marketing agency. This fragmentation creates three compounding problems: client data is siloed across systems requiring manual reconciliation, the Compound Method framework (Protect → Deepen → Amplify) cannot be tracked programmatically across tools, and the current stack costs $500–$1,500/month in subscriptions with no path to productizing the workflow for other agencies.</p>
+<p>The cost of not solving this: every new client compounds the manual overhead, the Compound Method loses fidelity as it passes through disconnected tools, and the SaaS resale opportunity ($300/month × 20 agencies = $72K/year recurring) remains unrealized.</p>
+
+<div class="h2">Goals</div>
+<div class="g2">
+  <div class="card">
+    <div style="font-size:10px;font-weight:700;color:${C.sg};margin-bottom:8px;letter-spacing:.5px">USER GOALS</div>
+    <ul class="checklist">
+      <li><span class="chk" style="color:${C.sg}">→</span> Single login to manage the full client lifecycle from lead to reporting</li>
+      <li><span class="chk" style="color:${C.sg}">→</span> Compound Method phase tracking (Protect/Deepen/Amplify) embedded in every workflow</li>
+      <li><span class="chk" style="color:${C.sg}">→</span> Clients self-serve approvals, view reports, and manage billing in a branded portal</li>
+      <li><span class="chk" style="color:${C.sg}">→</span> AI-assisted content generation that respects per-client brand voice profiles</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div style="font-size:10px;font-weight:700;color:${C.or};margin-bottom:8px;letter-spacing:.5px">BUSINESS GOALS</div>
+    <ul class="checklist">
+      <li><span class="chk" style="color:${C.or}">→</span> Reduce monthly tool spend from $500–$1,500 to $150–$650 within 12 months</li>
+      <li><span class="chk" style="color:${C.or}">→</span> Decrease client onboarding time from 2 weeks (manual) to 48 hours (automated)</li>
+      <li><span class="chk" style="color:${C.or}">→</span> Build multi-tenant SaaS foundation to resell to other agencies by end of Phase 4</li>
+      <li><span class="chk" style="color:${C.or}">→</span> Achieve 2-year payback on development investment through SaaS revenue</li>
+    </ul>
+  </div>
+</div>
+
+<div class="h2">Non-Goals (v1)</div>
+<div class="card">
+  <ul class="checklist">
+    <li><span class="chk" style="color:${C.or}">✕</span> <strong>Build a video editor</strong> — Descript/CapCut remain external tools. Platform handles organization, review, and approval only. (Too complex: $100M+ category)</li>
+    <li><span class="chk" style="color:${C.or}">✕</span> <strong>Replace QuickBooks for agency bookkeeping</strong> — Platform handles client billing only. Agency internal books stay in QuickBooks or export CSV. (Separate concern)</li>
+    <li><span class="chk" style="color:${C.or}">✕</span> <strong>White-label marketplace</strong> — Multi-tenant architecture ships in Phase 1, but a self-serve signup and marketplace is post-v1. (Premature before product-market fit)</li>
+    <li><span class="chk" style="color:${C.or}">✕</span> <strong>Mobile native apps</strong> — Responsive web app only. Native apps are post-launch if demand warrants. (Platform validation first)</li>
+    <li><span class="chk" style="color:${C.or}">✕</span> <strong>Self-hosted email delivery infrastructure</strong> — Use Amazon SES / Resend. Building SMTP infra is non-negotiably out of scope. (Email deliverability is a multi-year problem)</li>
+  </ul>
+</div>
+
+<div class="h2">Architecture Overview</div>
+<p>Path B: Full hybrid custom build — custom Next.js + FastAPI frontend/backend, with proven API services for commodity features.</p>
+<div class="g3" style="margin-top:16px">
+  <div class="card" style="border-left:3px solid ${C.sg}">
+    <div style="font-size:10px;font-weight:700;color:${C.sg};margin-bottom:8px">FRONTEND</div>
+    <div style="font-size:12px;color:var(--dim);line-height:1.7">Next.js 15 + Tailwind CSS + shadcn/ui on Vercel. SSR for SEO. Cal.com (self-hosted) for booking. TipTap for rich text editing.</div>
+  </div>
+  <div class="card" style="border-left:3px solid ${C.or}">
+    <div style="font-size:10px;font-weight:700;color:${C.or};margin-bottom:8px">BACKEND</div>
+    <div style="font-size:12px;color:var(--dim);line-height:1.7">FastAPI (Python) on Railway. PostgreSQL via Supabase with Row-Level Security. Celery + Redis for background jobs. Alembic for migrations.</div>
+  </div>
+  <div class="card" style="border-left:3px solid ${C.sb}">
+    <div style="font-size:10px;font-weight:700;color:${C.sb};margin-bottom:8px">EDGE / STORAGE</div>
+    <div style="font-size:12px;color:var(--dim);line-height:1.7">Cloudflare Workers (5 workers configured). R2 for media storage (zero egress). Mux for video streaming. Resend for transactional email.</div>
+  </div>
+</div>
+
+<div class="h2">Total Investment Summary</div>
+<table class="tbl">
+  <thead><tr><th>Phase</th><th>Module</th><th>Solo Timeline</th><th>Cost Range</th><th>Dependencies</th></tr></thead>
+  <tbody>
+    <tr><td>${tag(C.sg,'1')}</td><td style="font-weight:600;color:var(--txt)">Website + Analytics + Booking</td><td>8–12 weeks</td><td>$12,000–$20,000</td><td>None (foundation)</td></tr>
+    <tr><td>${tag(C.or,'2')}</td><td style="font-weight:600;color:var(--txt)">Financial Management</td><td>10–14 weeks</td><td>$15,000–$25,000</td><td>Phase 1 (auth/users)</td></tr>
+    <tr><td>${tag(C.sb,'3')}</td><td style="font-weight:600;color:var(--txt)">Proposals + Client Onboarding</td><td>6–10 weeks</td><td>$10,000–$18,000</td><td>Phase 2 (billing)</td></tr>
+    <tr><td>${tag('#edff6b','4')}</td><td style="font-weight:600;color:var(--txt)">Project Management</td><td>10–16 weeks</td><td>$15,000–$28,000</td><td>Phase 1 (users/orgs)</td></tr>
+    <tr><td>${tag(C.lv,'5')}</td><td style="font-weight:600;color:var(--txt)">Reporting & Analytics</td><td>6–10 weeks</td><td>$8,000–$15,000</td><td>Phases 1–4 (data sources)</td></tr>
+    <tr><td>${tag(C.or,'6')}</td><td style="font-weight:600;color:var(--txt)">Email + Forms + Automation</td><td>12–18 weeks</td><td>$18,000–$30,000</td><td>Phase 1 (contacts)</td></tr>
+    <tr><td>${tag(C.sg,'7')}</td><td style="font-weight:600;color:var(--txt)">Video + Social + AI</td><td>12–18 weeks</td><td>$18,000–$30,000</td><td>Phase 4 (tasks/approval)</td></tr>
+    <tr style="background:#16161e"><td></td><td style="font-weight:800;color:var(--txt)">Total (solo developer)</td><td style="font-weight:700;color:var(--txt)">18–28 months</td><td style="font-weight:700;color:${C.sg}">$96,000–$166,000</td><td></td></tr>
+    <tr style="background:#16161e"><td></td><td style="color:var(--mut)">With 25% contingency</td><td style="color:var(--mut)">—</td><td style="font-weight:600;color:var(--mut)">$120,000–$208,000</td><td></td></tr>
+  </tbody>
+</table>
+<p>AI-assisted development (Cursor, Claude Code, Copilot) can realistically reduce these estimates by 20–30%. A 2–3 person team completes in 9–15 months at $119,000–$224,000. Monthly infrastructure cost: $40–$260/month.</p>
+`;
+}
+
+// ─── CURRENT STATE PANEL ───
+function renderCurrent() {
+  return `
+<div class="h1">Current Development State</div>
+<div class="divider"></div>
+<div class="sub">Audit of all existing artifacts, code, and specifications as of April 2026. This assessment maps what has been built, what has been designed, and what remains to be developed.</div>
+
+<div class="h2">Artifacts Completed</div>
+<div class="g2">
+  <div class="card">
+    <div style="font-size:10px;font-weight:700;color:${C.sg};margin-bottom:10px">STRATEGY & DESIGN</div>
+    <ul class="checklist">
+      <li><span class="chk" style="color:${C.sg}">✓</span> Hybrid Architecture & Strategy Guide (PDF, 10+ pages)</li>
+      <li><span class="chk" style="color:${C.sg}">✓</span> Interactive Platform Spec (HTML, 7 features with full mockups)</li>
+      <li><span class="chk" style="color:${C.sg}">✓</span> Database Schema Spec (HTML, 15 tables with ERD + concurrency notes)</li>
+      <li><span class="chk" style="color:${C.sg}">✓</span> React Mockup App (Vite, all 7 module UI mockups)</li>
+      <li><span class="chk" style="color:${C.sg}">✓</span> Brand Guidelines PDF + Messaging Strategy 2026</li>
+      <li><span class="chk" style="color:${C.sg}">✓</span> The Compound Method framework documentation</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div style="font-size:10px;font-weight:700;color:${C.sb};margin-bottom:10px">CODE & INFRASTRUCTURE</div>
+    <ul class="checklist">
+      <li><span class="chk" style="color:${C.sb}">✓</span> FastAPI backend scaffolded — models, schemas, API routes, auth, services</li>
+      <li><span class="chk" style="color:${C.sb}">✓</span> Database models: organization, user, booking, lead, page, blog_post, analytics, contact, media_asset, audit_log</li>
+      <li><span class="chk" style="color:${C.sb}">✓</span> API routes: auth, analytics, blog, bookings, contacts, leads, media, pages, internal (cron + webhooks)</li>
+      <li><span class="chk" style="color:${C.sb}">✓</span> Cloudflare Workers config (5 workers: upload, cache, webhooks, cron, image-transform)</li>
+      <li><span class="chk" style="color:${C.sb}">✓</span> Alembic migration setup for database schema evolution</li>
+      <li><span class="chk" style="color:${C.sb}">✓</span> Cloudflare R2 service integration (backend/app/services/cloudflare.py)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="h2">Separate Product: FlowDylo (coldCallAutomated)</div>
+<div class="card">
+  <p style="margin-bottom:8px">FlowDylo is a separate AI-powered sales platform for life insurance professionals. It is <strong style="color:${C.sg}">95% production-ready</strong> with complete frontend (React + TypeScript + Vite + Ant Design) and backend (FastAPI + MongoDB + Redis). Features include calendar/appointments, call disposition workflow, communication services (SMS, voicemail), lead follow-up integration, and email campaigns.</p>
+  <p style="margin-bottom:0"><strong>Relevance to Stevie Social:</strong> Shares the FastAPI architectural pattern and provides a reference for building production-ready SaaS. The cold call automation patterns may inform Stevie Social's future outreach features.</p>
+</div>
+
+<div class="h2">Development Progress by Phase</div>
+${[
+  { name:'Phase 1: Website + Analytics + Booking', pct:35, color:C.sg, status:'In Progress',
+    done:['FastAPI backend scaffolded with models (organization, user, booking, lead, page, blog_post, analytics)','API routes for auth, bookings, leads, pages, blog, analytics','Cloudflare Workers configured (upload, cache, webhooks, cron, image-transform)','Alembic migration infrastructure','Cloudflare R2 service integration'],
+    remaining:['Next.js 15 production frontend build','Cal.com self-hosted deployment and OAuth integration','Umami analytics installation and dashboard','SurveyJS intake form replacing Typeform','TipTap content editor for pages and blog','Supabase PostgreSQL setup with Row-Level Security','Vercel deployment with preview environments'] },
+  { name:'Phase 2: Financial Management', pct:5, color:C.or, status:'Designed',
+    done:['Database schema designed (invoices table)','UI mockup complete (finance dashboard)','Stripe integration architecture documented'],
+    remaining:['Stripe Billing + Invoicing + Customer Portal integration','Payment webhook processing with idempotency','Revenue dashboard with MRR/outstanding/overdue','Celery automated payment reminders','React PDF branded invoice generation','Expense categorization system'] },
+  { name:'Phase 3: Proposals + Onboarding', pct:5, color:C.sb, status:'Designed',
+    done:['Database schema designed (proposals table)','UI mockup complete (proposal builder with 12 Compound Method blocks)','Workflow architecture documented'],
+    remaining:['TipTap drag-and-drop proposal editor','HelloSign API e-signature integration','Automated onboarding pipeline (project + invoice + portal + email sequence)','Proposal versioning and change history','Client portal access provisioning'] },
+  { name:'Phase 4: Project Management', pct:5, color:'#b8c920', status:'Designed',
+    done:['Database schema designed (projects, tasks, task_comments)','UI mockup complete (13-step Kanban with Compound Method phases)','Real-time architecture designed (Supabase NOTIFY/LISTEN)'],
+    remaining:['React DnD Kit Kanban board implementation','Supabase Realtime WebSocket integration','13-step Stevie workflow template engine','Client portal filtered view (Step 9 only)','Time tracking per task','Phase transition criteria automation'] },
+  { name:'Phase 5: Reporting & Analytics', pct:5, color:C.lv, status:'Designed',
+    done:['Database schema designed (analytics_daily with materialized views)','UI mockup complete (Compound Method phase-specific KPIs)','Backend analytics model and API route scaffolded'],
+    remaining:['Recharts interactive visualization components','PostgreSQL materialized views for pre-computed metrics','Celery scheduled report generation','React PDF branded client reports','Client portal filtered dashboard','Phase transition criteria tracking'] },
+  { name:'Phase 6: Email + Forms + Automation', pct:2, color:C.or, status:'Designed',
+    done:['Database schema designed (contacts, campaigns)','UI mockup complete (campaign builder)','Contacts model and API route scaffolded'],
+    remaining:['Listmonk self-hosted deployment','Amazon SES integration','React Email template builder','SurveyJS form builder integration','n8n self-hosted workflow automation','Flodesk subscriber list migration','Contact engagement scoring'] },
+  { name:'Phase 7: Video + Social + AI', pct:2, color:C.sg, status:'Designed',
+    done:['Database schema designed (assets, social_posts)','UI mockup complete','Media asset model and API route scaffolded','Cloudflare R2 upload worker configured'],
+    remaining:['Mux video streaming integration','RecordRTC browser recording','Social media API integrations (Meta, TikTok, LinkedIn, YouTube)','Claude Sonnet + GPT-4o mini content generation','Brand voice profile system','LiteLLM abstraction layer','Social scheduler with Celery'] },
+].map(ph => `
+  <div class="phase-card">
+    <div class="phase-header">
+      <div class="phase-title"><span style="color:${ph.color}">${ph.name}</span></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="tag" style="background:${ph.color}18;color:${ph.color}">${ph.status}</span>
+        <span style="font-size:12px;font-weight:700;color:${ph.color}">${ph.pct}%</span>
+      </div>
+    </div>
+    <div class="phase-body">
+      <div class="progress-bar"><div class="progress-fill" style="width:${ph.pct}%;background:${ph.color}"></div></div>
+      <div class="g2" style="margin-top:16px">
+        <div>
+          <div class="phase-section-title" style="color:${C.sg}">Completed</div>
+          <ul class="checklist">${ph.done.map(d => `<li><span class="chk" style="color:${C.sg}">✓</span>${d}</li>`).join('')}</ul>
+        </div>
+        <div>
+          <div class="phase-section-title" style="color:${C.or}">Remaining</div>
+          <ul class="checklist">${ph.remaining.map(r => `<li><span class="chk" style="color:${C.or}">○</span>${r}</li>`).join('')}</ul>
+        </div>
+      </div>
+    </div>
+  </div>
+`).join('')}
+`;
+}
+
+// ─── PHASE PANELS ───
+function renderPhase(num, title, color, replaces, weeks, cost, desc, stories, mustHave, niceToHave, future, acceptance, techStack, deps, risks) {
+  return `
+<div class="h1" style="display:flex;align-items:center;gap:12px">
+  <span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;background:${color}20;color:${color};font-family:'Archivo Black',sans-serif;font-size:16px">${num}</span>
+  ${title}
+</div>
+<div class="divider" style="background:${color}"></div>
+<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+  ${replaces.map(r => `<span class="tag" style="background:${color}12;color:${color}">Replaces ${r}</span>`).join('')}
+</div>
+<div style="display:flex;gap:16px;margin-bottom:20px">
+  <span style="font-size:12px;color:var(--mut)">Solo: <strong style="color:var(--txt)">${weeks}</strong></span>
+  <span style="font-size:12px;color:var(--mut)">Budget: <strong style="color:var(--txt)">${cost}</strong></span>
+</div>
+<p>${desc}</p>
+
+<div class="h2">User Stories</div>
+<div class="card">
+  <ul class="checklist">
+    ${stories.map(s => `<li><span class="chk" style="color:${color}">→</span><span>${s}</span></li>`).join('')}
+  </ul>
+</div>
+
+<div class="h2">Requirements</div>
+<div class="h3" style="color:${C.sg}">Must-Have (P0)</div>
+<div class="card" style="border-left:3px solid ${C.sg}">
+  <ul class="checklist">
+    ${mustHave.map(r => `<li><span class="chk" style="color:${C.sg}">■</span>${r}</li>`).join('')}
+  </ul>
+</div>
+<div class="h3" style="color:${C.sb}">Nice-to-Have (P1)</div>
+<div class="card" style="border-left:3px solid ${C.sb}">
+  <ul class="checklist">
+    ${niceToHave.map(r => `<li><span class="chk" style="color:${C.sb}">◆</span>${r}</li>`).join('')}
+  </ul>
+</div>
+<div class="h3" style="color:var(--mut)">Future Considerations (P2)</div>
+<div class="card" style="border-left:3px solid var(--mut)">
+  <ul class="checklist">
+    ${future.map(r => `<li><span class="chk" style="color:var(--mut)">○</span>${r}</li>`).join('')}
+  </ul>
+</div>
+
+<div class="h2">Acceptance Criteria</div>
+<div class="card">
+  <ul class="checklist">
+    ${acceptance.map(a => `<li><span class="chk" style="color:${color}">☐</span>${a}</li>`).join('')}
+  </ul>
+</div>
+
+<div class="h2">Tech Stack</div>
+<table class="tbl">
+  <thead><tr><th>Component</th><th>Role</th></tr></thead>
+  <tbody>
+    ${techStack.map(t => `<tr><td style="font-weight:600;color:var(--txt)">${t[0]}</td><td>${t[1]}</td></tr>`).join('')}
+  </tbody>
+</table>
+
+<div class="h2">Dependencies & Risks</div>
+<div class="g2">
+  <div class="card">
+    <div class="phase-section-title" style="color:${C.sb}">Dependencies</div>
+    <ul class="checklist">
+      ${deps.map(d => `<li><span class="chk" style="color:${C.sb}">↗</span>${d}</li>`).join('')}
+    </ul>
+  </div>
+  <div class="card">
+    <div class="phase-section-title" style="color:${C.or}">Risks</div>
+    <ul class="checklist">
+      ${risks.map(r => `<li><span class="chk" style="color:${C.or}">⚠</span>${r}</li>`).join('')}
+    </ul>
+  </div>
+</div>
+`;
+}
+
+// ─── METRICS PANEL ───
+function renderMetrics() {
+  return `
+<div class="h1">Success Metrics</div>
+<div class="divider"></div>
+<div class="sub">Each phase has leading indicators (measurable within days/weeks of launch) and lagging indicators (measured over weeks/months). Targets are set per phase with specific measurement methods.</div>
+
+<div class="h2">Leading Indicators (per phase launch)</div>
+<table class="tbl">
+  <thead><tr><th>Metric</th><th>Target</th><th>Measurement</th><th>Evaluate At</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:600;color:var(--txt)">Adoption rate</td><td>100% of Stevie team within 1 week</td><td>Active users / total team members</td><td>Week 1</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Task completion rate</td><td>&gt;90% of core workflows completable without fallback to old tool</td><td>Session recordings + support requests</td><td>Week 2</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Page load time</td><td>&lt;2s for all dashboard pages, &lt;1s for public website</td><td>Vercel Analytics + Umami</td><td>Day 1</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Error rate</td><td>&lt;1% of API requests return 5xx</td><td>Railway logs + Sentry</td><td>Week 1</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Client portal engagement</td><td>&gt;60% of clients log in within first month</td><td>Supabase auth logs</td><td>Month 1</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Booking conversion rate</td><td>&gt;3% of website visitors book a call (Phase 1)</td><td>Umami funnel + Cal.com webhook data</td><td>Month 1</td></tr>
+  </tbody>
+</table>
+
+<div class="h2">Lagging Indicators (quarterly review)</div>
+<table class="tbl">
+  <thead><tr><th>Metric</th><th>Success Target</th><th>Stretch Target</th><th>Evaluate At</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:600;color:var(--txt)">Monthly tool spend reduction</td><td>$500–$1,500 → $300 (40% reduction)</td><td>→ $150 (70% reduction)</td><td>Quarter 2</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Client onboarding time</td><td>2 weeks → 3 days</td><td>→ 48 hours</td><td>After Phase 3</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Revenue per client increase</td><td>5% increase (upsell via platform visibility)</td><td>15% increase</td><td>Quarter 3</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">SaaS resale revenue</td><td>5 paying agencies ($1,500/mo)</td><td>20 agencies ($6,000/mo)</td><td>Quarter 4</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Old tool cancellations</td><td>Cancel 8 of 14 subscriptions</td><td>Cancel 12 of 14</td><td>After Phase 6</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Team time saved per week</td><td>5 hours (manual data reconciliation)</td><td>10 hours</td><td>After Phase 4</td></tr>
+  </tbody>
+</table>
+
+<div class="h2">Phase-Specific Success Criteria</div>
+<div class="g2">
+  ${[
+    {p:'Phase 1',c:C.sg,metrics:['Website Lighthouse score > 90','Cal.com booking completion rate > 80%','Intake form completion rate > 50%','Umami tracking 100% of page views']},
+    {p:'Phase 2',c:C.or,metrics:['Invoice payment rate within 7 days > 70%','Zero duplicate payment processing','MRR dashboard accuracy within $50','QuickBooks invoice feature fully replaced']},
+    {p:'Phase 3',c:C.sb,metrics:['Proposal-to-signed conversion > 40%','Onboarding automation fires without manual intervention','E-signature completion within 24 hours > 60%']},
+    {p:'Phase 4',c:'#b8c920',metrics:['Task board load time < 500ms','Real-time sync latency < 100ms','Client portal shows only Step 9 content','ClickUp fully replaced for project tracking']},
+    {p:'Phase 5',c:C.lv,metrics:['Report generation < 10 seconds','PDF export matches brand guidelines','Phase transition criteria tracked automatically']},
+    {p:'Phase 6',c:C.or,metrics:['Email delivery rate > 98%','Flodesk subscriber list migrated 100%','n8n handles all current Zapier workflows']},
+    {p:'Phase 7',c:C.sg,metrics:['Video upload supports files > 1GB','AI content generation < 5 seconds','Social post scheduling works across 4+ platforms']},
+  ].map(m => `
+    <div class="card" style="border-left:3px solid ${m.c}">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:${m.c}">${m.p}</div>
+      <ul class="checklist">${m.metrics.map(met => `<li><span class="chk" style="color:${m.c}">◎</span>${met}</li>`).join('')}</ul>
+    </div>
+  `).join('')}
+</div>
+`;
+}
+
+// ─── RISKS PANEL ───
+function renderRisks() {
+  return `
+<div class="h1">Risks & Dependencies</div>
+<div class="divider"></div>
+
+<div class="h2">Dependency Chain</div>
+<p>Phases have deliberate dependencies to ensure each builds on a stable foundation. The critical path runs through Phase 1 → 2 → 3, while Phases 4–7 have more flexibility.</p>
+<div style="overflow-x:auto;margin:20px 0">
+  <div style="display:flex;gap:4px;align-items:stretch;min-width:900px">
+    ${[
+      {n:'1',l:'Website + Auth',c:C.sg,dep:'Foundation'},
+      {n:'2',l:'Finance',c:C.or,dep:'Phase 1 auth'},
+      {n:'3',l:'Proposals',c:C.sb,dep:'Phase 2 billing'},
+      {n:'4',l:'Projects',c:'#b8c920',dep:'Phase 1 users'},
+      {n:'5',l:'Reporting',c:C.lv,dep:'Phases 1–4 data'},
+      {n:'6',l:'Email + Forms',c:C.or,dep:'Phase 1 contacts'},
+      {n:'7',l:'Video + AI',c:C.sg,dep:'Phase 4 tasks'},
+    ].map((p,i) => `
+      ${i>0?'<div style="display:flex;align-items:center;font-weight:700;color:'+C.sg+';font-size:16px">→</div>':''}
+      <div style="background:var(--card);border:1px solid var(--bdr);border-top:3px solid ${p.c};border-radius:8px;padding:12px;min-width:110px;flex:1;text-align:center">
+        <div style="font-family:\'Archivo Black\',sans-serif;font-size:14px;color:${p.c}">Phase ${p.n}</div>
+        <div style="font-size:10px;color:var(--txt);margin-top:4px">${p.l}</div>
+        <div style="font-size:9px;color:var(--mut);margin-top:4px">${p.dep}</div>
+      </div>
+    `).join('')}
+  </div>
+</div>
+
+<div class="h2">Parallelization Opportunities</div>
+<div class="card">
+  <p style="margin-bottom:8px">Phases 4 (Project Management) and 6 (Email + Forms) both depend only on Phase 1, not on each other. They can be developed in parallel with a second developer. Similarly, Phase 7 (Video + AI) can overlap with Phase 5 (Reporting) since they share no direct dependencies beyond the Phase 1 foundation.</p>
+  <p style="margin-bottom:0"><strong style="color:${C.sg}">Recommended parallel tracks:</strong> Track A (critical path): 1 → 2 → 3 → 5. Track B (parallel): 4 → 7. Track C (parallel): 6. This reduces total timeline from 18–28 months to 12–18 months with a 2-person team.</p>
+</div>
+
+<div class="h2">Risk Register</div>
+<table class="tbl">
+  <thead><tr><th>Risk</th><th>Severity</th><th>Likelihood</th><th>Mitigation</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:600;color:var(--txt)">Social media API deprecations / rate limit changes</td><td>${tag(C.or,'High')}</td><td>${tag('#f59e0b','Medium')}</td><td>Use unified API (Ayrshare) or Postiz as abstraction layer. Monitor API changelogs. Build adapter pattern.</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Cal.com breaking changes (self-hosted)</td><td>${tag('#f59e0b','Medium')}</td><td>${tag('#f59e0b','Medium')}</td><td>Pin to a specific version. Upgrade on a quarterly cadence with test coverage.</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Scope creep within phases</td><td>${tag(C.or,'High')}</td><td>${tag(C.or,'High')}</td><td>This PRD defines explicit non-goals per phase. New feature requests go to the parking lot and are scoped as Phase 2 of that module.</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Email deliverability issues (Phase 6)</td><td>${tag(C.or,'High')}</td><td>${tag('#f59e0b','Medium')}</td><td>Use Amazon SES (established reputation). Warm up sending domain gradually. Never build custom SMTP.</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Video storage costs exceed projections</td><td>${tag('#f59e0b','Medium')}</td><td>${tag(C.sg,'Low')}</td><td>Cloudflare R2 has zero egress fees. Implement auto-archival to Backblaze B2 for content older than 90 days.</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Solo developer burnout / bottleneck</td><td>${tag(C.or,'High')}</td><td>${tag(C.or,'High')}</td><td>Milestone-based pricing. 2-week sprint cycles with clear deliverables. Consider Phase 4/6/7 parallelization with contract help.</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Multi-tenant security vulnerability</td><td>${tag(C.or,'Critical')}</td><td>${tag(C.sg,'Low')}</td><td>PostgreSQL Row-Level Security enforced at the database level. Every query filtered by org_id. Penetration test at Phase 4 launch.</td></tr>
+    <tr><td style="font-weight:600;color:var(--txt)">Stripe API version deprecation</td><td>${tag('#f59e0b','Medium')}</td><td>${tag(C.sg,'Low')}</td><td>Stripe maintains backward compatibility. Pin API version in config. Review annually.</td></tr>
+  </tbody>
+</table>
+`;
+}
+
+// ─── OPEN QUESTIONS PANEL ───
+function renderOpen() {
+  return `
+<div class="h1">Open Questions</div>
+<div class="divider"></div>
+<div class="sub">Questions that need answers before or during implementation. Tagged by who should answer and whether they block development.</div>
+
+<div class="h2">Blocking (must answer before Phase 1 starts)</div>
+<div class="card">
+  <table class="tbl">
+    <thead><tr><th>Question</th><th>Owner</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr><td style="color:var(--txt)">Which hosting provider for the FastAPI backend — Railway, Coolify (self-hosted VPS), or Render?</td><td>${tag(C.sg,'Engineering')}</td><td>Affects CI/CD, cost, and deployment workflow for all phases</td></tr>
+      <tr><td style="color:var(--txt)">Clerk or Supabase Auth for authentication? Clerk offers more out-of-the-box (org switching, invites) but adds a dependency. Supabase Auth is free for 50K MAUs but requires custom multi-tenancy work.</td><td>${tag(C.sg,'Engineering')}</td><td>Foundational decision for Phase 1 — affects every subsequent phase</td></tr>
+      <tr><td style="color:var(--txt)">Does Stevie Social want to pursue the GoHighLevel parallel track ($497/mo) for operational continuity during Phase 1–3 build, or go directly to the custom platform?</td><td>${tag(C.or,'Stakeholder')}</td><td>Affects timeline pressure and whether current clients need migration</td></tr>
+      <tr><td style="color:var(--txt)">What is the target launch date for Phase 1 (website replacement)? Is there a hard deadline (event, contract renewal)?</td><td>${tag(C.or,'Stakeholder')}</td><td>Determines sprint cadence and resource allocation</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="h2">Non-Blocking (can resolve during implementation)</div>
+<div class="card">
+  <table class="tbl">
+    <thead><tr><th>Question</th><th>Owner</th><th>Relevant Phase</th></tr></thead>
+    <tbody>
+      <tr><td style="color:var(--txt)">Should the proposal builder support custom templates beyond the Compound Method structure, or is the 12-block structure the only template?</td><td>${tag(C.lv,'Design')}</td><td>Phase 3</td></tr>
+      <tr><td style="color:var(--txt)">Which social media platforms are highest priority? The strategy doc lists Meta, TikTok, LinkedIn, YouTube, Pinterest, X — what is the MVP set?</td><td>${tag(C.or,'Stakeholder')}</td><td>Phase 7</td></tr>
+      <tr><td style="color:var(--txt)">What are the current Zapier automations that need to be replicated in n8n? Need an inventory to scope Phase 6 accurately.</td><td>${tag(C.or,'Stakeholder')}</td><td>Phase 6</td></tr>
+      <tr><td style="color:var(--txt)">How many clients are currently on Flodesk? What is the subscriber count and segmentation structure that needs to migrate?</td><td>${tag(C.or,'Stakeholder')}</td><td>Phase 6</td></tr>
+      <tr><td style="color:var(--txt)">For the multi-tenant SaaS resale: what pricing tiers are planned? This affects the organizations table and plan management logic.</td><td>${tag(C.or,'Stakeholder')}</td><td>Phase 1 (design for it), Phase 4+ (build it)</td></tr>
+      <tr><td style="color:var(--txt)">Should the AI content generation (Phase 7) use Anthropic Claude exclusively, or maintain the multi-model approach (Claude + GPT-4o mini via LiteLLM)?</td><td>${tag(C.sg,'Engineering')}</td><td>Phase 7</td></tr>
+      <tr><td style="color:var(--txt)">What is the data retention policy for video assets? Auto-archive to cold storage after 90 days? Delete after 1 year?</td><td>${tag(C.lv,'Legal / Stakeholder')}</td><td>Phase 7</td></tr>
+      <tr><td style="color:var(--txt)">HelloSign pricing: $15/mo for 3 signature requests per month. Is this sufficient for proposal volume, or do we need the Standard plan ($25/mo)?</td><td>${tag(C.or,'Stakeholder')}</td><td>Phase 3</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="h2">Timeline Considerations</div>
+<div class="card">
+  <ul class="checklist">
+    <li><span class="chk" style="color:${C.or}">!</span> <strong>Squarespace renewal:</strong> If the current Squarespace subscription renews soon, Phase 1 launch should align with that date to avoid paying for both.</li>
+    <li><span class="chk" style="color:${C.or}">!</span> <strong>Flodesk subscriber limit:</strong> If approaching the Flodesk plan limit, Phase 6 (email migration) may need to be accelerated or Listmonk deployed standalone earlier.</li>
+    <li><span class="chk" style="color:${C.sb}">→</span> <strong>Recommended cadence:</strong> 2-week sprints. Demo to Stevie Social team at the end of each sprint. Phase gate review before starting each new phase.</li>
+    <li><span class="chk" style="color:${C.sb}">→</span> <strong>Maintenance retainer:</strong> $3,000–$5,000/month post-launch covering bug fixes, security patches, API updates, and incremental feature development.</li>
+  </ul>
+</div>
+`;
+}
+
+// ─── ASSEMBLE ───
+const wrap = document.getElementById('wrap');
+wrap.innerHTML = panels.map(p => `<div class="pnl${p.id==='overview'?' on':''}" id="${p.id}"></div>`).join('');
+
+document.getElementById('overview').innerHTML = renderOverview();
+document.getElementById('current').innerHTML = renderCurrent();
+document.getElementById('metrics').innerHTML = renderMetrics();
+document.getElementById('risks').innerHTML = renderRisks();
+document.getElementById('open').innerHTML = renderOpen();
+
+// Phase 1
+document.getElementById('phase1').innerHTML = renderPhase(
+  1, 'Website + Analytics + Booking', C.sg,
+  ['Squarespace','Calendly','Typeform (intake)'], '8–12 weeks', '$12,000–$20,000',
+  'Build a custom Next.js marketing site driven by the 2026 Messaging Strategy. The site embeds Stevie\'s attract/repel framework: "We want a strategic partner, not a posting service" attracts $10M–$50M revenue brands while filtering out those seeking quick fixes. Includes SurveyJS intake form replacing Typeform, Cal.com booking replacing Calendly, and Umami privacy-first analytics replacing Squarespace analytics. This is the foundation phase — authentication, database, and multi-tenant architecture are established here for all subsequent phases.',
+  // User Stories
+  [
+    'As a <strong>prospective client</strong>, I want to view Stevie Social\'s portfolio and case studies so that I can evaluate whether they are the right strategic partner for my brand.',
+    'As a <strong>prospective client</strong>, I want to fill out a qualification form so that Stevie can assess fit before booking a call, saving both sides time.',
+    'As a <strong>prospective client</strong>, I want to book a strategy call directly on the website so that I do not need to email back and forth to find a time.',
+    'As a <strong>Stevie admin (Kelsie)</strong>, I want to see the full visitor funnel (unique visitors → form starts → form completions → bookings → close rate) so that I can optimize the website for qualified leads.',
+    'As a <strong>Stevie admin</strong>, I want to edit website pages and blog posts with a rich text editor so that I do not need a developer for content changes.',
+    'As a <strong>Stevie admin</strong>, I want new bookings to automatically create a Lead record with all form responses attached so that no information is lost between the website and the CRM.',
+    'As an <strong>unqualified visitor</strong>, I want to be directed to alternative resources so that I am not rejected but rather guided to a better fit.'
+  ],
+  // Must Have
+  [
+    'Next.js 15 site with server-side rendering for SEO. Lighthouse performance score > 90. Brand fonts (Margo+Beuys, Clash Display) self-hosted via Cloudflare R2.',
+    'SurveyJS multi-step intake form with conditional logic (replaces form.typeform.com/to/boBuNh98). Qualifies on revenue range, current social presence, and goals.',
+    'Cal.com self-hosted integration with Google Calendar OAuth. Embeddable booking widget. Only shows available slots.',
+    'Supabase PostgreSQL with Row-Level Security policies. Multi-tenant organization model from day one.',
+    'FastAPI backend with auth (JWT), CRUD for pages, blog posts, leads, bookings, and analytics.',
+    'Cloudflare Workers deployed: upload worker, cache worker, webhook worker, cron worker, image-transform worker.',
+    'Umami (self-hosted) privacy-first analytics. No cookie consent banner required. Tracks page views, referrers, and device types.',
+    'Admin dashboard showing visitor funnel: traffic → form starts → completions → bookings → conversion rate.',
+    'Cal.com webhook → FastAPI creates Lead record with form responses as JSONB. Confirmation email via Resend.'
+  ],
+  // Nice to Have
+  [
+    'TipTap rich text editor for live page/blog editing (Kelsie edits directly without developer intervention).',
+    'A/B test support for hero copy and CTA button text to optimize booking conversion.',
+    'Blog with CMS-driven content, on-demand ISR revalidation, and RSS feed.',
+    'SEO metadata editor per page (title, description, OG image).',
+  ],
+  // Future
+  [
+    'Multi-language support for the public website.',
+    'Chatbot / AI-powered intake that replaces the static form with a conversational qualification flow.',
+    'Integration with Google Search Console for organic keyword tracking.',
+  ],
+  // Acceptance Criteria
+  [
+    'Given a visitor arrives at stevie.social, when the page loads, then the Lighthouse performance score is > 90 and the brand fonts render correctly.',
+    'Given a visitor completes the intake form, when they qualify (revenue $10M+), then the Cal.com booking widget is displayed with available time slots.',
+    'Given a visitor completes the intake form, when they do NOT qualify, then they are shown alternative resources (not a rejection message).',
+    'Given a visitor books a call via Cal.com, when the booking is confirmed, then a Lead record is created in PostgreSQL with all form responses, and a confirmation email is sent via Resend.',
+    'Given an admin views the analytics dashboard, when they select a date range, then the visitor funnel shows accurate counts for each stage.',
+    'Given a user from Organization A is logged in, when they query the database, then Row-Level Security prevents access to Organization B\'s data.',
+    'Given the Cal.com embed is displayed, when a visitor selects a time slot, then it checks Google Calendar availability in real-time via OAuth.',
+  ],
+  // Tech Stack
+  [
+    ['Next.js 15','Server-rendered pages for SEO. API routes for form handling. CMS-driven blog.'],
+    ['Tailwind CSS + shadcn/ui','Utility styling mapped to Stevie brand tokens. Accessible component library.'],
+    ['Cal.com (self-hosted)','Open-source booking engine. Google Calendar OAuth. Embeddable widget.'],
+    ['Umami Analytics','Privacy-first, cookieless visitor tracking. Self-hosted. No consent banner.'],
+    ['SurveyJS','Multi-step intake form. Conditional logic. JSON storage in PostgreSQL.'],
+    ['Supabase (PostgreSQL)','Database + auth + realtime. Row-Level Security for multi-tenant isolation.'],
+    ['Vercel','Hosting optimized for Next.js. Edge CDN. Automatic HTTPS. Preview deploys.'],
+    ['TipTap Editor','Rich text editor for pages/blog posts. @mentions, checklists, file embeds.'],
+    ['FastAPI (Python)','Backend API. Auth, CRUD, webhook processing, business logic.'],
+    ['Cloudflare Workers (5)','Upload proxy, edge caching, webhook handler, cron triggers, image transform.'],
+    ['Resend','Transactional email (booking confirmations, notifications).'],
+  ],
+  // Dependencies
+  ['None — this is the foundation phase.','Domain DNS pointed to Vercel + Cloudflare.','Google OAuth credentials for Cal.com calendar sync.','Supabase project provisioned.','Cloudflare account with R2 bucket created.'],
+  // Risks
+  ['SEO parity with current Squarespace site — ensure all existing pages have redirects.','Cal.com self-hosting requires Docker and ongoing maintenance.','Timezone handling for booking across regions.','Migration of existing Typeform submissions if historical data is needed.']
+);
+
+// Phase 2
+document.getElementById('phase2').innerHTML = renderPhase(
+  2, 'Financial Management', C.or,
+  ['QuickBooks (client billing)','Stripe (expanded)'], '10–14 weeks', '$15,000–$25,000',
+  'Unified invoicing, subscription billing, payment processing, and revenue reporting. Stripe handles all payment infrastructure while the custom dashboard provides visibility into client billing by Compound Method phase. Each client row shows whether they are in Protect, Deepen, or Amplify, linking financial health to engagement progress.',
+  [
+    'As a <strong>Stevie admin</strong>, I want to create one-off invoices and recurring subscriptions from a single dashboard so that I do not need to switch between QuickBooks and Stripe.',
+    'As a <strong>Stevie admin</strong>, I want to see MRR, outstanding balance, and overdue amounts at a glance so that I can manage cash flow effectively.',
+    'As a <strong>Stevie admin</strong>, I want automated payment reminders (3 days before due, overdue at day 1/7/14) so that I do not need to manually chase payments.',
+    'As a <strong>client</strong>, I want to view my invoices, update my payment method, and manage my subscription in a self-service portal so that I do not need to email Stevie for billing changes.',
+    'As a <strong>Stevie admin</strong>, I want to see revenue segmented by Compound Method phase so that I can correlate client investment level with engagement depth.',
+    'As a <strong>Stevie admin</strong>, I want monthly revenue reports auto-generated as branded PDFs so that I can review financial health without manual spreadsheet work.',
+  ],
+  ['Stripe Billing integration for recurring subscriptions with dunning management.','Stripe Invoicing for one-off invoices with PDF generation (first 25/month free).','Stripe Customer Portal embedded for client self-service.','Stripe webhook processing with idempotency (stripe_event_id deduplication).','Revenue dashboard: MRR, outstanding, collected MTD, overdue. Filterable by client, date, Compound Method phase.','Celery-powered automated payment reminders at 3 days before, day 1, day 7, day 14 overdue.'],
+  ['Stripe Tax integration for automated sales tax calculation per transaction.','React PDF branded invoice and revenue report generation with Stevie brand colors.','Basic expense categorization for tracking agency costs per client.','Revenue forecasting based on subscription renewal dates and proposal pipeline.'],
+  ['QuickBooks API integration for syncing invoice data to the agency bookkeeping system.','Multi-currency support for international clients.','Stripe Connect for marketplace-style billing if platform is resold.'],
+  ['Given an admin creates an invoice, when the client pays via Stripe Checkout, then the invoice status updates to "paid" within 30 seconds via webhook.','Given a payment webhook fires, when the same event ID is received twice, then only one payment record is created (idempotency).','Given a client accesses the Customer Portal, when they update their payment method, then Stripe reflects the change and no card data touches the platform.','Given an invoice is 3 days before its due date, when the Celery job runs, then a reminder email is sent to the client.','Given the revenue dashboard is opened, when an admin selects a date range, then MRR, outstanding, and overdue amounts are accurate to the cent.'],
+  [['Stripe Billing','Recurring subscriptions with automatic charge retries and dunning.'],['Stripe Invoicing','One-off invoices. PDF generation. First 25/month free.'],['Stripe Customer Portal','Client self-service: payment methods, invoice history, subscriptions.'],['Stripe Tax','Automated sales tax calculation (0.5% per transaction).'],['FastAPI','Billing logic, webhook processing, revenue aggregation.'],['Celery + Redis','Automated payment reminders, monthly revenue report generation.'],['React PDF','Custom-branded invoice and report PDFs.']],
+  ['Phase 1 auth/user system (shared login, organization model).','Stripe account in production mode with API keys.','Resend configured for billing notification emails.'],
+  ['Accounting accuracy: cents must reconcile exactly with Stripe.','PCI compliance: no card data ever touches the platform — Stripe handles it.','Stripe webhook reliability: implement retry handling and dead letter logging.']
+);
+
+// Phase 3
+document.getElementById('phase3').innerHTML = renderPhase(
+  3, 'Proposals + Client Onboarding', C.sb,
+  ['Manual process','Typeform (partial)'], '6–10 weeks', '$10,000–$18,000',
+  'Template-based proposal builder with the 12-component Compound Method strategy structure built in. E-signatures via HelloSign. The critical automation: when a proposal is signed, the system creates a Project, generates the first Invoice, provisions Client Portal access, and starts the onboarding email sequence — all without manual intervention.',
+  [
+    'As a <strong>Stevie admin</strong>, I want to build proposals using the 12 Compound Method strategy blocks (executive summary, brand positioning, audience segments, content pillars, platform strategy, phased framework, guardrails, email strategy, KPIs, sample calendar, summary, e-signature) so that every proposal maintains strategic consistency.',
+    'As a <strong>Stevie admin</strong>, I want the system to auto-populate client data and pricing from the billing module so that I do not need to re-enter information.',
+    'As a <strong>client</strong>, I want to review the full strategy document and pricing in my browser and sign electronically so that I do not need to print, sign, and scan.',
+    'As a <strong>Stevie admin</strong>, I want accepted proposals to automatically create a Project, Invoice, Client Portal access, and onboarding email sequence so that no manual setup steps are missed.',
+    'As a <strong>client</strong>, I want the onboarding sequence to guide me through intake questionnaire, brand voice profile setup, and strategy call scheduling so that I know exactly what happens next.',
+  ],
+  ['TipTap drag-and-drop proposal editor with the 12 Compound Method blocks as reorderable sections.','Auto-population of client data and pricing from Phase 2 billing module.','HelloSign API e-signature integration embedded in proposals.','Automated cascade on signature: Project created → Invoice generated → Portal provisioned → Email sequence started.','Onboarding email sequence via Resend: welcome → intake form (SurveyJS) → brand voice profile → strategy call (Cal.com).','Proposal versioning with change history. Only one active proposal per client (database constraint).'],
+  ['Proposal analytics: when the client views the proposal, how long they spend on each section.','PDF export of proposals with full brand styling for offline review.','Proposal templates beyond the Compound Method — custom templates for different service tiers.'],
+  ['Proposal approval workflows with multiple signatories for larger organizations.','Integration with DocuSign as an alternative to HelloSign.','Contract renewal automation based on subscription end dates.'],
+  ['Given an admin builds a proposal, when they add the 12 Compound Method blocks, then each block renders with the correct structure and is drag-reorderable.','Given a proposal is sent, when the client opens the link, then they see the full strategy document and pricing without needing to log in.','Given a client signs via HelloSign, when the signature webhook fires, then a Project, Invoice, Portal access, and email sequence are all created automatically.','Given the onboarding email sequence starts, when the client completes the intake form, then the brand voice profile setup form is sent next.','Given a client already has an active proposal, when an admin tries to create another, then the system prevents it and shows the existing proposal.'],
+  [['TipTap Editor','Rich text block editor. Drag-and-drop section reordering.'],['HelloSign API','Legally binding e-signatures (~$15/mo for 3 requests).'],['SurveyJS','Client intake questionnaires and onboarding forms.'],['FastAPI','Template engine, PDF generation, cascade orchestration.'],['Resend','Onboarding email sequences (welcome, intake, brand voice, kickoff).'],['Celery','Automated pipeline: proposal acceptance triggers project + invoice + portal + emails.']],
+  ['Phase 2 billing system (invoice auto-generation on proposal acceptance).','HelloSign account with API access.','Cal.com (Phase 1) for strategy call scheduling in onboarding.'],
+  ['HelloSign API rate limits and pricing tiers.','Proposal content is strategy-sensitive — ensure encryption at rest and secure sharing links.','Cascade automation complexity — need robust error handling if any step in the chain fails.']
+);
+
+// Phase 4
+document.getElementById('phase4').innerHTML = renderPhase(
+  4, 'Project Management', '#b8c920',
+  ['ClickUp'], '10–16 weeks', '$15,000–$28,000',
+  'Kanban boards mapped to Stevie Social\'s 13-step production workflow with real-time collaboration. Each project tracks its Compound Method phase, and the client portal exposes only Step 9 (Client Approval & Revisions). This is the most complex module — real-time WebSocket collaboration, drag-and-drop with optimistic UI, and client-facing filtered views.',
+  [
+    'As a <strong>Stevie team member</strong>, I want to see all tasks organized in a Kanban board mapped to the 13-step workflow so that I always know what stage each piece of content is in.',
+    'As a <strong>Stevie team member</strong>, I want to drag tasks between columns and see changes reflected in real-time for all team members so that we can collaborate without refreshing.',
+    'As a <strong>Stevie admin</strong>, I want projects to auto-generate the 13-step pipeline when created (from a proposal or manually) so that the workflow is consistent across all clients.',
+    'As a <strong>client</strong>, I want to see only my approval tasks (Step 9) in the client portal so that I can review content, leave comments, approve, or request revisions without seeing internal workflow.',
+    'As a <strong>Stevie admin</strong>, I want time tracking per task that feeds into reporting so that I can understand team capacity and per-client effort.',
+    'As a <strong>Stevie admin</strong>, I want the system to prompt me when Compound Method phase transition criteria are met so that phase transitions are data-driven, not calendar-driven.',
+  ],
+  ['React DnD Kit Kanban board with keyboard accessibility and touch support.','13-step Stevie workflow template auto-generates as columns on project creation.','Supabase Realtime WebSocket broadcasts for sub-100ms collaborative updates.','Client portal filtered to Step 9 (Client Approval) tasks only — enforced by Row-Level Security.','Task model with float-based positioning for reorder without sibling locks.','Optimistic concurrency via version column on tasks.','File attachments stored in Cloudflare R2 with zero egress fees.'],
+  ['Time tracking per task with start/stop timer and manual entry.','@mentions in task comments with email/in-app notification.','Task templates for common workflows (e.g., "Instagram Reel" generates a pre-filled task set).','Board, List, and Timeline view toggles.','Compound Method phase transition criteria checker with automatic prompts.'],
+  ['Gantt chart view with dependency visualization.','Resource allocation view showing team workload across projects.','Recurring task automation (e.g., monthly content planning tasks).','Client-facing project timeline showing upcoming deliverables.'],
+  ['Given a project is created from an accepted proposal, when the project loads, then 13 Kanban columns are auto-generated matching Stevie\'s workflow steps.','Given a team member drags a task to a new column, when the drop completes, then all connected users see the change within 100ms via WebSocket.','Given a client logs into the portal, when they view their project, then they see ONLY Step 9 tasks and no internal workflow steps.','Given two team members edit the same task simultaneously, when both save, then the version column detects the conflict and the second save prompts a merge.','Given a task has a file attachment, when it is uploaded, then the file is stored in Cloudflare R2 and the task shows a thumbnail preview.'],
+  [['React DnD Kit','Drag-and-drop with keyboard accessibility and touch support.'],['Supabase Realtime','WebSocket live updates via PostgreSQL NOTIFY/LISTEN.'],['TipTap','Rich text task descriptions with @mentions, checklists, file embeds.'],['PostgreSQL + RLS','Multi-tenant data isolation. Float-based position column.'],['Celery','Due date reminders, recurring task generation, step transitions.'],['Cloudflare R2','Task file attachments with zero egress fees.']],
+  ['Phase 1 user/organization system.','Phase 3 proposal acceptance (auto-creates projects) — but projects can also be created manually.','Supabase Realtime enabled on the projects and tasks tables.'],
+  ['Real-time collaboration via WebSockets is the hardest technical challenge. Requires robust conflict resolution.','Complex drag-and-drop UI with optimistic updates — performance with large datasets.','Client portal security: must be airtight — clients should never see internal data.']
+);
+
+// Phase 5
+document.getElementById('phase5').innerHTML = renderPhase(
+  5, 'Reporting & Analytics', C.lv,
+  ['Metricool (partial)','Manual reporting'], '6–10 weeks', '$8,000–$15,000',
+  'Dashboards with KPIs specific to each Compound Method phase. In Protect: saves, shares, alignment signals, misaligned inquiry rate. In Deepen: inbound conversation quality, brand recognition, content library depth. In Amplify: cost per qualified lead, paid vs. organic comparison. Auto-generated branded client reports replace manual monthly reporting.',
+  [
+    'As a <strong>Stevie admin</strong>, I want to see phase-specific KPIs for each client so that I can evaluate progress through the Compound Method objectively.',
+    'As a <strong>Stevie admin</strong>, I want to generate branded PDF reports with one click so that client reporting does not require manual effort each month.',
+    'As a <strong>Stevie admin</strong>, I want to schedule automatic report emails to clients so that reports are delivered consistently without reminders.',
+    'As a <strong>client</strong>, I want to see my own dashboard in the portal with engagement quality metrics (not vanity metrics) so that I understand the value of the strategy.',
+    'As a <strong>Stevie admin</strong>, I want phase comparison views that overlay metrics across Protect → Deepen → Amplify so that the compounding effect is visible over time.',
+  ],
+  ['Nightly Celery cron job aggregating data from all modules into analytics_daily table with Compound Method phase tagging.','PostgreSQL materialized views pre-computing phase-specific KPIs for sub-second dashboard queries.','Recharts interactive visualizations: line, bar, area, funnel charts.','Compound Method phase-specific dashboards: Protect (saves, shares, alignment), Deepen (inbound quality, recognition), Amplify (CPL, paid vs. organic).','Phase transition criteria tracker with visual progress indicator.','Client portal filtered dashboard showing only their permitted metrics.'],
+  ['Branded PDF report export with Stevie brand colors, Margo+Beuys headings, client logo.','Scheduled auto-email report delivery (weekly or monthly).','Phase comparison overlay: metrics across phases to show compounding effect.','Customizable report builder (select which metrics to include).'],
+  ['Predictive analytics: based on current trajectory, when will phase transition criteria be met?','Benchmark comparison: how does this client compare to similar clients in the same phase?','Revenue attribution: which content/channel drives the most qualified leads?'],
+  ['Given the nightly Celery job runs, when data is aggregated, then the analytics_daily table is updated with accurate metrics for all clients.','Given an admin opens a client report, when they select a date range, then the dashboard loads in under 2 seconds with interactive charts.','Given a client is in Protect phase, when the dashboard renders, then only Protect-relevant KPIs are shown (saves, shares, alignment signals, misaligned inquiry rate).','Given an admin clicks "Export PDF", when the report generates, then it uses Stevie brand colors, Margo+Beuys headings, and includes the client logo.'],
+  [['Recharts','Interactive charts: line, bar, area, funnel. Responsive and accessible.'],['FastAPI','Data aggregation endpoints querying pre-computed views.'],['PostgreSQL Materialized Views','Nightly refresh via Celery. Pre-computes phase metrics.'],['Celery','Scheduled report generation, nightly data aggregation.'],['Resend','Branded report emails on schedule or on-demand.'],['React PDF (@react-pdf)','PDF export with brand styling and client logos.']],
+  ['Phases 1–4 as data sources (analytics, bookings, invoices, projects, tasks).','Social media engagement data (Phase 7) — reporting can launch without this, using internal data only.'],
+  ['Data consistency: materialized views must refresh reliably. Add monitoring for failed refresh jobs.','Report accuracy: financial figures must reconcile exactly with Stripe data.','Performance: dashboards with large date ranges and many clients must still load quickly.']
+);
+
+// Phase 6
+document.getElementById('phase6').innerHTML = renderPhase(
+  6, 'Email Marketing + Forms + Automation', C.or,
+  ['Flodesk','Typeform','Zapier'], '12–18 weeks', '$18,000–$30,000',
+  'Campaign management with audience segmentation, drag-and-drop email builder, visual form builder, and workflow automation. Migrates the existing Flodesk subscriber list at socialthatspeaks.myflodesk.com. Email strategy explicitly supports Compound Method Phase 2 (Deepen) — deepening relationships beyond algorithm reach. The drag-and-drop email template builder is the hardest UI piece in this phase.',
+  [
+    'As a <strong>Stevie admin</strong>, I want to build email templates with a visual editor using Stevie brand styles so that emails are on-brand without HTML coding.',
+    'As a <strong>Stevie admin</strong>, I want to segment audiences by tags, behavior, and engagement score so that each campaign reaches the right people.',
+    'As a <strong>Stevie admin</strong>, I want to schedule campaigns and see open/click analytics so that I can measure email effectiveness.',
+    'As a <strong>Stevie admin</strong>, I want form submissions to trigger automated workflows (create task, send follow-up, update CRM, notify team) so that manual handoffs are eliminated.',
+    'As a <strong>Stevie admin</strong>, I want all current Zapier automations replicated in n8n so that we can cancel the Zapier subscription.',
+    'As a <strong>Stevie admin</strong>, I want the existing Flodesk subscriber list migrated with all tags preserved so that we do not lose engagement history.',
+  ],
+  ['Listmonk self-hosted deployment with Amazon SES for delivery.','React Email template builder with Stevie brand styling.','Audience segmentation by tags, behavior, and engagement score.','Campaign scheduling with Celery dispatch.','Open/click tracking that updates contact engagement scores.','SurveyJS drag-and-drop form builder integration.','n8n self-hosted visual workflow automation replacing all Zapier automations.','Flodesk subscriber list migration with tag preservation.'],
+  ['Contact engagement scoring with automatic tier assignment.','A/B testing for subject lines and email content.','Drip sequence builder for multi-email nurture flows.','Email deliverability monitoring dashboard.','Form analytics (completion rates, drop-off points).'],
+  ['SMS marketing integration (Twilio or similar).','Advanced segmentation with predictive send-time optimization.','White-label email sending domain per client (for SaaS resale).'],
+  ['Given the Flodesk subscriber list is migrated, when the import completes, then all contacts and tags match the source data with zero data loss.','Given an admin builds an email template, when it renders, then it displays correctly in Gmail, Outlook, and Apple Mail.','Given a campaign is scheduled, when the send time arrives, then Celery dispatches to Listmonk which sends via Amazon SES with no duplicate sends.','Given a form is submitted, when the webhook fires, then the n8n workflow executes the configured action chain (create task → send email → update CRM).','Given a contact opens an email, when the tracking pixel fires, then their engagement score is updated within 5 minutes.'],
+  [['Listmonk (self-hosted)','Open-source campaign manager. Segmentation, analytics, templates.'],['Amazon SES','Email delivery at $0.10 per 1,000 emails. No subscriber limits.'],['React Email','JSX-based email template builder. Cross-client HTML rendering.'],['SurveyJS','Drag-and-drop form builder. Conditional logic. Multi-page flows.'],['n8n (self-hosted)','Visual workflow automation. 400+ integrations. JS/Python code nodes.'],['FastAPI + Celery','Event bus for triggers. Rate limiting. Scheduled dispatch.']],
+  ['Phase 1 contacts model and API.','Amazon SES account with verified sending domain.','Flodesk export (CSV) with subscriber data and tags.','Inventory of all current Zapier automations to replicate in n8n.'],
+  ['Email deliverability is the hardest problem in SaaS — using SES mitigates this but domain warming is still required.','Drag-and-drop email template builder is a complex UI challenge.','n8n self-hosting requires ongoing maintenance and monitoring.','GDPR/CAN-SPAM compliance for email marketing.']
+);
+
+// Phase 7
+document.getElementById('phase7').innerHTML = renderPhase(
+  7, 'Video, Social Media & AI', C.sg,
+  ['Dropbox','Descript','Loom','Metricool','ChatGPT'], '12–18 weeks', '$18,000–$30,000',
+  'Asset management with Cloudflare R2 storage (zero egress fees replacing Dropbox for large video files), Mux video streaming, browser-based recording (replacing Loom), social scheduling with platform analytics, and AI content generation. Per-client brand voice profiles enforce Stevie\'s tone: confident, calm, warm authority. The core principle: AI generates drafts, humans make decisions.',
+  [
+    'As a <strong>Stevie team member</strong>, I want to upload large video files (1GB+) directly to cloud storage so that I do not hit the current Dropbox size and organization limits.',
+    'As a <strong>Stevie team member</strong>, I want to record my screen in the browser so that I do not need a separate Loom subscription for quick walkthroughs.',
+    'As a <strong>Stevie team member</strong>, I want to add timestamped comments on videos so that feedback is precise and contextual.',
+    'As a <strong>client</strong>, I want to review and approve video content in the portal at Step 9 so that I do not need to download large files or use a separate tool.',
+    'As a <strong>Stevie admin</strong>, I want AI to suggest captions using the client\'s brand voice profile so that drafts are already on-tone and require minimal editing.',
+    'As a <strong>Stevie admin</strong>, I want to schedule social posts across Meta, TikTok, LinkedIn, and YouTube from one interface so that I do not need to log into each platform.',
+    'As a <strong>Stevie admin</strong>, I want engagement data from social platforms to flow back into reporting automatically so that the analytics dashboard always reflects current performance.',
+    'As a <strong>Stevie admin</strong>, I want to amplify only content that has proven organic alignment (Compound Method Phase 3) so that ad spend is directed at the highest-performing content.',
+  ],
+  ['Cloudflare R2 chunked upload for files over 1GB with progress indicator.','Mux integration for adaptive bitrate video streaming with auto-thumbnails.','PostgreSQL metadata indexing: client, campaign, tags, status, duration, resolution.','File organization: Client → Campaign → Asset Type (Raw/Edited/Final) → Date.','Social media scheduling with Celery publishing to Meta, TikTok, LinkedIn, YouTube APIs.','AI content generation via Claude Sonnet with per-client brand voice profiles injected as system prompts.','Brand voice profiles: tone descriptors, vocabulary preferences, 3–5 example pieces (few-shot), and explicit guardrails.','Engagement data ingestion from social platform APIs into analytics_daily.'],
+  ['RecordRTC browser-based screen and camera recording replacing Loom.','Timestamped commenting on video player for review workflow.','GPT-4o mini for utility tasks: grammar checks, sentiment analysis, structured data extraction.','LiteLLM abstraction layer for swapping AI models per feature without code changes.','Video thumbnail generation via Cloudflare Workers on upload.','is_amplified flag on social_posts: only organically proven content enters Amplify phase.'],
+  ['Remotion or Shotstack integration for template-based automated video generation.','"Send to Descript" deep link for creative editing with output returning to the platform.','Unified social media API via Ayrshare or open-source Postiz for simplified multi-platform management.','AI content quality scoring with thumbs up/down feedback loop for continuous prompt improvement.'],
+  ['Given a team member uploads a 2GB video file, when the chunked upload completes, then the file is stored in R2 and Mux processes it for streaming within 5 minutes.','Given an admin requests AI-generated captions, when the client brand voice profile is loaded, then the output reflects the tone, vocabulary, and guardrails defined in the profile.','Given an admin schedules a post for Instagram and TikTok, when the scheduled time arrives, then Celery publishes to both platforms and no double-posting occurs (SELECT FOR UPDATE SKIP LOCKED).','Given social platform APIs return engagement data, when the nightly aggregation runs, then analytics_daily is updated with accurate per-post metrics.','Given a client views video in the portal (Step 9), when they leave a comment, then it includes the video timestamp and is visible to the Stevie team.'],
+  [['Cloudflare R2','Object storage at $0.015/GB/mo with zero egress. S3-compatible.'],['Mux','Video streaming with adaptive bitrate, auto-thumbnails, viewer analytics.'],['RecordRTC','Browser-based screen + camera recording via MediaRecorder APIs.'],['Meta / TikTok / LinkedIn / YouTube APIs','Social publishing, scheduling, engagement analytics.'],['Claude Sonnet','Creative content generation with brand voice profiles ($3/M input tokens).'],['GPT-4o mini','Utility tasks: grammar, sentiment, extraction ($0.15/M input tokens).'],['LiteLLM','Model abstraction layer. Swap providers without code changes.']],
+  ['Phase 4 project management (task approval workflow for video review at Step 9).','Phase 5 reporting (engagement data feeds analytics dashboards).','Social media platform API approvals (TikTok requires partner status, 2+ week timeline).','AI API accounts (Anthropic Claude, OpenAI).'],
+  ['Social media API deprecations and rate limit changes — the highest-risk dependency in the platform.','TikTok API approval requires partner status and has a multi-week timeline.','AI API costs: estimated $25–$50/month for 50–100 content pieces. Monitor and cap with per-org spending limits.','Video storage costs at scale: implement auto-archival to Backblaze B2 cold storage for older content.']
+);
+</script>
+
+</body>
+</html>
