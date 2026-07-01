@@ -5,7 +5,10 @@
  * to make authorized requests to the FastAPI backend.
  */
 
-import { createClient } from "@/lib/supabase/client";
+import {
+  createClient,
+  hasSupabaseBrowserConfig,
+} from "@/lib/supabase/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -17,18 +20,22 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let accessToken: string | undefined;
+  if (hasSupabaseBrowserConfig()) {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    accessToken = session?.access_token;
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
 
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
   const res = await fetch(`${API_URL}${path}`, {
@@ -769,6 +776,244 @@ export interface PresignedUploadResponse {
   r2_key: string | null;
   cf_image_id: string | null;
   cf_stream_uid: string | null;
+}
+
+/* Autonomous Agency */
+
+export interface ClientEngagement {
+  id: string;
+  org_id: string;
+  lead_id: string | null;
+  project_id: string | null;
+  name: string;
+  client_url: string | null;
+  repo_url: string | null;
+  client_name: string | null;
+  client_email: string | null;
+  status: string;
+  goals: unknown[];
+  constraints: unknown[];
+  intake_payload: Record<string, unknown>;
+  integration_state: Record<string, unknown>;
+  created_by_agent: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarketingRun {
+  id: string;
+  org_id: string;
+  engagement_id: string;
+  project_id: string | null;
+  status: string;
+  stage: string;
+  objective: string;
+  strategy_summary: Record<string, unknown>;
+  current_blocker: Record<string, unknown> | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgencyArtifact {
+  id: string;
+  org_id: string;
+  engagement_id: string;
+  marketing_run_id: string | null;
+  virtual_agency_task_id: string | null;
+  artifact_type: string;
+  title: string;
+  body: string | null;
+  payload: Record<string, unknown>;
+  payload_hash: string;
+  version: number;
+  evidence_refs: unknown[];
+  lineage: Record<string, unknown>;
+  author_role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgencyApprovalRequest {
+  id: string;
+  org_id: string;
+  engagement_id: string;
+  marketing_run_id: string | null;
+  approval_type: string;
+  status: string;
+  subject_type: string;
+  subject_id: string;
+  reason: string;
+  approval_version: number;
+  approval_payload_hash: string;
+  decided_at: string | null;
+  decided_by_user_id: string | null;
+  decision_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgencyAccessRequest {
+  id: string;
+  org_id: string;
+  engagement_id: string;
+  marketing_run_id: string | null;
+  request_type: string;
+  provider: string | null;
+  status: string;
+  scope: Record<string, unknown>;
+  reason: string;
+  instructions: Record<string, unknown>;
+  resolved_at: string | null;
+  resolved_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientEngagementCreatePayload {
+  name?: string;
+  client_url?: string;
+  repo_url?: string;
+  client_name?: string;
+  client_email?: string;
+  goals?: string[];
+  constraints?: string[];
+  intake_payload?: Record<string, unknown>;
+  integration_state?: Record<string, unknown>;
+}
+
+export interface AgencyArtifactCreatePayload {
+  marketing_run_id?: string | null;
+  artifact_type: string;
+  title: string;
+  body?: string | null;
+  payload?: Record<string, unknown>;
+  evidence_refs?: Array<{ kind: string; id: string; label: string }>;
+  lineage?: Record<string, unknown>;
+  author_role: string;
+}
+
+export interface AgencyApprovalCreatePayload {
+  marketing_run_id?: string | null;
+  approval_type: string;
+  subject_type: string;
+  subject_id: string;
+  reason: string;
+  approval_payload?: Record<string, unknown>;
+}
+
+export interface AgencyAccessRequestCreatePayload {
+  marketing_run_id?: string | null;
+  request_type: string;
+  provider?: string | null;
+  scope?: Record<string, unknown>;
+  reason: string;
+  instructions?: Record<string, unknown>;
+}
+
+export async function listClientEngagements() {
+  return apiFetch<PaginatedResponse<ClientEngagement>>(
+    "/api/agency/engagements?per_page=50&page=1"
+  );
+}
+
+export async function createClientEngagement(
+  payload: ClientEngagementCreatePayload
+) {
+  return apiFetch<ClientEngagement>("/api/agency/engagements", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listMarketingRuns(engagementId: string) {
+  return apiFetch<MarketingRun[]>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/runs`
+  );
+}
+
+export async function createMarketingRun(
+  engagementId: string,
+  payload: { objective: string; project_id?: string | null }
+) {
+  return apiFetch<MarketingRun>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/runs`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function listAgencyArtifacts(engagementId: string) {
+  return apiFetch<AgencyArtifact[]>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/artifacts`
+  );
+}
+
+export async function createAgencyArtifact(
+  engagementId: string,
+  payload: AgencyArtifactCreatePayload
+) {
+  return apiFetch<AgencyArtifact>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/artifacts`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function listAgencyApprovals(engagementId: string) {
+  return apiFetch<AgencyApprovalRequest[]>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/approvals`
+  );
+}
+
+export async function createAgencyApproval(
+  engagementId: string,
+  payload: AgencyApprovalCreatePayload
+) {
+  return apiFetch<AgencyApprovalRequest>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/approvals`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function decideAgencyApproval(
+  approvalId: string,
+  payload: { decision: "approved" | "rejected" | "revoked"; decision_note?: string }
+) {
+  return apiFetch<AgencyApprovalRequest>(
+    `/api/agency/approvals/${encodeURIComponent(approvalId)}/decision`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function listAgencyAccessRequests(engagementId: string) {
+  return apiFetch<AgencyAccessRequest[]>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/access-requests`
+  );
+}
+
+export async function createAgencyAccessRequest(
+  engagementId: string,
+  payload: AgencyAccessRequestCreatePayload
+) {
+  return apiFetch<AgencyAccessRequest>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/access-requests`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export interface OrganizationSettings {

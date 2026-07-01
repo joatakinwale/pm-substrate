@@ -43,3 +43,26 @@ def test_agency_router_exposes_approval_decision_endpoint():
     assert '"/approvals/{approval_id}/decision"' in src
     assert "AgencyApprovalDecision" in src
     assert "decide_approval_request(" in src
+
+
+def test_agency_router_exposes_nested_read_routes_for_monitoring():
+    import app.api.agency as module
+
+    route_methods = {
+        (route.path, frozenset(route.methods or set()))
+        for route in module.router.routes
+    }
+
+    assert ("/agency/engagements/{engagement_id}/runs", frozenset({"GET"})) in route_methods
+    assert (
+        "/agency/engagements/{engagement_id}/artifacts",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/agency/engagements/{engagement_id}/approvals",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/agency/engagements/{engagement_id}/access-requests",
+        frozenset({"GET"}),
+    ) in route_methods

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import {
+  createClient,
+  hasSupabaseBrowserConfig,
+} from "@/lib/supabase/client";
 
 /**
  * Real-time event hook using Server-Sent Events.
@@ -50,15 +53,18 @@ export function useRealtime(
   const { projectId, enabled = true } = options;
   const [connected, setConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<RealtimeEvent | null>(null);
+  const [reconnectTick, setReconnectTick] = useState(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const handlersRef = useRef(handlers);
 
-  // Keep handlers ref current without re-triggering effect
-  handlersRef.current = handlers;
+  // Keep handlers ref current without re-triggering the connection effect.
+  useEffect(() => {
+    handlersRef.current = handlers;
+  }, [handlers]);
 
   const connect = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled || !hasSupabaseBrowserConfig()) return;
 
     // Resolve the live Supabase session — the Worker needs both the
     // access token (as ?token=) and the user's org_id (in the URL path).
@@ -137,7 +143,7 @@ export function useRealtime(
 
       // Reconnect with exponential backoff
       reconnectTimerRef.current = setTimeout(() => {
-        connect();
+        setReconnectTick((tick) => tick + 1);
       }, 3000);
     };
   }, [enabled, projectId]);
@@ -153,7 +159,7 @@ export function useRealtime(
         clearTimeout(reconnectTimerRef.current);
       }
     };
-  }, [connect]);
+  }, [connect, reconnectTick]);
 
   return { connected, lastEvent };
 }

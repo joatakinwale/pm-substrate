@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import {
+  createClient,
+  hasSupabaseBrowserConfig,
+} from "@/lib/supabase/client";
 import {
   LayoutDashboard,
   Users,
@@ -30,6 +33,7 @@ import {
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/agency", label: "Agency", icon: Sparkles },
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
@@ -65,18 +69,26 @@ export default function AdminSidebar() {
     let cancelled = false;
 
     async function loadUser() {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      const user = data.user;
-      if (cancelled || !user) return;
-      const email: string = user.email ?? "";
-      const fullName = user.user_metadata?.full_name;
-      const name: string =
-        (typeof fullName === "string" && fullName) ||
-        email.split("@")[0] ||
-        "User";
-      setUserEmail(email);
-      setUserName(name);
+      if (!hasSupabaseBrowserConfig()) return;
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        const user = data.user;
+        if (cancelled || !user) return;
+        const email: string = user.email ?? "";
+        const fullName = user.user_metadata?.full_name;
+        const name: string =
+          (typeof fullName === "string" && fullName) ||
+          email.split("@")[0] ||
+          "User";
+        setUserEmail(email);
+        setUserName(name);
+      } catch {
+        if (!cancelled) {
+          setUserEmail("");
+          setUserName("");
+        }
+      }
     }
 
     loadUser();
@@ -86,6 +98,10 @@ export default function AdminSidebar() {
   }, []);
 
   async function handleSignOut() {
+    if (!hasSupabaseBrowserConfig()) {
+      window.location.href = "/login";
+      return;
+    }
     const supabase = createClient();
     await supabase.auth.signOut();
     window.location.href = "/login";

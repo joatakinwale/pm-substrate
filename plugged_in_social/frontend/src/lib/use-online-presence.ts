@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/client";
+import {
+  createClient,
+  hasSupabaseBrowserConfig,
+} from "@/lib/supabase/client";
 import { useRealtime } from "@/lib/use-realtime";
 
 /**
@@ -41,15 +44,19 @@ const HEARTBEAT_MS = 30_000;
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let accessToken: string | undefined;
+  if (hasSupabaseBrowserConfig()) {
+    const supabase = createClient();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    accessToken = session?.access_token;
+  }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (session?.access_token) {
-    headers["Authorization"] = `Bearer ${session.access_token}`;
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
   }
   return headers;
 }
@@ -108,6 +115,7 @@ function postOfflineBeacon(token: string | undefined): void {
 export function useOnlinePresence(): UseOnlinePresenceReturn {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  const authConfigured = hasSupabaseBrowserConfig();
   // Live Map of user_id → OnlineUser. We mirror it into state via setOnlineUsers
   // whenever it mutates so React re-renders.
   const usersRef = useRef<Map<string, OnlineUser>>(new Map());
@@ -115,6 +123,8 @@ export function useOnlinePresence(): UseOnlinePresenceReturn {
 
   // Resolve current user identity once.
   useEffect(() => {
+    if (!authConfigured) return;
+
     let cancelled = false;
     const supabase = createClient();
     supabase.auth
@@ -124,14 +134,17 @@ export function useOnlinePresence(): UseOnlinePresenceReturn {
       tokenRef.current = session?.access_token ?? null;
       const uid = session?.user?.id;
       if (uid) setMyUserId(String(uid));
-    });
+    })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authConfigured]);
 
   // Heartbeat loop + unload beacon.
   useEffect(() => {
+    if (!authConfigured) return;
+
     // Fire immediately on mount, then every 30s.
     postHeartbeat();
     const interval = setInterval(postHeartbeat, HEARTBEAT_MS);
@@ -158,7 +171,7 @@ export function useOnlinePresence(): UseOnlinePresenceReturn {
       // Best-effort offline ping on unmount.
       postOfflineBeacon(tokenRef.current ?? undefined);
     };
-  }, []);
+  }, [authConfigured]);
 
   // Snapshot helper — sorts so the current user is first, then by name.
   const snapshot = useCallback((): OnlineUser[] => {
@@ -195,7 +208,7 @@ export function useOnlinePresence(): UseOnlinePresenceReturn {
         }
       },
     },
-    {}
+    { enabled: authConfigured }
   );
 
   return { onlineUsers, myUserId };

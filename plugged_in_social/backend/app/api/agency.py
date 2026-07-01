@@ -9,7 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user, get_db_with_rls_dep
-from app.models.agency import AgencyApprovalRequest, ClientEngagement
+from app.models.agency import (
+    AgencyAccessRequest,
+    AgencyApprovalRequest,
+    AgencyArtifact,
+    ClientEngagement,
+    MarketingRun,
+)
 from app.schemas.agency import (
     AgencyAccessRequestCreate,
     AgencyAccessRequestResponse,
@@ -126,6 +132,28 @@ async def get_engagement(
     return ClientEngagementResponse.model_validate(engagement)
 
 
+@router.get(
+    "/engagements/{engagement_id}/runs",
+    response_model=list[MarketingRunResponse],
+)
+async def list_marketing_runs(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement_or_404(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(MarketingRun)
+        .where(
+            MarketingRun.org_id == org_id,
+            MarketingRun.engagement_id == engagement_id,
+        )
+        .order_by(MarketingRun.created_at.desc())
+    )
+    return [MarketingRunResponse.model_validate(item) for item in result.scalars().all()]
+
+
 @router.post(
     "/engagements/{engagement_id}/runs",
     response_model=MarketingRunResponse,
@@ -152,6 +180,28 @@ async def create_marketing_run(
     await db.commit()
     await db.refresh(run)
     return MarketingRunResponse.model_validate(run)
+
+
+@router.get(
+    "/engagements/{engagement_id}/artifacts",
+    response_model=list[AgencyArtifactResponse],
+)
+async def list_artifacts(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement_or_404(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(AgencyArtifact)
+        .where(
+            AgencyArtifact.org_id == org_id,
+            AgencyArtifact.engagement_id == engagement_id,
+        )
+        .order_by(AgencyArtifact.created_at.desc())
+    )
+    return [AgencyArtifactResponse.model_validate(item) for item in result.scalars().all()]
 
 
 @router.post(
@@ -182,6 +232,28 @@ async def create_artifact(
     return AgencyArtifactResponse.model_validate(artifact)
 
 
+@router.get(
+    "/engagements/{engagement_id}/approvals",
+    response_model=list[AgencyApprovalResponse],
+)
+async def list_approvals(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement_or_404(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(AgencyApprovalRequest)
+        .where(
+            AgencyApprovalRequest.org_id == org_id,
+            AgencyApprovalRequest.engagement_id == engagement_id,
+        )
+        .order_by(AgencyApprovalRequest.created_at.desc())
+    )
+    return [AgencyApprovalResponse.model_validate(item) for item in result.scalars().all()]
+
+
 @router.post(
     "/engagements/{engagement_id}/approvals",
     response_model=AgencyApprovalResponse,
@@ -208,6 +280,31 @@ async def create_approval(
     await db.commit()
     await db.refresh(approval)
     return AgencyApprovalResponse.model_validate(approval)
+
+
+@router.get(
+    "/engagements/{engagement_id}/access-requests",
+    response_model=list[AgencyAccessRequestResponse],
+)
+async def list_access_requests(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement_or_404(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(AgencyAccessRequest)
+        .where(
+            AgencyAccessRequest.org_id == org_id,
+            AgencyAccessRequest.engagement_id == engagement_id,
+        )
+        .order_by(AgencyAccessRequest.created_at.desc())
+    )
+    return [
+        AgencyAccessRequestResponse.model_validate(item)
+        for item in result.scalars().all()
+    ]
 
 
 @router.post(
