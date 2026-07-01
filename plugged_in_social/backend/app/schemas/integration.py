@@ -122,6 +122,28 @@ class IntegrationTaskEnvelope(BaseModel):
     links: list[IntegrationLink]
 
 
+class IntegrationRunEventEnvelope(BaseModel):
+    resource_type: Literal["virtual_agency_event"] = "virtual_agency_event"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    marketing_run_id: uuid.UUID
+    task_id: uuid.UUID
+    project_id: uuid.UUID | None
+    event_type: str
+    actor_role: str | None
+    actor_id: str | None
+    idempotency_key: str
+    task_version: int | None
+    approval_version: int | None
+    previous_event_hash: str | None
+    payload_hash: str
+    event_hash: str
+    payload: dict[str, Any]
+    lineage: dict[str, Any]
+    occurred_at: datetime
+    links: list[IntegrationLink]
+
+
 class IntegrationApprovalEnvelope(BaseModel):
     resource_type: Literal["agency_approval_request"] = "agency_approval_request"
     id: uuid.UUID
@@ -140,6 +162,26 @@ class IntegrationApprovalEnvelope(BaseModel):
     decision_note: str | None
     created_at: datetime
     updated_at: datetime
+    links: list[IntegrationLink]
+
+
+class IntegrationEvidenceSummaryEnvelope(BaseModel):
+    resource_type: Literal["marketing_run_evidence_summary"] = (
+        "marketing_run_evidence_summary"
+    )
+    run_id: uuid.UUID
+    org_id: uuid.UUID
+    status: str
+    stage: str
+    artifact_count: int
+    artifact_type_counts: dict[str, int]
+    task_count: int
+    task_status_counts: dict[str, int]
+    event_count: int
+    event_type_counts: dict[str, int]
+    approval_count: int
+    pending_approval_count: int
+    evidence_hashes: dict[str, list[str]]
     links: list[IntegrationLink]
 
 

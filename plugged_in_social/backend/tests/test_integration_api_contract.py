@@ -36,6 +36,14 @@ def test_integration_router_imports_with_neutral_v1_prefix():
         frozenset({"GET"}),
     ) in route_methods
     assert (
+        "/integration/v1/marketing-runs/{run_id}/events",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/marketing-runs/{run_id}/evidence-summary",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
         "/integration/v1/approvals/{approval_id}/decision",
         frozenset({"POST"}),
     ) in route_methods
@@ -70,7 +78,9 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationAcceptedResponse,
         IntegrationArtifactEnvelope,
         IntegrationCapabilityResponse,
+        IntegrationEvidenceSummaryEnvelope,
         IntegrationEventIngest,
+        IntegrationRunEventEnvelope,
         IntegrationMarketingRunEnvelope,
         IntegrationTaskEnvelope,
     )
@@ -79,6 +89,8 @@ def test_integration_schemas_expose_stable_external_envelopes():
     run_fields = set(IntegrationMarketingRunEnvelope.model_fields)
     artifact_fields = set(IntegrationArtifactEnvelope.model_fields)
     task_fields = set(IntegrationTaskEnvelope.model_fields)
+    run_event_fields = set(IntegrationRunEventEnvelope.model_fields)
+    evidence_summary_fields = set(IntegrationEvidenceSummaryEnvelope.model_fields)
     event_fields = set(IntegrationEventIngest.model_fields)
     accepted_fields = set(IntegrationAcceptedResponse.model_fields)
 
@@ -115,6 +127,27 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "latest_event_hash",
         "lineage",
     }.issubset(task_fields)
+    assert {
+        "id",
+        "task_id",
+        "event_type",
+        "payload_hash",
+        "event_hash",
+        "previous_event_hash",
+        "lineage",
+        "occurred_at",
+    }.issubset(run_event_fields)
+    assert {
+        "run_id",
+        "artifact_count",
+        "artifact_type_counts",
+        "task_count",
+        "task_status_counts",
+        "event_count",
+        "event_type_counts",
+        "pending_approval_count",
+        "evidence_hashes",
+    }.issubset(evidence_summary_fields)
     assert {"engagement_id", "event_type", "source", "payload"}.issubset(
         event_fields
     )

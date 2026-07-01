@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from collections import Counter
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,7 +16,7 @@ from app.models.agency import (
     ClientEngagement,
     MarketingRun,
 )
-from app.models.virtual_agency import VirtualAgencyTask
+from app.models.virtual_agency import VirtualAgencyEvent, VirtualAgencyTask
 from app.schemas.agency import AgencyArtifactCreate
 from app.schemas.integration import (
     IntegrationAcceptedResponse,
@@ -25,9 +26,11 @@ from app.schemas.integration import (
     IntegrationCapability,
     IntegrationCapabilityResponse,
     IntegrationEngagementEnvelope,
+    IntegrationEvidenceSummaryEnvelope,
     IntegrationEventIngest,
     IntegrationLink,
     IntegrationMarketingRunEnvelope,
+    IntegrationRunEventEnvelope,
     IntegrationTaskEnvelope,
     IntegrationWebhookIngest,
 )
@@ -185,6 +188,37 @@ def _to_task(item: VirtualAgencyTask) -> IntegrationTaskEnvelope:
     )
 
 
+def _to_event(
+    item: VirtualAgencyEvent,
+    *,
+    run: MarketingRun,
+    task: VirtualAgencyTask,
+) -> IntegrationRunEventEnvelope:
+    return IntegrationRunEventEnvelope(
+        id=item.id,
+        org_id=item.org_id,
+        marketing_run_id=run.id,
+        task_id=item.task_id,
+        project_id=task.project_id,
+        event_type=item.event_type,
+        actor_role=item.actor_role,
+        actor_id=item.actor_id,
+        idempotency_key=item.idempotency_key,
+        task_version=item.task_version,
+        approval_version=item.approval_version,
+        previous_event_hash=item.previous_event_hash,
+        payload_hash=item.payload_hash,
+        event_hash=item.event_hash,
+        payload=dict(item.payload or {}),
+        lineage=dict(item.lineage or {}),
+        occurred_at=item.occurred_at,
+        links=[
+            _link("run", f"/api/integration/v1/marketing-runs/{run.id}"),
+            _link("task", f"/api/integration/v1/marketing-runs/{run.id}/tasks"),
+        ],
+    )
+
+
 def _to_approval(item: AgencyApprovalRequest) -> IntegrationApprovalEnvelope:
     return IntegrationApprovalEnvelope(
         id=item.id,
@@ -261,6 +295,80 @@ async def _get_approval(
     return item
 
 
+def _lineage_run_id(lineage: dict[str, Any] | None) -> str:
+    return str(dict(lineage or {}).get("marketing_run_id") or "")
+
+
+def _task_belongs_to_run(task: VirtualAgencyTask, run: MarketingRun) -> bool:
+    lineage_run_id = _lineage_run_id(task.lineage)
+    return lineage_run_id == str(run.id) or (
+        run.project_id is not None
+        and task.project_id == run.project_id
+        and not lineage_run_id
+    )
+
+
+def _event_belongs_to_run(
+    event: VirtualAgencyEvent,
+    *,
+    task: VirtualAgencyTask,
+    run: MarketingRun,
+) -> bool:
+    lineage_run_id = _lineage_run_id(event.lineage)
+    if lineage_run_id:
+        return lineage_run_id == str(run.id)
+    return _task_belongs_to_run(task, run)
+
+
+async def _list_run_tasks(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run: MarketingRun,
+) -> list[VirtualAgencyTask]:
+    query = select(VirtualAgencyTask).where(VirtualAgencyTask.org_id == org_id)
+    if run.project_id is not None:
+        query = query.where(VirtualAgencyTask.project_id == run.project_id)
+    result = await db.execute(query.order_by(VirtualAgencyTask.created_at.desc()))
+    return [
+        item
+        for item in result.scalars().all()
+        if _task_belongs_to_run(item, run)
+    ]
+
+
+async def _list_run_events(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run: MarketingRun,
+    limit: int | None = None,
+) -> list[tuple[VirtualAgencyEvent, VirtualAgencyTask]]:
+    query = (
+        select(VirtualAgencyEvent, VirtualAgencyTask)
+        .join(VirtualAgencyTask, VirtualAgencyEvent.task_id == VirtualAgencyTask.id)
+        .where(
+            VirtualAgencyEvent.org_id == org_id,
+            VirtualAgencyTask.org_id == org_id,
+        )
+    )
+    if run.project_id is not None:
+        query = query.where(VirtualAgencyTask.project_id == run.project_id)
+    query = query.order_by(VirtualAgencyEvent.occurred_at.asc())
+
+    result = await db.execute(query)
+    items = [
+        (event, task)
+        for event, task in result.all()
+        if _event_belongs_to_run(event, task=task, run=run)
+    ]
+    return items[:limit] if limit is not None else items
+
+
+def _count_by(items: list[Any], attr: str) -> dict[str, int]:
+    return dict(Counter(str(getattr(item, attr)) for item in items))
+
+
 def _capabilities() -> list[IntegrationCapability]:
     return [
         IntegrationCapability(
@@ -290,6 +398,20 @@ def _capabilities() -> list[IntegrationCapability]:
             description="Inspect agent tasks, approvals, hashes, and handoff lineage.",
             methods=["GET"],
             resources=["virtual_agency_task"],
+        ),
+        IntegrationCapability(
+            id="event_timeline.read",
+            name="Read marketing run event timeline",
+            description="Inspect ordered virtual-agency events for a marketing run.",
+            methods=["GET"],
+            resources=["virtual_agency_event"],
+        ),
+        IntegrationCapability(
+            id="evidence_summary.read",
+            name="Read marketing run evidence summary",
+            description="Inspect run-level artifact, task, event, approval, and hash counts.",
+            methods=["GET"],
+            resources=["marketing_run"],
         ),
         IntegrationCapability(
             id="approval.decide",
@@ -401,19 +523,24 @@ async def list_run_tasks(
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
-    query = select(VirtualAgencyTask).where(VirtualAgencyTask.org_id == org_id)
-    if run.project_id is not None:
-        query = query.where(VirtualAgencyTask.project_id == run.project_id)
-    result = await db.execute(query.order_by(VirtualAgencyTask.created_at.desc()))
-    tasks = []
-    for item in result.scalars().all():
-        lineage = dict(item.lineage or {})
-        lineage_run_id = str(lineage.get("marketing_run_id") or "")
-        if lineage_run_id == str(run.id) or (
-            run.project_id is not None and not lineage_run_id
-        ):
-            tasks.append(item)
+    tasks = await _list_run_tasks(db, org_id=org_id, run=run)
     return [_to_task(item) for item in tasks]
+
+
+@router.get(
+    "/marketing-runs/{run_id}/events",
+    response_model=list[IntegrationRunEventEnvelope],
+)
+async def list_run_events(
+    run_id: uuid.UUID,
+    limit: int = Query(200, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    run = await _get_run(db, org_id=org_id, run_id=run_id)
+    events = await _list_run_events(db, org_id=org_id, run=run, limit=limit)
+    return [_to_event(event, run=run, task=task) for event, task in events]
 
 
 @router.get(
@@ -436,6 +563,73 @@ async def list_run_approvals(
         .order_by(AgencyApprovalRequest.created_at.desc())
     )
     return [_to_approval(item) for item in result.scalars().all()]
+
+
+@router.get(
+    "/marketing-runs/{run_id}/evidence-summary",
+    response_model=IntegrationEvidenceSummaryEnvelope,
+)
+async def get_run_evidence_summary(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    run = await _get_run(db, org_id=org_id, run_id=run_id)
+
+    artifact_result = await db.execute(
+        select(AgencyArtifact).where(
+            AgencyArtifact.org_id == org_id,
+            AgencyArtifact.marketing_run_id == run_id,
+        )
+    )
+    artifacts = list(artifact_result.scalars().all())
+
+    approval_result = await db.execute(
+        select(AgencyApprovalRequest).where(
+            AgencyApprovalRequest.org_id == org_id,
+            AgencyApprovalRequest.marketing_run_id == run_id,
+        )
+    )
+    approvals = list(approval_result.scalars().all())
+
+    tasks = await _list_run_tasks(db, org_id=org_id, run=run)
+    events = await _list_run_events(db, org_id=org_id, run=run)
+    event_items = [event for event, _task in events]
+
+    return IntegrationEvidenceSummaryEnvelope(
+        run_id=run.id,
+        org_id=run.org_id,
+        status=run.status,
+        stage=run.stage,
+        artifact_count=len(artifacts),
+        artifact_type_counts=_count_by(artifacts, "artifact_type"),
+        task_count=len(tasks),
+        task_status_counts=_count_by(tasks, "status"),
+        event_count=len(event_items),
+        event_type_counts=_count_by(event_items, "event_type"),
+        approval_count=len(approvals),
+        pending_approval_count=sum(1 for item in approvals if item.status == "pending"),
+        evidence_hashes={
+            "artifact_payload_hashes": sorted(
+                {item.payload_hash for item in artifacts if item.payload_hash}
+            ),
+            "approval_payload_hashes": sorted(
+                {
+                    item.approval_payload_hash
+                    for item in approvals
+                    if item.approval_payload_hash
+                }
+            ),
+            "event_hashes": sorted(
+                {item.event_hash for item in event_items if item.event_hash}
+            ),
+            "task_latest_event_hashes": sorted(
+                {item.latest_event_hash for item in tasks if item.latest_event_hash}
+            ),
+        },
+        links=_run_links(run.id),
+    )
 
 
 @router.post(
