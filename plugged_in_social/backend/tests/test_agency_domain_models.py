@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
 from sqlalchemy import inspect
 
 
@@ -110,3 +112,51 @@ def test_artifact_approval_and_access_tables_are_hashable_and_traceable():
         "instructions",
         "resolved_at",
     }.issubset(access_columns)
+
+
+def test_client_engagement_create_schema_requires_name_or_url():
+    from app.schemas.agency import ClientEngagementCreate
+
+    with pytest.raises(ValidationError):
+        ClientEngagementCreate()
+
+    body = ClientEngagementCreate(
+        name="Acme",
+        client_url="https://example.com",
+        goals=["increase qualified leads"],
+    )
+
+    assert body.name == "Acme"
+    assert str(body.client_url) == "https://example.com/"
+    assert body.goals == ["increase qualified leads"]
+
+
+def test_agency_artifact_create_schema_accepts_evidence_refs():
+    from app.schemas.agency import AgencyArtifactCreate
+
+    body = AgencyArtifactCreate(
+        artifact_type="research_brief",
+        title="Research brief",
+        body="Initial findings",
+        payload={"positioning": "trust-first"},
+        evidence_refs=[
+            {
+                "kind": "url",
+                "id": "https://example.com",
+                "label": "Client homepage",
+            }
+        ],
+        author_role="research_strategist",
+    )
+
+    assert body.artifact_type == "research_brief"
+    assert body.evidence_refs[0].kind == "url"
+
+
+def test_approval_decision_schema_validates_supported_decisions():
+    from app.schemas.agency import AgencyApprovalDecision
+
+    assert AgencyApprovalDecision(decision="approved").decision == "approved"
+
+    with pytest.raises(ValidationError):
+        AgencyApprovalDecision(decision="maybe")
