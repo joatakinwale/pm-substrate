@@ -55,6 +55,7 @@ QUEUES=(
   stevie-ai-content
   stevie-report-builder
   stevie-automation-runner
+  stevie-virtual-agency
   stevie-social-publisher
 )
 
@@ -79,6 +80,7 @@ WORKERS=(
   billing-cron
   reports-cron
   automation-runner
+  virtual-agency
   social-publisher
   social-cron
   sse-pubsub
@@ -134,7 +136,7 @@ done
 
 # Workers that need BACKEND_BASE_URL (everything except queue-producer
 # and sse-pubsub — neither calls FastAPI internal endpoints)
-for w in stripe-sync email-sender email-events mux-ingest mux-webhook ai-content report-builder billing-cron reports-cron automation-runner social-publisher social-cron; do
+for w in stripe-sync email-sender email-events mux-ingest mux-webhook ai-content report-builder billing-cron reports-cron automation-runner virtual-agency social-publisher social-cron; do
   set_secret_if_missing "$w" BACKEND_BASE_URL "FastAPI public URL, no trailing slash, e.g. https://api.stevie.social"
 done
 
@@ -172,7 +174,7 @@ cd "$ROOT"
 echo
 
 # ── Step 5: deploy consumer + cron + DO Workers ───────────────────────
-for worker in stripe-sync email-sender email-events mux-ingest mux-webhook ai-content report-builder billing-cron reports-cron automation-runner social-publisher social-cron sse-pubsub; do
+for worker in stripe-sync email-sender email-events mux-ingest mux-webhook ai-content report-builder billing-cron reports-cron automation-runner virtual-agency social-publisher social-cron sse-pubsub; do
   if [ ! -f "$ROOT/workers/$worker/wrangler.toml" ]; then
     echo "  $worker: no wrangler.toml yet, skipping"
     continue

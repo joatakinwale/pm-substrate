@@ -81,14 +81,38 @@ export interface AutomationRunMessage extends BaseMessage {
 export interface SocialPublishMessage extends BaseMessage {
   type: "social.post.publish";
   post_id: string;
+  /** SHA-256 of the approved/scheduled content the Worker is allowed to publish. */
+  expected_content_hash: string;
 }
 
 // ── virtual agency queue ─────────────────────────────────────────────
+export type VirtualAgencyAgentRole =
+  | "chief_of_staff"
+  | "content_creative"
+  | "scheduling_distribution"
+  | "community_engagement"
+  | "analytics_reporting";
+
+export interface VirtualAgencyLineage {
+  client_request: string;
+  project_id: string;
+  legacy_task_id: string;
+  orchestration_task_id?: string;
+  artifact_id?: string;
+}
+
 export interface VirtualAgencyMessage extends BaseMessage {
   type: "virtual_agency.task";
-  agent_role: string;
-  project_id?: string;
-  task_id?: string;
+  agent_role: VirtualAgencyAgentRole;
+  project_id: string;
+  /** Legacy project task UUID. Null for source-less orchestration tasks. */
+  task_id?: string | null;
+  orchestration_task_id: string;
+  task_version: number;
+  approval_version?: number | null;
+  approval_payload_hash?: string | null;
+  lineage: VirtualAgencyLineage;
+  dependency_ids?: string[];
   context: Record<string, unknown>;
 }
 
@@ -135,6 +159,12 @@ export function validateMessage<T extends QueueMessage>(
   if (typeof msg["emitted_at"] !== "string") {
     throw new InvalidMessageError("missing emitted_at");
   }
+  if (expectedType === "virtual_agency.task") {
+    validateVirtualAgencyMessage(msg);
+  }
+  if (expectedType === "social.post.publish") {
+    validateSocialPublishMessage(msg);
+  }
   return raw as T;
 }
 
@@ -143,5 +173,127 @@ export class InvalidMessageError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "InvalidMessageError";
+  }
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SHA256_RE = /^[0-9a-f]{64}$/i;
+
+const VIRTUAL_AGENCY_ROLES = new Set<string>([
+  "chief_of_staff",
+  "content_creative",
+  "scheduling_distribution",
+  "community_engagement",
+  "analytics_reporting",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireString(
+  msg: Record<string, unknown>,
+  field: string
+): string {
+  const value = msg[field];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new InvalidMessageError(`missing or empty ${field}`);
+  }
+  return value;
+}
+
+function requireUuid(msg: Record<string, unknown>, field: string): void {
+  const value = requireString(msg, field);
+  if (!UUID_RE.test(value)) {
+    throw new InvalidMessageError(`${field} must be a UUID`);
+  }
+}
+
+function validateOptionalUuid(
+  msg: Record<string, unknown>,
+  field: string
+): void {
+  const value = msg[field];
+  if (value == null) {
+    return;
+  }
+  if (typeof value !== "string" || !UUID_RE.test(value)) {
+    throw new InvalidMessageError(`${field} must be a UUID when provided`);
+  }
+}
+
+function requireSha256(msg: Record<string, unknown>, field: string): void {
+  const value = requireString(msg, field);
+  if (!SHA256_RE.test(value)) {
+    throw new InvalidMessageError(`${field} must be a SHA-256 hex digest`);
+  }
+}
+
+function validateSocialPublishMessage(msg: Record<string, unknown>): void {
+  requireString(msg, "post_id");
+  requireSha256(msg, "expected_content_hash");
+}
+
+function validateVirtualAgencyMessage(msg: Record<string, unknown>): void {
+  requireUuid(msg, "org_id");
+  requireUuid(msg, "project_id");
+  validateOptionalUuid(msg, "task_id");
+  requireUuid(msg, "orchestration_task_id");
+
+  const agentRole = requireString(msg, "agent_role");
+  if (!VIRTUAL_AGENCY_ROLES.has(agentRole)) {
+    throw new InvalidMessageError(`unknown virtual agency role: ${agentRole}`);
+  }
+
+  if (!Number.isInteger(msg["task_version"])) {
+    throw new InvalidMessageError("missing or invalid task_version");
+  }
+  const approvalVersion = msg["approval_version"];
+  if (approvalVersion != null && !Number.isInteger(approvalVersion)) {
+    throw new InvalidMessageError("approval_version must be an integer when provided");
+  }
+  const approvalPayloadHash = msg["approval_payload_hash"];
+  if (
+    approvalPayloadHash != null &&
+    (typeof approvalPayloadHash !== "string" || approvalPayloadHash.length === 0)
+  ) {
+    throw new InvalidMessageError(
+      "approval_payload_hash must be a non-empty string when provided"
+    );
+  }
+
+  const lineage = msg["lineage"];
+  if (!isRecord(lineage)) {
+    throw new InvalidMessageError("missing or invalid lineage");
+  }
+  for (const field of ["client_request", "project_id", "legacy_task_id"]) {
+    const value = lineage[field];
+    if (typeof value !== "string" || value.length === 0) {
+      throw new InvalidMessageError(`missing lineage.${field}`);
+    }
+  }
+  if (!UUID_RE.test(lineage["project_id"] as string)) {
+    throw new InvalidMessageError("lineage.project_id must be a UUID");
+  }
+  if (!UUID_RE.test(lineage["legacy_task_id"] as string)) {
+    throw new InvalidMessageError("lineage.legacy_task_id must be a UUID");
+  }
+
+  const context = msg["context"];
+  if (!isRecord(context)) {
+    throw new InvalidMessageError("missing or invalid context");
+  }
+
+  const dependencyIds = msg["dependency_ids"];
+  if (dependencyIds != null) {
+    if (!Array.isArray(dependencyIds)) {
+      throw new InvalidMessageError("dependency_ids must be an array when provided");
+    }
+    for (const dependencyId of dependencyIds) {
+      if (typeof dependencyId !== "string" || !UUID_RE.test(dependencyId)) {
+        throw new InvalidMessageError("dependency_ids must contain only UUIDs");
+      }
+    }
   }
 }

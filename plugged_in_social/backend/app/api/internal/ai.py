@@ -372,6 +372,7 @@ async def begin_ai_request(
         role="system",
     )
 
+    response: AIBeginResponse | None = None
     async for db in get_db_with_rls(ctx):
         req = await db.get(AIContentRequest, request_id)
         if req is None or req.org_id != body.org_id:
@@ -388,6 +389,9 @@ async def begin_ai_request(
                     f"'{req.status}', not startable"
                 ),
             )
+
+        req.status = "generating"
+        await db.flush()
 
         # Resolve the optional brand voice profile inline so the Worker
         # never sees the BrandVoiceProfile shape.
@@ -415,7 +419,7 @@ async def begin_ai_request(
             explicit_model=req.model,
         )
 
-        return AIBeginResponse(
+        response = AIBeginResponse(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             model=chain[0],
@@ -423,6 +427,9 @@ async def begin_ai_request(
             max_tokens=_DEFAULT_MAX_TOKENS,
             temperature=_DEFAULT_TEMPERATURE,
         )
+
+    if response is not None:
+        return response
 
     # Defensive — get_db_with_rls is an async-generator dependency so the
     # for-loop above always yields exactly once. This path is unreachable

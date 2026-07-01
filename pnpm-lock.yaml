@@ -331,6 +331,9 @@ importers:
       '@pm/agent-state':
         specifier: workspace:*
         version: link:../agent-state
+      '@pm/evals':
+        specifier: workspace:*
+        version: link:../evals
       '@pm/types':
         specifier: workspace:*
         version: link:../types
@@ -341,9 +344,6 @@ importers:
       '@pm/entity-mapping':
         specifier: workspace:*
         version: link:../entity-mapping
-      '@pm/evals':
-        specifier: workspace:*
-        version: link:../evals
       '@pm/events':
         specifier: workspace:*
         version: link:../events

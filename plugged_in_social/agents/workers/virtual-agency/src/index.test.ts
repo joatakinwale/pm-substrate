@@ -38,10 +38,35 @@ const VALID_MSG: VirtualAgencyMessage = {
   org_id: "11111111-2222-3333-4444-555555555555",
   idempotency_key: "virtual-agency-task-abc123",
   emitted_at: "2026-05-01T12:00:00Z",
-  agent_role: "content_writer",
-  project_id: "project-123",
-  task_id: "task-456",
+  agent_role: "content_creative",
+  project_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  task_id: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+  orchestration_task_id: "cccccccc-dddd-eeee-ffff-000000000000",
+  task_version: 1,
+  approval_version: 1,
+  approval_payload_hash: "9".repeat(64),
+  lineage: {
+    client_request: "Launch a June campaign",
+    project_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    legacy_task_id: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+  },
   context: { draft_type: "post", tone: "friendly" },
+};
+
+const SOURCELESS_TASK_MSG: VirtualAgencyMessage = {
+  ...VALID_MSG,
+  task_id: null,
+  orchestration_task_id: "dddddddd-eeee-ffff-0000-111111111111",
+  task_version: 2,
+  lineage: {
+    ...VALID_MSG.lineage,
+    legacy_task_id: "dddddddd-eeee-ffff-0000-111111111111",
+    orchestration_task_id: "dddddddd-eeee-ffff-0000-111111111111",
+  },
+  context: {
+    report_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    proposal_kind: "next_action",
+  },
 };
 
 describe("validateMessage(virtual_agency.task)", () => {
@@ -49,6 +74,24 @@ describe("validateMessage(virtual_agency.task)", () => {
     expect(() =>
       validateMessage<VirtualAgencyMessage>(VALID_MSG, "virtual_agency.task")
     ).not.toThrow();
+  });
+
+  it("accepts a source-less orchestration task with null legacy task id", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        SOURCELESS_TASK_MSG,
+        "virtual_agency.task"
+      )
+    ).not.toThrow();
+  });
+
+  it("rejects an invalid legacy task id when provided", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        { ...VALID_MSG, task_id: "not-a-uuid" },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
   });
 
   it("rejects mismatched type", () => {
@@ -71,6 +114,44 @@ describe("validateMessage(virtual_agency.task)", () => {
     expect(() =>
       validateMessage<VirtualAgencyMessage>(
         { ...VALID_MSG, idempotency_key: "" },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects missing orchestration task id", () => {
+    const { orchestration_task_id: _omit, ...rest } = VALID_MSG;
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(rest, "virtual_agency.task")
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects missing task version", () => {
+    const { task_version: _omit, ...rest } = VALID_MSG;
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(rest, "virtual_agency.task")
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects unknown agent role", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        { ...VALID_MSG, agent_role: "content_writer" },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects missing required lineage fields", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        {
+          ...VALID_MSG,
+          lineage: {
+            client_request: "Launch a June campaign",
+            project_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          },
+        },
         "virtual_agency.task"
       )
     ).toThrow(InvalidMessageError);
@@ -170,10 +251,52 @@ describe("queue handler — retry classification", () => {
     expect(msg.ack).not.toHaveBeenCalled();
   });
 
+  it("425 dependency not ready → RetryableError → msg.retry()", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ error: "dependencies not satisfied" }), {
+        status: 425,
+      }) as unknown as Response
+    );
+
+    const { default: handler } = await import("./index.js");
+    const msg = makeMsg(VALID_MSG);
+
+    await handler.queue(
+      { messages: [msg] } as unknown as MessageBatch<unknown>,
+      ENV,
+      {} as unknown as ExecutionContext
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(msg.retry).toHaveBeenCalledTimes(1);
+    expect(msg.ack).not.toHaveBeenCalled();
+  });
+
   it("400 → PermanentError → msg.ack()", async () => {
     fetchSpy.mockResolvedValue(
       new Response(JSON.stringify({ error: "bad request" }), {
         status: 400,
+      }) as unknown as Response
+    );
+
+    const { default: handler } = await import("./index.js");
+    const msg = makeMsg(VALID_MSG);
+
+    await handler.queue(
+      { messages: [msg] } as unknown as MessageBatch<unknown>,
+      ENV,
+      {} as unknown as ExecutionContext
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(msg.ack).toHaveBeenCalledTimes(1);
+    expect(msg.retry).not.toHaveBeenCalled();
+  });
+
+  it("409 invariant conflict → PermanentError → msg.ack()", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ error: "stale approval" }), {
+        status: 409,
       }) as unknown as Response
     );
 

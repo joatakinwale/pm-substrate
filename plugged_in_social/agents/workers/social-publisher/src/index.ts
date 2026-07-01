@@ -6,7 +6,7 @@
  * Flow:
  *   1. Consume SocialPublishMessage from the stevie-social-publisher queue.
  *   2. POST FastAPI /api/internal/social/posts/{post_id}/publish body
- *      {org_id}.
+ *      {org_id, expected_content_hash}.
  *   3. 200 → ack (terminal: published or failed — backend has persisted
  *      the SocialPost row in either case).
  *      4xx (404 — post or account deleted; 422 — unknown platform / config /
@@ -111,6 +111,7 @@ async function publishOne(
     await backend.publishSocialPost({
       post_id: payload.post_id,
       org_id: payload.org_id,
+      expected_content_hash: payload.expected_content_hash,
     });
   } catch (err) {
     if (err instanceof BackendCallError) {

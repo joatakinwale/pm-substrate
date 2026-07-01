@@ -32,6 +32,7 @@ describe("validateMessage(social.post.publish)", () => {
     idempotency_key: "social-publish-abc123",
     emitted_at: "2026-05-01T12:00:00Z",
     post_id: "aa-bb-cc",
+    expected_content_hash: "a".repeat(64),
   };
 
   it("accepts a well-formed message", () => {
@@ -60,6 +61,22 @@ describe("validateMessage(social.post.publish)", () => {
     expect(() =>
       validateMessage<SocialPublishMessage>(
         { ...valid, idempotency_key: "" },
+        "social.post.publish"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects missing expected_content_hash", () => {
+    const { expected_content_hash: _omit, ...rest } = valid;
+    expect(() =>
+      validateMessage<SocialPublishMessage>(rest, "social.post.publish")
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects invalid expected_content_hash", () => {
+    expect(() =>
+      validateMessage<SocialPublishMessage>(
+        { ...valid, expected_content_hash: "not-a-sha256" },
         "social.post.publish"
       )
     ).toThrow(InvalidMessageError);
@@ -108,6 +125,7 @@ const VALID_MSG: SocialPublishMessage = {
   idempotency_key: "social-publish-abc123",
   emitted_at: "2026-05-01T12:00:00Z",
   post_id: "aa-bb-cc",
+  expected_content_hash: "a".repeat(64),
 };
 
 describe("queue handler — retry classification", () => {
@@ -147,6 +165,7 @@ describe("queue handler — retry classification", () => {
     expect(arg).toMatchObject({
       post_id: VALID_MSG.post_id,
       org_id: VALID_MSG.org_id,
+      expected_content_hash: VALID_MSG.expected_content_hash,
     });
     expect(msg.ack).toHaveBeenCalledTimes(1);
     expect(msg.retry).not.toHaveBeenCalled();
@@ -247,6 +266,22 @@ describe("queue handler — retry classification", () => {
     // producer bug doesn't burn the retry budget — the bad message is
     // ack'd immediately and CF Queues sends it to the DLQ for operator
     // review on the next retry trip.
+    expect(publishSpy).not.toHaveBeenCalled();
+    expect(msg.ack).toHaveBeenCalledTimes(1);
+    expect(msg.retry).not.toHaveBeenCalled();
+  });
+
+  it("malformed message (missing expected_content_hash) → PermanentError → msg.ack()", async () => {
+    const { default: handler } = await import("./index.js");
+    const { expected_content_hash: _omit, ...badBody } = VALID_MSG;
+    const msg = makeMsg(badBody);
+
+    await handler.queue(
+      { messages: [msg] } as unknown as MessageBatch<unknown>,
+      ENV,
+      {} as unknown as ExecutionContext
+    );
+
     expect(publishSpy).not.toHaveBeenCalled();
     expect(msg.ack).toHaveBeenCalledTimes(1);
     expect(msg.retry).not.toHaveBeenCalled();

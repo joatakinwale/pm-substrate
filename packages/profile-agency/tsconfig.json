@@ -6,6 +6,7 @@
   },
   "references": [
     { "path": "../agent-state" },
+    { "path": "../evals" },
     { "path": "../types" }
   ],
   "include": ["src/**/*"],

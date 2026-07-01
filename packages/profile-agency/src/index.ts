@@ -13,6 +13,8 @@
  *   - The runtime ProfileDefinition (`AGENCY_PROFILE`) for substrate
  *     registration.
  *   - The edge catalog and lifecycle defs as named exports for inspection.
+ *   - PluggedInSocial source manifests, Axis B adapters, and integration
+ *     audits for marketing-engine validation.
  *
  * Usage:
  *
@@ -23,5 +25,9 @@
 export * from "./entities.js";
 export * from "./edges.js";
 export * from "./lifecycles.js";
+export * from "./next-action-proposal.js";
+export * from "./plugged-in-social-axis-b-adapter.js";
+export * from "./plugged-in-social-integration-audit.js";
 export * from "./publication-terminal.js";
+export * from "./plugged-in-social-manifest.js";
 export { AGENCY_PROFILE } from "./profile.js";

@@ -1,6 +1,7 @@
 """Department-agent execution with enforced orchestration invariants."""
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,21 +10,28 @@ from app.models.project import Task
 from app.models.virtual_agency import (
     VirtualAgencyEventType,
     VirtualAgencyTask,
+    VirtualAgencyTaskStatus,
 )
+from app.services.virtual_agency import publish_agent_task
 from app.services.virtual_agency_orchestration import (
     apply_mutations,
+    build_next_action_proposal_completion_payload,
     build_event,
     create_analytics_mutations,
     create_content_mutations,
     create_scheduling_mutations,
+    DependencyNotSatisfiedError,
+    ExecutionScopeError,
     ensure_approval_is_current,
     ensure_dependencies_completed,
+    ensure_task_evidence_ready,
     find_event_by_idempotency_key,
     first_social_account,
     get_by_id,
     link_artifact_lineage,
     list_project_draft_posts,
     list_virtual_task_dependencies,
+    list_virtual_task_dependents,
     mark_claimed,
     mark_done,
     sync_legacy_task_completion,
@@ -39,6 +47,64 @@ async def _load_task(
     if task is None:
         raise ValueError("Orchestration task not found")
     return task
+
+
+def _parse_uuid(value: str | uuid.UUID | None, field_name: str) -> uuid.UUID | None:
+    if value is None:
+        return None
+    if isinstance(value, uuid.UUID):
+        return value
+    try:
+        return uuid.UUID(str(value))
+    except ValueError as exc:
+        raise ExecutionScopeError(f"Invalid {field_name}") from exc
+
+
+def _ensure_handoff_scope(
+    task: VirtualAgencyTask,
+    *,
+    org_id: str | uuid.UUID,
+    project_id: str | uuid.UUID | None,
+    task_id: str | uuid.UUID | None,
+) -> None:
+    claimed_org_id = _parse_uuid(org_id, "org_id")
+    claimed_project_id = _parse_uuid(project_id, "project_id")
+    claimed_task_id = _parse_uuid(task_id, "task_id")
+
+    if claimed_org_id != task.org_id:
+        raise ExecutionScopeError("Handoff org_id does not match orchestration task")
+    if claimed_project_id != task.project_id:
+        raise ExecutionScopeError("Handoff project_id does not match orchestration task")
+    if task.source_task_id is not None and claimed_task_id != task.source_task_id:
+        raise ExecutionScopeError("Handoff task_id does not match source task")
+    if task.source_task_id is None and claimed_task_id is not None:
+        raise ExecutionScopeError("Handoff task_id was provided for task without source")
+
+
+async def _dispatch_ready_dependents(
+    db: AsyncSession,
+    task: VirtualAgencyTask,
+) -> list[dict[str, Any]]:
+    dispatched: list[dict[str, Any]] = []
+    dependents = await list_virtual_task_dependents(db, task)
+    for dependent in dependents:
+        if dependent.status != VirtualAgencyTaskStatus.todo.value:
+            continue
+        if not dependent.approval_active:
+            continue
+        dependencies = await list_virtual_task_dependencies(db, dependent)
+        try:
+            ensure_dependencies_completed(dependencies)
+            await ensure_task_evidence_ready(db, dependent)
+        except DependencyNotSatisfiedError:
+            continue
+        dispatch = await publish_agent_task(
+            queue="stevie-virtual-agency",
+            task=dependent,
+        )
+        db.add(dispatch["event"])
+        dispatched.append(dispatch["message"])
+    return dispatched
 
 
 async def route_virtual_agency_task(
@@ -59,16 +125,23 @@ async def route_virtual_agency_task(
     dependency_ids: list[str] | None = None,
 ):
     """Route a durable handoff to the correct department executor."""
-    del org_id, project_id, task_id, lineage, context, emitted_at, type, dependency_ids
-
-    existing = await find_event_by_idempotency_key(db, idempotency_key)
-    if (
-        existing is not None
-        and existing.event_type == VirtualAgencyEventType.execution_completed.value
-    ):
-        return {"ok": True, "status": "duplicate", "task_id": str(existing.task_id)}
+    del lineage, context, emitted_at, type, dependency_ids
 
     task = await _load_task(db, orchestration_task_id)
+    _ensure_handoff_scope(
+        task,
+        org_id=org_id,
+        project_id=project_id,
+        task_id=task_id,
+    )
+
+    existing = await find_event_by_idempotency_key(db, idempotency_key)
+    if existing is not None:
+        if existing.task_id != task.id:
+            raise ExecutionScopeError("Idempotency key belongs to a different task")
+        if existing.event_type == VirtualAgencyEventType.execution_completed.value:
+            return {"ok": True, "status": "duplicate", "task_id": str(existing.task_id)}
+
     validate_required_context(task)
     if task.agent_role != agent_role:
         raise ValueError("Agent role does not match orchestration task")
@@ -81,6 +154,7 @@ async def route_virtual_agency_task(
     )
     dependencies = await list_virtual_task_dependencies(db, task)
     ensure_dependencies_completed(dependencies)
+    await ensure_task_evidence_ready(db, task)
 
     mark_claimed(task)
     db.add(
@@ -105,7 +179,10 @@ async def route_virtual_agency_task(
         posts = await list_project_draft_posts(db, task.project_id)
         mutations = create_scheduling_mutations(posts)
     elif agent_role == "analytics_reporting":
-        mutations = create_analytics_mutations(task)
+        if task.task_type == "next_action_proposal":
+            mutations = []
+        else:
+            mutations = create_analytics_mutations(task)
     elif agent_role == "community_engagement":
         mutations = []
     else:
@@ -114,6 +191,11 @@ async def route_virtual_agency_task(
     artifacts = await apply_mutations(db=db, task=task, mutations=mutations)
     link_artifact_lineage(task=task, artifacts=artifacts)
     mark_done(task)
+    completion_payload = {"artifacts_created": len(artifacts)}
+    if task.task_type == "next_action_proposal":
+        completion_payload["next_action_proposal"] = (
+            build_next_action_proposal_completion_payload(task)
+        )
 
     legacy_task = await get_by_id(db, Task, task.source_task_id)
     sync_legacy_task_completion(legacy_task)
@@ -127,8 +209,14 @@ async def route_virtual_agency_task(
             idempotency_key=idempotency_key,
             actor_role=agent_role,
             actor_id=None,
-            payload={"artifacts_created": len(artifacts)},
+            payload=completion_payload,
             approval_version=task.approved_version,
         )
     )
-    return {"ok": True, "status": task.status, "task_id": str(task.id)}
+    dispatched_dependents = await _dispatch_ready_dependents(db, task)
+    return {
+        "ok": True,
+        "status": task.status,
+        "task_id": str(task.id),
+        "dispatched_dependents": len(dispatched_dependents),
+    }

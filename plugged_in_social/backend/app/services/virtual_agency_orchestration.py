@@ -19,6 +19,7 @@ from app.models.virtual_agency import (
     VirtualAgencyEventType,
     VirtualAgencyTask,
     VirtualAgencyTaskStatus,
+    virtual_agency_task_dependencies,
 )
 
 
@@ -36,6 +37,10 @@ class DependencyNotSatisfiedError(VirtualAgencyInvariantError):
 
 class ApprovalStateError(VirtualAgencyInvariantError):
     """Raised when approval is stale, revoked, or version-mismatched."""
+
+
+class ExecutionScopeError(VirtualAgencyInvariantError):
+    """Raised when a handoff claims the wrong tenant, project, or task."""
 
 
 class CapabilityViolationError(VirtualAgencyInvariantError):
@@ -57,7 +62,10 @@ AGENT_CAPABILITIES: dict[str, dict[str, set[str]]] = {
     },
     "analytics_reporting": {
         "writes": {"client_report.create"},
-        "emits": {"client_report.draft_created"},
+        "emits": {
+            "client_report.draft_created",
+            "marketing.next_action.proposed",
+        },
     },
     "community_engagement": {
         "writes": set(),
@@ -82,6 +90,20 @@ def _canonical_json(payload: dict[str, Any]) -> str:
 
 def compute_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def social_post_content_hash(post: SocialPost) -> str:
+    """Hash the content-bearing fields that approval/scheduling depends on."""
+    return compute_hash(
+        {
+            "platform": post.platform,
+            "social_account_id": str(post.social_account_id),
+            "caption": post.caption or "",
+            "hashtags": post.hashtags or [],
+            "media_urls": post.media_urls or [],
+            "media_type": post.media_type,
+        }
+    )
 
 
 def build_lineage(
@@ -152,6 +174,19 @@ def ensure_dependencies_completed(tasks: Iterable[VirtualAgencyTask]) -> None:
     if unmet:
         raise DependencyNotSatisfiedError(
             f"Dependencies not satisfied: {', '.join(unmet)}"
+        )
+
+
+async def ensure_task_evidence_ready(
+    db: AsyncSession,
+    task: VirtualAgencyTask,
+) -> None:
+    if task.agent_role != "analytics_reporting" or task.task_type != "analytics_reporting":
+        return
+    metric_posts = await list_project_metric_posts(db, task.project_id)
+    if not metric_posts:
+        raise DependencyNotSatisfiedError(
+            "Analytics task requires published social metrics evidence"
         )
 
 
@@ -314,6 +349,23 @@ async def list_virtual_task_dependencies(
     return list((loaded.dependencies if loaded else task.dependencies) or [])
 
 
+async def list_virtual_task_dependents(
+    db: AsyncSession,
+    task: VirtualAgencyTask,
+) -> list[VirtualAgencyTask]:
+    if hasattr(db, "list_virtual_task_dependents"):
+        return list(db.list_virtual_task_dependents(task))
+    result = await db.execute(
+        select(VirtualAgencyTask)
+        .join(
+            virtual_agency_task_dependencies,
+            VirtualAgencyTask.id == virtual_agency_task_dependencies.c.task_id,
+        )
+        .where(virtual_agency_task_dependencies.c.depends_on_task_id == task.id)
+    )
+    return list(result.scalars().all())
+
+
 async def find_event_by_idempotency_key(
     db: AsyncSession,
     idempotency_key: str,
@@ -359,6 +411,35 @@ async def first_social_account(
     return result.scalar_one_or_none()
 
 
+async def list_project_metric_posts(
+    db: AsyncSession,
+    project_id: uuid.UUID | str,
+) -> list[SocialPost]:
+    if isinstance(project_id, str):
+        project_id = uuid.UUID(project_id)
+    if hasattr(db, "list_project_metric_posts"):
+        return list(db.list_project_metric_posts(project_id))
+    result = await db.execute(
+        select(SocialPost).where(
+            SocialPost.project_id == project_id,
+            SocialPost.status == "published",
+            SocialPost.published_at.isnot(None),
+        )
+    )
+    return [post for post in result.scalars().all() if post_has_metric_evidence(post)]
+
+
+def post_has_metric_evidence(post: SocialPost) -> bool:
+    return any([
+        bool(post.likes),
+        bool(post.comments),
+        bool(post.shares),
+        bool(post.impressions),
+        bool(post.reach),
+        post.engagement_rate is not None,
+    ])
+
+
 def create_content_mutations(
     *,
     task: VirtualAgencyTask,
@@ -389,7 +470,10 @@ def create_scheduling_mutations(posts: Iterable[SocialPost]) -> list[MutationReq
                 write_kind="social_post.schedule",
                 target_id=post.id,
                 expected_version=post.version,
-                payload={"scheduled_at": base_time + timedelta(days=offset)},
+                payload={
+                    "scheduled_at": base_time + timedelta(days=offset),
+                    "expected_content_hash": social_post_content_hash(post),
+                },
             )
         )
     return mutations
@@ -407,6 +491,67 @@ def create_analytics_mutations(task: VirtualAgencyTask) -> list[MutationRequest]
             },
         )
     ]
+
+
+def build_next_action_proposal_completion_payload(task: VirtualAgencyTask) -> dict[str, Any]:
+    context = task.context or {}
+    metrics = context.get("metrics_snapshot") or {}
+    source_report = context.get("source_report") or {}
+    pm_substrate = context.get("pm_substrate") or {}
+    evidence_refs = context.get("evidence_refs") or []
+    content_hashes = context.get("content_hashes") or {}
+
+    return {
+        "recommended_action": _recommend_next_marketing_action(metrics),
+        "source_report_id": source_report.get("client_report_id"),
+        "evidence_ref_count": len(evidence_refs) if isinstance(evidence_refs, list) else 0,
+        "content_hashes": content_hashes if isinstance(content_hashes, dict) else {},
+        "pm_substrate_action_type": pm_substrate.get("action_type"),
+    }
+
+
+def _recommend_next_marketing_action(metrics: dict[str, Any]) -> str:
+    qualified_leads = _metric_number(
+        metrics,
+        "qualified_leads_generated",
+        "qualified_leads",
+        "leads",
+    )
+    sample_size = max(
+        _metric_number(metrics, "total_reach", "reach"),
+        _metric_number(metrics, "total_impressions", "impressions"),
+        _metric_number(metrics, "content_pieces_published", "posts_published"),
+    )
+    conversion_rate = _metric_number(metrics, "conversion_rate", "lead_conversion_rate")
+    if conversion_rate > 1:
+        conversion_rate = conversion_rate / 100
+    if conversion_rate <= 0 and sample_size > 0:
+        conversion_rate = qualified_leads / sample_size
+
+    engagement_rate = _metric_number(metrics, "avg_engagement_rate", "engagement_rate")
+    if engagement_rate > 1:
+        engagement_rate = engagement_rate / 100
+
+    if qualified_leads >= 10 and conversion_rate >= 0.03:
+        return "launch_followup_campaign"
+    if engagement_rate >= 0.05 and conversion_rate < 0.015:
+        return "increase_distribution"
+    if engagement_rate < 0.02 or conversion_rate < 0.01:
+        return "revise_content_strategy"
+    return "pause_and_review"
+
+
+def _metric_number(metrics: dict[str, Any], *keys: str) -> float:
+    for key in keys:
+        value = metrics.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str) and value.strip():
+            try:
+                return float(value)
+            except ValueError:
+                continue
+    return 0.0
 
 
 async def apply_mutations(
@@ -440,7 +585,14 @@ async def apply_mutations(
                 raise ConcurrentMutationError("Target social post was not found")
             if post.version != mutation.expected_version:
                 raise ConcurrentMutationError("Social post version conflict detected")
+            expected_content_hash = mutation.payload.get("expected_content_hash")
+            if not isinstance(expected_content_hash, str) or not expected_content_hash:
+                raise ConcurrentMutationError("Social post content hash gate missing")
+            if social_post_content_hash(post) != expected_content_hash:
+                raise ConcurrentMutationError("Social post content hash conflict detected")
             post.scheduled_at = mutation.payload["scheduled_at"]
+            post.status = "scheduled"
+            post.scheduled_content_hash = expected_content_hash
             post.version += 1
             db.add(post)
             created.append(post)

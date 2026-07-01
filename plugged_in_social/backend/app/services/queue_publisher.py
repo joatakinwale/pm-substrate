@@ -247,6 +247,7 @@ async def publish_social_post_publish(
     *,
     org_id: uuid.UUID | str,
     post_id: uuid.UUID | str,
+    expected_content_hash: str,
 ) -> None:
     """Publish a single social media post to its target platform.
 
@@ -259,5 +260,6 @@ async def publish_social_post_publish(
             "type": "social.post.publish",
             "org_id": str(org_id),
             "post_id": str(post_id),
+            "expected_content_hash": expected_content_hash,
         },
     )
