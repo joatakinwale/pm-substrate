@@ -2,9 +2,11 @@
 
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   CheckCircle2,
   Clock3,
   FileText,
+  Hash,
   KeyRound,
   Loader2,
   Plus,
@@ -17,6 +19,8 @@ import {
   type AgencyApprovalRequest,
   type AgencyArtifact,
   type ClientEngagement,
+  type IntegrationEvidenceSummary,
+  type IntegrationRunEvent,
   type MarketingRun,
   createAgencyAccessRequest,
   createAgencyApproval,
@@ -24,10 +28,12 @@ import {
   createClientEngagement,
   createMarketingRun,
   decideAgencyApproval,
+  getIntegrationEvidenceSummary,
   listAgencyAccessRequests,
   listAgencyApprovals,
   listAgencyArtifacts,
   listClientEngagements,
+  listIntegrationRunEvents,
   listMarketingRuns,
 } from "@/lib/api";
 
@@ -50,6 +56,24 @@ function compactDate(value: string | null) {
     month: "short",
     day: "numeric",
   });
+}
+
+function compactDateTime(value: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function shortHash(value: string | null | undefined) {
+  return value ? value.slice(0, 8) : "-";
+}
+
+function countEntries(value: Record<string, number> | undefined) {
+  return Object.entries(value || {}).sort(([a], [b]) => a.localeCompare(b));
 }
 
 function splitLines(value: string) {
@@ -80,6 +104,32 @@ function EmptyState({ children }: { children: ReactNode }) {
   );
 }
 
+function CountMap({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<[string, number]>;
+}) {
+  return (
+    <div className="rounded-lg border border-border px-3 py-3">
+      <p className="text-xs font-medium uppercase text-muted-foreground">{title}</p>
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm text-muted-foreground">-</p>
+      ) : (
+        <div className="mt-2 space-y-1.5">
+          {items.map(([label, count]) => (
+            <div key={label} className="flex items-center justify-between gap-3 text-sm">
+              <span className="truncate text-muted-foreground">{label}</span>
+              <span className="font-medium">{count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AgencyCommandCenterPage() {
   const [engagements, setEngagements] = useState<ClientEngagement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -87,6 +137,9 @@ export default function AgencyCommandCenterPage() {
   const [artifacts, setArtifacts] = useState<AgencyArtifact[]>([]);
   const [approvals, setApprovals] = useState<AgencyApprovalRequest[]>([]);
   const [accessRequests, setAccessRequests] = useState<AgencyAccessRequest[]>([]);
+  const [runEvents, setRunEvents] = useState<IntegrationRunEvent[]>([]);
+  const [evidenceSummary, setEvidenceSummary] =
+    useState<IntegrationEvidenceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -134,6 +187,17 @@ export default function AgencyCommandCenterPage() {
   const openAccessRequests = accessRequests.filter(
     (item) => item.status === "requested" || item.status === "blocked"
   );
+  const recentRunEvents = useMemo(
+    () => runEvents.slice(-8).reverse(),
+    [runEvents]
+  );
+  const evidenceHashGroups = useMemo(
+    () =>
+      Object.entries(evidenceSummary?.evidence_hashes || {}).filter(
+        ([, hashes]) => hashes.length > 0
+      ),
+    [evidenceSummary]
+  );
 
   const loadEngagements = useCallback(async () => {
     setLoading(true);
@@ -159,10 +223,21 @@ export default function AgencyCommandCenterPage() {
         listAgencyApprovals(engagementId),
         listAgencyAccessRequests(engagementId),
       ]);
+      const latestRun = runData[0] || null;
+      let eventData: IntegrationRunEvent[] = [];
+      let summaryData: IntegrationEvidenceSummary | null = null;
+      if (latestRun) {
+        [eventData, summaryData] = await Promise.all([
+          listIntegrationRunEvents(latestRun.id),
+          getIntegrationEvidenceSummary(latestRun.id),
+        ]);
+      }
       setRuns(runData);
       setArtifacts(artifactData);
       setApprovals(approvalData);
       setAccessRequests(accessData);
+      setRunEvents(eventData);
+      setEvidenceSummary(summaryData);
       setApprovalForm((current) => ({
         ...current,
         subject_id:
@@ -192,6 +267,8 @@ export default function AgencyCommandCenterPage() {
         setArtifacts([]);
         setApprovals([]);
         setAccessRequests([]);
+        setRunEvents([]);
+        setEvidenceSummary(null);
         return;
       }
       void loadEngagementDetail(selectedId);
@@ -561,6 +638,159 @@ export default function AgencyCommandCenterPage() {
                       ))
                     ) : (
                       <span className="text-sm text-muted-foreground">-</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-border bg-white p-5">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h2 className="font-semibold">Run Monitor</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {activeRun?.objective || "No active strategy run"}
+                </p>
+              </div>
+              {activeRun && (
+                <span
+                  className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(activeRun.stage)}`}
+                >
+                  {activeRun.stage}
+                </span>
+              )}
+            </div>
+
+            {!activeRun ? (
+              <EmptyState>No active run.</EmptyState>
+            ) : detailLoading ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                {[0, 1, 2, 3].map((item) => (
+                  <div
+                    key={item}
+                    className="h-24 animate-pulse rounded-lg bg-gray-50"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                  {[
+                    {
+                      label: "Tasks",
+                      value: evidenceSummary?.task_count ?? 0,
+                      icon: Activity,
+                    },
+                    {
+                      label: "Events",
+                      value: evidenceSummary?.event_count ?? runEvents.length,
+                      icon: Clock3,
+                    },
+                    {
+                      label: "Artifacts",
+                      value: evidenceSummary?.artifact_count ?? artifacts.length,
+                      icon: FileText,
+                    },
+                    {
+                      label: "Pending",
+                      value:
+                        evidenceSummary?.pending_approval_count ??
+                        pendingApprovals.length,
+                      icon: ShieldCheck,
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-lg border border-border px-4 py-3"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-xs font-medium uppercase text-muted-foreground">
+                          {item.label}
+                        </p>
+                        <item.icon className="h-4 w-4 text-stevie-green" />
+                      </div>
+                      <p className="heading-brand text-2xl">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                  <div className="space-y-4">
+                    <div>
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Hash className="h-4 w-4 text-muted-foreground" />
+                        Evidence Hashes
+                      </div>
+                      {evidenceHashGroups.length === 0 ? (
+                        <EmptyState>No hashes recorded.</EmptyState>
+                      ) : (
+                        <div className="space-y-2">
+                          {evidenceHashGroups.map(([label, hashes]) => (
+                            <div
+                              key={label}
+                              className="rounded-lg border border-border px-3 py-2"
+                            >
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {label.replaceAll("_", " ")}
+                              </p>
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {hashes.slice(0, 6).map((hash) => (
+                                  <span
+                                    key={hash}
+                                    className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                                  >
+                                    {shortHash(hash)}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <CountMap
+                        title="Task Status"
+                        items={countEntries(evidenceSummary?.task_status_counts)}
+                      />
+                      <CountMap
+                        title="Event Types"
+                        items={countEntries(evidenceSummary?.event_type_counts)}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <Activity className="h-4 w-4 text-muted-foreground" />
+                      Event Timeline
+                    </div>
+                    {recentRunEvents.length === 0 ? (
+                      <EmptyState>No timeline events.</EmptyState>
+                    ) : (
+                      <div className="space-y-2">
+                        {recentRunEvents.map((event) => (
+                          <div key={event.id} className="rounded-lg border border-border px-3 py-3">
+                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                              <div>
+                                <p className="text-sm font-medium">{event.event_type}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {event.actor_role || "system"} - {compactDateTime(event.occurred_at)}
+                                </p>
+                              </div>
+                              <span className="w-fit rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                {shortHash(event.event_hash)}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                              <span>payload {shortHash(event.payload_hash)}</span>
+                              <span>previous {shortHash(event.previous_event_hash)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>

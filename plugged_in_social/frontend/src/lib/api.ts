@@ -871,6 +871,46 @@ export interface AgencyAccessRequest {
   updated_at: string;
 }
 
+export interface IntegrationRunEvent {
+  resource_type: "virtual_agency_event";
+  id: string;
+  org_id: string;
+  marketing_run_id: string;
+  task_id: string;
+  project_id: string | null;
+  event_type: string;
+  actor_role: string | null;
+  actor_id: string | null;
+  idempotency_key: string;
+  task_version: number | null;
+  approval_version: number | null;
+  previous_event_hash: string | null;
+  payload_hash: string;
+  event_hash: string;
+  payload: Record<string, unknown>;
+  lineage: Record<string, unknown>;
+  occurred_at: string;
+  links: Array<{ rel: string; href: string }>;
+}
+
+export interface IntegrationEvidenceSummary {
+  resource_type: "marketing_run_evidence_summary";
+  run_id: string;
+  org_id: string;
+  status: string;
+  stage: string;
+  artifact_count: number;
+  artifact_type_counts: Record<string, number>;
+  task_count: number;
+  task_status_counts: Record<string, number>;
+  event_count: number;
+  event_type_counts: Record<string, number>;
+  approval_count: number;
+  pending_approval_count: number;
+  evidence_hashes: Record<string, string[]>;
+  links: Array<{ rel: string; href: string }>;
+}
+
 export interface ClientEngagementCreatePayload {
   name?: string;
   client_url?: string;
@@ -1013,6 +1053,18 @@ export async function createAgencyAccessRequest(
       method: "POST",
       body: JSON.stringify(payload),
     }
+  );
+}
+
+export async function listIntegrationRunEvents(runId: string) {
+  return apiFetch<IntegrationRunEvent[]>(
+    `/api/integration/v1/marketing-runs/${encodeURIComponent(runId)}/events`
+  );
+}
+
+export async function getIntegrationEvidenceSummary(runId: string) {
+  return apiFetch<IntegrationEvidenceSummary>(
+    `/api/integration/v1/marketing-runs/${encodeURIComponent(runId)}/evidence-summary`
   );
 }
 
