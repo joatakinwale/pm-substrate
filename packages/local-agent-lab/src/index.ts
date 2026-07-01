@@ -14,6 +14,22 @@ export { World } from "./world.js";
 export type { AdmitInput, KeyView } from "./world.js";
 export { LabAgent } from "./agent.js";
 export type { AgentTokenLedger } from "./agent.js";
+export { runLabSession, LabSessionRunner, armsForMode } from "./session.js";
+export type {
+  LabSessionAgentResult,
+  LabSessionRequest,
+  LabSessionRun,
+  LabSessionRunnerConfig,
+} from "./session.js";
+export type {
+  LabSessionEvent,
+  LabSessionEventListener,
+  LabSessionEventType,
+  LabSessionMode,
+  LabSessionStatus,
+} from "./session-events.js";
+export type { LabInjection, LabInjectionType } from "./injection.js";
+export type { LabMutation, LabMutationType } from "./mutation.js";
 export type {
   Arm,
   EvalResult,

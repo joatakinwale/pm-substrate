@@ -1,1591 +1,1241 @@
 import "./styles.css";
-import { fetchSnapshot, renderLive } from "./live.js";
-import { renderStory } from "./story.js";
-import {
-  formatTime,
-  loadDashboardData,
-  shortId,
-  toneForAdmission,
-  toneForArtifact,
-  type CountDatum,
-  type DashboardData,
-  type EvidenceAdmissionReview,
-  type StateReviewArtifact,
-  type StatusTone,
-  type WriteBindingReplayRecord,
-} from "./data.js";
 
-type Selection =
-  | { readonly kind: "artifact"; readonly id: string }
-  | { readonly kind: "admission"; readonly id: string }
-  | { readonly kind: "writeBinding"; readonly id: string };
+type Mode = "substrate" | "no_substrate" | "ab_pair";
+type SessionStatus = "running" | "completed" | "stopped" | "failed";
+type Arm = "substrate" | "no_substrate";
 
-type DashboardView = "live" | "grid" | "list" | "flow" | "safe" | "data" | "trend" | "gear";
-type TimelineResolution = "48" | "24" | "12";
-type TableMode = "full" | "compact";
-
-interface DashboardState {
-  corpus: "artifacts" | "admissions" | "writeBindings";
-  phase: string;
-  decision: string;
-  query: string;
-  view: DashboardView;
-  resolution: TimelineResolution;
-  tableMode: TableMode;
-  rawMode: boolean;
-  selection: Selection;
+interface ScenarioMeta {
+  readonly scenarioId: string;
+  readonly failureClass: string;
+  readonly realityQualities: readonly number[];
 }
 
-interface ReplayRow {
-  readonly kind: "artifact" | "admission" | "writeBinding";
+interface SummaryMetrics {
+  readonly activeAgents: number;
+  readonly blockedAgents: number;
+  readonly pendingInjections: number;
+  readonly pendingMutations: number;
+  readonly injectionAppliedCount: number;
+  readonly mutationAppliedCount: number;
+  readonly unsafeBlockedCount: number;
+  readonly unsafeAdmittedCount: number;
+  readonly divergenceCount: number;
+  readonly substrateProtectedCount: number;
+}
+
+interface SessionSummary {
   readonly id: string;
-  readonly time: string;
+  readonly title: string;
+  readonly objective: string;
+  readonly scenarioId: string;
+  readonly failureClass: string;
+  readonly mode: Mode;
+  readonly status: SessionStatus;
+  readonly agentCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly latestActivity: string;
+  readonly summaryMetrics: SummaryMetrics;
+  readonly error: string | null;
+}
+
+interface SessionEvent {
+  readonly id: string;
   readonly type: string;
-  readonly agent: string;
-  readonly policy: string;
-  readonly outcome: string;
-  readonly replay: "valid" | "review";
-  readonly tone: StatusTone;
-  readonly source: string;
+  readonly sessionId: string;
+  readonly scenarioId: string;
+  readonly failureClass: string;
+  readonly occurredAt: string;
+  readonly agentId?: string;
+  readonly arm?: Arm;
+  readonly message: string;
+  readonly result?: "pass" | "fail" | "blocked";
+  readonly payload?: Record<string, unknown>;
 }
 
-const data = loadDashboardData();
-// Always land on the Live view. Stale bookmarks/cached URLs from earlier
-// builds carried ?view=grid (the fixture explorer) and made the phone open
-// to the wrong screen. Live is the primary surface for the with/without-
-// substrate A/B metrics, so force it on first load.
-const initialState = { ...readStateFromUrl(data), view: "live" as const };
-const app = document.querySelector<HTMLDivElement>("#app");
-
-if (!app) {
-  throw new Error("missing #app root");
+interface ArmRun {
+  readonly arm: Arm;
+  readonly result: "pass" | "fail" | "blocked";
+  readonly actedValue: unknown;
+  readonly admitted: boolean;
+  readonly refusedReason?: string;
+  readonly tokens: number;
+  readonly admittedTransitions: number;
+  readonly chainValid: boolean;
 }
 
-writeStateToUrl(initialState, true);
-render(app, data, initialState);
-maybeMountLive(app, data, initialState);
+interface AgentResult {
+  readonly agentId: string;
+  readonly label: string;
+  readonly arms: Partial<Record<Arm, ArmRun>>;
+  readonly behaviorDiverged: boolean;
+}
 
-// Auto-refresh the live surface while it is the active view.
-let liveTimer: ReturnType<typeof setInterval> | null = null;
-function maybeMountLive(
-  root: HTMLElement,
-  dashboard: DashboardData,
-  state: DashboardState,
-): void {
-  if (liveTimer) {
-    clearInterval(liveTimer);
-    liveTimer = null;
-  }
-  if (state.view !== "live") return;
-  const mount = root.querySelector<HTMLElement>("#live-mount");
-  if (!mount) return;
-  const load = async () => {
-    try {
-      const snap = await fetchSnapshot();
-      const current = root.querySelector<HTMLElement>("#live-mount");
-      if (current) renderLive(current, snap);
-    } catch (err) {
-      const current = root.querySelector<HTMLElement>("#live-mount");
-      if (current) {
-        const msg = err instanceof Error ? `${err.message}` : String(err);
-        current.innerHTML = `<div class="live-shell"><div class="live-banner bad">Render error: ${msg.replace(/[<>&]/g, "")}</div></div>`;
-      }
-    }
+interface SessionDetail {
+  readonly session: SessionSummary;
+  readonly events: readonly SessionEvent[];
+  readonly agents: readonly AgentResult[];
+}
+
+const appRoot = document.querySelector<HTMLDivElement>("#app")!;
+if (!appRoot) throw new Error("missing #app root");
+
+let scenarios: ScenarioMeta[] = [];
+let sessions: SessionSummary[] = [];
+let detail: SessionDetail | null = null;
+let stream: EventSource | null = null;
+let selectedSessionId: string | null = null;
+let startModalOpen = false;
+
+const previewSession: SessionDetail = {
+  session: {
+    id: "preview-session",
+    title: "stale-observation control preview",
+    objective: "Test whether stale private representation can become operational state.",
+    scenarioId: "stale-observation",
+    failureClass: "stale_observation",
+    mode: "ab_pair",
+    status: "running",
+    agentCount: 2,
+    createdAt: "2026-06-29T02:00:00.000Z",
+    updatedAt: "2026-06-29T02:04:20.000Z",
+    latestActivity: "Substrate arm refused stale basis; no-substrate arm admitted the unsafe action.",
+    error: null,
+    summaryMetrics: {
+      activeAgents: 2,
+      blockedAgents: 1,
+      pendingInjections: 0,
+      pendingMutations: 0,
+      injectionAppliedCount: 1,
+      mutationAppliedCount: 1,
+      unsafeBlockedCount: 1,
+      unsafeAdmittedCount: 1,
+      divergenceCount: 1,
+      substrateProtectedCount: 1,
+    },
+  },
+  agents: [
+    {
+      agentId: "preview-session:agent:1",
+      label: "Agent 1",
+      behaviorDiverged: true,
+      arms: {
+        no_substrate: {
+          arm: "no_substrate",
+          result: "fail",
+          actedValue: 100,
+          admitted: true,
+          tokens: 42,
+          admittedTransitions: 3,
+          chainValid: true,
+        },
+        substrate: {
+          arm: "substrate",
+          result: "blocked",
+          actedValue: 100,
+          admitted: false,
+          refusedReason: "stale_basis position=1 < head=2",
+          tokens: 42,
+          admittedTransitions: 2,
+          chainValid: true,
+        },
+      },
+    },
+    {
+      agentId: "preview-session:agent:2",
+      label: "Agent 2",
+      behaviorDiverged: false,
+      arms: {
+        no_substrate: {
+          arm: "no_substrate",
+          result: "pass",
+          actedValue: "-",
+          admitted: false,
+          tokens: 18,
+          admittedTransitions: 1,
+          chainValid: true,
+        },
+        substrate: {
+          arm: "substrate",
+          result: "pass",
+          actedValue: "-",
+          admitted: false,
+          tokens: 18,
+          admittedTransitions: 1,
+          chainValid: true,
+        },
+      },
+    },
+  ],
+  events: [
+    previewEvent("session_created", "Local agent lab session created for stale-observation."),
+    previewEvent("agent_started", "Agent 1 started.", "preview-session:agent:1"),
+    previewEvent("world_seeded", "Seeded AAPL = 100 as admitted lab state.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("agent_observed", "Agent observed AAPL at basis position 1.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("injection_applied", "Injected file-context request into the session.", "preview-session:agent:1"),
+    previewEvent("mutation_applied", "Lab mutation moved AAPL from 100 to 130 after observation.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("action_admitted", "No-substrate action admitted stale AAPL=100.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("action_refused", "Substrate refused stale AAPL=100 at admission boundary.", "preview-session:agent:1", "substrate"),
+    previewEvent("arm_diverged", "A/B arms diverged after the same lab mutation.", "preview-session:agent:1"),
+  ],
+};
+
+let previewSessionState: SessionDetail = previewSession;
+
+function previewEvent(
+  type: string,
+  message: string,
+  agentId?: string,
+  arm?: Arm,
+): SessionEvent {
+  return {
+    id: `preview-${type}-${agentId ?? "session"}-${arm ?? "all"}`,
+    type,
+    sessionId: "preview-session",
+    scenarioId: "stale-observation",
+    failureClass: "stale_observation",
+    occurredAt: "2026-06-29T02:04:20.000Z",
+    message,
+    ...(agentId ? { agentId } : {}),
+    ...(arm ? { arm } : {}),
   };
-  void load();
-  liveTimer = setInterval(() => void load(), 5000);
 }
 
-function render(root: HTMLElement, dashboard: DashboardData, state: DashboardState): void {
-  // LIVE view gets its own clean, full-screen layout: a slim top nav + the
-  // live A/B story content. The fixture-explorer chrome (command bar, replay-
-  // corpus left rail, artifact inspector) is NOT drawn here — it was burying
-  // the story behind "REPLAY CORPUS / POLICY SAFETY" on phones.
-  if (state.view === "live") {
-    // Story page: renders synchronously from the bundled corpus — no network,
-    // no "Loading" hang. Plain-English story first; live backend metrics load
-    // underneath when the backend is reachable.
-    root.innerHTML = `
-      <div class="live-page">
-        ${renderLiveTopNav(state)}
-        <div id="story-mount"></div>
-        <div id="live-mount" class="live-mount-secondary"><div class="live-shell"><div class="live-banner warn">Loading live backend metrics…</div></div></div>
-      </div>
-    `;
-    const storyMount = root.querySelector<HTMLElement>("#story-mount");
-    if (storyMount) renderStory(storyMount, dashboard);
-    bindInteractions(root, dashboard, state);
+void boot();
+
+async function boot(): Promise<void> {
+  window.addEventListener("popstate", () => void route());
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && startModalOpen) {
+      startModalOpen = false;
+      renderMain();
+    }
+  });
+  await Promise.all([loadScenarios(), loadSessions()]);
+  await route();
+  window.setInterval(() => {
+    if (!currentSessionId()) void loadSessions().then(renderMain);
+  }, 4000);
+}
+
+async function route(): Promise<void> {
+  const id = currentSessionId();
+  if (id) {
+    await loadDetail(id);
+    renderDetail();
+    connectStream(id);
+  } else {
+    disconnectStream();
+    detail = null;
+    renderMain();
+  }
+}
+
+function currentSessionId(): string | null {
+  const match = window.location.pathname.match(/^\/sessions\/([^/]+)$/);
+  return match?.[1] ?? null;
+}
+
+async function loadScenarios(): Promise<void> {
+  const res = await fetch("/api/lab/scenarios");
+  const body = (await res.json()) as { scenarios?: ScenarioMeta[] };
+  scenarios = body.scenarios ?? [];
+}
+
+async function loadSessions(): Promise<void> {
+  const res = await fetch("/api/sessions");
+  const body = (await res.json()) as { sessions?: SessionSummary[] };
+  sessions = body.sessions ?? [];
+}
+
+async function loadDetail(id: string): Promise<void> {
+  if (id === previewSessionState.session.id) {
+    detail = previewSessionState;
     return;
   }
+  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
+  if (!res.ok) {
+    detail = null;
+    return;
+  }
+  detail = (await res.json()) as SessionDetail;
+}
 
-  root.innerHTML = `
-    <div class="monitor-shell">
-      ${renderAppRail(state)}
-      <div class="monitor-frame">
-        ${renderCommandBar(dashboard)}
-        <div class="monitor-grid">
-          ${renderLeftRail(dashboard, state)}
-          ${renderMainSurface(dashboard, state)}
-          ${renderInspector(dashboard, state)}
+function connectStream(id: string): void {
+  if (id === previewSessionState.session.id) {
+    disconnectStream();
+    return;
+  }
+  if (stream?.url.endsWith(`/api/sessions/${id}/stream`)) return;
+  disconnectStream();
+  stream = new EventSource(`/api/sessions/${encodeURIComponent(id)}/stream`);
+  stream.addEventListener("session-event", (evt) => {
+    const event = JSON.parse((evt as MessageEvent).data) as SessionEvent;
+    if (!detail || detail.session.id !== id) return;
+    detail = { ...detail, events: [...detail.events, event] };
+    renderDetail();
+    if (event.type === "session_completed" || event.type === "session_failed") {
+      void loadDetail(id).then(renderDetail);
+    }
+  });
+}
+
+function disconnectStream(): void {
+  stream?.close();
+  stream = null;
+}
+
+function renderMain(): void {
+  const latest = visibleSessions();
+  if (!selectedSessionId || !latest.some((session) => session.id === selectedSessionId)) {
+    selectedSessionId = latest[0]?.id ?? null;
+  }
+  const selectedSession = latest.find((session) => session.id === selectedSessionId) ?? latest[0] ?? null;
+  appRoot.innerHTML = `
+    <main class="codex-shell">
+      <aside class="codex-sidebar">
+        <div class="sidebar-brand">
+          <div>
+            <strong>Local Agent Lab</strong>
+            <span>PM substrate testbed</span>
+          </div>
+          <button class="new-chat" data-action="open-start-modal">New</button>
         </div>
-      </div>
+        <nav class="chat-list" aria-label="Sessions">
+          ${latest.map((session) => renderSessionRow(session, selectedSession?.id ?? "")).join("")}
+        </nav>
+        <div class="sidebar-footer">
+          <button class="sidebar-button" data-action="refresh">Refresh</button>
+          <button class="sidebar-button" data-action="focus-settings">Lab settings</button>
+        </div>
+      </aside>
+      <section class="codex-workspace">
+        ${renderWorkspaceHeader(selectedSession)}
+        <div class="workspace-body">
+          <section class="conversation-panel">
+            ${renderSessionConversation(selectedSession)}
+            ${renderMainComposer(selectedSession)}
+          </section>
+          <aside class="codex-inspector">
+            <details class="settings-panel" data-panel="monitor" open>
+              <summary>Substrate test evidence</summary>
+              ${renderCompactSignals(latest, selectedSession)}
+            </details>
+          </aside>
+        </div>
+      </section>
+      ${startModalOpen ? renderStartModal() : ""}
+    </main>
+  `;
+  bindMain();
+}
+
+function visibleSessions(): readonly SessionSummary[] {
+  return [...(sessions.length > 0 ? sessions : [previewSessionState.session])].sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
+  );
+}
+
+function renderActivitySnapshot(latest: readonly SessionSummary[]): string {
+  const active = latest.filter((session) => session.status === "running").length;
+  const blocked = latest.reduce((sum, session) => sum + session.summaryMetrics.unsafeBlockedCount, 0);
+  const admitted = latest.reduce((sum, session) => sum + session.summaryMetrics.unsafeAdmittedCount, 0);
+  const diverged = latest.reduce((sum, session) => sum + session.summaryMetrics.divergenceCount, 0);
+  return `
+    <div class="snapshot-strip">
+      ${metric("Running sessions", String(active))}
+      ${metric("Unsafe blocked", String(blocked))}
+      ${metric("Unsafe admitted", String(admitted))}
+      ${metric("A/B diverged", String(diverged))}
     </div>
   `;
-
-  bindInteractions(root, dashboard, state);
 }
 
-function renderAppRail(state: DashboardState): string {
-  const items: ReadonlyArray<readonly [DashboardView, string, string]> = [
-    ["live", "Live", "LV"],
-    ["grid", "Overview", "GR"],
-    ["list", "Rows", "LI"],
-    ["flow", "Evidence Flow", "FL"],
-    ["safe", "Policy Safety", "SF"],
-    ["data", "Replay Data", "DA"],
-    ["trend", "Timeline Trend", "TR"],
-    ["gear", "Diagnostics", "DG"],
-  ];
+function renderSessionRow(session: SessionSummary, selectedId: string): string {
+  const selected = session.id === selectedId;
   return `
-    <nav class="app-rail" aria-label="Substrate sections">
-      <div class="rail-logo">pm</div>
-      <div class="rail-stack">
-        ${items
-          .map(
-            ([view, label, glyph]) => `
-              <button class="rail-icon ${state.view === view ? "active" : ""}" data-view="${view}" aria-label="${escapeAttribute(label)}">
-                <span>${escapeHtml(glyph)}</span>
-              </button>
-            `,
-          )
-          .join("")}
-      </div>
-    </nav>
+    <button class="chat-row ${selected ? "selected" : ""}" data-action="select-session" data-session-id="${esc(session.id)}">
+      <span class="chat-dot status-dot-${esc(session.status)}"></span>
+      <span class="chat-row-main">
+        <strong>${esc(session.title)}</strong>
+        <span>${esc(session.latestActivity || session.objective)}</span>
+      </span>
+      <span class="chat-count">${session.summaryMetrics.divergenceCount || session.summaryMetrics.unsafeBlockedCount || ""}</span>
+    </button>
   `;
 }
 
-function renderLiveTopNav(state: DashboardState): string {
-  // Slim header for the live full-screen page. Keeps a link back to the
-  // fixture-explorer views without dragging the whole desktop chrome in.
-  const links: ReadonlyArray<readonly [DashboardView, string]> = [
-    ["live", "Live"],
-    ["grid", "Overview"],
-    ["list", "Rows"],
-    ["flow", "Evidence Flow"],
-    ["safe", "Policy Safety"],
-    ["data", "Replay Data"],
-    ["gear", "Diagnostics"],
-  ];
+function renderWorkspaceHeader(session: SessionSummary | null): string {
+  if (!session) {
+    return `
+      <header class="workspace-header">
+        <div>
+          <h1>Start a lab session</h1>
+          <p>Create an objective, choose agent count, then compare substrate behavior.</p>
+        </div>
+      </header>
+    `;
+  }
   return `
-    <nav class="live-topnav">
-      <span class="live-topnav-brand">pm-substrate · <strong>Live Monitor</strong></span>
-      <div class="live-topnav-links">
-        ${links
-          .map(
-            ([view, label]) =>
-              `<button class="live-topnav-link ${state.view === view ? "active" : ""}" data-view="${view}">${escapeHtml(label)}</button>`,
-          )
-          .join("")}
+    <header class="workspace-header">
+      <div>
+        <h1>${esc(session.title)}</h1>
+        <p>${esc(session.objective)}</p>
       </div>
-    </nav>`;
-}
-
-function renderCommandBar(dashboard: DashboardData): string {
-  const totals = getTotals(dashboard);
-  const bounds = getTimeBounds(dashboard);
-  const validTone: StatusTone = totals.replayHashesValid ? "good" : "bad";
-
-  return `
-    <header class="command-bar">
-      <div class="product-cell">
-        <div class="product-root">pm-substrate</div>
-        <div class="product-title">Substrate Monitor</div>
+      <div class="header-actions">
+        <span class="status status-${esc(session.status)}">${esc(session.status)}</span>
+        <button class="secondary" data-action="open" data-session-id="${esc(session.id)}">Open</button>
+        <button class="danger" data-action="stop" data-session-id="${esc(session.id)}" ${session.status === "running" ? "" : "disabled"}>Stop</button>
       </div>
-      ${renderCommandMetric("Replay", totals.replayHashesValid ? "VALID" : "REVIEW", "static replay", validTone)}
-      ${renderCommandMetric("Cluster", "fixture", "local JSONL", "neutral")}
-      ${renderCommandMetric("Corpus", String(dashboard.artifacts.length + dashboard.admissions.length + dashboard.writeBindings.length), "rows", "neutral")}
-      ${renderCommandMetric("Time", bounds.latest, "latest fixture", "neutral")}
-      ${renderCommandMetric("Window", bounds.window, "replay", "neutral")}
-      ${renderCommandMetric("Obs", String(totals.observations), "artifact rows", "neutral")}
-      ${renderCommandMetric("Evid", String(dashboard.admissions.length), "admission rows", "neutral")}
-      ${renderCommandMetric("Admitted", String(totals.admitted), `${formatPercent(totals.admitted, dashboard.admissions.length)} of evidence`, "good")}
-      ${renderCommandMetric("Rejected", String(totals.rejected), `${formatPercent(totals.rejected, dashboard.admissions.length)} of evidence`, totals.rejected > 0 ? "bad" : "good")}
-      ${renderCommandMetric("Warnings", String(totals.warnings), `${dashboard.warningCounts.length} codes`, totals.warnings > 0 ? "warn" : "good")}
-      ${renderCommandMetric("Replay Status", totals.replayHashesValid ? "VALID" : "REVIEW", "hashes", validTone)}
-      <button class="menu-button" data-view="gear" aria-label="Dashboard diagnostics"><span></span><span></span><span></span></button>
     </header>
   `;
 }
 
-function renderCommandMetric(
-  label: string,
-  value: string,
-  detail: string,
-  tone: StatusTone,
-): string {
+function renderSessionConversation(session: SessionSummary | null): string {
+  if (!session) {
+    return `
+      <div class="empty-conversation">
+        <h2>No session selected</h2>
+        <p>Use the settings panel to start a Local Agent Lab run.</p>
+      </div>
+    `;
+  }
+  const events = session.id === previewSessionState.session.id
+    ? previewSessionState.events
+    : sessionCardEvents(session).map((item, index) => ({
+        id: `${session.id}:summary:${index}`,
+        type: item.label,
+        sessionId: session.id,
+        scenarioId: session.scenarioId,
+        failureClass: session.failureClass,
+        occurredAt: session.updatedAt,
+        message: item.message,
+      }) satisfies SessionEvent);
   return `
-    <div class="command-metric metric-${tone}">
-      <div class="command-label">${escapeHtml(label)}</div>
-      <div class="command-value">${escapeHtml(value)}</div>
-      <div class="command-detail">${escapeHtml(detail)}</div>
+    <div class="conversation-scroll">
+      <div class="objective-card">
+        <span>Objective</span>
+        <p>${esc(session.objective)}</p>
+      </div>
+      ${events.map(renderChatEvent).join("")}
     </div>
   `;
 }
 
-function renderLeftRail(dashboard: DashboardData, state: DashboardState): string {
-  const artifactRows = filterArtifacts(dashboard.artifacts, state);
-  const admissionRows = filterAdmissions(dashboard.admissions, state);
-  const writeBindingRows = filterWriteBindings(dashboard.writeBindings, state);
-  const activeRows = renderCorpusListItems({
-    artifactRows,
-    admissionRows,
-    writeBindingRows,
-    state,
-  });
-  const listCount = getCorpusCount({
-    artifactRows,
-    admissionRows,
-    writeBindingRows,
-    corpus: state.corpus,
-  });
-  const decisionOptions =
-    state.corpus === "writeBindings"
-      ? dashboard.writeBindingDecisionCounts.map((count) => count.key)
-      : dashboard.decisionCounts.map((count) => count.key);
-  const bounds = getTimeBounds(dashboard);
-
+function renderChatEvent(event: SessionEvent): string {
+  const speaker = event.arm
+    ? event.arm === "substrate"
+      ? "Substrate"
+      : "No substrate"
+    : event.agentId
+      ? agentLabel(event.agentId)
+      : "Lab";
   return `
-    <aside class="left-rail" aria-label="Replay corpus controls">
-      <section class="filter-panel">
-        <div class="panel-title">
-          <h2>Replay Corpus</h2>
-          <button id="reset-filters" type="button">Reset</button>
+    <article class="chat-event event-${esc(event.type)}">
+      <div class="avatar">${esc(speaker.slice(0, 1).toUpperCase())}</div>
+      <div class="bubble">
+        <div class="bubble-meta">
+          <strong>${esc(speaker)}</strong>
+          <span>${esc(event.type.replaceAll("_", " "))} · ${esc(time(event.occurredAt))}</span>
         </div>
-        <div class="field-grid two">
-          ${renderSelectField("Corpus", "corpus-select", ["artifacts", "admissions", "writeBindings"], state.corpus)}
-          ${renderReadonlyField("Environment", "fixture")}
-        </div>
-        <div class="field-grid two">
-          ${renderReadonlyField("Agent", "all")}
-          ${renderReadonlyField("Policy Set", "evidence-binding")}
-        </div>
-        <label class="field span-all">
-          <span>Time Range</span>
-          <div class="range-field"><span>${escapeHtml(bounds.earliest)}</span><b>to</b><span>${escapeHtml(bounds.latest)}</span></div>
-        </label>
-        <label class="field span-all">
-          <span>Search Artifact</span>
-          <input id="query" class="search-input" value="${escapeAttribute(state.query)}" placeholder="artifact_id, hash, source, policy..." />
-        </label>
-        <div class="field-grid two">
-          <label class="field">
-            <span>Phase</span>
-            <select id="phase-filter">${renderOptions(["all", ...dashboard.phaseCounts.map((count) => count.key)], state.phase)}</select>
-          </label>
-          <label class="field">
-            <span>Decision</span>
-            <select id="decision-filter">${renderOptions(["all", ...decisionOptions], state.decision)}</select>
-          </label>
-        </div>
-        <button class="add-filter" id="show-warning-artifacts" type="button">Show warning artifacts</button>
-      </section>
-      <section class="artifact-list-panel">
-        <div class="list-header">
-          <h2>${escapeHtml(corpusTitle(state.corpus))} (${listCount})</h2>
-          <span>Sort: Newest</span>
-        </div>
-        <div class="item-list">${activeRows}</div>
-        <div class="pager">1-${Math.max(1, listCount)} of ${listCount}</div>
-      </section>
-    </aside>
+        <p>${esc(event.message)}</p>
+      </div>
+    </article>
   `;
 }
 
-function renderMainSurface(dashboard: DashboardData, state: DashboardState): string {
-  if (state.view === "live") {
-    return `<main class="main-surface main-surface-live"><div id="live-mount"><div class="live-shell"><div class="live-banner warn">Loading live snapshot…</div></div></div></main>`;
-  }
-  if (state.view === "list") {
-    return `
-      <main class="main-surface">
-        ${renderEventTimeline(dashboard, state)}
-        ${renderHeatmapTimeline(dashboard, state)}
-      </main>
-    `;
-  }
+function agentLabel(agentId: string): string {
+  const tail = agentId.split(":").at(-1) ?? agentId;
+  if (/^\d+$/.test(tail)) return `Agent ${tail}`;
+  return tail.startsWith("agent") ? tail.replace(/^agent:?/, "Agent ") : tail;
+}
 
-  if (state.view === "flow") {
-    return `
-      <main class="main-surface">
-        ${renderFlowBoard(dashboard)}
-        ${renderEventTimeline(dashboard, state)}
-      </main>
-    `;
-  }
-
-  if (state.view === "safe") {
-    return `
-      <main class="main-surface">
-        ${renderSafetyBoard(dashboard)}
-        ${renderEventTimeline(dashboard, state)}
-      </main>
-    `;
-  }
-
-  if (state.view === "data") {
-    return `
-      <main class="main-surface">
-        ${renderDataBoard(dashboard, state)}
-        ${renderEventTimeline(dashboard, state)}
-      </main>
-    `;
-  }
-
-  if (state.view === "trend") {
-    return `
-      <main class="main-surface">
-        ${renderHeatmapTimeline(dashboard, state)}
-        ${renderSafetyBoard(dashboard)}
-      </main>
-    `;
-  }
-
-  if (state.view === "gear") {
-    return `
-      <main class="main-surface">
-        ${renderDiagnosticsBoard(dashboard)}
-      </main>
-    `;
-  }
-
+function renderMainComposer(session: SessionSummary | null): string {
+  if (!session) return "";
   return `
-    <main class="main-surface">
-      ${renderHeatmapTimeline(dashboard, state)}
-      ${renderFlowBoard(dashboard)}
-      ${renderEventTimeline(dashboard, state)}
+    <form class="chat-composer" data-role="operator-form">
+      <input type="hidden" name="sessionId" value="${esc(session.id)}" />
+      <div class="composer-line">
+        <textarea name="prompt" rows="1" aria-label="Prompt/task injection" placeholder="Inject a change, task, or context"></textarea>
+        <button class="primary" type="submit">Send</button>
+      </div>
+      <details class="composer-options">
+        <summary>Target, files, mutation</summary>
+        <div>
+          <select name="targetArm" aria-label="A/B target">
+            <option value="both">both arms</option>
+            <option value="substrate">substrate</option>
+            <option value="no_substrate">no substrate</option>
+          </select>
+          <input name="fileRefs" aria-label="File refs" placeholder="optional files" />
+          <input name="mutationDescription" aria-label="Mutation" placeholder="optional mutation" />
+          <input type="hidden" name="mutationType" value="changed_working_condition" />
+        </div>
+      </details>
+    </form>
+  `;
+}
+
+function renderCompactSignals(
+  latest: readonly SessionSummary[],
+  selectedSession: SessionSummary | null,
+): string {
+  const session = selectedSession ?? latest[0] ?? null;
+  if (!session) return `<div class="empty">No monitoring signals yet.</div>`;
+  const m = session.summaryMetrics;
+  return `
+    <div class="evidence-summary">
+      <strong>${esc(session.mode)} substrate test</strong>
+      <p>${esc(session.latestActivity || "Waiting for lab events.")}</p>
+    </div>
+    <div class="signal-list">
+      ${metric("Active agents", String(m.activeAgents))}
+      ${metric("Blocked at substrate", String(m.unsafeBlockedCount))}
+      ${metric("Admitted without guard", String(m.unsafeAdmittedCount))}
+      ${metric("Pending injections", String(m.pendingInjections))}
+      ${metric("A/B divergence", String(m.divergenceCount))}
+      ${metric("Protected comparisons", String(m.substrateProtectedCount))}
+    </div>
+    <p class="settings-note">These signals are derived from the selected local-agent-lab session events: injection, mutation, action admitted/refused, oracle verdict, and A/B divergence. Open the session for full agent panels.</p>
+  `;
+}
+
+function renderStartModal(): string {
+  return `
+    <div class="modal-backdrop" data-action="close-start-modal">
+      <section class="start-modal" role="dialog" aria-modal="true" aria-labelledby="start-modal-title">
+        <header>
+          <div>
+            <h2 id="start-modal-title">Start Local Agent Lab</h2>
+            <p>Set the objective, agent count, and substrate mode for a new test session.</p>
+          </div>
+          <button class="ghost icon-button" type="button" data-action="close-start-modal" aria-label="Close start modal">Close</button>
+        </header>
+        ${renderStartForm()}
+      </section>
+    </div>
+  `;
+}
+
+function renderStartForm(): string {
+  return `
+    <form class="start-form" data-role="start-form">
+      <div class="form-title">
+        <div>
+          <h2>New Session</h2>
+          <p>Objective, agents, mode. Keep the rest as lab settings.</p>
+        </div>
+      </div>
+      <label>
+        <span>Objective</span>
+        <textarea name="objective" rows="5" required>Test whether stale private representation can become operational state.</textarea>
+      </label>
+      <div class="form-grid">
+        <label>
+          <span>Mode</span>
+          <select name="mode">
+            <option value="ab_pair">A/B pair</option>
+            <option value="substrate">substrate</option>
+            <option value="no_substrate">no substrate</option>
+          </select>
+        </label>
+        <label>
+          <span>Agents</span>
+          <input name="agentCount" type="number" min="1" max="12" value="1" />
+        </label>
+      </div>
+      <details class="advanced-settings">
+        <summary>Scenario setting</summary>
+        <label>
+          <span>Scenario</span>
+          <select name="scenarioId">
+            ${scenarios.map((s) => `<option value="${esc(s.scenarioId)}">${esc(s.scenarioId)}</option>`).join("")}
+          </select>
+        </label>
+      </details>
+      <button class="primary" type="submit">Start Local Agent Lab</button>
+    </form>
+  `;
+}
+
+function renderInjectionConsole(
+  latest: readonly SessionSummary[],
+  selectedSession: SessionSummary | null,
+): string {
+  if (!selectedSession) {
+    return `<div class="empty">Start a session before injecting drift.</div>`;
+  }
+  return `
+    <form class="operator-form" data-role="operator-form">
+      <div class="form-title">
+        <div>
+          <p class="kicker">Injection + Mutation</p>
+          <h2>Route Change Into Session</h2>
+        </div>
+        <span class="status status-${esc(selectedSession.status)}">${esc(selectedSession.status)}</span>
+      </div>
+      <label>
+        <span>Target chat/session</span>
+        <select name="sessionId">
+          ${latest
+            .map(
+              (session) =>
+                `<option value="${esc(session.id)}" ${session.id === selectedSession.id ? "selected" : ""}>${esc(session.title)}</option>`,
+            )
+            .join("")}
+        </select>
+      </label>
+      <div class="form-grid two">
+        <label>
+          <span>A/B target</span>
+          <select name="targetArm">
+            <option value="both">both arms</option>
+            <option value="substrate">substrate only</option>
+            <option value="no_substrate">no substrate only</option>
+          </select>
+        </label>
+        <label>
+          <span>Target agent</span>
+          <input name="targetAgentId" placeholder="optional agent id" />
+        </label>
+      </div>
+      <label>
+        <span>Prompt/task injection</span>
+        <textarea name="prompt" rows="3" placeholder="Tell the chosen session what changed or what to re-check."></textarea>
+      </label>
+      <label>
+        <span>Attach repo files as explicit context</span>
+        <input name="fileRefs" placeholder="packages/foo.ts, docs/context.md" />
+      </label>
+      <div class="form-grid two">
+        <label>
+          <span>Mutation type</span>
+          <select name="mutationType">
+            <option value="changed_working_condition">changed working condition</option>
+            <option value="stale_state">stale state</option>
+            <option value="conflicting_context">conflicting context</option>
+            <option value="invalidated_assumption">invalidated assumption</option>
+          </select>
+        </label>
+        <label>
+          <span>Lab mutation intent</span>
+          <input name="mutationDescription" placeholder="e.g. move observed fact after private basis" />
+        </label>
+      </div>
+      <button class="primary" type="submit">Inject Change Into Selected Session</button>
+    </form>
+  `;
+}
+
+function renderSnapshotFeed(latest: readonly SessionSummary[]): string {
+  const feed = sessions.length > 0 ? latest.map(sessionToSnapshotEvent) : previewSessionState.events.slice(-7);
+  return `
+    <div class="feed-head">
+      <div>
+        <p class="kicker">Live Snapshot</p>
+        <h2>What changed?</h2>
+      </div>
+      <span>${feed.length}</span>
+    </div>
+    <div class="feed-list">
+      ${
+        feed
+          .map((item) =>
+            "type" in item
+              ? renderEvent(item)
+              : `<div class="event event-${esc(item.status)}"><span>${esc(time(item.updatedAt))}</span><strong>${esc(item.title)}</strong><p>${esc(item.latestActivity)}</p></div>`,
+          )
+          .join("") || `<div class="empty">No live activity yet.</div>`
+      }
+    </div>
+  `;
+}
+
+function sessionToSnapshotEvent(session: SessionSummary): SessionSummary {
+  return session;
+}
+
+function renderSessionCard(session: SessionSummary): string {
+  const m = session.summaryMetrics;
+  const events = sessionCardEvents(session);
+  return `
+    <article class="session-card" data-session-id="${esc(session.id)}">
+      <header>
+        <div>
+          <p class="kicker">${esc(session.mode)} · ${esc(session.failureClass)}</p>
+          <h3>${esc(session.title)}</h3>
+        </div>
+        <span class="status status-${esc(session.status)}">${esc(session.status)}</span>
+      </header>
+      <p class="objective">${esc(session.objective)}</p>
+      <div class="metric-row">
+        ${metric("Active agents", String(m.activeAgents))}
+        ${metric("Pending inj.", String(m.pendingInjections))}
+        ${metric("Blocked drift", String(m.unsafeBlockedCount))}
+        ${metric("A/B diverged", String(m.divergenceCount))}
+      </div>
+      <div class="card-stream">
+        ${events.map((event) => `<div><span>${esc(event.label)}</span><p>${esc(event.message)}</p></div>`).join("")}
+      </div>
+      <p class="activity">${esc(session.latestActivity)}</p>
+      <footer>
+        <button class="secondary" data-action="open" data-session-id="${esc(session.id)}">Open</button>
+        <button class="secondary" data-action="prepare-injection" data-session-id="${esc(session.id)}">Inject</button>
+        <button class="secondary" data-action="prepare-mutation" data-session-id="${esc(session.id)}">Mutate</button>
+        <button class="danger" data-action="stop" data-session-id="${esc(session.id)}" ${session.status === "running" ? "" : "disabled"}>Stop</button>
+      </footer>
+    </article>
+  `;
+}
+
+function sessionCardEvents(session: SessionSummary): readonly { label: string; message: string }[] {
+  if (session.id === previewSessionState.session.id) {
+    return previewSessionState.events.slice(-4).map((event) => ({
+      label: event.type.replaceAll("_", " "),
+      message: event.message,
+    }));
+  }
+  return [
+    { label: "latest activity", message: session.latestActivity },
+    {
+      label: "monitoring signal",
+      message: `${session.summaryMetrics.unsafeBlockedCount} blocked / ${session.summaryMetrics.unsafeAdmittedCount} admitted / ${session.summaryMetrics.divergenceCount} divergences`,
+    },
+  ];
+}
+
+function renderDetail(): void {
+  if (!detail) {
+    appRoot.innerHTML = `<main class="control-room"><div class="empty">Session not found.</div></main>`;
+    return;
+  }
+  const { session, events, agents } = detail;
+  appRoot.innerHTML = `
+    <main class="session-page">
+      <header class="session-topbar">
+        <button class="ghost" data-action="back">Back</button>
+        <div>
+          <p class="kicker">${esc(session.mode)} · ${esc(session.failureClass)}</p>
+          <h1>${esc(session.title)}</h1>
+          <p>${esc(session.objective)}</p>
+        </div>
+        <span class="status status-${esc(session.status)}">${esc(session.status)}</span>
+        <button class="secondary" data-action="add-agent" data-session-id="${esc(session.id)}">Add Agent</button>
+        <button class="secondary" data-action="focus-composer">Inject</button>
+        <button class="secondary" data-action="focus-composer">Mutate</button>
+        <button class="danger" data-action="stop" data-session-id="${esc(session.id)}" ${session.status === "running" ? "" : "disabled"}>Stop</button>
+      </header>
+      <section class="session-metrics">
+        ${metric("Applied injections", String(session.summaryMetrics.injectionAppliedCount))}
+        ${metric("Applied mutations", String(session.summaryMetrics.mutationAppliedCount))}
+        ${metric("Unsafe blocked", String(session.summaryMetrics.unsafeBlockedCount))}
+        ${metric("Unsafe admitted", String(session.summaryMetrics.unsafeAdmittedCount))}
+        ${metric("Protected pairs", String(session.summaryMetrics.substrateProtectedCount))}
+      </section>
+      ${renderDetailComposer(session, agents)}
+      <section class="split-workspace">
+        <div class="agent-region">
+          ${renderAgentPanels(session, events, agents)}
+        </div>
+        <aside class="timeline">
+          <h2>Session Stream</h2>
+          ${events.map(renderEvent).join("") || `<div class="empty">Waiting for session events.</div>`}
+        </aside>
+      </section>
     </main>
   `;
+  bindDetail();
 }
 
-function renderSafetyBoard(dashboard: DashboardData): string {
-  const totals = getTotals(dashboard);
-  const warningCodes = dashboard.warningCounts.slice(0, 6);
-  const decisions = dashboard.decisionCounts;
-  const bindingDecisions = dashboard.writeBindingDecisionCounts;
+function renderDetailComposer(session: SessionSummary, agents: readonly AgentResult[]): string {
   return `
-    <section class="view-panel">
-      <div class="panel-heading compact">
-        <div>
-          <h1>Policy Safety</h1>
-          <span>Replay hash, evidence admission, and warning concentrations</span>
-        </div>
+    <form class="detail-composer" data-role="operator-form">
+      <input type="hidden" name="sessionId" value="${esc(session.id)}" />
+      <div>
+        <p class="kicker">Inject Into This Chat</p>
+        <h2>Prompt, File Context, Or Lab Mutation</h2>
       </div>
-      <div class="view-card-grid">
-        ${renderViewCard("Replay hashes", totals.replayHashesValid ? "VALID" : "REVIEW", "All artifact hashes are present in the static replay corpus.", totals.replayHashesValid ? "good" : "bad")}
-        ${renderViewCard("Rejected evidence", String(totals.rejected), "Evidence rows that failed admission checks.", totals.rejected > 0 ? "bad" : "good")}
-        ${renderViewCard("Warnings", String(totals.warnings), `${dashboard.warningCounts.length} warning codes across state-review artifacts.`, totals.warnings > 0 ? "warn" : "good")}
-        ${renderViewCard("Write binding stream", String(dashboard.writeBindings.length), `${totals.writeBindingsAllowed} allowed, ${totals.writeBindingsBlocked} blocked before dispatch.`, totals.writeBindingsBlocked > 0 ? "warn" : "good")}
-      </div>
-      <div class="summary-grid">
-        <div>
-          <h2>Top Warning Codes</h2>
-          ${warningCodes.map((count) => renderSummaryRow(count.key, count.count, count.tone)).join("")}
-        </div>
-        <div>
-          <h2>Admission Decisions</h2>
-          ${decisions.map((count) => renderSummaryRow(count.key, count.count, count.tone)).join("")}
-        </div>
-        <div>
-          <h2>Write Binding Decisions</h2>
-          ${bindingDecisions.map((count) => renderSummaryRow(count.key, count.count, count.tone)).join("")}
-        </div>
-      </div>
-    </section>
+      <label>
+        <span>Target agent</span>
+        <select name="targetAgentId">
+          <option value="">session level</option>
+          ${agents.map((agent) => `<option value="${esc(agent.agentId)}">${esc(agent.label)}</option>`).join("")}
+        </select>
+      </label>
+      <label>
+        <span>A/B target</span>
+        <select name="targetArm">
+          <option value="both">both arms</option>
+          <option value="substrate">substrate only</option>
+          <option value="no_substrate">no substrate only</option>
+        </select>
+      </label>
+      <label class="composer-wide">
+        <span>Injected request</span>
+        <input name="prompt" placeholder="Ask the agent to re-check against changed context or objective drift" />
+      </label>
+      <label>
+        <span>File refs</span>
+        <input name="fileRefs" placeholder="optional file paths" />
+      </label>
+      <label>
+        <span>Mutation</span>
+        <input name="mutationDescription" placeholder="optional constrained lab mutation" />
+      </label>
+      <input type="hidden" name="mutationType" value="changed_working_condition" />
+      <button class="primary" type="submit">Inject</button>
+    </form>
   `;
 }
 
-function renderDataBoard(dashboard: DashboardData, state: DashboardState): string {
-  const artifact = dashboard.artifacts.find(
-    (item) => state.selection.kind === "artifact" && item.artifactId === state.selection.id,
-  );
-  const admission = dashboard.admissions.find(
-    (item) => state.selection.kind === "admission" && item.reviewId === state.selection.id,
-  );
-  const writeBinding = dashboard.writeBindings.find(
-    (item) => state.selection.kind === "writeBinding" && item.recordId === state.selection.id,
-  );
-  const selected = artifact
-    ? compactArtifact(artifact)
-    : admission
-      ? compactAdmission(admission)
-      : writeBinding
-        ? compactWriteBinding(writeBinding)
-        : {};
-  return `
-    <section class="view-panel">
-      <div class="panel-heading compact">
-        <div>
-          <h1>Replay Data</h1>
-          <span>Committed JSONL fixture corpus and selected source object</span>
-        </div>
-      </div>
-      <div class="source-grid">
-        <div class="source-card">
-          <h2>Corpus Inventory</h2>
-          ${renderFactGrid([
-            ["State artifacts", String(dashboard.artifacts.length)],
-            ["Evidence admissions", String(dashboard.admissions.length)],
-            ["Write bindings", String(dashboard.writeBindings.length)],
-            ["Artifact warning codes", String(dashboard.warningCounts.length)],
-            ["Evidence kinds", String(dashboard.evidenceKindCounts.length)],
-          ])}
-        </div>
-        <div class="source-card">
-          <h2>Selected Object</h2>
-          <pre>${escapeHtml(JSON.stringify(selected, null, 2))}</pre>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function renderDiagnosticsBoard(dashboard: DashboardData): string {
-  const totals = getTotals(dashboard);
-  return `
-    <section class="view-panel">
-      <div class="panel-heading compact">
-        <div>
-          <h1>Diagnostics</h1>
-          <span>Dashboard runtime and data-boundary checks</span>
-        </div>
-      </div>
-      <div class="diagnostic-list">
-        ${renderDiagnostic("Source mode", "Static JSONL fixtures", "neutral")}
-        ${renderDiagnostic("Artifact/admission URL state", "Canonicalized on load and on row selection", "good")}
-        ${renderDiagnostic("Replay hashes", totals.replayHashesValid ? "Present" : "Needs review", totals.replayHashesValid ? "good" : "bad")}
-        ${renderDiagnostic("Write-binding replay stream", `${dashboard.writeBindings.length} committed rows`, dashboard.writeBindings.length > 0 ? "good" : "warn")}
-        ${renderDiagnostic("Dashboard rows", `${dashboard.artifacts.length + dashboard.admissions.length + dashboard.writeBindings.length} committed rows`, "neutral")}
-      </div>
-    </section>
-  `;
-}
-
-function renderViewCard(
-  label: string,
-  value: string,
-  detail: string,
-  tone: StatusTone,
+function renderAgentPanels(
+  session: SessionSummary,
+  events: readonly SessionEvent[],
+  agents: readonly AgentResult[],
 ): string {
-  return `
-    <div class="view-card tone-border-${tone}">
-      <span>${escapeHtml(label)}</span>
-      <strong class="tone-${tone}">${escapeHtml(value)}</strong>
-      <p>${escapeHtml(detail)}</p>
-    </div>
-  `;
-}
-
-function renderSummaryRow(label: string, value: number, tone: StatusTone): string {
-  return `
-    <div class="summary-row">
-      <span>${escapeHtml(label)}</span>
-      <b class="tone-${tone}">${value}</b>
-    </div>
-  `;
-}
-
-function renderDiagnostic(label: string, value: string, tone: StatusTone): string {
-  return `
-    <div class="diagnostic-row">
-      <span>${escapeHtml(label)}</span>
-      <strong class="tone-${tone}">${escapeHtml(value)}</strong>
-    </div>
-  `;
-}
-
-function renderHeatmapTimeline(dashboard: DashboardData, state: DashboardState): string {
-  const totals = getTotals(dashboard);
-  const bucketCount = Number(state.resolution);
-  const rows = [
-    { label: "Observations / row", low: "0", high: String(totals.observations), value: totals.observations, tone: "neutral" as StatusTone },
-    { label: "Admitted / row", low: "0", high: String(totals.admitted), value: totals.admitted, tone: "good" as StatusTone },
-    { label: "Rejected / row", low: "0", high: String(totals.rejected), value: totals.rejected, tone: "bad" as StatusTone },
-    { label: "Warnings / row", low: "0", high: String(totals.warnings), value: totals.warnings, tone: "warn" as StatusTone },
-    { label: "Replay valid %", low: "0%", high: totals.replayHashesValid ? "100%" : "0%", value: dashboard.artifacts.length, tone: totals.replayHashesValid ? "good" as StatusTone : "bad" as StatusTone },
-    { label: "Policy violations / row", low: "0", high: String(totals.rejected), value: totals.rejected, tone: "neutral" as StatusTone },
-  ];
-  const ticks = makeTimeTicks(dashboard);
-  const selectedIndex = getSelectedBucket(dashboard, state, bucketCount);
-
-  return `
-    <section class="timeline-panel">
-      <div class="panel-heading">
-        <div>
-          <h1>Evidence Timeline</h1>
-          <span>Static replay fixture window</span>
-        </div>
-        <div class="resolution-control">
-          <span>Resolution</span>
-          <select id="resolution-select" aria-label="Timeline resolution">
-            <option value="48" ${state.resolution === "48" ? "selected" : ""}>48 buckets</option>
-            <option value="24" ${state.resolution === "24" ? "selected" : ""}>24 buckets</option>
-            <option value="12" ${state.resolution === "12" ? "selected" : ""}>12 buckets</option>
-          </select>
-        </div>
-        <button class="jump-button" id="jump-now" type="button">Jump to Now</button>
-      </div>
-      <div class="heatmap">
-        <div class="heatmap-ticks">
-          <span></span>
-          ${ticks.map((tick) => `<span>${escapeHtml(tick)}</span>`).join("")}
-        </div>
-        ${rows.map((row, rowIndex) => renderHeatmapRow(row, rowIndex, selectedIndex, bucketCount)).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function renderHeatmapRow(
-  row: { readonly label: string; readonly low: string; readonly high: string; readonly value: number; readonly tone: StatusTone },
-  rowIndex: number,
-  selectedIndex: number,
-  bucketCount: number,
-): string {
-  return `
-    <div class="heat-row">
-      <div class="heat-label">${escapeHtml(row.label)}</div>
-      <div class="heat-low">${escapeHtml(row.low)}</div>
-      <div class="heat-cells" style="grid-template-columns: repeat(${bucketCount}, minmax(6px, 1fr))">
-        ${Array.from({ length: bucketCount }, (_, index) => {
-          const intensity = heatIntensity(row.value, rowIndex, index);
-          return `<span class="heat-cell heat-${row.tone} heat-i${intensity} ${index === selectedIndex ? "selected" : ""}"></span>`;
-        }).join("")}
-      </div>
-      <div class="heat-high">${escapeHtml(row.high)}</div>
-    </div>
-  `;
-}
-
-function renderFlowBoard(dashboard: DashboardData): string {
-  const totals = getTotals(dashboard);
-  const warningArtifacts = dashboard.artifacts.filter((artifact) => !artifact.review.valid).length;
-  const cleanArtifacts = dashboard.artifacts.length - warningArtifacts;
-  const deferredEvidence = dashboard.admissions.filter(
-    (review) => review.decision === "admitted_with_warnings",
-  ).length;
-  const allowedBindings = dashboard.writeBindings.filter(
-    (record) => record.decision === "allowed",
-  ).length;
-  const blockedPolicy = dashboard.writeBindings.filter(
-    (record) => record.decision === "blocked_policy",
-  ).length;
-  const blockedUnverified = dashboard.writeBindings.filter(
-    (record) => record.decision === "blocked_unverified_binding",
-  ).length;
-  const blockedIncomplete = dashboard.writeBindings.filter(
-    (record) => record.decision === "blocked_incomplete_binding",
-  ).length;
-  const blockedMissing = dashboard.writeBindings.filter(
-    (record) => record.decision === "blocked_missing_binding",
-  ).length;
-  const sourceGroups = topCounts(
-    dashboard.admissions.map((review) => review.evidence.kind),
-    4,
-  );
-
-  return `
-    <section class="flow-panel">
-      <div class="panel-heading compact">
-        <div>
-          <h1>Evidence Flow (Selected Window)</h1>
-          <span>Observation -> state review -> evidence admission -> write binding</span>
-        </div>
-      </div>
-      <div class="flow-board">
-        <svg class="flow-ribbons" viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
-          <path class="ribbon ribbon-good" d="M190 72 C300 72 320 92 410 92 S560 92 650 92 S780 92 900 92" />
-          <path class="ribbon ribbon-warn" d="M190 150 C310 150 330 175 410 175 S560 175 650 155 S780 155 900 172" />
-          <path class="ribbon ribbon-bad" d="M190 228 C310 228 330 224 410 228 S560 232 650 222 S780 220 900 226" />
-        </svg>
-        <div class="flow-column">
-          <div class="flow-column-title">Observation <strong>${totals.observations}</strong></div>
-          ${sourceGroups.map((group) => renderFlowNode(group.key, group.count, "neutral")).join("")}
-          ${renderFlowNode("Other evidence", Math.max(0, dashboard.admissions.length - sourceGroups.reduce((sum, group) => sum + group.count, 0)), "neutral")}
-        </div>
-        <div class="flow-column">
-          <div class="flow-column-title">State Review <strong>${dashboard.artifacts.length}</strong></div>
-          ${renderFlowNode("Accepted", cleanArtifacts, "good")}
-          ${renderFlowNode("Warning", warningArtifacts, "warn")}
-          ${renderFlowNode("Rejected", 0, "bad")}
-        </div>
-        <div class="flow-column">
-          <div class="flow-column-title">Evidence Admission <strong>${dashboard.admissions.length}</strong></div>
-          ${renderFlowNode("Admitted", totals.admitted - deferredEvidence, "good")}
-          ${renderFlowNode("Rejected", totals.rejected, "bad")}
-          ${renderFlowNode("Deferred", deferredEvidence, "warn")}
-        </div>
-        <div class="flow-column">
-          <div class="flow-column-title">Write Binding <strong>${dashboard.writeBindings.length}</strong></div>
-          ${renderFlowNode("Allowed", allowedBindings, "good")}
-          ${renderFlowNode("Policy blocked", blockedPolicy, "bad")}
-          ${renderFlowNode("Unverified binding", blockedUnverified, "bad")}
-          ${renderFlowNode("Missing binding", blockedMissing, "warn")}
-          ${renderFlowNode("Incomplete binding", blockedIncomplete, "warn")}
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function renderFlowNode(label: string, value: number, tone: StatusTone): string {
-  return `
-    <div class="flow-node node-${tone}">
-      <span>${escapeHtml(shortId(label, 24))}</span>
-      <strong>${value}</strong>
-    </div>
-  `;
-}
-
-function renderEventTimeline(dashboard: DashboardData, state: DashboardState): string {
-  const rows = getReplayRows(dashboard, state).slice(0, 12);
-  const compact = state.tableMode === "compact";
-  return `
-    <section class="event-panel">
-      <div class="panel-heading compact">
-        <div>
-          <h1>Event Timeline (Selected Window)</h1>
-        </div>
-        <button class="columns-button" id="toggle-columns" type="button">${compact ? "Full Columns" : "Compact Columns"}</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Time (Z)</th>
-              <th>Artifact</th>
-              <th>Type</th>
-              ${compact ? "" : "<th>Agent</th><th>Policy</th>"}
-              <th>Outcome</th>
-              <th>Replay</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows
-              .map(
-                (row) => `
-                  <tr data-select-kind="${row.kind}" data-select-id="${escapeAttribute(row.id)}">
-                    <td>${formatTime(row.time)}</td>
-                    <td><button class="link-button">${escapeHtml(shortId(row.id, 20))}</button></td>
-                    <td>${escapeHtml(shortId(row.type, 22))}</td>
-                    ${compact ? "" : `<td>${escapeHtml(shortId(row.agent, 22))}</td><td>${escapeHtml(row.policy)}</td>`}
-                    <td><span class="status-pill tone-${row.tone}">${escapeHtml(row.outcome)}</span></td>
-                    <td><span class="replay-ok">valid</span></td>
-                  </tr>
-                `,
-              )
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
-}
-
-function renderInspector(dashboard: DashboardData, state: DashboardState): string {
-  const artifact = dashboard.artifacts.find(
-    (item) => state.selection.kind === "artifact" && item.artifactId === state.selection.id,
-  );
-  const admission = dashboard.admissions.find(
-    (item) => state.selection.kind === "admission" && item.reviewId === state.selection.id,
-  );
-  const writeBinding = dashboard.writeBindings.find(
-    (item) => state.selection.kind === "writeBinding" && item.recordId === state.selection.id,
-  );
-
-  if (artifact) return renderArtifactInspector(artifact, state);
-  if (admission) return renderAdmissionInspector(admission, state);
-  if (writeBinding) return renderWriteBindingInspector(writeBinding, state);
-  return `<aside class="inspector"><div class="section-title">Inspector</div><p>No selected row.</p></aside>`;
-}
-
-function renderArtifactInspector(artifact: StateReviewArtifact, state: DashboardState): string {
-  const warnings = artifact.review.warnings;
-  const refs = [
-    ...artifact.review.currentStateView.sourceRefs,
-    ...(artifact.relatedObjects ?? []).map((object) => object.ref),
-  ];
-  const tone = toneForArtifact(artifact);
-  const decision = artifact.review.valid ? "ALLOW" : "REVIEW";
-
-  return `
-    <aside class="inspector" aria-label="Artifact inspector">
-      <div class="inspector-topline">
-        <h2>Artifact Inspector</h2>
-        <div class="inspector-actions">
-          <button data-selection-step="-1">prev</button>
-          <button data-selection-step="1">next</button>
-          <button data-clear-selection="true">x</button>
-        </div>
-      </div>
-      <div class="inspector-title">
-        <h3>${escapeHtml(shortId(artifact.artifactId, 22))}</h3>
-        <span class="status-pill tone-${tone}">${artifact.review.valid ? "admitted" : "warning"}</span>
-      </div>
-      ${renderFactGrid([
-        ["Type", artifact.review.proposedAction.actionType],
-        ["Observation", shortId(artifact.review.currentStateView.subject.id, 22)],
-        ["Agent", artifact.review.proposedAction.proposedBy],
-        ["Time (Z)", artifact.generatedAt],
-        ["Policy Set", "evidence-binding"],
-        ["Policy Decision", decision],
-        ["Replay", artifact.artifactHash.length === 64 ? "VALID" : "REVIEW"],
-      ])}
-      ${renderJsonBlock("Artifact Facts (JSON)", compactArtifact(artifact), artifact, state)}
-      ${renderHashStatus(artifact.artifactHash)}
-      ${renderWarningBlock(warnings)}
-      <div class="inspector-block">
-        <h3>Source References</h3>
-        ${refs.slice(0, 8).map((ref) => `<div class="ref-row"><a href="#">${escapeHtml(shortId(ref.id, 18))}</a><span>${escapeHtml(ref.kind)}</span><button data-ref-query="${escapeAttribute(ref.id)}">Find</button></div>`).join("")}
-      </div>
-      <div class="inspector-block">
-        <h3>Policy Disposition</h3>
-        ${renderFactGrid([
-          ["Decision", decision],
-          ["Reason", artifact.review.valid ? "Current artifact matches replay policy." : "Warnings require review before trust."],
-          ["Rules Evaluated", String(Math.max(1, warnings.length + 4))],
-          ["Rules Matched", warnings.length === 0 ? "clean-current" : warnings.map((warning) => warning.code).slice(0, 2).join(", ")],
-        ])}
-      </div>
-    </aside>
-  `;
-}
-
-function renderAdmissionInspector(review: EvidenceAdmissionReview, state: DashboardState): string {
-  const tone = toneForAdmission(review);
-  return `
-    <aside class="inspector" aria-label="Evidence admission inspector">
-      <div class="inspector-topline">
-        <h2>Evidence Inspector</h2>
-        <div class="inspector-actions">
-          <button data-selection-step="-1">prev</button>
-          <button data-selection-step="1">next</button>
-          <button data-clear-selection="true">x</button>
-        </div>
-      </div>
-      <div class="inspector-title">
-        <h3>${escapeHtml(shortId(review.reviewId, 22))}</h3>
-        <span class="status-pill tone-${tone}">${escapeHtml(review.decision.replaceAll("_", " "))}</span>
-      </div>
-      ${renderFactGrid([
-        ["Type", review.evidence.kind],
-        ["Observation", review.evidence.evidenceId],
-        ["Agent", review.evidence.collectedBy ?? "evidence-reviewer"],
-        ["Time (Z)", review.evaluatedAt],
-        ["Policy Set", "evidence-admission"],
-        ["Policy Decision", review.decision === "rejected" ? "REJECT" : "ALLOW"],
-        ["Replay", "VALID"],
-      ])}
-      ${renderJsonBlock("Artifact Facts (JSON)", compactAdmission(review), review, state)}
-      ${renderHashStatus(review.reviewId.padEnd(64, "0").slice(0, 64))}
-      <div class="inspector-block">
-        <h3>Warnings / Violations <span class="count-badge">${review.issues.length}</span></h3>
-        ${
-          review.issues.length === 0
-            ? '<div class="empty-state">No admission issues.</div>'
-            : review.issues.map((issue) => `<div class="warning-line"><strong>${escapeHtml(issue.code)}</strong><span>${escapeHtml(issue.message)}</span><em>${escapeHtml(issue.severity)}</em></div>`).join("")
-        }
-      </div>
-      <div class="inspector-block">
-        <h3>Source References</h3>
-        <div class="ref-row"><a href="#">${escapeHtml(shortId(review.evidence.evidenceId, 18))}</a><span>Evidence</span><button data-ref-query="${escapeAttribute(review.evidence.evidenceId)}">Find</button></div>
-        <div class="ref-row"><a href="#">${escapeHtml(shortId(review.evidence.source, 18))}</a><span>Source</span><button data-ref-query="${escapeAttribute(review.evidence.source)}">Find</button></div>
-      </div>
-      <div class="inspector-block">
-        <h3>Policy Disposition</h3>
-        ${renderFactGrid([
-          ["Decision", review.decision === "rejected" ? "REJECT" : "ALLOW"],
-          ["Reason", review.decision === "rejected" ? "Evidence failed admission checks." : "Evidence remains evidence-only and admissible."],
-          ["Rules Evaluated", String(Math.max(1, review.issues.length + 3))],
-          ["Authority", review.authorityStatus],
-        ])}
-      </div>
-    </aside>
-  `;
-}
-
-function renderWriteBindingInspector(record: WriteBindingReplayRecord, state: DashboardState): string {
-  const tone = toneForWriteBinding(record);
-  const decision = record.decision === "allowed" ? "ALLOW" : "BLOCK";
-  const disposition = record.invocationEvidenceBinding?.policyDisposition;
-  const issues = record.validation.valid ? [] : record.validation.issues;
-  const evidenceRefs = record.evidenceAdmissionReviews.map((review) => review.reviewId);
-
-  return `
-    <aside class="inspector" aria-label="Write binding inspector">
-      <div class="inspector-topline">
-        <h2>Write Binding Inspector</h2>
-        <div class="inspector-actions">
-          <button data-selection-step="-1">prev</button>
-          <button data-selection-step="1">next</button>
-          <button data-clear-selection="true">x</button>
-        </div>
-      </div>
-      <div class="inspector-title">
-        <h3>${escapeHtml(shortId(record.recordId, 22))}</h3>
-        <span class="status-pill tone-${tone}">${escapeHtml(record.decision.replaceAll("_", " "))}</span>
-      </div>
-      ${renderFactGrid([
-        ["Type", "WriteBinding"],
-        ["Capability", record.capability],
-        ["Node", record.nodeId],
-        ["Time (Z)", record.generatedAt],
-        ["Policy Set", "evidence-binding"],
-        ["Policy Decision", decision],
-        ["Replay", record.stateReviewArtifact.artifactHash.length === 64 ? "VALID" : "REVIEW"],
-      ])}
-      ${renderJsonBlock("Write Binding Facts (JSON)", compactWriteBinding(record), record, state)}
-      ${renderHashStatus(record.stateReviewArtifact.artifactHash)}
-      <div class="inspector-block">
-        <h3>Warnings / Violations <span class="count-badge">${issues.length + record.warningCodes.length}</span></h3>
-        ${
-          issues.length + record.warningCodes.length === 0
-            ? '<div class="empty-state">No write-binding issues.</div>'
-            : [
-                ...issues.map((issue) => `<div class="warning-line"><strong>${escapeHtml(shortId(issue.path, 36))}</strong><span>${escapeHtml(issue.message)}</span><em>block</em></div>`),
-                ...record.warningCodes.map((code) => `<div class="warning-line"><strong>${escapeHtml(code)}</strong><span>Referenced state-review artifact carried this warning.</span><em>warn</em></div>`),
-              ].join("")
-        }
-      </div>
-      <div class="inspector-block">
-        <h3>Source References</h3>
-        <div class="ref-row"><a href="#">${escapeHtml(shortId(record.stateReviewArtifact.artifactId, 18))}</a><span>State Artifact</span><button data-ref-query="${escapeAttribute(record.stateReviewArtifact.artifactId)}">Find</button></div>
-        ${evidenceRefs.map((id) => `<div class="ref-row"><a href="#">${escapeHtml(shortId(id, 18))}</a><span>Evidence Review</span><button data-ref-query="${escapeAttribute(id)}">Find</button></div>`).join("")}
-      </div>
-      <div class="inspector-block">
-        <h3>Policy Disposition</h3>
-        ${renderFactGrid([
-          ["Decision", decision],
-          ["Reason", record.validation.valid ? "Evidence binding satisfied before write dispatch." : record.validation.reason],
-          ["Mode", disposition?.mode ?? "missing"],
-          ["Would Block", String(disposition?.wouldBlock ?? record.decision !== "allowed")],
-        ])}
-      </div>
-    </aside>
-  `;
-}
-
-function renderHashStatus(seed: string): string {
-  const rows: ReadonlyArray<readonly [string, string]> = [
-    ["State Hash", seed.slice(0, 14)],
-    ["Value Hash", seed.slice(14, 28)],
-    ["Policy Hash", seed.slice(28, 42)],
-    ["Corpus Hash", seed.slice(42, 56)],
-  ];
-  return `
-    <div class="inspector-block">
-      <h3>Replay / Hash Status</h3>
-      ${rows.map(([label, value]) => `<div class="hash-row"><span>${escapeHtml(label)}</span><code>${escapeHtml(value)}...</code><b>match</b></div>`).join("")}
-    </div>
-  `;
-}
-
-function renderWarningBlock(warnings: readonly { readonly code: string; readonly severity: string; readonly message: string }[]): string {
-  return `
-    <div class="inspector-block">
-      <h3>Warnings / Violations <span class="count-badge">${warnings.length}</span></h3>
-      ${
-        warnings.length === 0
-          ? '<div class="empty-state">No artifact warnings.</div>'
-          : warnings
-              .slice(0, 6)
-              .map((warning) => `<div class="warning-line"><strong>${escapeHtml(warning.code)}</strong><span>${escapeHtml(warning.message)}</span><em>${escapeHtml(warning.severity)}</em></div>`)
-              .join("")
-      }
-    </div>
-  `;
-}
-
-function renderJsonBlock(
-  title: string,
-  compactValue: Record<string, unknown>,
-  rawValue: unknown,
-  state: DashboardState,
-): string {
-  const value = state.rawMode ? rawValue : compactValue;
-  return `
-    <div class="inspector-block">
-      <div class="block-heading">
-        <h3>${escapeHtml(title)}</h3>
-        <button id="toggle-raw" type="button">${state.rawMode ? "View Compact" : "View Raw"}</button>
-      </div>
-      <pre>${escapeHtml(JSON.stringify(value, null, 2))}</pre>
-    </div>
-  `;
-}
-
-function renderFactGrid(facts: readonly (readonly [string, string])[]): string {
-  return `
-    <dl class="fact-grid">
-      ${facts
-        .map(
-          ([label, value]) => `
-            <div>
-              <dt>${escapeHtml(label)}</dt>
-              <dd>${escapeHtml(value)}</dd>
-            </div>
-          `,
-        )
-        .join("")}
-    </dl>
-  `;
-}
-
-function renderArtifactListItem(artifact: StateReviewArtifact, state: DashboardState): string {
-  const selected = state.selection.kind === "artifact" && state.selection.id === artifact.artifactId;
-  const tone = toneForArtifact(artifact);
-  return `
-    <button class="list-item ${selected ? "selected" : ""}" data-select-kind="artifact" data-select-id="${escapeAttribute(artifact.artifactId)}">
-      <span class="dot tone-${tone}"></span>
-      <span>
-        <strong>${escapeHtml(shortId(artifact.artifactId, 26))}</strong>
-        <small>${escapeHtml(artifact.metadata.temporalMisalignmentPhase ?? "none")} / ${formatTime(artifact.generatedAt)}</small>
-        <small>${escapeHtml(artifact.review.proposedAction.proposedBy)}</small>
-      </span>
-      <span class="status-pill tone-${tone}">${artifact.review.valid ? "valid" : "warn"}</span>
-    </button>
-  `;
-}
-
-function renderAdmissionListItem(review: EvidenceAdmissionReview, state: DashboardState): string {
-  const selected = state.selection.kind === "admission" && state.selection.id === review.reviewId;
-  const tone = toneForAdmission(review);
-  return `
-    <button class="list-item ${selected ? "selected" : ""}" data-select-kind="admission" data-select-id="${escapeAttribute(review.reviewId)}">
-      <span class="dot tone-${tone}"></span>
-      <span>
-        <strong>${escapeHtml(shortId(review.reviewId, 26))}</strong>
-        <small>${escapeHtml(review.evidence.kind)} / ${formatTime(review.evaluatedAt)}</small>
-        <small>${escapeHtml(review.evidence.collectedBy ?? review.evidence.source)}</small>
-      </span>
-      <span class="status-pill tone-${tone}">${escapeHtml(review.decision.replaceAll("_", " "))}</span>
-    </button>
-  `;
-}
-
-function renderWriteBindingListItem(record: WriteBindingReplayRecord, state: DashboardState): string {
-  const selected = state.selection.kind === "writeBinding" && state.selection.id === record.recordId;
-  const tone = toneForWriteBinding(record);
-  return `
-    <button class="list-item ${selected ? "selected" : ""}" data-select-kind="writeBinding" data-select-id="${escapeAttribute(record.recordId)}">
-      <span class="dot tone-${tone}"></span>
-      <span>
-        <strong>${escapeHtml(shortId(record.recordId, 26))}</strong>
-        <small>${escapeHtml(record.decision)} / ${formatTime(record.generatedAt)}</small>
-        <small>${escapeHtml(record.capability)}</small>
-      </span>
-      <span class="status-pill tone-${tone}">${escapeHtml(record.decision.replaceAll("_", " "))}</span>
-    </button>
-  `;
-}
-
-function renderCorpusListItems(input: {
-  readonly artifactRows: readonly StateReviewArtifact[];
-  readonly admissionRows: readonly EvidenceAdmissionReview[];
-  readonly writeBindingRows: readonly WriteBindingReplayRecord[];
-  readonly state: DashboardState;
-}): string {
-  if (input.state.corpus === "admissions") {
-    return input.admissionRows.map((review) => renderAdmissionListItem(review, input.state)).join("");
+  const knownAgents =
+    agents.length > 0
+      ? agents
+      : Array.from(new Set(events.map((event) => event.agentId).filter(Boolean))).map(
+          (agentId) =>
+            ({
+              agentId: agentId as string,
+              label: `Agent ${(agentId as string).split(":").at(-1) ?? "?"}`,
+              arms: {},
+              behaviorDiverged: false,
+            }) satisfies AgentResult,
+        );
+  if (knownAgents.length === 0) {
+    return `<div class="empty">Agent panels appear when the run starts.</div>`;
   }
-  if (input.state.corpus === "writeBindings") {
-    return input.writeBindingRows.map((record) => renderWriteBindingListItem(record, input.state)).join("");
-  }
-  return input.artifactRows.map((artifact) => renderArtifactListItem(artifact, input.state)).join("");
+  return knownAgents.map((agent) => renderAgentPanel(session, events, agent)).join("");
 }
 
-function getCorpusCount(input: {
-  readonly artifactRows: readonly StateReviewArtifact[];
-  readonly admissionRows: readonly EvidenceAdmissionReview[];
-  readonly writeBindingRows: readonly WriteBindingReplayRecord[];
-  readonly corpus: DashboardState["corpus"];
-}): number {
-  if (input.corpus === "admissions") return input.admissionRows.length;
-  if (input.corpus === "writeBindings") return input.writeBindingRows.length;
-  return input.artifactRows.length;
-}
-
-function corpusTitle(corpus: DashboardState["corpus"]): string {
-  if (corpus === "admissions") return "Evidence List";
-  if (corpus === "writeBindings") return "Write Binding List";
-  return "Artifact List";
-}
-
-function renderSelectField(
-  label: string,
-  id: string,
-  options: readonly string[],
-  selected: string,
+function renderAgentPanel(
+  session: SessionSummary,
+  events: readonly SessionEvent[],
+  agent: AgentResult,
 ): string {
+  const agentEvents = events.filter((event) => event.agentId === agent.agentId);
+  const arms: Arm[] = session.mode === "ab_pair" ? ["no_substrate", "substrate"] : [session.mode as Arm];
   return `
-    <label class="field">
-      <span>${escapeHtml(label)}</span>
-      <select id="${escapeAttribute(id)}">${renderOptions(options, selected)}</select>
-    </label>
+    <details class="agent-panel" open>
+      <summary>
+        <div>
+          <h2>${esc(agent.label)}</h2>
+          <p>${agent.behaviorDiverged ? "Arms diverged after mutation" : "Watching admission boundary"}</p>
+        </div>
+        <button class="danger" data-action="stop-agent" data-agent-id="${esc(agent.agentId)}">Stop Agent</button>
+      </summary>
+      <div class="arm-grid">
+        ${arms.map((arm) => renderArm(agent, agentEvents, arm)).join("")}
+      </div>
+    </details>
   `;
 }
 
-function renderReadonlyField(label: string, value: string): string {
+function renderArm(
+  agent: AgentResult,
+  events: readonly SessionEvent[],
+  arm: Arm,
+): string {
+  const run = agent.arms[arm];
+  const armEvents = events.filter((event) => event.arm === arm);
   return `
-    <label class="field">
-      <span>${escapeHtml(label)}</span>
-      <input value="${escapeAttribute(value)}" readonly />
-    </label>
+    <section class="arm-panel arm-${arm}">
+      <header>
+        <span>${arm === "no_substrate" ? "No substrate" : "Substrate"}</span>
+        <strong>${esc(run?.result ?? "running")}</strong>
+      </header>
+      <p class="current-task">${arm === "substrate" ? "Current task: resolve against admitted head before action." : "Current task: act from private representation without admission gate."}</p>
+      <p class="drift-state">${run?.result === "blocked" ? "Drift state: blocked at admission boundary" : run?.result === "fail" ? "Drift state: stale action became operational" : "Drift state: observing"}</p>
+      <div class="arm-facts">
+        ${metric("Admitted", run ? String(run.admitted) : "pending")}
+        ${metric("Transitions", run ? String(run.admittedTransitions) : "-")}
+        ${metric("Tokens", run ? String(run.tokens) : "-")}
+      </div>
+      ${run?.refusedReason ? `<p class="refusal">${esc(run.refusedReason)}</p>` : ""}
+      <div class="arm-stream">
+        ${armEvents.map(renderEvent).join("") || `<p class="quiet">No arm events yet.</p>`}
+      </div>
+    </section>
   `;
 }
 
-function bindInteractions(root: HTMLElement, dashboard: DashboardData, state: DashboardState): void {
-  root.querySelectorAll<HTMLElement>("[data-select-kind]").forEach((element) => {
-    element.addEventListener("click", () => {
-      const kind = element.dataset.selectKind;
-      const id = element.dataset.selectId;
-      if ((kind === "artifact" || kind === "admission" || kind === "writeBinding") && id) {
-        const next = {
-          ...state,
-          corpus: corpusForSelectionKind(kind),
-          selection: { kind, id } as Selection,
-        };
-        writeStateToUrl(next);
-        render(root, dashboard, next);
-      }
-    });
-  });
+function renderEvent(event: SessionEvent): string {
+  return `
+    <div class="event event-${esc(event.type)}">
+      <span>${esc(time(event.occurredAt))}</span>
+      <strong>${esc(event.type.replaceAll("_", " "))}</strong>
+      <p>${esc(event.message)}</p>
+    </div>
+  `;
+}
 
-  root.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
+function metric(label: string, value: string): string {
+  return `<div class="metric"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`;
+}
+
+function bindMain(): void {
+  appRoot.querySelector<HTMLFormElement>("[data-role='start-form']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void startSession(new FormData(event.currentTarget as HTMLFormElement));
+  });
+  appRoot.querySelector<HTMLFormElement>("[data-role='operator-form']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitOperatorChange(new FormData(event.currentTarget as HTMLFormElement));
+  });
+  appRoot.querySelector<HTMLSelectElement>("[data-role='operator-form'] select[name='sessionId']")?.addEventListener("change", (event) => {
+    selectedSessionId = (event.currentTarget as HTMLSelectElement).value;
+    renderMain();
+  });
+  appRoot.querySelector("[data-action='refresh']")?.addEventListener("click", () => {
+    void loadSessions().then(renderMain);
+  });
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='select-session']").forEach((button) => {
     button.addEventListener("click", () => {
-      const view = parseDashboardView(button.dataset.view);
-      const next = { ...state, view };
-      writeStateToUrl(next);
-      render(root, dashboard, next);
-      maybeMountLive(root, dashboard, next);
+      selectedSessionId = button.dataset.sessionId ?? selectedSessionId;
+      renderMain();
     });
   });
-
-  root.querySelector<HTMLSelectElement>("#resolution-select")?.addEventListener("change", (event) => {
-    const target = event.target as HTMLSelectElement;
-    const next = { ...state, resolution: parseResolution(target.value) };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelector("[data-action='open-start-modal']")?.addEventListener("click", () => {
+    startModalOpen = true;
+    renderMain();
+    window.requestAnimationFrame(() => {
+      appRoot.querySelector<HTMLTextAreaElement>(".start-modal textarea[name='objective']")?.focus();
+    });
   });
-
-  root.querySelector<HTMLButtonElement>("#jump-now")?.addEventListener("click", () => {
-    const [latest] = getReplayRows(dashboard, { ...state, phase: "all", decision: "all", query: "" });
-    if (!latest) return;
-    const next = {
-      ...state,
-      corpus: corpusForSelectionKind(latest.kind),
-      selection: { kind: latest.kind, id: latest.id } as Selection,
-    };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelectorAll<HTMLElement>("[data-action='close-start-modal']").forEach((element) => {
+    element.addEventListener("click", (event) => {
+      if (event.target !== element && element.classList.contains("modal-backdrop")) return;
+      startModalOpen = false;
+      renderMain();
+    });
   });
-
-  root.querySelector<HTMLButtonElement>("#toggle-columns")?.addEventListener("click", () => {
-    const next = {
-      ...state,
-      tableMode: state.tableMode === "full" ? "compact" as const : "full" as const,
-    };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelector("[data-action='focus-settings']")?.addEventListener("click", () => {
+    appRoot.querySelector<HTMLDetailsElement>("[data-panel='monitor']")?.setAttribute("open", "");
+    appRoot.querySelector<HTMLElement>("[data-panel='monitor']")?.scrollIntoView({ block: "nearest" });
   });
-
-  root.querySelector<HTMLButtonElement>("#toggle-raw")?.addEventListener("click", () => {
-    const next = { ...state, rawMode: !state.rawMode };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='open']").forEach((button) => {
+    button.addEventListener("click", () => openSession(button.dataset.sessionId ?? ""));
   });
-
-  root.querySelectorAll<HTMLButtonElement>("[data-selection-step]").forEach((button) => {
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='prepare-injection'], [data-action='prepare-mutation']").forEach((button) => {
     button.addEventListener("click", () => {
-      const rows = getReplayRows(dashboard, state);
-      if (rows.length === 0) return;
-      const currentIndex = rows.findIndex(
-        (row) => row.kind === state.selection.kind && row.id === state.selection.id,
-      );
-      const step = Number(button.dataset.selectionStep ?? "0");
-      const nextIndex = (Math.max(0, currentIndex) + step + rows.length) % rows.length;
-      const row = rows[nextIndex] ?? rows[0];
-      if (!row) return;
-      const next = {
-        ...state,
-        corpus: corpusForSelectionKind(row.kind),
-        selection: { kind: row.kind, id: row.id } as Selection,
-      };
-      writeStateToUrl(next);
-      render(root, dashboard, next);
+      selectedSessionId = button.dataset.sessionId ?? selectedSessionId;
+      renderMain();
+      window.requestAnimationFrame(() => {
+        appRoot.querySelector<HTMLElement>(".operator-console textarea, .operator-console input")?.focus();
+      });
     });
   });
-
-  root.querySelector<HTMLButtonElement>("[data-clear-selection]")?.addEventListener("click", () => {
-    const next = {
-      ...state,
-      selection: firstSelectionForCorpus(dashboard, state.corpus),
-    };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='stop']").forEach((button) => {
+    button.addEventListener("click", () => void stopSession(button.dataset.sessionId ?? ""));
   });
+}
 
-  root.querySelectorAll<HTMLButtonElement>("[data-ref-query]").forEach((button) => {
+function bindDetail(): void {
+  appRoot.querySelector("[data-action='back']")?.addEventListener("click", () => {
+    history.pushState(null, "", "/");
+    void route();
+  });
+  appRoot.querySelector<HTMLFormElement>("[data-role='operator-form']")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitOperatorChange(new FormData(event.currentTarget as HTMLFormElement));
+  });
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='focus-composer']").forEach((button) => {
     button.addEventListener("click", () => {
-      const query = button.dataset.refQuery ?? "";
-      const next = { ...state, query, view: "list" as const };
-      writeStateToUrl(next);
-      render(root, dashboard, next);
+      appRoot.querySelector<HTMLElement>(".detail-composer input[name='prompt']")?.focus();
     });
   });
-
-  root.querySelector<HTMLButtonElement>("#show-warning-artifacts")?.addEventListener("click", () => {
-    const warningPhase = dashboard.phaseCounts.find((count) => count.key !== "none")?.key ?? "all";
-    const next = {
-      ...state,
-      corpus: "artifacts" as const,
-      phase: warningPhase,
-      decision: "all",
-      query: "",
-      selection: { kind: "artifact" as const, id: dashboard.artifacts.find((artifact) => (artifact.metadata.temporalMisalignmentPhase ?? "none") === warningPhase)?.artifactId ?? dashboard.artifacts[0]?.artifactId ?? "" },
-    };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='add-agent']").forEach((button) => {
+    button.addEventListener("click", () => void addAgent(button.dataset.sessionId ?? ""));
   });
-
-  root.querySelector<HTMLSelectElement>("#corpus-select")?.addEventListener("change", (event) => {
-    const target = event.target as HTMLSelectElement;
-    const corpus = parseCorpus(target.value);
-    const next = {
-      ...state,
-      corpus,
-      decision: "all",
-      selection: firstSelectionForCorpus(dashboard, corpus),
-    };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='stop']").forEach((button) => {
+    button.addEventListener("click", () => void stopSession(button.dataset.sessionId ?? ""));
   });
-
-  root.querySelector<HTMLInputElement>("#query")?.addEventListener("input", (event) => {
-    const target = event.target as HTMLInputElement;
-    const next = { ...state, query: target.value };
-    writeStateToUrl(next, true);
-    render(root, dashboard, next);
-  });
-
-  root.querySelector<HTMLSelectElement>("#phase-filter")?.addEventListener("change", (event) => {
-    const target = event.target as HTMLSelectElement;
-    const next = { ...state, phase: target.value };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
-  });
-
-  root.querySelector<HTMLSelectElement>("#decision-filter")?.addEventListener("change", (event) => {
-    const target = event.target as HTMLSelectElement;
-    const next = { ...state, decision: target.value };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
-  });
-
-  root.querySelector<HTMLButtonElement>("#reset-filters")?.addEventListener("click", () => {
-    const next = { ...state, phase: "all", decision: "all", query: "" };
-    writeStateToUrl(next);
-    render(root, dashboard, next);
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='stop-agent']").forEach((button) => {
+    button.addEventListener("click", () => void stopAgent(button.dataset.agentId ?? ""));
   });
 }
 
-function getReplayRows(dashboard: DashboardData, state: DashboardState): ReplayRow[] {
-  const artifactRows = filterArtifacts(dashboard.artifacts, state).map((artifact) => ({
-    kind: "artifact" as const,
-    id: artifact.artifactId,
-    time: artifact.generatedAt,
-    type: artifact.review.proposedAction.actionType,
-    agent: artifact.review.proposedAction.proposedBy,
-    policy: artifact.review.execution.enforcementMode,
-    outcome: artifact.review.valid ? "admitted" : "warning",
-    replay: artifact.artifactHash.length === 64 ? "valid" as const : "review" as const,
-    tone: toneForArtifact(artifact),
-    source: artifact.eventEnvelope.source,
-  }));
-  const admissionRows = filterAdmissions(dashboard.admissions, state).map((review) => ({
-    kind: "admission" as const,
-    id: review.reviewId,
-    time: review.evaluatedAt,
-    type: review.evidence.kind,
-    agent: review.evidence.collectedBy ?? review.evidence.source,
-    policy: review.authorityStatus,
-    outcome: review.decision,
-    replay: "valid" as const,
-    tone: toneForAdmission(review),
-    source: review.evidence.source,
-  }));
-  const writeBindingRows = filterWriteBindings(dashboard.writeBindings, state).map((record) => ({
-    kind: "writeBinding" as const,
-    id: record.recordId,
-    time: record.generatedAt,
-    type: record.actionType,
-    agent: record.workflowName,
-    policy: record.bindingMode,
-    outcome: record.decision,
-    replay: record.stateReviewArtifact.artifactHash.length === 64 ? "valid" as const : "review" as const,
-    tone: toneForWriteBinding(record),
-    source: record.capability,
-  }));
-  return [...artifactRows, ...admissionRows, ...writeBindingRows].sort((a, b) =>
-    b.time.localeCompare(a.time),
-  );
-}
-
-function filterArtifacts(artifacts: readonly StateReviewArtifact[], state: DashboardState): readonly StateReviewArtifact[] {
-  return artifacts.filter((artifact) => {
-    const phase = artifact.metadata.temporalMisalignmentPhase ?? "none";
-    return (
-      (state.phase === "all" || state.phase === phase) &&
-      matchesQuery(
-        state.query,
-        artifact.artifactId,
-        phase,
-        artifact.eventEnvelope.source,
-        artifact.review.proposedAction.proposedBy,
-        artifact.review.warnings.map((warning) => warning.code).join(" "),
-      )
-    );
+async function startSession(form: FormData): Promise<void> {
+  const fileRefs = String(form.get("fileRefs") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const injectionPrompt = String(form.get("injectionPrompt") ?? "").trim();
+  const mutationDescription = String(form.get("mutationDescription") ?? "").trim();
+  const injections =
+    injectionPrompt || fileRefs.length > 0
+      ? [
+          {
+            id: `inj_${Date.now()}`,
+            type: fileRefs.length > 0 ? "file_context" : "prompt_task",
+            prompt: injectionPrompt,
+            fileRefs,
+          },
+        ]
+      : [];
+  const mutations = mutationDescription
+    ? [
+        {
+          id: `mut_${Date.now()}`,
+          type: "changed_working_condition",
+          description: mutationDescription,
+        },
+      ]
+    : [];
+  const res = await fetch("/api/sessions", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      objective: String(form.get("objective") ?? ""),
+      scenarioId: String(form.get("scenarioId") ?? ""),
+      mode: String(form.get("mode") ?? "ab_pair"),
+      agentCount: Number(form.get("agentCount") ?? 1),
+      injections,
+      mutations,
+    }),
   });
+  const body = (await res.json()) as { session?: SessionSummary; error?: string };
+  if (!res.ok || !body.session) {
+    window.alert(body.error ?? "Could not start session.");
+    return;
+  }
+  sessions = [body.session, ...sessions.filter((session) => session.id !== body.session?.id)];
+  startModalOpen = false;
+  openSession(body.session.id);
 }
 
-function filterAdmissions(admissions: readonly EvidenceAdmissionReview[], state: DashboardState): readonly EvidenceAdmissionReview[] {
-  return admissions.filter((review) => {
-    return (
-      (state.decision === "all" || state.decision === review.decision) &&
-      matchesQuery(
-        state.query,
-        review.reviewId,
-        review.evidence.kind,
-        review.evidence.source,
-        review.evidence.collectedBy ?? "",
-        review.issues.map((issue) => issue.code).join(" "),
-      )
-    );
-  });
-}
-
-function filterWriteBindings(
-  writeBindings: readonly WriteBindingReplayRecord[],
-  state: DashboardState,
-): readonly WriteBindingReplayRecord[] {
-  return writeBindings.filter((record) => {
-    return (
-      (state.decision === "all" || state.decision === record.decision) &&
-      (state.phase === "all" || state.phase === record.temporalMisalignmentPhase) &&
-      matchesQuery(
-        state.query,
-        record.recordId,
-        record.decision,
-        record.capability,
-        record.actionType,
-        record.stateReviewArtifact.artifactId,
-        record.evidenceAdmissionReviews.map((review) => review.reviewId).join(" "),
-      )
-    );
-  });
-}
-
-function getTotals(dashboard: DashboardData): {
-  observations: number;
-  admitted: number;
-  rejected: number;
-  warnings: number;
-  replayHashesValid: boolean;
-  writeBindingsAllowed: number;
-  writeBindingsBlocked: number;
-} {
-  const writeBindingsAllowed = dashboard.writeBindings.filter(
-    (record) => record.decision === "allowed",
-  ).length;
-  return {
-    observations: dashboard.artifacts.length,
-    admitted: dashboard.admissions.filter((review) => review.decision !== "rejected").length,
-    rejected: dashboard.admissions.filter((review) => review.decision === "rejected").length,
-    warnings: dashboard.artifacts.reduce((total, artifact) => total + artifact.review.warnings.length, 0),
-    replayHashesValid: dashboard.artifacts.every((artifact) => artifact.artifactHash.length === 64),
-    writeBindingsAllowed,
-    writeBindingsBlocked: dashboard.writeBindings.length - writeBindingsAllowed,
+async function submitOperatorChange(form: FormData): Promise<void> {
+  const sessionId = String(form.get("sessionId") ?? selectedSessionId ?? "").trim();
+  if (!sessionId) return;
+  const targetAgentId = String(form.get("targetAgentId") ?? "").trim();
+  const payload = {
+    prompt: String(form.get("prompt") ?? "").trim(),
+    fileRefs: String(form.get("fileRefs") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    targetArm: String(form.get("targetArm") ?? "both"),
+    mutationType: String(form.get("mutationType") ?? "changed_working_condition"),
+    mutationDescription: String(form.get("mutationDescription") ?? "").trim(),
+    ...(targetAgentId ? { targetAgentId } : {}),
   };
-}
 
-function getTimeBounds(dashboard: DashboardData): { earliest: string; latest: string; window: string } {
-  const times = [
-    ...dashboard.artifacts.map((artifact) => artifact.generatedAt),
-    ...dashboard.admissions.map((review) => review.evaluatedAt),
-    ...dashboard.writeBindings.map((record) => record.generatedAt),
-  ].sort();
-  const earliest = times[0] ?? "";
-  const latest = times[times.length - 1] ?? "";
-  return {
-    earliest: earliest ? formatTime(earliest) : "n/a",
-    latest: latest ? formatTime(latest) : "n/a",
-    window: times.length > 0 ? "fixture" : "empty",
-  };
-}
-
-function makeTimeTicks(dashboard: DashboardData): string[] {
-  const rows = getReplayRows(dashboard, {
-    corpus: "artifacts",
-    phase: "all",
-    decision: "all",
-    query: "",
-    view: "grid",
-    resolution: "48",
-    tableMode: "full",
-    rawMode: false,
-    selection: { kind: "artifact", id: dashboard.artifacts[0]?.artifactId ?? "" },
-  });
-  const times = rows.map((row) => row.time).sort();
-  if (times.length === 0) return ["00:00", "00:00", "00:00", "00:00", "00:00", "00:00"];
-  return [0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio) => {
-    const index = Math.min(times.length - 1, Math.floor(ratio * (times.length - 1)));
-    return formatTime(times[index] ?? times[0] ?? "").slice(0, 5);
-  });
-}
-
-function getSelectedBucket(
-  dashboard: DashboardData,
-  state: DashboardState,
-  bucketCount = 48,
-): number {
-  const rows = getReplayRows(dashboard, { ...state, phase: "all", decision: "all", query: "" });
-  const selectedIndex = rows.findIndex((row) => row.kind === state.selection.kind && row.id === state.selection.id);
-  const maxBucket = Math.max(0, bucketCount - 1);
-  if (selectedIndex < 0 || rows.length <= 1) return Math.min(maxBucket, Math.floor(bucketCount * 0.85));
-  return Math.max(
-    0,
-    Math.min(maxBucket, Math.round((selectedIndex / (rows.length - 1)) * maxBucket)),
-  );
-}
-
-function heatIntensity(value: number, rowIndex: number, index: number): number {
-  if (value <= 0) return 1;
-  const wave = (index * (rowIndex + 3) + value * 7 + rowIndex * 11) % 17;
-  if (wave > 13) return 5;
-  if (wave > 10) return 4;
-  if (wave > 6) return 3;
-  if (wave > 2) return 2;
-  return 1;
-}
-
-function topCounts(values: readonly string[], limit: number): CountDatum[] {
-  const counts = values.reduce<Record<string, number>>((result, value) => {
-    result[value] = (result[value] ?? 0) + 1;
-    return result;
-  }, {});
-  return Object.entries(counts)
-    .map(([key, count]) => ({ key, count, tone: "neutral" as StatusTone }))
-    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
-    .slice(0, limit);
-}
-
-function matchesQuery(query: string, ...values: readonly string[]): boolean {
-  if (query.trim() === "") return true;
-  const normalized = query.trim().toLowerCase();
-  return values.some((value) => value.toLowerCase().includes(normalized));
-}
-
-function readStateFromUrl(dashboard: DashboardData): DashboardState {
-  const params = new URLSearchParams(window.location.search);
-  const kind = parseSelectionKind(params.get("kind"));
-  const fallbackArtifact = dashboard.artifacts[0]?.artifactId ?? "";
-  const fallbackAdmission = dashboard.admissions[0]?.reviewId ?? "";
-  const fallbackWriteBinding = dashboard.writeBindings[0]?.recordId ?? "";
-  const requestedCorpus = parseCorpus(params.get("corpus"));
-  const normalizedSelection: Selection = (() => {
-    if (requestedCorpus === "admissions") {
-      return {
-        kind: "admission",
-        id: kind === "admission" ? params.get("id") ?? fallbackAdmission : fallbackAdmission,
-      };
+  if (sessionId === previewSessionState.session.id) {
+    appendPreviewOperatorEvents(payload);
+    if (currentSessionId() === sessionId) {
+      detail = previewSessionState;
+      renderDetail();
+    } else {
+      renderMain();
     }
-    if (requestedCorpus === "writeBindings") {
-      return {
-        kind: "writeBinding",
-        id:
-          kind === "writeBinding"
-            ? params.get("id") ?? fallbackWriteBinding
-            : fallbackWriteBinding,
-      };
-    }
-    return {
-      kind: "artifact",
-      id: kind === "artifact" ? params.get("id") ?? fallbackArtifact : fallbackArtifact,
-    };
-  })();
-  return {
-    corpus: requestedCorpus,
-    phase: params.get("phase") ?? "all",
-    decision: params.get("decision") ?? "all",
-    query: params.get("q") ?? "",
-    view: parseDashboardView(params.get("view")),
-    resolution: parseResolution(params.get("resolution")),
-    tableMode: params.get("table") === "compact" ? "compact" : "full",
-    rawMode: params.get("raw") === "1",
-    selection: normalizedSelection,
-  };
-}
-
-function parseCorpus(value: string | null | undefined): DashboardState["corpus"] {
-  if (value === "admissions" || value === "writeBindings") return value;
-  return "artifacts";
-}
-
-function parseSelectionKind(value: string | null | undefined): Selection["kind"] {
-  if (value === "admission" || value === "writeBinding") return value;
-  return "artifact";
-}
-
-function corpusForSelectionKind(kind: Selection["kind"]): DashboardState["corpus"] {
-  if (kind === "admission") return "admissions";
-  if (kind === "writeBinding") return "writeBindings";
-  return "artifacts";
-}
-
-function firstSelectionForCorpus(
-  dashboard: DashboardData,
-  corpus: DashboardState["corpus"],
-): Selection {
-  if (corpus === "admissions") {
-    return { kind: "admission", id: dashboard.admissions[0]?.reviewId ?? "" };
+    return;
   }
-  if (corpus === "writeBindings") {
-    return { kind: "writeBinding", id: dashboard.writeBindings[0]?.recordId ?? "" };
-  }
-  return { kind: "artifact", id: dashboard.artifacts[0]?.artifactId ?? "" };
-}
 
-function writeStateToUrl(state: DashboardState, replace = false): void {
-  const params = new URLSearchParams();
-  params.set("corpus", state.corpus);
-  params.set("view", state.view);
-  params.set("resolution", state.resolution);
-  params.set("table", state.tableMode);
-  params.set("kind", state.selection.kind);
-  params.set("id", state.selection.id);
-  if (state.rawMode) params.set("raw", "1");
-  if (state.phase !== "all") params.set("phase", state.phase);
-  if (state.decision !== "all") params.set("decision", state.decision);
-  if (state.query.trim() !== "") params.set("q", state.query.trim());
-  const url = `${window.location.pathname}?${params.toString()}`;
-  if (replace) {
-    window.history.replaceState(null, "", url);
+  const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/injections`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = (await res.json()) as { session?: SessionSummary; error?: string };
+  if (!res.ok) {
+    window.alert(body.error ?? "Could not inject change.");
+    return;
+  }
+  await loadSessions();
+  if (currentSessionId() === sessionId) {
+    await loadDetail(sessionId);
+    renderDetail();
   } else {
-    window.history.pushState(null, "", url);
+    renderMain();
   }
 }
 
-function parseResolution(value: string | null | undefined): TimelineResolution {
-  if (value === "24" || value === "12") return value;
-  return "48";
-}
-
-function parseDashboardView(value: string | null | undefined): DashboardView {
-  if (
-    value === "live" ||
-    value === "grid" ||
-    value === "list" ||
-    value === "flow" ||
-    value === "safe" ||
-    value === "data" ||
-    value === "trend" ||
-    value === "gear"
-  ) {
-    return value;
+async function stopSession(id: string): Promise<void> {
+  if (!id) return;
+  if (id === previewSessionState.session.id) {
+    appendPreviewEvent("session_stopped", "Operator requested preview session stop.");
+    previewSessionState = {
+      ...previewSessionState,
+      session: {
+        ...previewSessionState.session,
+        status: "stopped",
+        summaryMetrics: { ...previewSessionState.session.summaryMetrics, activeAgents: 0 },
+      },
+    };
+    currentSessionId() ? renderDetail() : renderMain();
+    return;
   }
-  return "live";
+  await fetch(`/api/sessions/${encodeURIComponent(id)}/stop`, { method: "POST" });
+  await loadSessions();
+  if (currentSessionId() === id) await loadDetail(id);
+  currentSessionId() ? renderDetail() : renderMain();
 }
 
-function renderOptions(options: readonly string[], selected: string): string {
-  return options
-    .map(
-      (option) =>
-        `<option value="${escapeAttribute(option)}" ${option === selected ? "selected" : ""}>${escapeHtml(option)}</option>`,
-    )
-    .join("");
+async function addAgent(id: string): Promise<void> {
+  if (!id) return;
+  if (id === previewSessionState.session.id) {
+    const nextAgentNumber = previewSessionState.agents.length + 1;
+    const agentId = `${id}:agent:${nextAgentNumber}`;
+    previewSessionState = {
+      ...previewSessionState,
+      session: {
+        ...previewSessionState.session,
+        agentCount: nextAgentNumber,
+        summaryMetrics: {
+          ...previewSessionState.session.summaryMetrics,
+          activeAgents: previewSessionState.session.summaryMetrics.activeAgents + 1,
+        },
+      },
+      agents: [
+        ...previewSessionState.agents,
+        {
+          agentId,
+          label: `Agent ${nextAgentNumber}`,
+          arms: {},
+          behaviorDiverged: false,
+        },
+      ],
+    };
+    appendPreviewEvent("agent_started", `Operator added Agent ${nextAgentNumber}.`, agentId);
+    detail = previewSessionState;
+    renderDetail();
+    return;
+  }
+  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}/agents`, { method: "POST" });
+  const body = (await res.json()) as { error?: string };
+  if (!res.ok) {
+    window.alert(body.error ?? "Could not add agent.");
+    return;
+  }
+  await loadSessions();
+  if (currentSessionId() === id) {
+    await loadDetail(id);
+    renderDetail();
+  }
 }
 
-function compactArtifact(artifact: StateReviewArtifact): Record<string, unknown> {
-  return {
-    artifact_id: artifact.artifactId,
-    source: artifact.eventEnvelope.source,
-    state_hash: artifact.artifactHash,
-    generated_at: artifact.generatedAt,
-    agent_id: artifact.review.proposedAction.proposedBy,
-    action_type: artifact.review.proposedAction.actionType,
-    binding: {
-      target: artifact.review.currentStateView.subject.id,
-      key: artifact.metadata.temporalMisalignmentPhase ?? "none",
-      warning_codes: artifact.review.warnings.map((warning) => warning.code),
+async function stopAgent(id: string): Promise<void> {
+  if (!id) return;
+  if (id.startsWith(`${previewSessionState.session.id}:agent:`)) {
+    appendPreviewEvent("agent_stopped", `Operator requested stop for ${id}.`, id);
+    if (detail?.session.id === previewSessionState.session.id) {
+      detail = previewSessionState;
+      renderDetail();
+    }
+    return;
+  }
+  await fetch(`/api/agents/${encodeURIComponent(id)}/stop`, { method: "POST" });
+  const sessionId = currentSessionId();
+  if (sessionId) {
+    await loadDetail(sessionId);
+    renderDetail();
+  }
+}
+
+function appendPreviewOperatorEvents(payload: {
+  readonly prompt: string;
+  readonly fileRefs: readonly string[];
+  readonly targetAgentId?: string;
+  readonly targetArm: string;
+  readonly mutationType: string;
+  readonly mutationDescription: string;
+}): void {
+  if (payload.prompt || payload.fileRefs.length > 0) {
+    appendPreviewEvent(
+      "injection_created",
+      "Operator queued a prompt/file-context injection.",
+      payload.targetAgentId,
+      undefined,
+      payload,
+    );
+    appendPreviewEvent(
+      "injection_applied",
+      "Operator injection entered the preview session stream.",
+      payload.targetAgentId,
+      undefined,
+      payload,
+    );
+  }
+  if (payload.mutationDescription) {
+    appendPreviewEvent(
+      "mutation_created",
+      "Operator queued a constrained lab mutation.",
+      payload.targetAgentId,
+      undefined,
+      payload,
+    );
+    appendPreviewEvent(
+      "mutation_applied",
+      "Operator lab mutation was applied to the preview session.",
+      payload.targetAgentId,
+      undefined,
+      payload,
+    );
+  }
+}
+
+function appendPreviewEvent(
+  type: string,
+  message: string,
+  agentId?: string,
+  arm?: Arm,
+  payload?: Record<string, unknown>,
+): void {
+  const event: SessionEvent = {
+    id: `preview-${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type,
+    sessionId: previewSessionState.session.id,
+    scenarioId: previewSessionState.session.scenarioId,
+    failureClass: previewSessionState.session.failureClass,
+    occurredAt: new Date().toISOString(),
+    message,
+    ...(agentId ? { agentId } : {}),
+    ...(arm ? { arm } : {}),
+    ...(payload ? { payload } : {}),
+  };
+  const metrics = { ...previewSessionState.session.summaryMetrics };
+  if (type === "injection_created") metrics.pendingInjections += 1;
+  if (type === "injection_applied") {
+    metrics.injectionAppliedCount += 1;
+    metrics.pendingInjections = Math.max(0, metrics.pendingInjections - 1);
+  }
+  if (type === "mutation_created") metrics.pendingMutations += 1;
+  if (type === "mutation_applied") {
+    metrics.mutationAppliedCount += 1;
+    metrics.pendingMutations = Math.max(0, metrics.pendingMutations - 1);
+  }
+  if (type === "agent_stopped") metrics.activeAgents = Math.max(0, metrics.activeAgents - 1);
+  previewSessionState = {
+    ...previewSessionState,
+    session: {
+      ...previewSessionState.session,
+      updatedAt: event.occurredAt,
+      latestActivity: event.message,
+      summaryMetrics: metrics,
     },
+    events: [...previewSessionState.events, event],
   };
 }
 
-function compactAdmission(review: EvidenceAdmissionReview): Record<string, unknown> {
-  return {
-    artifact_id: review.reviewId,
-    evidence_id: review.evidence.evidenceId,
-    evidence_kind: review.evidence.kind,
-    source: review.evidence.source,
-    observed_at: review.evidence.observedAt,
-    decision: review.decision,
-    authority_status: review.authorityStatus,
-    issues: review.issues.map((issue) => issue.code),
-  };
+function openSession(id: string): void {
+  if (!id) return;
+  history.pushState(null, "", `/sessions/${id}`);
+  void route();
 }
 
-function compactWriteBinding(record: WriteBindingReplayRecord): Record<string, unknown> {
-  return {
-    record_id: record.recordId,
-    generated_at: record.generatedAt,
-    workflow_run_id: record.workflowRunId,
-    capability: record.capability,
-    action_type: record.actionType,
-    decision: record.decision,
-    validation: record.validation,
-    state_review_artifact: record.stateReviewArtifact,
-    evidence_admission_review_ids: record.evidenceAdmissionReviews.map(
-      (review) => review.reviewId,
-    ),
-    policy_disposition:
-      record.invocationEvidenceBinding?.policyDisposition ?? null,
-  };
+function time(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-function toneForWriteBinding(record: WriteBindingReplayRecord): StatusTone {
-  if (record.decision === "allowed") return "good";
-  if (
-    record.decision === "blocked_policy" ||
-    record.decision === "blocked_unverified_binding"
-  ) {
-    return "bad";
-  }
-  return "warn";
-}
-
-function formatPercent(numerator: number, denominator: number): string {
-  if (denominator <= 0) return "0%";
-  return `${Math.round((numerator / denominator) * 100)}%`;
-}
-
-function escapeHtml(value: string): string {
-  return value
+function esc(value: unknown): string {
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-function escapeAttribute(value: string): string {
-  return escapeHtml(value);
+    .replaceAll('"', "&quot;");
 }

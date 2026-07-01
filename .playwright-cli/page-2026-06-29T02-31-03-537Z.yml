@@ -1,0 +1,53 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]: Local Agent Lab
+      - heading "Control Room" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Run substrate state-coherence tests as operator sessions. Inject context, mutate lab conditions, and compare what becomes operational.
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e11]: Objective
+        - textbox "Objective" [ref=e12]: Test whether stale private representation can become operational state.
+      - generic [ref=e13]:
+        - generic [ref=e14]:
+          - generic [ref=e15]: Scenario
+          - combobox "Scenario" [ref=e16]:
+            - option "partial-observation" [selected]
+            - option "stale-observation"
+            - option "representation-loss"
+            - option "memory-drift"
+            - option "source-authority-conflict"
+            - option "workflow-invalidation"
+            - option "capability-contract-violation"
+            - option "parallel-write-conflict"
+            - option "feedback-disconnection"
+            - option "continuity-break"
+        - generic [ref=e17]:
+          - generic [ref=e18]: Mode
+          - combobox "Mode" [ref=e19]:
+            - option "A/B pair" [selected]
+            - option "substrate"
+            - option "no substrate"
+        - generic [ref=e20]:
+          - generic [ref=e21]: Agents
+          - spinbutton "Agents" [ref=e22]: "1"
+      - generic [ref=e23]:
+        - generic [ref=e24]: Injection prompt
+        - textbox "Injection prompt" [ref=e25]:
+          - /placeholder: Optional task/context change for the lab session
+      - generic [ref=e26]:
+        - generic [ref=e27]: File refs
+        - textbox "File refs" [ref=e28]:
+          - /placeholder: Optional comma-separated file paths
+      - generic [ref=e29]:
+        - generic [ref=e30]: Lab mutation
+        - textbox "Lab mutation" [ref=e31]:
+          - /placeholder: Optional lab-scoped mutation intent
+      - button "Start Local Agent Lab" [ref=e32] [cursor=pointer]
+  - generic [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - heading "Sessions" [level=2] [ref=e36]
+        - paragraph [ref=e37]: 0 active or recent lab runs
+      - button "Refresh" [ref=e38] [cursor=pointer]
+    - generic [ref=e40]: No sessions yet. Start a lab run to create the first one.
