@@ -9,11 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user, get_db_with_rls_dep
-from app.models.agency import ClientEngagement
+from app.models.agency import AgencyApprovalRequest, ClientEngagement
 from app.schemas.agency import (
     AgencyAccessRequestCreate,
     AgencyAccessRequestResponse,
     AgencyApprovalCreate,
+    AgencyApprovalDecision,
     AgencyApprovalResponse,
     AgencyArtifactCreate,
     AgencyArtifactResponse,
@@ -28,6 +29,7 @@ from app.services.agency_domain import (
     create_agency_artifact,
     create_approval_request,
     create_client_engagement,
+    decide_approval_request,
     start_marketing_run,
 )
 
@@ -234,3 +236,37 @@ async def create_access(
     await db.commit()
     await db.refresh(access_request)
     return AgencyAccessRequestResponse.model_validate(access_request)
+
+
+@router.post(
+    "/approvals/{approval_id}/decision",
+    response_model=AgencyApprovalResponse,
+)
+async def decide_approval(
+    approval_id: uuid.UUID,
+    body: AgencyApprovalDecision,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    result = await db.execute(
+        select(AgencyApprovalRequest).where(
+            AgencyApprovalRequest.id == approval_id,
+            AgencyApprovalRequest.org_id == org_id,
+        )
+    )
+    approval = result.scalar_one_or_none()
+    if approval is None:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    decided = await decide_approval_request(
+        db,
+        approval=approval,
+        decision=body.decision,
+        decided_by_user_id=(
+            uuid.UUID(str(current_user["id"])) if current_user.get("id") else None
+        ),
+        decision_note=body.decision_note,
+    )
+    await db.commit()
+    await db.refresh(decided)
+    return AgencyApprovalResponse.model_validate(decided)

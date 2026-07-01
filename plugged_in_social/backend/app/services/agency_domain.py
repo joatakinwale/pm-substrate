@@ -200,3 +200,22 @@ async def create_access_request(
     db.add(access_request)
     await db.flush()
     return access_request
+
+
+async def decide_approval_request(
+    db: AsyncSession,
+    *,
+    approval: AgencyApprovalRequest,
+    decision: str,
+    decided_by_user_id: uuid.UUID | None,
+    decision_note: str | None = None,
+) -> AgencyApprovalRequest:
+    if decision not in {"approved", "rejected", "revoked"}:
+        raise ValueError("decision must be approved, rejected, or revoked")
+    approval.status = decision
+    approval.decided_by_user_id = decided_by_user_id
+    approval.decision_note = decision_note
+    approval.decided_at = datetime.now(timezone.utc)
+    db.add(approval)
+    await db.flush()
+    return approval

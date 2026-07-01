@@ -33,3 +33,13 @@ def test_main_registers_agency_router():
 
     assert "from app.api.agency import router as agency_router" in src
     assert 'app.include_router(agency_router, prefix="/api")' in src
+
+
+def test_agency_router_exposes_approval_decision_endpoint():
+    import app.api.agency as module
+
+    src = inspect.getsource(module)
+
+    assert '"/approvals/{approval_id}/decision"' in src
+    assert "AgencyApprovalDecision" in src
+    assert "decide_approval_request(" in src

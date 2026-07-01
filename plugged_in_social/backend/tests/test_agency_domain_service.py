@@ -198,3 +198,49 @@ async def test_create_access_request_records_visible_blocker():
     assert request.provider == "umami"
     assert request.scope == {"website_id": "required"}
     assert request.reason == "Metrics reporting needs analytics access"
+
+
+@pytest.mark.asyncio
+async def test_decide_approval_request_records_decision_actor_and_note():
+    from app.services.agency_domain import (
+        create_approval_request,
+        create_client_engagement,
+        decide_approval_request,
+    )
+
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    subject_id = uuid.uuid4()
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(name="Acme"),
+        created_by_agent="chief_of_staff",
+    )
+    approval = await create_approval_request(
+        db,
+        org_id=org_id,
+        engagement=engagement,
+        body=AgencyApprovalCreate(
+            approval_type="strategy",
+            subject_type="agency_artifact",
+            subject_id=subject_id,
+            reason="Approve strategy",
+            approval_payload={"subject_id": str(subject_id)},
+        ),
+    )
+
+    decided = await decide_approval_request(
+        db,
+        approval=approval,
+        decision="approved",
+        decided_by_user_id=user_id,
+        decision_note="Approved for production",
+    )
+
+    assert decided is approval
+    assert approval.status == "approved"
+    assert approval.decided_by_user_id == user_id
+    assert approval.decision_note == "Approved for production"
+    assert approval.decided_at is not None
