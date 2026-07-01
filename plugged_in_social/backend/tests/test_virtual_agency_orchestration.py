@@ -315,3 +315,29 @@ async def test_capability_contract_blocks_wrong_mutation():
                 )
             ],
         )
+
+
+def test_build_lineage_accepts_agency_context_ids_without_breaking_legacy_keys():
+    from app.services.virtual_agency_orchestration import build_lineage
+
+    project_id = uuid.uuid4()
+    legacy_task_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    marketing_run_id = uuid.uuid4()
+    artifact_id = uuid.uuid4()
+
+    lineage = build_lineage(
+        client_request="Launch campaign",
+        project_id=project_id,
+        legacy_task_id=legacy_task_id,
+        engagement_id=engagement_id,
+        marketing_run_id=marketing_run_id,
+        artifact_id=artifact_id,
+    )
+
+    assert lineage["client_request"] == "Launch campaign"
+    assert lineage["project_id"] == str(project_id)
+    assert lineage["legacy_task_id"] == str(legacy_task_id)
+    assert lineage["engagement_id"] == str(engagement_id)
+    assert lineage["marketing_run_id"] == str(marketing_run_id)
+    assert lineage["artifact_id"] == str(artifact_id)

@@ -91,6 +91,8 @@ def build_lineage(
     legacy_task_id: uuid.UUID,
     orchestration_task_id: uuid.UUID | None = None,
     artifact_id: uuid.UUID | None = None,
+    engagement_id: uuid.UUID | None = None,
+    marketing_run_id: uuid.UUID | None = None,
 ) -> dict[str, str]:
     lineage = {
         "client_request": client_request,
@@ -101,6 +103,10 @@ def build_lineage(
         lineage["orchestration_task_id"] = str(orchestration_task_id)
     if artifact_id:
         lineage["artifact_id"] = str(artifact_id)
+    if engagement_id:
+        lineage["engagement_id"] = str(engagement_id)
+    if marketing_run_id:
+        lineage["marketing_run_id"] = str(marketing_run_id)
     return lineage
 
 
