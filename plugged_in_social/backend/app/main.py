@@ -55,6 +55,7 @@ from app.api.video import router as video_router
 from app.api.agent_assisted import router as agent_assisted_router
 from app.api.virtual_agency import router as virtual_agency_router
 from app.api.agency import router as agency_router
+from app.api.integration import router as integration_router
 
 # Client Portal
 from app.api.portal import router as portal_router
@@ -212,6 +213,7 @@ app.include_router(video_router, prefix="/api")
 app.include_router(agent_assisted_router, prefix="/api")
 app.include_router(virtual_agency_router, prefix="/api")
 app.include_router(agency_router, prefix="/api")
+app.include_router(integration_router, prefix="/api")
 
 # Client Portal (public + portal-session auth)
 app.include_router(portal_router, prefix="/api")

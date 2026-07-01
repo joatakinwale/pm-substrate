@@ -69,6 +69,26 @@ describe("PluggedInSocial source manifest", () => {
           path: "/internal/virtual-agency/task",
           boundary: "internal_system_rls",
         }),
+        expect.objectContaining({
+          method: "GET",
+          path: "/integration/v1/capabilities",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "GET",
+          path: "/integration/v1/marketing-runs/{run_id}/artifacts",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "GET",
+          path: "/integration/v1/marketing-runs/{run_id}/tasks",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "POST",
+          path: "/integration/v1/events",
+          boundary: "public_rls",
+        }),
       ]),
     );
 
@@ -207,6 +227,7 @@ describe("PluggedInSocial source manifest", () => {
     expect(manifest.governance.nextActionApprovalSurface).toBe(true);
     expect(manifest.governance.metricsReadyAnalyticsDispatch).toBe(true);
     expect(manifest.governance.closedLoopRuntimeFixture).toBe(true);
+    expect(manifest.governance.externalIntegrationBoundary).toBe(true);
     expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
       "contentHashMutationGate",
     );
@@ -262,6 +283,12 @@ describe("PluggedInSocial source manifest", () => {
         path: "backend/tests/test_virtual_agency_orchestration.py",
       }),
     );
+    expect(manifest.evidenceRefs).toContainEqual(
+      expect.objectContaining({
+        id: "plugged_in_social:api:integration-v1",
+        path: "backend/app/api/integration.py",
+      }),
+    );
   });
 
   it("feeds Axis B readiness with a substrate next-action proposal boundary", () => {
@@ -287,6 +314,9 @@ describe("PluggedInSocial source manifest", () => {
     );
     expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
       "plugged_in_social:data-model:virtual-agency-tasks",
+    );
+    expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
+      "plugged_in_social:api:integration-v1",
     );
     expect(event.substrateRefs.map((ref) => ref.id)).toContain(
       "pm_substrate:profile-agency:publication-terminal",

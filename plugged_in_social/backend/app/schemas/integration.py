@@ -1,0 +1,173 @@
+"""Neutral integration API schemas.
+
+These envelopes are for pm-substrate and other external systems. They are
+stable API contracts over PluggedInSocial state, not ORM/table mirrors.
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+from app.schemas.agency import AgencyApprovalDecision, EvidenceRef
+
+
+class IntegrationLink(BaseModel):
+    rel: str = Field(min_length=1)
+    href: str = Field(min_length=1)
+
+
+class IntegrationCapability(BaseModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    description: str
+    methods: list[str]
+    resources: list[str]
+    events: list[str] = Field(default_factory=list)
+    requires_approval: bool = False
+    writes_external_systems: bool = False
+
+
+class IntegrationCapabilityResponse(BaseModel):
+    version: Literal["v1"] = "v1"
+    service: Literal["plugged_in_social"] = "plugged_in_social"
+    capabilities: list[IntegrationCapability]
+    closed_loop_stages: list[str]
+
+
+class IntegrationEngagementEnvelope(BaseModel):
+    resource_type: Literal["client_engagement"] = "client_engagement"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    lead_id: uuid.UUID | None
+    project_id: uuid.UUID | None
+    name: str
+    client_url: str | None
+    repo_url: str | None
+    status: str
+    goals: list[Any]
+    constraints: list[Any]
+    intake_payload: dict[str, Any]
+    integration_state: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
+class IntegrationMarketingRunEnvelope(BaseModel):
+    resource_type: Literal["marketing_run"] = "marketing_run"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    engagement_id: uuid.UUID
+    project_id: uuid.UUID | None
+    status: str
+    stage: str
+    objective: str
+    strategy_summary: dict[str, Any]
+    current_blocker: dict[str, Any] | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
+class IntegrationArtifactEnvelope(BaseModel):
+    resource_type: Literal["agency_artifact"] = "agency_artifact"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    engagement_id: uuid.UUID
+    marketing_run_id: uuid.UUID | None
+    virtual_agency_task_id: uuid.UUID | None
+    artifact_type: str
+    title: str
+    body: str | None
+    payload: dict[str, Any]
+    payload_hash: str
+    version: int
+    evidence_refs: list[Any]
+    lineage: dict[str, Any]
+    author_role: str
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
+class IntegrationTaskEnvelope(BaseModel):
+    resource_type: Literal["virtual_agency_task"] = "virtual_agency_task"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    project_id: uuid.UUID
+    source_task_id: uuid.UUID | None
+    parent_task_id: uuid.UUID | None
+    title: str
+    description: str | None
+    reason: str
+    agent_role: str
+    task_type: str
+    status: str
+    task_version: int
+    approved_version: int | None
+    approval_active: bool
+    approval_payload_hash: str | None
+    latest_event_hash: str | None
+    context: dict[str, Any]
+    lineage: dict[str, Any]
+    claimed_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
+class IntegrationApprovalEnvelope(BaseModel):
+    resource_type: Literal["agency_approval_request"] = "agency_approval_request"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    engagement_id: uuid.UUID
+    marketing_run_id: uuid.UUID | None
+    approval_type: str
+    status: str
+    subject_type: str
+    subject_id: uuid.UUID
+    reason: str
+    approval_version: int
+    approval_payload_hash: str
+    decided_at: datetime | None
+    decided_by_user_id: uuid.UUID | None
+    decision_note: str | None
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
+class IntegrationEventIngest(BaseModel):
+    engagement_id: uuid.UUID
+    marketing_run_id: uuid.UUID | None = None
+    event_type: str = Field(min_length=1, max_length=120)
+    source: str = Field(min_length=1, max_length=120)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    idempotency_key: str | None = Field(default=None, max_length=160)
+
+
+class IntegrationWebhookIngest(BaseModel):
+    engagement_id: uuid.UUID
+    marketing_run_id: uuid.UUID | None = None
+    provider: str = Field(min_length=1, max_length=80)
+    event_type: str = Field(min_length=1, max_length=120)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class IntegrationAcceptedResponse(BaseModel):
+    ok: bool
+    status: Literal["accepted"]
+    payload_hash: str
+    artifact_id: uuid.UUID | None = None
+    links: list[IntegrationLink] = Field(default_factory=list)
+
+
+IntegrationApprovalDecision = AgencyApprovalDecision

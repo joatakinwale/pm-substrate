@@ -34,6 +34,7 @@ export const PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES = [
   "nextActionApprovalSurface",
   "metricsReadyAnalyticsDispatch",
   "closedLoopRuntimeFixture",
+  "externalIntegrationBoundary",
 ] as const;
 
 export type PluggedInSocialGovernanceGate =
@@ -136,6 +137,8 @@ export const PLUGGED_IN_SOCIAL_DEFAULT_SOURCE_PATH = "./plugged_in_social";
 
 const REQUIRED_SOURCE_FILES = [
   "AGENTS.md",
+  "backend/app/api/integration.py",
+  "backend/app/schemas/integration.py",
   "backend/app/api/virtual_agency.py",
   "backend/app/api/internal/virtual_agency.py",
   "backend/app/services/virtual_agency.py",
@@ -149,6 +152,7 @@ const REQUIRED_SOURCE_FILES = [
   "agents/workers/virtual-agency/src/index.ts",
   "agents/workers/virtual-agency/wrangler.toml",
   "backend/app/services/report_next_actions.py",
+  "backend/tests/test_integration_api_contract.py",
   "frontend/src/app/admin/page.tsx",
 ] as const;
 
@@ -335,13 +339,14 @@ function extractApiEndpoints(
     "backend/app/api/internal/social.py",
     "backend/app/api/internal/ai.py",
     "backend/app/api/internal/automations.py",
+    "backend/app/api/integration.py",
   ];
 
   return routeFiles.flatMap((sourcePath) => {
     const source = readSource(sourceRoot, sourcePath);
     const prefix = routerPrefix(source);
     return Array.from(
-      source.matchAll(/@router\.(get|post|put|patch|delete)\("([^"]*)"/g),
+      source.matchAll(/@router\.(get|post|put|patch|delete)\(\s*"([^"]*)"/g),
       (match): PluggedInSocialApiEndpointManifest | undefined => {
         const method = match[1]?.toUpperCase();
         const routePath = match[2];
@@ -587,6 +592,15 @@ function extractDataModels(
 
 function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
   const publicApi = readSource(sourceRoot, "backend/app/api/virtual_agency.py");
+  const integrationApi = readSource(sourceRoot, "backend/app/api/integration.py");
+  const integrationSchemas = readSource(
+    sourceRoot,
+    "backend/app/schemas/integration.py",
+  );
+  const integrationTests = readSource(
+    sourceRoot,
+    "backend/tests/test_integration_api_contract.py",
+  );
   const internalApi = readSource(
     sourceRoot,
     "backend/app/api/internal/virtual_agency.py",
@@ -718,6 +732,25 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       orchestrationTests.includes("ReportStatus.generated.value") &&
       orchestrationTests.includes("build_handoff_payload(next_action_task)") &&
       orchestrationTests.includes('"pm_substrate_action_type": "marketing.next_action.propose"'),
+    externalIntegrationBoundary:
+      integrationApi.includes('APIRouter(prefix="/integration/v1"') &&
+      integrationApi.includes("get_db_with_rls_dep") &&
+      integrationApi.includes("get_current_user") &&
+      integrationApi.includes('"/capabilities"') &&
+      integrationApi.includes('"/engagements"') &&
+      integrationApi.includes('"/marketing-runs/{run_id}/artifacts"') &&
+      integrationApi.includes('"/marketing-runs/{run_id}/tasks"') &&
+      integrationApi.includes('"/approvals/{approval_id}/decision"') &&
+      integrationApi.includes('"/events"') &&
+      integrationApi.includes('"/webhooks"') &&
+      integrationSchemas.includes("IntegrationCapabilityResponse") &&
+      integrationSchemas.includes("IntegrationMarketingRunEnvelope") &&
+      integrationSchemas.includes("IntegrationArtifactEnvelope") &&
+      integrationSchemas.includes("IntegrationTaskEnvelope") &&
+      integrationTests.includes("test_integration_router_uses_rls_and_has_no_substrate_imports") &&
+      !integrationApi.includes("pm_substrate") &&
+      !integrationApi.includes("packages.profile") &&
+      !integrationApi.includes("packages/evals"),
   };
 }
 
@@ -916,6 +949,12 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
       id: "plugged_in_social:api:virtual-agency",
       label: "Virtual agency FastAPI routes",
       path: "backend/app/api/virtual_agency.py",
+    },
+    {
+      kind: "source_record",
+      id: "plugged_in_social:api:integration-v1",
+      label: "Neutral PluggedInSocial integration API",
+      path: "backend/app/api/integration.py",
     },
     {
       kind: "source_record",
