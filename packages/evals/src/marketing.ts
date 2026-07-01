@@ -206,15 +206,37 @@ export interface MarketingAxisBNextActionAdapterEvalInput {
   readonly scenarioId?: string;
 }
 
+export interface MarketingAxisBLiveRunEvidenceAdapterResultLike {
+  readonly sourcePath: string;
+  readonly ready: boolean;
+  readonly terminalOutcome: EvalOperationalTerminalOutcome;
+  readonly actionId?: string;
+  readonly runId?: string;
+  readonly evidenceRefs: readonly MarketingAxisBAdapterRef[];
+  readonly substrateRefs: readonly MarketingAxisBAdapterRef[];
+  readonly issues: readonly string[];
+}
+
+export interface MarketingAxisBLiveRunEvidenceEvalInput {
+  readonly tenantId: TenantId;
+  readonly observedAt: Timestamp;
+  readonly adapterResult: MarketingAxisBLiveRunEvidenceAdapterResultLike;
+  readonly runId?: string;
+  readonly agentId?: string;
+  readonly scenarioId?: string;
+}
+
 export interface MarketingAxisBLiveIntegrationSuiteInput {
   readonly tenantId: TenantId;
   readonly observedAt: Timestamp;
   readonly manifest: MarketingAxisBSourceManifestLike;
+  readonly liveRunEvidenceAdapterResult?: MarketingAxisBLiveRunEvidenceAdapterResultLike;
   readonly nextActionAdapterResult: MarketingAxisBNextActionAdapterResultLike;
   readonly pairedScenarios?: readonly MarketingAxisBPairedScenario[];
   readonly sourceId?: string;
   readonly sourceLabel?: string;
   readonly readinessScenarioId?: string;
+  readonly liveRunEvidenceScenarioId?: string;
   readonly nextActionScenarioId?: string;
   readonly agentId?: string;
 }
@@ -586,6 +608,61 @@ export function buildMarketingAxisBNextActionAdapterEval(
   });
 }
 
+export function buildMarketingAxisBLiveRunEvidenceEval(
+  input: MarketingAxisBLiveRunEvidenceEvalInput,
+): EvalEvent {
+  const scenarioId = input.scenarioId ?? "axis-b-live-run-evidence";
+  const adapterResult = input.adapterResult;
+  const result =
+    adapterResult.ready && adapterResult.terminalOutcome === "accepted"
+      ? "pass"
+      : "blocked";
+  const issueNote =
+    adapterResult.issues.length > 0
+      ? ` issues: ${adapterResult.issues.join(", ")}.`
+      : "";
+  const actionNote =
+    adapterResult.actionId === undefined
+      ? ""
+      : ` actionId=${adapterResult.actionId}.`;
+  const observedRunId =
+    adapterResult.runId === undefined ? "" : ` observedRun=${adapterResult.runId}.`;
+  const substrateRefs = adapterResult.substrateRefs.map(evidenceRefForAdapterRef);
+  const terminalOutcomeRef = evalEvidenceRef(
+    "action_outcome_envelope",
+    adapterResult.actionId ??
+      `plugged_in_social:axis_b:${scenarioId}:live_run_evidence_outcome`,
+    "PluggedInSocial live run evidence adapter outcome",
+  );
+
+  return evalEvent({
+    tenantId: input.tenantId,
+    axis: "marketing",
+    runId: input.runId ?? `run_axis_b_live_${scenarioId}`,
+    agentId: input.agentId ?? "marketing_axis_b_agent",
+    scenarioId,
+    failureClass: "continuity_break",
+    observedAt: input.observedAt,
+    source: "plugged_in_social/axis-b-live-run-evidence-adapter",
+    evidenceRefs: adapterResult.evidenceRefs.map(evidenceRefForAdapterRef),
+    substrateRefs: substrateRefs.some((ref) => ref.kind === "action_outcome_envelope")
+      ? substrateRefs
+      : [...substrateRefs, terminalOutcomeRef],
+    stateBenchCategory: "stateful",
+    memoryBenchmarkBridge: "workflow_rebase",
+    mastCategory: "task_verification",
+    coordinationClass: "append_only_observation",
+    evidenceStage: result === "pass" ? "live_run" : "detected_warning",
+    scenarioResult: result,
+    operationalTerminalOutcome: adapterResult.terminalOutcome,
+    result,
+    notes:
+      result === "pass"
+        ? `Axis B live run evidence adapter accepted durable run evidence from ${adapterResult.sourcePath}.${observedRunId}${actionNote}`
+        : `Blocked: Axis B live run evidence adapter did not admit durable run evidence from ${adapterResult.sourcePath}; terminalOutcome=${adapterResult.terminalOutcome}.${observedRunId}${actionNote}${issueNote}`,
+  });
+}
+
 export function buildMarketingAxisBLiveIntegrationSuite(
   input: MarketingAxisBLiveIntegrationSuiteInput,
 ): MarketingAxisBLiveIntegrationSuite {
@@ -599,6 +676,19 @@ export function buildMarketingAxisBLiveIntegrationSuite(
         : {}),
       ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
     }),
+    ...(input.liveRunEvidenceAdapterResult === undefined
+      ? []
+      : [
+          buildMarketingAxisBLiveRunEvidenceEval({
+            tenantId: input.tenantId,
+            observedAt: input.observedAt,
+            adapterResult: input.liveRunEvidenceAdapterResult,
+            ...(input.liveRunEvidenceScenarioId !== undefined
+              ? { scenarioId: input.liveRunEvidenceScenarioId }
+              : {}),
+            ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
+          }),
+        ]),
     buildMarketingAxisBNextActionAdapterEval({
       tenantId: input.tenantId,
       observedAt: input.observedAt,

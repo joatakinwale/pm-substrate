@@ -6,6 +6,7 @@ import {
   buildMarketingAxisBBlockedEval,
   buildMarketingAxisBCorePairedScenarios,
   buildMarketingAxisBIntegrationReadinessEval,
+  buildMarketingAxisBLiveRunEvidenceEval,
   buildMarketingAxisBNextActionAdapterEval,
   buildMarketingAxisBPairedScenario,
   MARKETING_AXIS_B_REQUIRED_ANCHORS,
@@ -251,6 +252,47 @@ describe("marketing Axis B blocker eval", () => {
     expect(event.operationalTerminalOutcome).toBe("accepted");
     expect(event.evidenceStage).toBe("live_run");
     expect(event.notes).toContain("Axis B next-action adapter accepted");
+    expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
+  });
+
+  it("passes the live run evidence eval when the adapter admits durable integration API evidence", () => {
+    const event = buildMarketingAxisBLiveRunEvidenceEval({
+      tenantId: tenantId("tnt_axis_b_live_run_evidence"),
+      observedAt: timestamp("2026-07-01T18:10:00.000Z"),
+      adapterResult: {
+        sourcePath: "./plugged_in_social",
+        ready: true,
+        terminalOutcome: "accepted",
+        actionId: "plugged_in_social:run_abc:live-axis-b-evidence",
+        runId: "run_abc",
+        evidenceRefs: [
+          {
+            kind: "workflow_run",
+            id: "plugged_in_social:marketing_runs:run_abc",
+            label: "PluggedInSocial marketing run",
+          },
+          {
+            kind: "event",
+            id: "plugged_in_social:virtual_agency_events:event_abc",
+            label: "PluggedInSocial virtual-agency event",
+          },
+        ],
+        substrateRefs: [
+          {
+            kind: "state_review_artifact",
+            id: "plugged_in_social:marketing_runs:run_abc:live-axis-b-review",
+            label: "PluggedInSocial live Axis B run evidence review",
+          },
+        ],
+        issues: [],
+      },
+    });
+
+    expect(event.result).toBe("pass");
+    expect(event.operationalTerminalOutcome).toBe("accepted");
+    expect(event.evidenceStage).toBe("live_run");
+    expect(event.failureClass).toBe("continuity_break");
+    expect(event.notes).toContain("Axis B live run evidence adapter accepted");
     expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
   });
 

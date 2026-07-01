@@ -4,6 +4,11 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildPluggedInSocialAxisBNextActionAdapterResult,
+  buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult,
+  fetchPluggedInSocialLiveRunEvidenceSnapshot,
+  type PluggedInSocialIntegrationFetch,
+  type PluggedInSocialIntegrationFetchResponse,
+  type PluggedInSocialLiveRunEvidenceSnapshot,
   type PluggedInSocialClientReportSnapshot,
 } from "./plugged-in-social-axis-b-adapter.js";
 import { readPluggedInSocialSourceManifest } from "./plugged-in-social-manifest.js";
@@ -24,6 +29,180 @@ const report: PluggedInSocialClientReportSnapshot = {
     total_ad_spend_cents: 12_500,
   },
 };
+
+const liveRunId = "44444444-4444-4444-8444-444444444444";
+const liveOrgId = "22222222-2222-4222-8222-222222222222";
+const liveTaskId = "55555555-5555-4555-8555-555555555555";
+const liveEventHashA = "a".repeat(64);
+const liveEventHashB = "b".repeat(64);
+const liveArtifactHash = "c".repeat(64);
+
+function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
+  return {
+    capabilities: {
+      version: "v1",
+      service: "plugged_in_social",
+      closed_loop_stages: [
+        "intake",
+        "strategy",
+        "content",
+        "approval",
+        "scheduling",
+        "publishing",
+        "metrics",
+        "report",
+        "next_action",
+      ],
+      capabilities: [
+        "marketing_run.read",
+        "task.read",
+        "artifact.read",
+        "event_timeline.read",
+        "evidence_summary.read",
+        "approval.decide",
+        "event.ingest",
+      ].map((id) => ({
+        id,
+        methods: ["GET"],
+        resources: ["marketing_run"],
+      })),
+    },
+    run: {
+      resource_type: "marketing_run",
+      id: liveRunId,
+      org_id: liveOrgId,
+      engagement_id: "66666666-6666-4666-8666-666666666666",
+      project_id: "33333333-3333-4333-8333-333333333333",
+      status: "completed",
+      stage: "next_action",
+      objective: "Autonomously improve launch conversion",
+      strategy_summary: { offer: "launch audit" },
+      current_blocker: null,
+      started_at: "2026-07-01T16:00:00.000Z",
+      completed_at: "2026-07-01T18:00:00.000Z",
+      created_at: "2026-07-01T16:00:00.000Z",
+      updated_at: "2026-07-01T18:00:00.000Z",
+    },
+    summary: {
+      resource_type: "marketing_run_evidence_summary",
+      run_id: liveRunId,
+      org_id: liveOrgId,
+      status: "completed",
+      stage: "next_action",
+      artifact_count: 1,
+      artifact_type_counts: { strategy_plan: 1 },
+      task_count: 1,
+      task_status_counts: { done: 1 },
+      event_count: 2,
+      event_type_counts: { task_created: 1, execution_completed: 1 },
+      approval_count: 0,
+      pending_approval_count: 0,
+      evidence_hashes: {
+        artifact_payload_hashes: [liveArtifactHash],
+        event_hashes: [liveEventHashA, liveEventHashB],
+        task_latest_event_hashes: [liveEventHashB],
+      },
+    },
+    events: [
+      {
+        resource_type: "virtual_agency_event",
+        id: "77777777-7777-4777-8777-777777777777",
+        org_id: liveOrgId,
+        marketing_run_id: liveRunId,
+        task_id: liveTaskId,
+        project_id: "33333333-3333-4333-8333-333333333333",
+        event_type: "task_created",
+        actor_role: "chief_of_staff",
+        actor_id: null,
+        idempotency_key: "task-created",
+        task_version: 1,
+        approval_version: null,
+        previous_event_hash: null,
+        payload_hash: "d".repeat(64),
+        event_hash: liveEventHashA,
+        payload: { title: "Plan launch" },
+        lineage: { marketing_run_id: liveRunId },
+        occurred_at: "2026-07-01T16:05:00.000Z",
+      },
+      {
+        resource_type: "virtual_agency_event",
+        id: "88888888-8888-4888-8888-888888888888",
+        org_id: liveOrgId,
+        marketing_run_id: liveRunId,
+        task_id: liveTaskId,
+        project_id: "33333333-3333-4333-8333-333333333333",
+        event_type: "execution_completed",
+        actor_role: "analytics_reporting",
+        actor_id: null,
+        idempotency_key: "task-completed",
+        task_version: 1,
+        approval_version: 1,
+        previous_event_hash: liveEventHashA,
+        payload_hash: "e".repeat(64),
+        event_hash: liveEventHashB,
+        payload: { artifacts_created: 1 },
+        lineage: { marketing_run_id: liveRunId },
+        occurred_at: "2026-07-01T17:45:00.000Z",
+      },
+    ],
+    tasks: [
+      {
+        resource_type: "virtual_agency_task",
+        id: liveTaskId,
+        org_id: liveOrgId,
+        project_id: "33333333-3333-4333-8333-333333333333",
+        source_task_id: null,
+        parent_task_id: null,
+        title: "Propose next marketing action",
+        agent_role: "analytics_reporting",
+        task_type: "next_action_proposal",
+        status: "done",
+        task_version: 1,
+        approved_version: 1,
+        approval_active: true,
+        approval_payload_hash: "f".repeat(64),
+        latest_event_hash: liveEventHashB,
+        context: { required_gates: ["pm_substrate_next_action_adapter"] },
+        lineage: { marketing_run_id: liveRunId },
+      },
+    ],
+    artifacts: [
+      {
+        resource_type: "agency_artifact",
+        id: "99999999-9999-4999-8999-999999999999",
+        org_id: liveOrgId,
+        engagement_id: "66666666-6666-4666-8666-666666666666",
+        marketing_run_id: liveRunId,
+        virtual_agency_task_id: liveTaskId,
+        artifact_type: "strategy_plan",
+        title: "Launch conversion plan",
+        payload_hash: liveArtifactHash,
+        version: 1,
+        evidence_refs: [],
+        lineage: { marketing_run_id: liveRunId },
+        author_role: "analytics_reporting",
+      },
+    ],
+    approvals: [],
+  };
+}
+
+function jsonResponse(
+  body: unknown,
+  status = 200,
+): PluggedInSocialIntegrationFetchResponse {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status >= 200 && status < 300 ? "OK" : "Error",
+    async json() {
+      return body;
+    },
+    async text() {
+      return JSON.stringify(body);
+    },
+  };
+}
 
 describe("PluggedInSocial Axis B next-action adapter", () => {
   it("maps a generated ClientReport row into an accepted substrate next-action proposal", () => {
@@ -93,6 +272,124 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     expect(result.ready).toBe(false);
     expect(result.issues).toContain(
       "missing governance gate: sharedPayloadContract",
+    );
+  });
+
+  it("fetches live run evidence through the neutral integration API and admits durable evidence", async () => {
+    const snapshot = liveSnapshotFixture();
+    const responses = new Map<string, unknown>([
+      ["https://api.example/api/integration/v1/capabilities", snapshot.capabilities],
+      [
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}`,
+        snapshot.run,
+      ],
+      [
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-summary`,
+        snapshot.summary,
+      ],
+      [
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/events?limit=1000`,
+        snapshot.events,
+      ],
+      [
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/tasks`,
+        snapshot.tasks,
+      ],
+      [
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/artifacts`,
+        snapshot.artifacts,
+      ],
+      [
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/approvals`,
+        snapshot.approvals,
+      ],
+    ]);
+    const calls: Array<{ url: string; authorization: string | undefined }> = [];
+    const fetchFn: PluggedInSocialIntegrationFetch = async (url, init) => {
+      calls.push({ url, authorization: init?.headers?.authorization });
+      if (!responses.has(url)) {
+        return jsonResponse({ error: "not found" }, 404);
+      }
+      return jsonResponse(responses.get(url));
+    };
+
+    const fetched = await fetchPluggedInSocialLiveRunEvidenceSnapshot({
+      integrationBaseUrl: "https://api.example",
+      runId: liveRunId,
+      bearerToken: "jwt-token",
+      fetchFn,
+    });
+    const result = buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult({
+      workspaceRoot: process.cwd(),
+      snapshot: fetched,
+    });
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.example/api/integration/v1/capabilities",
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}`,
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-summary`,
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/events?limit=1000`,
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/tasks`,
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/artifacts`,
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/approvals`,
+    ]);
+    expect(new Set(calls.map((call) => call.authorization))).toEqual(
+      new Set(["Bearer jwt-token"]),
+    );
+    expect(result.ready).toBe(true);
+    expect(result.terminalOutcome).toBe("accepted");
+    expect(result.issues).toEqual([]);
+    expect(result.evidenceRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "workflow_run",
+          id: `plugged_in_social:marketing_runs:${liveRunId}`,
+        }),
+        expect.objectContaining({
+          kind: "event",
+          id: "plugged_in_social:virtual_agency_events:88888888-8888-4888-8888-888888888888",
+        }),
+      ]),
+    );
+    expect(result.substrateRefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "action_outcome_envelope",
+          id: `plugged_in_social:marketing_runs:${liveRunId}:live-axis-b-evidence-outcome`,
+        }),
+        expect.objectContaining({
+          kind: "state_review_artifact",
+          id: `plugged_in_social:marketing_runs:${liveRunId}:live-axis-b-review`,
+        }),
+      ]),
+    );
+  });
+
+  it("blocks live run evidence when durable hashes are missing", () => {
+    const snapshot = liveSnapshotFixture();
+    const result = buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult({
+      workspaceRoot: process.cwd(),
+      snapshot: {
+        ...snapshot,
+        summary: {
+          ...snapshot.summary,
+          evidence_hashes: {
+            artifact_payload_hashes: [],
+            event_hashes: [],
+            task_latest_event_hashes: [],
+          },
+        },
+      },
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.terminalOutcome).toBe("blocked");
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        "missing evidence hashes: artifact_payload_hashes",
+        "missing evidence hashes: event_hashes",
+        "missing evidence hashes: task_latest_event_hashes",
+      ]),
     );
   });
 });
