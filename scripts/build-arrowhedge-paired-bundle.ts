@@ -7,11 +7,17 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
+  compareArrowHedgeIntegrationRunEnvelopePair,
+  deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot,
+  fetchArrowHedgeIntegrationSnapshot,
+  validateArrowHedgeIntegrationSnapshot,
   buildArrowHedgePairedExperimentBatchReport,
   buildArrowHedgePairedExperimentBundleFromIntegrationRuns,
   buildArrowHedgePairedExperimentBundle,
   verifyArrowHedgePairedExperimentBundle,
   type ArrowHedgeIntegrationFetch,
+  type ArrowHedgeIntegrationFlowRun,
   type ArrowHedgePairedExperimentBatchReport,
   type ArrowHedgeIntegrationRunEnvelope,
   type ArrowHedgePairedExperimentArmMetrics,
@@ -98,6 +104,44 @@ export interface WriteArrowHedgePairedBundleBatchFromIntegrationResult {
   readonly outputPaths: {
     readonly batchReport: string;
     readonly bundleDirs: readonly string[];
+  };
+}
+
+export interface DiscoverArrowHedgePairedBatchPlanFromIntegrationInput {
+  readonly integrationBaseUrl: string;
+  readonly outputDir: string;
+  readonly bearerToken?: string;
+  readonly generatedAt?: string;
+  readonly fetchFn?: ArrowHedgeIntegrationFetch;
+}
+
+export interface ArrowHedgePairedBatchPlanDiscoveryReport {
+  readonly schemaVersion: "arrowhedge.paired-batch-plan-discovery-report.v1";
+  readonly generatedAt: string;
+  readonly backtestRunCount: number;
+  readonly labeledBaselineCount: number;
+  readonly labeledSubstrateCount: number;
+  readonly plannedExperimentCount: number;
+  readonly planPath: string;
+  readonly issues: readonly string[];
+  readonly skippedRuns: readonly {
+    readonly runId: number;
+    readonly reason: string;
+  }[];
+  readonly candidates: readonly {
+    readonly baselineRunId: number;
+    readonly substrateRunId: number;
+    readonly ready: boolean;
+    readonly issues: readonly string[];
+  }[];
+}
+
+export interface DiscoverArrowHedgePairedBatchPlanFromIntegrationResult {
+  readonly plan: ArrowHedgePairedBundleBatchPlan;
+  readonly report: ArrowHedgePairedBatchPlanDiscoveryReport;
+  readonly outputPaths: {
+    readonly plan: string;
+    readonly report: string;
   };
 }
 
@@ -302,6 +346,167 @@ export async function writeArrowHedgePairedBundleBatchFromIntegration(
   };
 }
 
+export async function discoverArrowHedgePairedBatchPlanFromIntegration(
+  input: DiscoverArrowHedgePairedBatchPlanFromIntegrationInput,
+): Promise<DiscoverArrowHedgePairedBatchPlanFromIntegrationResult> {
+  const inventory = await fetchArrowHedgeIntegrationSnapshot({
+    integrationBaseUrl: input.integrationBaseUrl,
+    ...(input.bearerToken === undefined ? {} : { bearerToken: input.bearerToken }),
+    ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+  });
+  const inventoryValidation = validateArrowHedgeIntegrationSnapshot(inventory);
+  if (!inventoryValidation.ready) {
+    throw new Error(
+      `integration inventory failed validation: ${inventoryValidation.issues.join("; ")}`,
+    );
+  }
+
+  const backtestRunIds = uniqueNumbers(
+    inventory.backtests.backtests.map((backtest) => backtest.run_id),
+  );
+  const flowIds = uniqueNumbers(
+    inventory.backtests.backtests.map((backtest) => backtest.flow_id),
+  );
+  const snapshot = await fetchArrowHedgeIntegrationSnapshot({
+    integrationBaseUrl: input.integrationBaseUrl,
+    ...(input.bearerToken === undefined ? {} : { bearerToken: input.bearerToken }),
+    ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+    flowIds,
+    runIds: backtestRunIds,
+    backtestRunIds,
+  });
+  const validation = validateArrowHedgeIntegrationSnapshot(snapshot);
+  if (!validation.ready) {
+    throw new Error(
+      `integration details failed validation: ${validation.issues.join("; ")}`,
+    );
+  }
+
+  const skippedRuns: ArrowHedgePairedBatchPlanDiscoveryReport["skippedRuns"] = [];
+  const arms = backtestRunIds.flatMap((runId) => {
+    const run = snapshot.runDetails.find((candidate) => candidate.id === runId);
+    if (run === undefined) {
+      skippedRuns.push({ runId, reason: "missing run details" });
+      return [];
+    }
+    const mode = inferArrowHedgeRunMode(run);
+    if (mode === undefined) {
+      skippedRuns.push({ runId, reason: "missing substrate mode label" });
+      return [];
+    }
+    const role = modeRole(mode);
+    if (role === "unknown") {
+      skippedRuns.push({
+        runId,
+        reason: `unsupported substrate mode label: ${mode}`,
+      });
+      return [];
+    }
+    const envelope = buildArrowHedgeRunEnvelopeFromIntegrationSnapshot({
+      snapshot,
+      runId,
+      substrateMode: mode,
+    });
+    if (!envelope.valid || envelope.envelope === undefined) {
+      skippedRuns.push({
+        runId,
+        reason: `invalid envelope: ${envelope.issues.join("; ")}`,
+      });
+      return [];
+    }
+    return [
+      {
+        run,
+        runId,
+        mode,
+        role,
+        envelope: envelope.envelope,
+        metrics: deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot(
+          snapshot,
+          runId,
+        ),
+      },
+    ];
+  });
+  const baselines = arms.filter((arm) => arm.role === "baseline");
+  const substrates = arms.filter((arm) => arm.role === "substrate");
+  const candidates: ArrowHedgePairedBatchPlanDiscoveryReport["candidates"] = [];
+  const experiments: ArrowHedgePairedBundleBatchPlan["experiments"] = [];
+  for (const baseline of baselines) {
+    for (const substrate of substrates) {
+      const gate = compareArrowHedgeIntegrationRunEnvelopePair({
+        baseline: baseline.envelope,
+        substrate: substrate.envelope,
+      });
+      candidates.push({
+        baselineRunId: baseline.runId,
+        substrateRunId: substrate.runId,
+        ready: gate.ready,
+        issues: gate.issues,
+      });
+      if (!gate.ready) continue;
+      experiments.push({
+        experimentId: `exp_arrowhedge_${baseline.runId}_${substrate.runId}`,
+        baseline: {
+          runId: baseline.runId,
+          flowId: baseline.run.flow_id,
+          backtestRunId: baseline.runId,
+          mode: baseline.mode,
+          metrics: baseline.metrics,
+        },
+        substrate: {
+          runId: substrate.runId,
+          flowId: substrate.run.flow_id,
+          backtestRunId: substrate.runId,
+          mode: substrate.mode,
+          metrics: substrate.metrics,
+        },
+      });
+    }
+  }
+
+  const plan: ArrowHedgePairedBundleBatchPlan = {
+    schemaVersion: "arrowhedge.paired-bundle-batch-plan.v1",
+    integrationBaseUrl: input.integrationBaseUrl,
+    ...(input.bearerToken === undefined ? {} : { bearerToken: input.bearerToken }),
+    ...(input.generatedAt === undefined ? {} : { generatedAt: input.generatedAt }),
+    experiments,
+  };
+  const issues = [
+    ...(backtestRunIds.length === 0 ? ["no backtest runs found"] : []),
+    ...(baselines.length === 0 ? ["no baseline/off/observe runs found"] : []),
+    ...(substrates.length === 0 ? ["no blocking/substrate runs found"] : []),
+    ...(experiments.length === 0 && backtestRunIds.length > 0
+      ? ["no readiness-admitted baseline/substrate pairs found"]
+      : []),
+  ];
+  const outputPaths = {
+    plan: join(input.outputDir, "paired-batch-plan.json"),
+    report: join(input.outputDir, "plan-discovery-report.json"),
+  };
+  const report: ArrowHedgePairedBatchPlanDiscoveryReport = {
+    schemaVersion: "arrowhedge.paired-batch-plan-discovery-report.v1",
+    generatedAt: input.generatedAt ?? new Date().toISOString(),
+    backtestRunCount: backtestRunIds.length,
+    labeledBaselineCount: baselines.length,
+    labeledSubstrateCount: substrates.length,
+    plannedExperimentCount: experiments.length,
+    planPath: outputPaths.plan,
+    issues,
+    skippedRuns,
+    candidates,
+  };
+
+  mkdirSync(input.outputDir, { recursive: true });
+  writeJsonFile(outputPaths.plan, plan);
+  writeJsonFile(outputPaths.report, report);
+  return {
+    plan,
+    report,
+    outputPaths,
+  };
+}
+
 export function verifyArrowHedgePairedBundleDirectory(input: {
   readonly bundleDir: string;
 }): VerifyArrowHedgePairedBundleDirectoryResult {
@@ -383,6 +588,51 @@ function writePairedBundleArtifacts(
   writeJsonFile(outputPaths.manifest, bundle.manifest);
   writeJsonFile(outputPaths.pairedBundle, bundle);
   return outputPaths;
+}
+
+function uniqueNumbers(values: readonly number[]): readonly number[] {
+  return [...new Set(values)];
+}
+
+function inferArrowHedgeRunMode(
+  run: ArrowHedgeIntegrationFlowRun,
+): string | undefined {
+  const request = isRecord(run.requestData) ? run.requestData : undefined;
+  const results = isRecord(run.results) ? run.results : undefined;
+  return normalizeRunMode(
+    stringField(request, "substrate_mode") ??
+      stringField(request, "substrateMode") ??
+      stringField(request, "pm_substrate_mode") ??
+      stringField(request, "pmSubstrateMode") ??
+      stringField(results, "substrate_mode") ??
+      stringField(results, "substrateMode") ??
+      stringField(results, "pm_substrate_mode") ??
+      stringField(results, "pmSubstrateMode"),
+  );
+}
+
+function normalizeRunMode(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  return normalized.length === 0 ? undefined : normalized;
+}
+
+function modeRole(mode: string): "baseline" | "substrate" | "unknown" {
+  if (["off", "observe", "baseline", "without_substrate"].includes(mode)) {
+    return "baseline";
+  }
+  if (["blocking", "substrate", "with_substrate"].includes(mode)) {
+    return "substrate";
+  }
+  return "unknown";
+}
+
+function stringField(
+  record: Record<string, unknown> | undefined,
+  field: string,
+): string | undefined {
+  const value = record?.[field];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
 function readMetricsFile(
@@ -576,6 +826,7 @@ function parseArgs(argv: readonly string[]):
   | { readonly command: "write"; readonly input: WriteArrowHedgePairedBundleFilesInput }
   | { readonly command: "from-integration"; readonly input: WriteArrowHedgePairedBundleFromIntegrationInput }
   | { readonly command: "batch-from-integration"; readonly input: WriteArrowHedgePairedBundleBatchFromIntegrationInput }
+  | { readonly command: "discover-plan-from-integration"; readonly input: DiscoverArrowHedgePairedBatchPlanFromIntegrationInput }
   | { readonly command: "verify"; readonly bundleDir: string } {
   const [command, ...rest] = argv;
   const args = new Map<string, string>();
@@ -677,6 +928,27 @@ function parseArgs(argv: readonly string[]):
     };
   }
 
+  if (command === "discover-plan-from-integration") {
+    const integrationBaseUrl = args.get("--base-url");
+    const outputDir = args.get("--out");
+    if (!integrationBaseUrl || !outputDir) {
+      throw new Error(usage());
+    }
+    return {
+      command,
+      input: {
+        integrationBaseUrl,
+        outputDir,
+        ...(args.has("--bearer-token")
+          ? { bearerToken: args.get("--bearer-token")! }
+          : {}),
+        ...(args.has("--generated-at")
+          ? { generatedAt: args.get("--generated-at")! }
+          : {}),
+      },
+    };
+  }
+
   if (command === "verify") {
     const bundleDir = args.get("--bundle-dir");
     if (!bundleDir) {
@@ -713,6 +985,7 @@ function usage(): string {
     "  tsx scripts/build-arrowhedge-paired-bundle.ts write --experiment-id <id> --baseline-envelope <path> --substrate-envelope <path> --out <dir> [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts from-integration --experiment-id <id> --base-url <url> --baseline-run-id <id> --substrate-run-id <id> --out <dir> [--bearer-token <token>] [--baseline-flow-id <id>] [--substrate-flow-id <id>] [--baseline-backtest-run-id <id>] [--substrate-backtest-run-id <id>] [--baseline-mode <mode>] [--substrate-mode <mode>] [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts batch-from-integration --plan <path> --out <dir> [--bearer-token <token>]",
+    "  tsx scripts/build-arrowhedge-paired-bundle.ts discover-plan-from-integration --base-url <url> --out <dir> [--bearer-token <token>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts verify --bundle-dir <dir>",
   ].join("\n");
 }
@@ -769,6 +1042,30 @@ async function main(): Promise<void> {
           claimDeniedCount: result.report.claimDeniedCount,
           issueCount: result.report.issueCount,
           batchReportPath: result.outputPaths.batchReport,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  if (parsed.command === "discover-plan-from-integration") {
+    const result = await discoverArrowHedgePairedBatchPlanFromIntegration(
+      parsed.input,
+    );
+    console.log(
+      JSON.stringify(
+        {
+          schemaVersion: result.report.schemaVersion,
+          backtestRunCount: result.report.backtestRunCount,
+          labeledBaselineCount: result.report.labeledBaselineCount,
+          labeledSubstrateCount: result.report.labeledSubstrateCount,
+          plannedExperimentCount: result.report.plannedExperimentCount,
+          issueCount: result.report.issues.length,
+          skippedRunCount: result.report.skippedRuns.length,
+          planPath: result.outputPaths.plan,
+          reportPath: result.outputPaths.report,
         },
         null,
         2,

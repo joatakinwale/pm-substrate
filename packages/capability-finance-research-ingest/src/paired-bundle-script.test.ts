@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  discoverArrowHedgePairedBatchPlanFromIntegration,
   writeArrowHedgePairedBundleBatchFromIntegration,
   writeArrowHedgePairedBundleFromIntegration,
   verifyArrowHedgePairedBundleDirectory,
@@ -348,6 +349,73 @@ describe("build-arrowhedge-paired-bundle script", () => {
       }),
     ).toMatchObject({ valid: true, issues: [] });
   });
+
+  it("discovers only labeled and readiness-admitted ArrowHedge integration pairs", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "arrowhedge-plan-discovery-"));
+    const responses = integrationDiscoveryResponses();
+    const fetchFn: ArrowHedgeIntegrationFetch = async (url) =>
+      jsonResponse(
+        responses.get(url) ?? { error: "not found" },
+        responses.has(url) ? 200 : 404,
+      );
+
+    const result = await discoverArrowHedgePairedBatchPlanFromIntegration({
+      integrationBaseUrl: "https://arrow.example",
+      generatedAt: "2026-06-03T14:20:00.000Z",
+      outputDir: join(dir, "discovery"),
+      fetchFn,
+    });
+
+    expect(result.plan.experiments).toEqual([
+      expect.objectContaining({
+        experimentId: "exp_arrowhedge_11_12",
+        baseline: expect.objectContaining({
+          runId: 11,
+          flowId: 7,
+          backtestRunId: 11,
+          mode: "off",
+        }),
+        substrate: expect.objectContaining({
+          runId: 12,
+          flowId: 7,
+          backtestRunId: 12,
+          mode: "blocking",
+        }),
+      }),
+    ]);
+    expect(result.report).toMatchObject({
+      schemaVersion: "arrowhedge.paired-batch-plan-discovery-report.v1",
+      generatedAt: "2026-06-03T14:20:00.000Z",
+      backtestRunCount: 3,
+      labeledBaselineCount: 1,
+      labeledSubstrateCount: 1,
+      plannedExperimentCount: 1,
+      issues: [],
+      skippedRuns: [{ runId: 13, reason: "missing substrate mode label" }],
+      candidates: [
+        {
+          baselineRunId: 11,
+          substrateRunId: 12,
+          ready: true,
+          issues: [],
+        },
+      ],
+    });
+    expect(readJson(result.outputPaths.plan)).toMatchObject({
+      schemaVersion: "arrowhedge.paired-bundle-batch-plan.v1",
+      experiments: [
+        {
+          experimentId: "exp_arrowhedge_11_12",
+          baseline: { runId: 11, mode: "off" },
+          substrate: { runId: 12, mode: "blocking" },
+        },
+      ],
+    });
+    expect(readJson(result.outputPaths.report)).toMatchObject({
+      schemaVersion: "arrowhedge.paired-batch-plan-discovery-report.v1",
+      plannedExperimentCount: 1,
+    });
+  });
 });
 
 function writeInputFiles(dir: string): {
@@ -674,4 +742,164 @@ function integrationResponses(): Map<string, unknown> {
       },
     ],
   ]);
+}
+
+function integrationDiscoveryResponses(): Map<string, unknown> {
+  const responses = integrationResponses();
+  const run11 = responses.get(
+    "https://arrow.example/integration/v1/runs/11",
+  ) as Record<string, unknown>;
+  const requestData = run11["requestData"] as Record<string, unknown>;
+  responses.set("https://arrow.example/integration/v1/runs/11", {
+    ...run11,
+    requestData: {
+      ...requestData,
+      substrate_mode: "off",
+    },
+  });
+  const backtests = responses.get(
+    "https://arrow.example/integration/v1/backtests",
+  ) as { readonly backtests: readonly Record<string, unknown>[] };
+  responses.set("https://arrow.example/integration/v1/backtests", {
+    schemaVersion: "arrowhedgelab.integration.backtests.v1",
+    count: 3,
+    backtests: [
+      backtests.backtests[0],
+      integrationBacktestSummary(12, "8".repeat(64)),
+      integrationBacktestSummary(13, "9".repeat(64)),
+    ],
+  });
+  addIntegrationRunResponses(responses, {
+    runId: 12,
+    substrateMode: "blocking",
+    completedAt: "2026-06-03T14:01:00.000Z",
+    daysSha256: "8".repeat(64),
+    daySha256: "b1".repeat(32),
+    eventSha256: "6".repeat(64),
+  });
+  addIntegrationRunResponses(responses, {
+    runId: 13,
+    completedAt: "2026-06-03T14:02:00.000Z",
+    daysSha256: "9".repeat(64),
+    daySha256: "c1".repeat(32),
+    eventSha256: "7".repeat(64),
+  });
+  return responses;
+}
+
+function integrationBacktestSummary(
+  runId: number,
+  daysSha256: string,
+): Record<string, unknown> {
+  return {
+    schemaVersion: "arrowhedgelab.integration.backtest.v1",
+    id: runId,
+    run_id: runId,
+    flow_id: 7,
+    day_count: 1,
+    first_date: "2026-05-01",
+    last_date: "2026-06-03",
+    hashes: { daysSha256 },
+  };
+}
+
+function addIntegrationRunResponses(
+  responses: Map<string, unknown>,
+  input: {
+    readonly runId: number;
+    readonly completedAt: string;
+    readonly daysSha256: string;
+    readonly daySha256: string;
+    readonly eventSha256: string;
+    readonly substrateMode?: string;
+  },
+): void {
+  const run11Sources = responses.get(
+    "https://arrow.example/integration/v1/runs/11/source-artifacts",
+  ) as { readonly artifacts: readonly unknown[] };
+  const requestData = {
+    tickers: ["AAPL"],
+    start_date: "2026-05-01",
+    end_date: "2026-06-03",
+    ...(input.substrateMode === undefined
+      ? {}
+      : { substrate_mode: input.substrateMode }),
+  };
+  responses.set(`https://arrow.example/integration/v1/runs/${input.runId}`, {
+    schemaVersion: "arrowhedgelab.integration.flow-run.v1",
+    id: input.runId,
+    flow_id: 7,
+    status: "COMPLETE",
+    completed_at: input.completedAt,
+    requestData,
+    results: {},
+  });
+  responses.set(
+    `https://arrow.example/integration/v1/runs/${input.runId}/events`,
+    {
+      schemaVersion: "arrowhedgelab.integration.run-events.v1",
+      run_id: input.runId,
+      flow_id: 7,
+      count: 1,
+      events: [
+        {
+          id: `flow-run-${input.runId}-1-flow_run.results_recorded`,
+          sequence: 1,
+          type: "flow_run.results_recorded",
+          occurred_at: input.completedAt,
+          payload: { run_id: input.runId },
+          payload_sha256: input.eventSha256,
+        },
+      ],
+    },
+  );
+  responses.set(
+    `https://arrow.example/integration/v1/runs/${input.runId}/source-artifacts`,
+    {
+      schemaVersion: "arrowhedgelab.integration.run-source-artifacts.v1",
+      run_id: input.runId,
+      flow_id: 7,
+      request: {
+        tickers: ["AAPL"],
+        start_date: "2026-05-01",
+        end_date: "2026-06-03",
+      },
+      count: run11Sources.artifacts.length,
+      artifacts: run11Sources.artifacts,
+    },
+  );
+  responses.set(
+    `https://arrow.example/integration/v1/backtests/${input.runId}`,
+    {
+      ...integrationBacktestSummary(input.runId, input.daysSha256),
+      performance_metrics: { total_return: 0.0025 },
+      final_portfolio: { cash: 1002500 },
+      portfolioValues: [{ Date: "2026-06-03", "Portfolio Value": 1002500 }],
+    },
+  );
+  responses.set(
+    `https://arrow.example/integration/v1/backtests/${input.runId}/days`,
+    {
+      schemaVersion: "arrowhedgelab.integration.backtest-days.v1",
+      run_id: input.runId,
+      flow_id: 7,
+      count: 1,
+      days: [
+        {
+          sequence: 1,
+          date: "2026-06-03",
+          cash: 250000,
+          decisions: { AAPL: { action: "buy", quantity: 100 } },
+          executed_trades: { AAPL: 100 },
+          analyst_signals: {
+            warren_buffett: {
+              AAPL: { signal: "bullish", confidence: 0.74 },
+            },
+          },
+          current_prices: { AAPL: 189.25 },
+          sha256: input.daySha256,
+        },
+      ],
+    },
+  );
 }

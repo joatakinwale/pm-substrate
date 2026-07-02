@@ -74,7 +74,7 @@ Implemented first adapter surface:
 
 Remaining minimum experiment surface:
 
-- Automated paired experiment execution: run or assemble admitted baseline/substrate arms from ArrowHedgeLab runs, call the pm-substrate bundle/report gate, and collect enough historical windows to evaluate the market hypothesis.
+- Automated paired experiment execution: run baseline/substrate arms from ArrowHedgeLab with explicit mode labels, use adapter discovery to assemble admitted pairs, call the pm-substrate bundle/report gate, and collect enough historical windows to evaluate the market hypothesis.
 
 pm-substrate connector requirements:
 
@@ -114,11 +114,25 @@ pnpm arrowhedge:paired-bundle -- from-integration \
   --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001
 ```
 
+Discover a conservative batch plan from saved ArrowHedgeLab adapter runs:
+
+```bash
+pnpm arrowhedge:paired-bundle -- discover-plan-from-integration \
+  --base-url http://127.0.0.1:8000 \
+  --out artifacts/arrowhedge/discovery_axis_a_001
+```
+
+The discovery command writes `paired-batch-plan.json` and
+`plan-discovery-report.json`. It only emits experiments for runs with explicit
+baseline/substrate mode labels and readiness-equal envelopes; unlabeled,
+unsupported, or non-comparable runs stay in the discovery report as skipped
+runs or candidate issues.
+
 Batch many historical pairs from one plan:
 
 ```bash
 pnpm arrowhedge:paired-bundle -- batch-from-integration \
-  --plan artifacts/arrowhedge/paired-batch-plan.json \
+  --plan artifacts/arrowhedge/discovery_axis_a_001/paired-batch-plan.json \
   --out artifacts/arrowhedge/batch_axis_a_001
 ```
 
@@ -144,7 +158,7 @@ The market-win hypothesis cannot be claimed from a single run or from governance
 
 ## Next Implementation Order
 
-1. Add an automated paired experiment runner that executes or selects baseline/substrate arms from ArrowHedgeLab and emits the batch plan automatically.
+1. Add an automated paired experiment runner that executes baseline/substrate arms from ArrowHedgeLab with explicit mode labels; the current adapter-side discovery can then emit the conservative batch plan automatically from saved runs.
 2. Run paired contract tests against the fresh upstream clone, then run substrate-side TypeScript tests for envelope expansion, COP projection, stale-state blocking, invalid-action blocking, clean-current acceptance, bundle claim gating, and bundle directory verification.
 3. Collect enough saved historical windows to estimate market/PnL deltas separately from governance/protection deltas without claiming improvement from governance-only wins.
 

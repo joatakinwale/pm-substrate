@@ -142,17 +142,21 @@ Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
   evidence gates pass. The `pnpm arrowhedge:paired-bundle` script now writes
   and verifies replayable local bundle directories either from saved envelope
   and metrics files or directly from ArrowHedgeLab `/integration/v1/*` run IDs.
-  It also supports `batch-from-integration` plans that write one verified bundle
-  directory per historical pair plus a `batch-report.json` summarizing market
-  aggregates, governance aggregates, claim-denial issues, and verification
-  issues. Automated paired experiment execution over real historical windows is
-  still required before live or backtest experiments can make strong market-win
-  claims.
+  It also supports conservative `discover-plan-from-integration` plan discovery
+  from saved adapter runs, which only admits explicit baseline/substrate mode
+  labels with readiness-equal envelopes and records unlabeled or non-comparable
+  runs in `plan-discovery-report.json`. `batch-from-integration` then writes one
+  verified bundle directory per admitted historical pair plus a
+  `batch-report.json` summarizing market aggregates, governance aggregates,
+  claim-denial issues, and verification issues. Automated paired experiment
+  execution over real historical windows is still required before live or
+  backtest experiments can make strong market-win claims.
 
 The next valid historical experiment path is:
 
-1. Add a paired experiment runner that executes or selects baseline/substrate
-   ArrowHedgeLab arms and emits the batch plan automatically.
+1. Add a paired experiment runner that executes baseline/substrate ArrowHedgeLab
+   arms with explicit mode labels; adapter-side discovery can then emit the
+   conservative batch plan from saved runs automatically.
 2. Collect enough saved historical windows to estimate market/PnL deltas
    separately from governance/protection deltas without claiming improvement
    from governance-only wins.
