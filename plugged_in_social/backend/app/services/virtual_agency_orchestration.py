@@ -79,6 +79,7 @@ AGENT_CAPABILITIES: dict[str, dict[str, set[str]]] = {
 }
 
 REQUIRED_LINEAGE_KEYS = {"client_request", "project_id", "legacy_task_id"}
+STRATEGY_RESEARCH_ARTIFACT_TYPE = "strategy_research_brief"
 
 
 @dataclass(slots=True)
@@ -186,12 +187,45 @@ async def ensure_task_evidence_ready(
     db: AsyncSession,
     task: VirtualAgencyTask,
 ) -> None:
+    if (
+        task.agent_role == "content_creative"
+        and task.task_type == "content_generation"
+        and _uuid_from_lineage(task.lineage, "engagement_id") is not None
+    ):
+        await ensure_strategy_research_artifact_ready(db, task)
+        return
     if task.agent_role != "analytics_reporting" or task.task_type != "analytics_reporting":
         return
     metric_posts = await list_project_metric_posts(db, task.project_id)
     if not metric_posts:
         raise DependencyNotSatisfiedError(
             "Analytics task requires published social metrics evidence"
+        )
+
+
+async def ensure_strategy_research_artifact_ready(
+    db: AsyncSession,
+    task: VirtualAgencyTask,
+) -> None:
+    strategy_dependencies = [
+        dependency
+        for dependency in await list_virtual_task_dependencies(db, task)
+        if dependency.task_type == "strategy_research"
+    ]
+    if not strategy_dependencies:
+        raise DependencyNotSatisfiedError(
+            "Content task requires a strategy research dependency"
+        )
+
+    missing = [
+        str(dependency.id)
+        for dependency in strategy_dependencies
+        if not await has_strategy_research_artifact(db, dependency)
+    ]
+    if missing:
+        raise DependencyNotSatisfiedError(
+            "Content task requires strategy research artifact evidence: "
+            + ", ".join(missing)
         )
 
 
@@ -434,6 +468,25 @@ async def list_project_metric_posts(
     return [post for post in result.scalars().all() if post_has_metric_evidence(post)]
 
 
+async def has_strategy_research_artifact(
+    db: AsyncSession,
+    strategy_task: VirtualAgencyTask,
+) -> bool:
+    if hasattr(db, "list_strategy_research_artifacts_for_task"):
+        artifacts = db.list_strategy_research_artifacts_for_task(strategy_task.id)
+        return bool(artifacts)
+    result = await db.execute(
+        select(AgencyArtifact.id)
+        .where(
+            AgencyArtifact.org_id == strategy_task.org_id,
+            AgencyArtifact.virtual_agency_task_id == strategy_task.id,
+            AgencyArtifact.artifact_type == STRATEGY_RESEARCH_ARTIFACT_TYPE,
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 def post_has_metric_evidence(post: SocialPost) -> bool:
     return any([
         bool(post.likes),
@@ -488,7 +541,7 @@ def create_strategy_research_mutations(task: VirtualAgencyTask) -> list[Mutation
         MutationRequest(
             write_kind="agency_artifact.create",
             payload={
-                "artifact_type": "strategy_research_brief",
+                "artifact_type": STRATEGY_RESEARCH_ARTIFACT_TYPE,
                 "title": "Strategy research brief",
                 "body": (
                     "Research brief generated from intake, access gates, and "

@@ -117,6 +117,14 @@ class _FakeAgencySession:
             ])
         ]
 
+    def list_strategy_research_artifacts_for_task(self, task_id):
+        return [
+            artifact
+            for artifact in self._store.get(AgencyArtifact, {}).values()
+            if artifact.virtual_agency_task_id == task_id
+            and artifact.artifact_type == "strategy_research_brief"
+        ]
+
 
 async def _capture_publish(monkeypatch):
     sent: list[dict] = []
@@ -425,6 +433,67 @@ async def test_dispatch_marketing_run_approves_tasks_and_dispatches_first_ready_
         [event.event_type for event in events_after_second].count("handoff_dispatched")
         == 1
     )
+
+
+@pytest.mark.asyncio
+async def test_content_generation_requires_strategy_research_artifact(monkeypatch):
+    from app.services.agency_domain import (
+        approve_and_dispatch_marketing_run,
+        create_client_engagement,
+        kickoff_marketing_run,
+        start_marketing_run,
+    )
+    from app.services.virtual_agency_agents import route_virtual_agency_task
+    from app.services.virtual_agency_orchestration import (
+        DependencyNotSatisfiedError,
+        build_handoff_payload,
+    )
+
+    await _capture_publish(monkeypatch)
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(
+            name="Acme Launch",
+            client_url="https://acme.example",
+        ),
+        created_by_agent="chief_of_staff",
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective="Build campaign",
+    )
+    await kickoff_marketing_run(db, engagement=engagement, run=run)
+    for request in db._store.get(AgencyAccessRequest, {}).values():
+        request.status = "granted"
+
+    await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+    tasks = list(db._store.get(VirtualAgencyTask, {}).values())
+    strategy_task = next(task for task in tasks if task.task_type == "strategy_research")
+    content_task = next(task for task in tasks if task.task_type == "content_generation")
+    strategy_task.status = "done"
+
+    with pytest.raises(
+        DependencyNotSatisfiedError,
+        match="strategy research artifact evidence",
+    ):
+        await route_virtual_agency_task(
+            db=db,
+            **{
+                **build_handoff_payload(content_task),
+                "idempotency_key": f"agency-run:execute:{content_task.id}",
+                "type": "virtual_agency.task",
+                "emitted_at": None,
+            },
+        )
 
 
 @pytest.mark.asyncio
