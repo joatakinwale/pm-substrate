@@ -1,4 +1,4 @@
--- 0120_agent_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transitions.sql
+-- 0120_agent_state_th_checkpoint_aw_authority_transition_witness_authority_transitions.sql
 -- Durable authority transitions for tombstone-history checkpoint transition-admission witness certificates.
 
 CREATE TABLE IF NOT EXISTS agent_state.tombstone_hist_trans_adm_wit_auth_transitions (

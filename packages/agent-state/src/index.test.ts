@@ -852,7 +852,7 @@ const recoveryCutAdmissionWitnessAuthorityTransitionAdmissionWitnessAuthorityTra
     const transitionAdmissionStoreId =
       "recovery-cut-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:recovery-cut-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -1104,7 +1104,7 @@ const recoveryCutAdmissionWitnessAuthorityTransitionAdmissionWitnessFixture = (
   const transitionAdmissionWitnessStoreId =
     "recovery-cut-admission-witness-authority-transition-admission-witnesses";
   const authorityBoundary =
-    "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness";
+    "operational_state_recovery_cut_aw_authority_transition_witness";
   const buildWitnessRecord = (
     admissionRecord: (typeof transitionFixture.records)[number],
     witnessSequence: number,
@@ -1311,7 +1311,7 @@ const pruningPolicyAdmissionWitnessAuthorityTransitionAdmissionFixture = (
   const transitionAdmissionStoreId =
     "pruning-policy-admission-witness-authority-transition-admissions";
   const authorityBoundary =
-    "operational_state_pruning_policy_admission_witness_authority_transition_admission";
+    "operational_state_pruning_policy_aw_authority_transition";
   const bootstrapTopologyHash =
     "bootstrap:pruning-policy-admission-witness-authority";
   const buildCertificate = (input: {
@@ -1627,7 +1627,7 @@ const pruningPolicyAdmissionWitnessAuthorityTransitionAdmissionWitnessAuthorityT
     const transitionAdmissionStoreId =
       "pruning-policy-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:pruning-policy-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -1879,7 +1879,7 @@ const pruningPolicyAdmissionWitnessAuthorityTransitionAdmissionWitnessFixture = 
   const transitionAdmissionWitnessStoreId =
     "pruning-policy-admission-witness-authority-transition-admission-witnesses";
   const authorityBoundary =
-    "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness";
+    "operational_state_pruning_policy_aw_authority_transition_witness";
   const buildWitnessRecord = (
     admissionRecord: (typeof transitionFixture.records)[number],
     witnessSequence: number,
@@ -2098,7 +2098,7 @@ const storageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmiss
     const transitionAdmissionStoreId =
       "storage-mutation-guard-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admission";
+      "operational_state_smga_adm_witness_authority_transition";
     const bootstrapTopologyHash =
       "bootstrap:storage-mutation-guard-admission-witness-authority";
     const buildCertificate = (input: {
@@ -2414,7 +2414,7 @@ const storageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmiss
     const transitionAdmissionStoreId =
       "storage-mutation-guard-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_smga_adm_witness_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:storage-guard-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -2667,7 +2667,7 @@ const storageMutationGuardAuthorizationAdmissionWitnessAuthorityTransitionAdmiss
     const transitionAdmissionWitnessStoreId =
       "storage-mutation-guard-admission-witness-authority-transition-admission-witnesses";
     const authorityBoundary =
-      "operational_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admission_witness";
+      "operational_state_smga_adm_witness_authority_transition_witness";
     const buildWitnessRecord = (
       admissionRecord: (typeof transitionFixture.records)[number],
       witnessSequence: number,
@@ -2891,9 +2891,9 @@ const tombstoneHistoryCheckpointAdmissionWitnessAuthorityTransitionAdmissionFixt
     const topologyId =
       "tombstone-history-checkpoint-admission-witness-authority";
     const transitionAdmissionStoreId =
-      "agent_state.tombstone_history_checkpoint_admission_witness_authority_transition_admissions";
+      "agent_state.th_checkpoint_aw_authority_transition_admissions";
     const authorityBoundary =
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission";
+      "operational_state_th_checkpoint_aw_authority_transition";
     const bootstrapTopologyHash =
       "bootstrap:tombstone-history-checkpoint-admission-witness-authority";
     const buildCertificate = (input: {
@@ -3214,7 +3214,7 @@ const tombstoneHistoryCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitn
     const transitionAdmissionStoreId =
       "tombstone-history-checkpoint-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:tombstone-history-checkpoint-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -3467,7 +3467,7 @@ const tombstoneHistoryCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitn
     const transitionAdmissionWitnessStoreId =
       "tombstone-history-checkpoint-admission-witness-authority-transition-admission-witnesses";
     const authorityBoundary =
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness";
+      "operational_state_th_checkpoint_aw_authority_transition_witness";
     const buildWitnessRecord = (
       admissionRecord: (typeof transitionFixture.records)[number],
       witnessSequence: number,
@@ -3855,9 +3855,9 @@ const witnessLedgerCheckpointAdmissionWitnessAuthorityTransitionAdmissionFixture
     const topologyId =
       "witness-ledger-checkpoint-admission-witness-authority";
     const transitionAdmissionStoreId =
-      "agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admissions";
+      "agent_state.wl_checkpoint_aw_authority_transition_admissions";
     const authorityBoundary =
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission";
+      "operational_state_wl_checkpoint_aw_authority_transition";
     const bootstrapTopologyHash =
       "bootstrap:witness-ledger-checkpoint-admission-witness-authority";
     const buildCertificate = (input: {
@@ -4178,7 +4178,7 @@ const witnessLedgerCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitness
     const transitionAdmissionStoreId =
       "witness-ledger-checkpoint-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:witness-ledger-checkpoint-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -4431,7 +4431,7 @@ const witnessLedgerCheckpointAdmissionWitnessAuthorityTransitionAdmissionWitness
     const transitionAdmissionWitnessStoreId =
       "witness-ledger-checkpoint-admission-witness-authority-transition-admission-witnesses";
     const authorityBoundary =
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness";
+      "operational_state_wl_checkpoint_aw_authority_transition_witness";
     const buildWitnessRecord = (
       admissionRecord: (typeof transitionFixture.records)[number],
       witnessSequence: number,
@@ -5051,7 +5051,7 @@ const proofRecordAdmissionWitnessAuthorityTransitionAdmissionFixture = (
   const transitionAdmissionStoreId =
     "agent_state.proof_record_admission_witness_authority_transition_admissions";
   const authorityBoundary =
-    "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission";
+    "operational_state_qc_proof_aw_authority_transition";
   const bootstrapTopologyHash =
     "bootstrap:proof-record-admission-witness-authority";
   const buildCertificate = (input: {
@@ -5372,7 +5372,7 @@ const proofRecordAdmissionWitnessAuthorityTransitionAdmissionWitnessAuthorityTra
     const transitionAdmissionStoreId =
       "proof-record-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:proof-record-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -5626,7 +5626,7 @@ const proofRecordAdmissionWitnessAuthorityTransitionAdmissionWitnessFixture = (
   const transitionAdmissionWitnessStoreId =
     "proof-record-admission-witness-authority-transition-admission-witnesses";
   const authorityBoundary =
-    "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness";
+    "operational_state_qc_proof_aw_authority_transition_witness";
   const buildWitnessRecord = (
     admissionRecord: (typeof transitionFixture.records)[number],
     witnessSequence: number,
@@ -6002,9 +6002,9 @@ const authorityTopologyCheckpointAdmissionWitnessAuthorityTransitionAdmissionFix
     const topologyId =
       "authority-topology-checkpoint-admission-witness-authority";
     const transitionAdmissionStoreId =
-      "agent_state.authority_topology_checkpoint_admission_witness_authority_transition_admissions";
+      "agent_state.auth_topo_checkpoint_aw_authority_transition_admissions";
     const authorityBoundary =
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission";
+      "operational_state_auth_topo_checkpoint_aw_authority_transition";
     const bootstrapTopologyHash =
       "bootstrap:authority-topology-checkpoint-admission-witness-authority";
     const buildCertificate = (input: {
@@ -6245,7 +6245,7 @@ const authorityTopologyCheckpointAdmissionWitnessAuthorityTransitionAdmissionWit
     const transitionAdmissionStoreId =
       "authority-topology-checkpoint-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:authority-topology-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -6581,7 +6581,7 @@ const authorityTopologyCheckpointAdmissionWitnessAuthorityTransitionAdmissionWit
     const transitionAdmissionWitnessStoreId =
       "authority-topology-checkpoint-admission-witness-authority-transition-admission-witnesses";
     const authorityBoundary =
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness";
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness";
     const buildWitnessRecord = (
       admissionRecord: (typeof transitionFixture.records)[number],
       witnessSequence: number,
@@ -6959,7 +6959,7 @@ const signatureVerifierProofAdmissionWitnessAuthorityTransitionAdmissionFixture 
   ) => {
     const topologyId = "signature-verifier-proof-admission-witness-authority";
     const transitionAdmissionStoreId =
-      "agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions";
+      "agent_state.sig_verifier_proof_aw_authority_transition_admissions";
     const authorityBoundary =
       "operational_state_signature_verifier_adapter_proof_admission_witness_authority_transition_admission";
     const bootstrapTopologyHash =
@@ -7939,9 +7939,9 @@ const finalizerProofAdmissionWitnessAuthorityTransitionAdmissionFixture = (
   const topologyId =
     "authority-epoch-seal-finalizer-proof-admission-witness-authority";
   const transitionAdmissionStoreId =
-    "agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admissions";
+    "agent_state.auth_epoch_seal_fin_aw_authority_transition_admissions";
   const authorityBoundary =
-    "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission";
+    "operational_state_auth_epoch_seal_fin_aw_authority_transition";
   const bootstrapTopologyHash =
     "bootstrap:authority-epoch-seal-finalizer-proof-admission-witness-authority";
   const buildCertificate = (input: {
@@ -8181,7 +8181,7 @@ const finalizerProofAdmissionWitnessAuthorityTransitionAdmissionWitnessAuthority
     const transitionAdmissionStoreId =
       "finalizer-proof-admission-witness-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:finalizer-proof-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -8517,7 +8517,7 @@ const finalizerProofAdmissionWitnessAuthorityTransitionAdmissionWitnessFixture =
     const transitionAdmissionWitnessStoreId =
       "finalizer-proof-admission-witness-authority-transition-admission-witnesses";
     const authorityBoundary =
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness";
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness";
     const buildWitnessRecord = (
       admissionRecord: (typeof transitionFixture.records)[number],
       witnessSequence: number,
@@ -9045,7 +9045,7 @@ const historyRootSettlementAuthorityTransitionAdmissionWitnessAuthorityTransitio
     const transitionAdmissionStoreId =
       "history-root-settlement-authority-transition-admission-witness-authority-transition-admissions";
     const authorityBoundary =
-      "operational_state_history_root_settlement_authority_transition_admission_witness_authority_transition_admission";
+      "operational_state_history_root_settle_authority_transition_witness_authority_transition_admission";
     const bootstrapTopologyHash =
       "bootstrap:history-root-transition-admission-witness-authority";
     const buildCertificate = (input: {
@@ -9297,7 +9297,7 @@ const historyRootSettlementAuthorityTransitionAdmissionWitnessFixture = (
   const transitionAdmissionWitnessStoreId =
     "history-root-settlement-authority-transition-admission-witnesses";
   const authorityBoundary =
-    "operational_state_history_root_settlement_authority_transition_admission_witness";
+    "operational_state_history_root_settle_authority_transition_witness";
   const buildWitnessRecord = (
     admissionRecord: (typeof transitionFixture.records)[number],
     witnessSequence: number,
@@ -17609,7 +17609,7 @@ describe("@pm/agent-state read-set validation", () => {
       );
     const recoveryCut = replayClosedRecoveryCutForView(
       view,
-      "recovery_cut_admission_witness_authority_transition_admission_witness",
+      "recovery_cut_aw_authority_transition_witness",
     );
     const recoveredView = { ...view, recoveryCut };
     const currentStateViewIdentityHash =
@@ -17781,7 +17781,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       );
     expect(missingWitnessReplay.issues.map((issue) => issue.code)).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -17807,7 +17807,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       witnessReplayWithoutAdmissionWitness.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_replay_missing",
     );
     expect(
       evaluateOperationalStateRecoveryCutAdmission({
@@ -17829,7 +17829,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       );
     expect(wrongSubjectWitnessFixture.replay.issues.map((issue) => issue.code)).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_recovery_cut_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     expect(
       replayOperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -17847,7 +17847,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_recovery_cut_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -17915,7 +17915,7 @@ describe("@pm/agent-state read-set validation", () => {
 
     const recoveryCut = replayClosedRecoveryCutForView(
       view,
-      "recovery_cut_admission_witness_authority_transition_admission_witness_authority",
+      "recovery_cut_aw_authority_transition_witness_authority",
     );
     const recoveredView = { ...view, recoveryCut };
     const currentStateViewIdentityHash =
@@ -18078,7 +18078,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedTopologyReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const missingNestedAuthorityTransitionReplay =
@@ -18104,7 +18104,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedAuthorityTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedAuthorityTransitionFixture =
@@ -18124,7 +18124,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const certificateLocalWitnessFixture =
@@ -18148,7 +18148,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const certificateLocalWithTopologyWitnessFixture =
@@ -18182,7 +18182,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayedAuthorityTransitionWithoutStrictNestedHistory =
@@ -18229,7 +18229,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     const forgedWitnessReplayWithoutNestedAuthorityHistory = {
       ...witnessReplayWithoutNestedAuthorityHistory,
@@ -18252,7 +18252,7 @@ describe("@pm/agent-state read-set validation", () => {
           forgedWitnessReplayWithoutNestedAuthorityHistory,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_recovery_cut_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const unknownWitnessFixture =
@@ -18271,8 +18271,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_recovery_cut_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_recovery_cut_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -18292,8 +18292,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_recovery_cut_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_recovery_cut_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -18313,8 +18313,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_recovery_cut_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_recovery_cut_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -18330,7 +18330,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_recovery_cut_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_recovery_cut_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -23103,7 +23103,7 @@ describe("@pm/agent-state read-set validation", () => {
         admissionWitnessReplay: topologyOnlyWitnessReplay,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_replay_missing",
     );
 
     const strictMissingTransitionReplay =
@@ -23123,7 +23123,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       strictMissingTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_replay_missing",
     );
   });
 
@@ -23352,7 +23352,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -23390,7 +23390,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_replay_missing",
     );
     expect(
       evaluateOperationalStatePruningPolicyAdmission({
@@ -23407,7 +23407,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_replay_missing",
     );
 
     const invalidTransitionAdmissionWitnessFixture =
@@ -23420,7 +23420,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_pruning_policy_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     const invalidWitnessedAuthorityTransitionReplay =
       replayOperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -23443,7 +23443,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_pruning_policy_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -23714,7 +23714,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedAuthorityTransitionFixture =
@@ -23747,7 +23747,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const witnessReplayWithoutNestedAuthorityHistory =
@@ -23774,7 +23774,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayedAuthorityTransitionWithoutStrictNestedHistory =
@@ -23820,7 +23820,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     expect(
       evaluateOperationalStatePruningPolicyAdmission({
@@ -23841,7 +23841,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const witnessReplayWithoutTopology =
@@ -23865,7 +23865,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const replayWithoutNestedTopology =
@@ -23905,7 +23905,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       witnessReplayMissingNestedTopology.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_topology_missing",
     );
     expect(
       evaluateOperationalStatePruningPolicyAdmission({
@@ -23924,7 +23924,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_pruning_policy_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const unknownWitnessFixture =
@@ -23942,8 +23942,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_pruning_policy_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_pruning_policy_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -23962,8 +23962,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_pruning_policy_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_pruning_policy_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -23981,8 +23981,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_pruning_policy_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_pruning_policy_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -23998,7 +23998,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyHashFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_pruning_policy_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -24023,7 +24023,7 @@ describe("@pm/agent-state read-set validation", () => {
       missingLatestTransitionReplay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_topology_mismatch",
+        "operational_state_pruning_policy_aw_authority_transition_topology_mismatch",
         "operational_state_pruning_policy_admission_witness_authority_transition_not_admitted",
       ]),
     );
@@ -24039,8 +24039,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_authority_witness_unknown",
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_pruning_policy_aw_authority_transition_authority_witness_unknown",
+        "operational_state_pruning_policy_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -24055,8 +24055,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_authority_duplicate_witness",
-        "operational_state_pruning_policy_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_pruning_policy_aw_authority_transition_authority_duplicate_witness",
+        "operational_state_pruning_policy_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -24068,7 +24068,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongPriorTopologyFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_pruning_policy_admission_witness_authority_transition_admission_certificate_authority_topology_mismatch",
+      "operational_state_pruning_policy_aw_authority_transition_certificate_authority_topology_mismatch",
     );
   });
 
@@ -28358,7 +28358,7 @@ describe("@pm/agent-state read-set validation", () => {
         checkpointAdmissionWitnessReplay: topologyOnlyWitnessReplay,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_replay_missing",
     );
 
     const strictMissingTransitionReplay =
@@ -28383,7 +28383,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       strictMissingTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_replay_missing",
     );
   });
 
@@ -28516,7 +28516,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -28559,7 +28559,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_replay_missing",
     );
     expect(
       evaluateOperationalStateTombstoneHistoryCompaction({
@@ -28579,7 +28579,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_replay_missing",
     );
 
     const invalidTransitionAdmissionWitnessFixture =
@@ -28592,7 +28592,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     const invalidWitnessedAuthorityTransitionReplay =
       replayOperationalStateTombstoneHistoryCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -28615,7 +28615,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -28756,7 +28756,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const witnessReplayWithoutTopology =
@@ -28780,7 +28780,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const replayWithoutNestedTopology =
@@ -28825,7 +28825,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       witnessReplayMissingNestedTopology.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
     expect(
       evaluateOperationalStateTombstoneHistoryCompaction({
@@ -28847,7 +28847,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const unknownWitnessFixture =
@@ -28865,8 +28865,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_th_checkpoint_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_th_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -28885,8 +28885,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_th_checkpoint_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_th_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -28904,8 +28904,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_th_checkpoint_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_th_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -28921,7 +28921,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyHashFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -29074,7 +29074,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedReplayFixture =
@@ -29093,7 +29093,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       mismatchedNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const witnessReplayWithoutNestedTransition =
@@ -29122,7 +29122,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayWithoutNestedAdmission =
@@ -29171,7 +29171,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     expect(
       evaluateOperationalStateTombstoneHistoryCompaction({
@@ -29195,7 +29195,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_th_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
   });
 
@@ -29222,7 +29222,7 @@ describe("@pm/agent-state read-set validation", () => {
       missingLatestTransitionReplay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_topology_mismatch",
+        "operational_state_th_checkpoint_aw_authority_transition_topology_mismatch",
         "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_not_admitted",
       ]),
     );
@@ -29241,8 +29241,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_authority_witness_unknown",
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_th_checkpoint_aw_authority_transition_authority_witness_unknown",
+        "operational_state_th_checkpoint_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -29260,8 +29260,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_authority_duplicate_witness",
-        "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_th_checkpoint_aw_authority_transition_authority_duplicate_witness",
+        "operational_state_th_checkpoint_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -29276,7 +29276,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongPriorTopologyFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_certificate_authority_topology_mismatch",
+      "operational_state_th_checkpoint_aw_authority_transition_certificate_authority_topology_mismatch",
     );
   });
 
@@ -30833,7 +30833,7 @@ describe("@pm/agent-state read-set validation", () => {
         checkpointAdmissionWitnessReplay: topologyOnlyWitnessReplay,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_replay_missing",
     );
 
     const strictMissingTransitionReplay =
@@ -30858,7 +30858,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       strictMissingTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_replay_missing",
     );
   });
 
@@ -30992,7 +30992,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -31035,7 +31035,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_replay_missing",
     );
     expect(
       evaluateOperationalStateWitnessLedgerCompaction({
@@ -31055,7 +31055,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_replay_missing",
     );
 
     const invalidTransitionAdmissionWitnessFixture =
@@ -31068,7 +31068,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     const invalidWitnessedAuthorityTransitionReplay =
       replayOperationalStateWitnessLedgerCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -31091,7 +31091,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -31233,7 +31233,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const witnessReplayWithoutTopology =
@@ -31257,7 +31257,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const replayWithoutNestedTopology =
@@ -31302,7 +31302,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       witnessReplayMissingNestedTopology.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
     expect(
       evaluateOperationalStateWitnessLedgerCompaction({
@@ -31324,7 +31324,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const unknownWitnessFixture =
@@ -31342,8 +31342,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -31362,8 +31362,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -31381,8 +31381,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -31398,7 +31398,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyHashFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -31552,7 +31552,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedReplayFixture =
@@ -31571,7 +31571,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       mismatchedNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const witnessReplayWithoutNestedTransition =
@@ -31600,7 +31600,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayWithoutNestedAdmission =
@@ -31649,7 +31649,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     expect(
       evaluateOperationalStateWitnessLedgerCompaction({
@@ -31673,7 +31673,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_wl_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
   });
 
@@ -31700,7 +31700,7 @@ describe("@pm/agent-state read-set validation", () => {
       missingLatestTransitionReplay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_topology_mismatch",
+        "operational_state_wl_checkpoint_aw_authority_transition_topology_mismatch",
         "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_not_admitted",
       ]),
     );
@@ -31719,8 +31719,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_authority_witness_unknown",
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_wl_checkpoint_aw_authority_transition_authority_witness_unknown",
+        "operational_state_wl_checkpoint_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -31738,8 +31738,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_authority_duplicate_witness",
-        "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_wl_checkpoint_aw_authority_transition_authority_duplicate_witness",
+        "operational_state_wl_checkpoint_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -31754,7 +31754,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongPriorTopologyFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_certificate_authority_topology_mismatch",
+      "operational_state_wl_checkpoint_aw_authority_transition_certificate_authority_topology_mismatch",
     );
   });
 
@@ -33015,7 +33015,7 @@ describe("@pm/agent-state read-set validation", () => {
         proofRecordAdmissionWitnessReplay: topologyOnlyWitnessReplay,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_replay_missing",
     );
 
     const strictMissingTransitionReplay =
@@ -33038,7 +33038,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       strictMissingTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_replay_missing",
     );
   });
 
@@ -33175,7 +33175,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingWitnessedTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -33216,7 +33216,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_replay_missing",
     );
     expect(
       replayOperationalStateQuorumCertificateProofRecords({
@@ -33238,7 +33238,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_replay_missing",
     );
 
     const invalidTransitionAdmissionWitnessFixture =
@@ -33253,7 +33253,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_qc_proof_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     const invalidWitnessedAuthorityTransitionReplay =
       replayOperationalStateQuorumCertificateProofRecordAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -33275,7 +33275,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_qc_proof_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -33416,7 +33416,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const witnessReplayWithoutTopology =
@@ -33440,7 +33440,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const replayWithoutNestedTopology =
@@ -33483,7 +33483,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       witnessReplayMissingNestedTopology.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_topology_missing",
     );
     expect(
       replayOperationalStateQuorumCertificateProofRecords({
@@ -33507,7 +33507,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const unknownWitnessFixture =
@@ -33525,8 +33525,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_qc_proof_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_qc_proof_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -33545,8 +33545,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_qc_proof_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_qc_proof_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -33564,8 +33564,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_qc_proof_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_qc_proof_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -33581,7 +33581,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyHashFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_qc_proof_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -33734,7 +33734,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedReplayFixture =
@@ -33753,7 +33753,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       mismatchedNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const witnessReplayWithoutNestedTransition =
@@ -33782,7 +33782,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayWithoutNestedAdmission =
@@ -33829,7 +33829,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     expect(
       replayOperationalStateQuorumCertificateProofRecords({
@@ -33855,7 +33855,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_qc_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
   });
 
@@ -33880,7 +33880,7 @@ describe("@pm/agent-state read-set validation", () => {
       missingLatestTransitionReplay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_topology_mismatch",
+        "operational_state_qc_proof_aw_authority_transition_topology_mismatch",
         "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_not_admitted",
       ]),
     );
@@ -33896,8 +33896,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_authority_witness_unknown",
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_qc_proof_aw_authority_transition_authority_witness_unknown",
+        "operational_state_qc_proof_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -33912,8 +33912,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_authority_duplicate_witness",
-        "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_qc_proof_aw_authority_transition_authority_duplicate_witness",
+        "operational_state_qc_proof_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -33925,7 +33925,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongPriorTopologyFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_certificate_authority_topology_mismatch",
+      "operational_state_qc_proof_aw_authority_transition_certificate_authority_topology_mismatch",
     );
   });
 
@@ -39974,7 +39974,7 @@ describe("@pm/agent-state read-set validation", () => {
       valid: false,
       issues: expect.arrayContaining([
         expect.objectContaining({
-          code: "projection_replay_pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_authority_hash_mismatch",
+          code: "projection_replay_pt_hsh_ptsh_witness_authority_hash_mismatch",
         }),
       ]),
     });
@@ -40304,7 +40304,7 @@ describe("@pm/agent-state read-set validation", () => {
       valid: false,
       issues: expect.arrayContaining([
         expect.objectContaining({
-          code: "projection_replay_pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_authority_epoch_seal_invalid",
+          code: "projection_replay_pt_hsh_ptsh_witness_authority_epoch_seal_invalid",
         }),
       ]),
     });
@@ -40327,7 +40327,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ),
     ).rejects.toThrow(
-      "projection_replay_pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_authority_retroactive_transition",
+      "projection_replay_pt_hsh_ptsh_witness_authority_retroactive_transition",
     );
     const certifiedHistoryStoreHeadPruningTombstoneStoreHeadWitnessRecords =
       await historyStoreHeadPruningTombstoneStoreHeadWitnessLedger.listProjectionReplayPruningTombstoneHistoryStoreHeadPruningTombstoneStoreHeadWitnessRecords(
@@ -40937,7 +40937,7 @@ describe("@pm/agent-state read-set validation", () => {
       valid: false,
       issues: expect.arrayContaining([
         expect.objectContaining({
-          code: "projection_replay_pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_authority_sequence_gap",
+          code: "projection_replay_pt_hsh_ptsh_witness_authority_sequence_gap",
         }),
       ]),
     });
@@ -46092,7 +46092,7 @@ describe("@pm/agent-state read-set validation", () => {
         checkpointAdmissionWitnessReplay: topologyOnlyWitnessReplay,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_replay_missing",
     );
 
     const strictMissingTransitionReplay =
@@ -46117,7 +46117,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       strictMissingTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_replay_missing",
     );
   });
 
@@ -46255,7 +46255,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingWitnessedTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -46298,7 +46298,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_replay_missing",
     );
     expect(
       evaluateOperationalStateAuthorityTopologyCompaction({
@@ -46318,7 +46318,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_replay_missing",
     );
 
     const invalidTransitionAdmissionWitnessFixture =
@@ -46334,7 +46334,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     const invalidWitnessedAuthorityTransitionReplay =
       replayOperationalStateAuthorityTopologyCompactionCheckpointAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -46356,7 +46356,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -46498,7 +46498,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const witnessReplayWithoutTopology =
@@ -46522,7 +46522,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const replayWithoutNestedTopology =
@@ -46567,7 +46567,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       witnessReplayMissingNestedTopology.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
     expect(
       evaluateOperationalStateAuthorityTopologyCompaction({
@@ -46589,7 +46589,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const unknownWitnessFixture =
@@ -46607,8 +46607,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -46627,8 +46627,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -46646,8 +46646,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -46663,7 +46663,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyHashFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -46817,7 +46817,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedReplayFixture =
@@ -46836,7 +46836,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       mismatchedNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const witnessReplayWithoutNestedTransition =
@@ -46865,7 +46865,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayWithoutNestedAdmission =
@@ -46914,7 +46914,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     expect(
       evaluateOperationalStateAuthorityTopologyCompaction({
@@ -46938,7 +46938,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
   });
 
@@ -46965,7 +46965,7 @@ describe("@pm/agent-state read-set validation", () => {
       missingLatestTransitionReplay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_topology_mismatch",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_topology_mismatch",
         "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_not_admitted",
       ]),
     );
@@ -46984,8 +46984,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_authority_witness_unknown",
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_authority_witness_unknown",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -47003,8 +47003,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_authority_duplicate_witness",
-        "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_authority_duplicate_witness",
+        "operational_state_auth_topo_checkpoint_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -47019,7 +47019,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongPriorTopologyFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_certificate_authority_topology_mismatch",
+      "operational_state_auth_topo_checkpoint_aw_authority_transition_certificate_authority_topology_mismatch",
     );
   });
 
@@ -48542,7 +48542,7 @@ describe("@pm/agent-state read-set validation", () => {
         proofAdmissionWitnessReplay: topologyOnlyWitnessReplay,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_replay_missing",
     );
 
     const strictMissingTransitionReplay =
@@ -48562,7 +48562,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       strictMissingTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_replay_missing",
     );
   });
 
@@ -48700,7 +48700,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingWitnessedTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -48738,7 +48738,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_replay_missing",
     );
     expect(
       evaluateOperationalStateSignatureVerifierAdapterProof({
@@ -48759,7 +48759,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_replay_missing",
     );
 
     const invalidTransitionAdmissionWitnessFixture =
@@ -48774,7 +48774,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     const invalidWitnessedAuthorityTransitionReplay =
       replayOperationalStateSignatureVerifierAdapterProofAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -48796,7 +48796,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -48938,7 +48938,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const witnessReplayWithoutTopology =
@@ -48962,7 +48962,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const replayWithoutNestedTopology =
@@ -49004,7 +49004,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_topology_missing",
     );
     expect(
       evaluateOperationalStateSignatureVerifierAdapterProof({
@@ -49027,7 +49027,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const unknownWitnessFixture =
@@ -49045,8 +49045,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -49065,8 +49065,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -49084,8 +49084,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -49101,7 +49101,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyHashFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -49255,7 +49255,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedReplayFixture =
@@ -49274,7 +49274,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       mismatchedNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const witnessReplayWithoutNestedTransition =
@@ -49304,7 +49304,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayWithoutNestedAdmission =
@@ -49349,7 +49349,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     expect(
       evaluateOperationalStateSignatureVerifierAdapterProof({
@@ -49374,7 +49374,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_sig_verifier_proof_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
   });
 
@@ -49401,7 +49401,7 @@ describe("@pm/agent-state read-set validation", () => {
       missingLatestTransitionReplay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_topology_mismatch",
+        "operational_state_sig_verifier_proof_aw_authority_transition_topology_mismatch",
         "operational_state_signature_verifier_proof_admission_witness_authority_transition_not_admitted",
       ]),
     );
@@ -49420,8 +49420,8 @@ describe("@pm/agent-state read-set validation", () => {
       unknownWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_authority_witness_unknown",
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_sig_verifier_proof_aw_authority_transition_authority_witness_unknown",
+        "operational_state_sig_verifier_proof_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -49439,8 +49439,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_authority_duplicate_witness",
-        "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_sig_verifier_proof_aw_authority_transition_authority_duplicate_witness",
+        "operational_state_sig_verifier_proof_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -49455,7 +49455,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongPriorTopologyFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_signature_verifier_proof_admission_witness_authority_transition_admission_certificate_authority_topology_mismatch",
+      "operational_state_sig_verifier_proof_aw_authority_transition_certificate_authority_topology_mismatch",
     );
   });
 
@@ -50927,7 +50927,7 @@ describe("@pm/agent-state read-set validation", () => {
       }).issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_topology_missing",
+        "operational_state_auth_epoch_seal_fin_aw_authority_topology_missing",
       ]),
     );
   });
@@ -51066,7 +51066,7 @@ describe("@pm/agent-state read-set validation", () => {
         finalizerProofAdmissionWitnessReplay: topologyOnlyWitnessReplay,
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_replay_missing",
     );
 
     const strictMissingTransitionReplay =
@@ -51090,7 +51090,7 @@ describe("@pm/agent-state read-set validation", () => {
       );
 
     expect(strictMissingTransitionReplay.issues.map((issue) => issue.code)).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_replay_missing",
     );
   });
 
@@ -51249,7 +51249,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingWitnessedTransitionReplay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_replay_missing",
     );
 
     const transitionReplayWithoutWitness =
@@ -51292,7 +51292,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_replay_missing",
     );
     expect(
       evaluateOperationalStateAuthorityEpochSealFinalizer({
@@ -51319,7 +51319,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_replay_missing",
     );
 
     const invalidTransitionAdmissionWitnessFixture =
@@ -51334,7 +51334,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_certificate_subject_mismatch",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_certificate_subject_mismatch",
     );
     const invalidWitnessedAuthorityTransitionReplay =
       replayOperationalStateAuthorityEpochSealFinalizerProofAdmissionWitnessAuthorityTransitionAdmissionRecords(
@@ -51356,7 +51356,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_replay_invalid",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_replay_invalid",
     );
   });
 
@@ -51522,7 +51522,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const witnessReplayWithoutTopology =
@@ -51547,7 +51547,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const replayWithoutNestedTopology =
@@ -51596,7 +51596,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_topology_missing",
     );
     expect(
       evaluateOperationalStateAuthorityEpochSealFinalizer({
@@ -51625,7 +51625,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_topology_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_topology_missing",
     );
 
     const unknownWitnessFixture =
@@ -51641,8 +51641,8 @@ describe("@pm/agent-state read-set validation", () => {
       );
     expect(unknownWitnessFixture.replay.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_witness_unknown",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_witness_unknown",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -51661,8 +51661,8 @@ describe("@pm/agent-state read-set validation", () => {
       duplicateWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_duplicate_witness",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_duplicate_witness",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -51680,8 +51680,8 @@ describe("@pm/agent-state read-set validation", () => {
       suspendedWitnessFixture.replay.issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_witness_not_active",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_witness_not_active",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_quorum_not_met",
       ]),
     );
 
@@ -51697,7 +51697,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       wrongTopologyHashFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_certificate_authority_topology_mismatch",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_certificate_authority_topology_mismatch",
     );
   });
 
@@ -51875,7 +51875,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       missingNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const mismatchedNestedReplayFixture =
@@ -51894,7 +51894,7 @@ describe("@pm/agent-state read-set validation", () => {
     expect(
       mismatchedNestedReplayFixture.replay.issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_topology_mismatch",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transition_admission_topology_mismatch",
     );
 
     const witnessReplayWithoutNestedTransition =
@@ -51925,7 +51925,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
 
     const replayWithoutNestedAdmission =
@@ -51977,7 +51977,7 @@ describe("@pm/agent-state read-set validation", () => {
         (issue) => issue.code,
       ),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
     expect(
       evaluateOperationalStateAuthorityEpochSealFinalizer({
@@ -52008,7 +52008,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       }).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admission_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transition_admission_replay_missing",
     );
   });
 
@@ -52087,7 +52087,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_certificate_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_certificate_missing",
     );
 
     expect(
@@ -52110,8 +52110,8 @@ describe("@pm/agent-state read-set validation", () => {
       ).issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_certificate_hash_mismatch",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_certificate_root_evidence_missing",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_certificate_hash_mismatch",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_certificate_root_evidence_missing",
       ]),
     );
 
@@ -52135,8 +52135,8 @@ describe("@pm/agent-state read-set validation", () => {
       ).issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_certificate_hash_mismatch",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_certificate_signature_missing",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_certificate_hash_mismatch",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_certificate_signature_missing",
       ]),
     );
 
@@ -52161,7 +52161,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_certificate_mismatch",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_certificate_mismatch",
     );
   });
 
@@ -52274,7 +52274,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_settlement_replay_missing",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_settlement_replay_missing",
     );
 
     const alternateBootstrapCertificate =
@@ -52322,7 +52322,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_certificate_not_settled",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_certificate_not_settled",
     );
 
     const conflictingSettlementReplay =
@@ -52369,7 +52369,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).issues.map((issue) => issue.code),
     ).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_bootstrap_settlement_replay_invalid",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_bootstrap_settlement_replay_invalid",
     );
   });
 
@@ -52394,8 +52394,8 @@ describe("@pm/agent-state read-set validation", () => {
 
     expect(missingLatestReplay.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_topology_mismatch",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_not_admitted",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_topology_mismatch",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_not_admitted",
       ]),
     );
 
@@ -52411,8 +52411,8 @@ describe("@pm/agent-state read-set validation", () => {
       ).replay;
     expect(unknownWitnessReplay.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_authority_witness_unknown",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_authority_witness_unknown",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -52428,8 +52428,8 @@ describe("@pm/agent-state read-set validation", () => {
       ).replay;
     expect(duplicateWitnessReplay.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_authority_duplicate_witness",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_authority_duplicate_witness",
+        "operational_state_auth_epoch_seal_fin_aw_authority_transition_authority_quorum_not_met",
       ]),
     );
 
@@ -52441,7 +52441,7 @@ describe("@pm/agent-state read-set validation", () => {
         },
       ).replay;
     expect(wrongPriorTopologyReplay.issues.map((issue) => issue.code)).toContain(
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_certificate_authority_topology_mismatch",
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition_certificate_authority_topology_mismatch",
     );
   });
 
@@ -52468,7 +52468,7 @@ describe("@pm/agent-state read-set validation", () => {
       ).issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_topology_missing",
+        "operational_state_auth_epoch_seal_fin_aw_authority_topology_missing",
       ]),
     );
 
@@ -52498,8 +52498,8 @@ describe("@pm/agent-state read-set validation", () => {
       ).issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_witness_unknown",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_witness_unknown",
+        "operational_state_auth_epoch_seal_fin_aw_authority_quorum_not_met",
       ]),
     );
 
@@ -52529,8 +52529,8 @@ describe("@pm/agent-state read-set validation", () => {
       ).issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_witness_not_active",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_witness_not_active",
+        "operational_state_auth_epoch_seal_fin_aw_authority_quorum_not_met",
       ]),
     );
 
@@ -52560,8 +52560,8 @@ describe("@pm/agent-state read-set validation", () => {
       ).issues.map((issue) => issue.code),
     ).toEqual(
       expect.arrayContaining([
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_duplicate_witness",
-        "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_quorum_not_met",
+        "operational_state_auth_epoch_seal_fin_aw_authority_duplicate_witness",
+        "operational_state_auth_epoch_seal_fin_aw_authority_quorum_not_met",
       ]),
     );
 
@@ -52878,7 +52878,7 @@ describe("@pm/agent-state read-set validation", () => {
   it("admits authority-transition ledger compaction only through replayed checkpoint authority", () => {
     const authorityScope = "agent-state:ops";
     const authorityBoundary =
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission";
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition";
     const checkpointAdmissionBoundary =
       "authority_transition_ledger_compaction_checkpoint_admission_quorum";
     const transitionAdmissionStoreId =
@@ -52998,7 +52998,7 @@ describe("@pm/agent-state read-set validation", () => {
   it("rejects stale, tampered, wrong-boundary, and gapful authority-transition ledger compaction", () => {
     const authorityScope = "agent-state:ops";
     const authorityBoundary =
-      "operational_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission";
+      "operational_state_auth_epoch_seal_fin_aw_authority_transition";
     const checkpointAdmissionBoundary =
       "authority_transition_ledger_compaction_checkpoint_admission_quorum";
     const transitionAdmissionStoreId =

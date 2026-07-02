@@ -26,7 +26,7 @@
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, normalize, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 
 import { buildSnapshot } from "./aggregator.mjs";
@@ -34,10 +34,7 @@ import { buildSnapshot } from "./aggregator.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST =
   process.env.SUBSTRATE_DASHBOARD_DIST ?? join(HERE, "..", "dist");
-const LOCAL_AGENT_LAB_DIST = new URL(
-  "../../local-agent-lab/dist/index.js",
-  import.meta.url,
-);
+const LOCAL_AGENT_LAB_PACKAGE = "@pm/local-agent-lab";
 const PORT = parseInt(process.env.PORT ?? "4178", 10);
 const CACHE_MS = Number(process.env.SNAPSHOT_CACHE_MS ?? "4000");
 
@@ -57,14 +54,35 @@ const labSessions = new Map();
 const sessionStreams = new Map();
 const activeRunners = new Map();
 
-async function loadLocalAgentLab() {
+async function defaultLoadLocalAgentLab() {
   try {
-    return await import(LOCAL_AGENT_LAB_DIST.href);
+    return await import(LOCAL_AGENT_LAB_PACKAGE);
   } catch (err) {
     throw new Error(
       `local-agent-lab build is required for lab sessions: ${err?.message ?? String(err)}`,
     );
   }
+}
+
+let loadLocalAgentLabImpl = defaultLoadLocalAgentLab;
+
+export function setLocalAgentLabLoaderForTests(loader) {
+  loadLocalAgentLabImpl = loader;
+}
+
+export function resetDashboardServerStateForTests() {
+  for (const runner of activeRunners.values()) {
+    runner.stop?.("test reset");
+  }
+  cache = { at: 0, snapshot: null };
+  labSessions.clear();
+  sessionStreams.clear();
+  activeRunners.clear();
+  loadLocalAgentLabImpl = defaultLoadLocalAgentLab;
+}
+
+async function loadLocalAgentLab() {
+  return loadLocalAgentLabImpl();
 }
 
 async function getSnapshot() {
@@ -153,27 +171,103 @@ function appendRecordEvent(record, event) {
   broadcastSessionEvent(record.id, event);
 }
 
+function agentNumberFromId(agentId) {
+  const match = String(agentId).match(/:agent:(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
+function ensureRecordAgent(record, event) {
+  if (!event.agentId) return null;
+  let agent = record.agents.find((candidate) => candidate.agentId === event.agentId);
+  if (agent) return agent;
+  const agentNumber =
+    Number(event.payload?.agentNumber ?? agentNumberFromId(event.agentId) ?? record.agents.length + 1);
+  agent = {
+    agentId: event.agentId,
+    label: String(event.payload?.label ?? `Agent ${agentNumber}`),
+    arms: {},
+    behaviorDiverged: false,
+  };
+  record.agents.push(agent);
+  return agent;
+}
+
+function mergeAgentResult(record, agentResult) {
+  if (!agentResult?.agentId) return;
+  let agent = record.agents.find((candidate) => candidate.agentId === agentResult.agentId);
+  if (!agent) {
+    agent = {
+      agentId: agentResult.agentId,
+      label: String(agentResult.label ?? `Agent ${record.agents.length + 1}`),
+      arms: {},
+      behaviorDiverged: false,
+    };
+    record.agents.push(agent);
+  }
+  agent.label = String(agentResult.label ?? agent.label);
+  agent.arms = { ...agent.arms, ...(agentResult.arms ?? {}) };
+  agent.behaviorDiverged = Boolean(agentResult.behaviorDiverged);
+}
+
 function updateRecordFromEvent(record, event) {
   record.events.push(event);
   record.updatedAt = event.occurredAt;
   record.latestActivity = event.message;
+  if (event.type === "session_stopped") record.status = "stopped";
+  if (event.type === "session_completed") record.status = "completed";
+  if (event.type === "session_failed") record.status = "failed";
+  if (event.type === "agent_started") {
+    const agent = ensureRecordAgent(record, event);
+    const agentNumber = Number(event.payload?.agentNumber ?? agentNumberFromId(event.agentId));
+    if (Number.isFinite(agentNumber)) {
+      record.agentCount = Math.max(record.agentCount, agentNumber);
+    }
+    if (agent) record.summaryMetrics.activeAgents += 1;
+  }
+  if (event.type === "agent_completed") {
+    mergeAgentResult(record, event.payload);
+    record.summaryMetrics.activeAgents = Math.max(0, record.summaryMetrics.activeAgents - 1);
+  }
   if (event.type === "agent_stopped") {
     record.summaryMetrics.activeAgents = Math.max(0, record.summaryMetrics.activeAgents - 1);
+  }
+  if (event.type === "arm_completed") {
+    const agent = ensureRecordAgent(record, event);
+    if (agent && event.arm) {
+      agent.arms[event.arm] = event.payload ?? {
+        arm: event.arm,
+        result: event.result,
+      };
+    }
   }
   if (event.type === "injection_created") record.summaryMetrics.pendingInjections += 1;
   if (event.type === "mutation_created") record.summaryMetrics.pendingMutations += 1;
   if (event.type === "action_refused") record.summaryMetrics.unsafeBlockedCount += 1;
-  if (event.type === "action_admitted" && event.arm === "no_substrate") {
+  if (event.type === "oracle_verdict" && event.result === "fail") {
     record.summaryMetrics.unsafeAdmittedCount += 1;
   }
-  if (event.type === "arm_diverged") record.summaryMetrics.divergenceCount += 1;
+  if (event.type === "arm_diverged") {
+    record.summaryMetrics.divergenceCount += 1;
+    const agent = ensureRecordAgent(record, event);
+    if (agent) agent.behaviorDiverged = true;
+    if (
+      event.payload?.noSubstrateResult === "fail" &&
+      event.payload?.substrateResult !== "fail"
+    ) {
+      record.summaryMetrics.substrateProtectedCount += 1;
+    }
+  }
   if (event.type === "mutation_applied") {
     record.summaryMetrics.mutationAppliedCount += 1;
-    record.summaryMetrics.pendingMutations = Math.max(0, record.summaryMetrics.pendingMutations - 1);
+    if (event.payload?.id) {
+      record.summaryMetrics.pendingMutations = Math.max(0, record.summaryMetrics.pendingMutations - 1);
+    }
   }
   if (event.type === "injection_applied") {
     record.summaryMetrics.injectionAppliedCount += 1;
-    record.summaryMetrics.pendingInjections = Math.max(0, record.summaryMetrics.pendingInjections - 1);
+    if (event.payload?.id) {
+      record.summaryMetrics.pendingInjections = Math.max(0, record.summaryMetrics.pendingInjections - 1);
+    }
   }
 }
 
@@ -215,10 +309,10 @@ async function startLabSession(body) {
     updatedAt: now,
     latestActivity: "Session queued.",
     summaryMetrics: {
-      activeAgents: agentCount,
+      activeAgents: 0,
       blockedAgents: 0,
-      pendingInjections: Array.isArray(body.injections) ? body.injections.length : 0,
-      pendingMutations: Array.isArray(body.mutations) ? body.mutations.length : 0,
+      pendingInjections: 0,
+      pendingMutations: 0,
       injectionAppliedCount: 0,
       mutationAppliedCount: 0,
       unsafeBlockedCount: 0,
@@ -265,7 +359,8 @@ async function startLabSession(body) {
       activeRunners.delete(id);
       record.status = result.status;
       record.updatedAt = new Date().toISOString();
-      record.latestActivity = "Session completed.";
+      record.latestActivity =
+        result.status === "stopped" ? "Session stopped." : "Session completed.";
       record.agents = result.agents;
       record.summaryMetrics = {
         ...record.summaryMetrics,
@@ -279,12 +374,15 @@ async function startLabSession(body) {
       };
       broadcastSessionEvent(id, {
         id: `event_${randomUUID()}`,
-        type: "session_completed",
+        type: result.status === "stopped" ? "session_stopped" : "session_completed",
         sessionId: id,
         scenarioId: scenario.scenarioId,
         failureClass: scenario.failureClass,
         occurredAt: record.updatedAt,
-        message: "Session result stored.",
+        message:
+          result.status === "stopped"
+            ? "Stopped session result stored."
+            : "Session result stored.",
       });
     })
     .catch((err) => {
@@ -339,6 +437,12 @@ function normalizeFileRefs(value) {
     .filter(Boolean);
 }
 
+function normalizeTargetArm(value) {
+  const arm = normalizeString(value);
+  if (arm === "substrate" || arm === "no_substrate") return arm;
+  return "both";
+}
+
 function recordHasAgent(record, agentId) {
   if (!agentId) return true;
   return (
@@ -350,6 +454,10 @@ function recordHasAgent(record, agentId) {
 function injectIntoSession(id, body) {
   const record = getSession(id);
   if (!record) return { status: 404, body: { ok: false, error: "session not found" } };
+  const runner = activeRunners.get(id);
+  if (!runner) {
+    return { status: 409, body: { ok: false, error: "session is not running" } };
+  }
 
   const targetAgentId = normalizeString(body.targetAgentId ?? body.agentId) || undefined;
   if (targetAgentId && !recordHasAgent(record, targetAgentId)) {
@@ -358,13 +466,14 @@ function injectIntoSession(id, body) {
 
   const prompt = normalizeString(body.prompt ?? body.text);
   const fileRefs = normalizeFileRefs(body.fileRefs);
-  const targetArm = normalizeString(body.targetArm ?? body.armTarget) || "both";
+  const targetArm = normalizeTargetArm(body.targetArm ?? body.armTarget);
   const mutationDescription = normalizeString(
     body.mutationDescription ?? body.mutation?.description,
   );
   const mutationType =
     normalizeString(body.mutationType ?? body.mutation?.type) || "changed_working_condition";
-  const events = [];
+  const beforeEventCount = record.events.length;
+  let delivered = false;
 
   if (prompt || fileRefs.length > 0) {
     const injection = {
@@ -376,18 +485,12 @@ function injectIntoSession(id, body) {
       targetArm,
       createdAt: new Date().toISOString(),
     };
-    events.push(
-      createRecordEvent(record, "injection_created", "Operator queued a prompt/context injection.", {
-        ...(targetAgentId ? { agentId: targetAgentId } : {}),
-        payload: injection,
-      }),
-    );
-    events.push(
-      createRecordEvent(record, "injection_applied", "Operator injection entered the session stream.", {
-        ...(targetAgentId ? { agentId: targetAgentId } : {}),
-        payload: injection,
-      }),
-    );
+    try {
+      runner.inject(injection);
+    } catch (err) {
+      return { status: 409, body: { ok: false, error: err?.message ?? String(err) } };
+    }
+    delivered = true;
   }
 
   if (mutationDescription) {
@@ -399,28 +502,22 @@ function injectIntoSession(id, body) {
       targetArm,
       createdAt: new Date().toISOString(),
     };
-    events.push(
-      createRecordEvent(record, "mutation_created", "Operator queued a constrained lab mutation.", {
-        ...(targetAgentId ? { agentId: targetAgentId } : {}),
-        payload: mutation,
-      }),
-    );
-    events.push(
-      createRecordEvent(record, "mutation_applied", "Operator lab mutation was applied to the test session.", {
-        ...(targetAgentId ? { agentId: targetAgentId } : {}),
-        payload: mutation,
-      }),
-    );
+    try {
+      runner.mutate(mutation);
+    } catch (err) {
+      return { status: 409, body: { ok: false, error: err?.message ?? String(err) } };
+    }
+    delivered = true;
   }
 
-  if (events.length === 0) {
+  if (!delivered) {
     return {
       status: 400,
       body: { ok: false, error: "provide a prompt, fileRefs, or mutationDescription" },
     };
   }
 
-  for (const event of events) appendRecordEvent(record, event);
+  const events = record.events.slice(beforeEventCount);
   return {
     status: 202,
     body: { ok: true, session: summarizeSession(record), events },
@@ -444,27 +541,18 @@ function stopAgent(agentId) {
 function addAgentToSession(id) {
   const record = getSession(id);
   if (!record) return { status: 404, body: { ok: false, error: "session not found" } };
-  const nextAgentNumber = record.agentCount + 1;
-  const agent = {
-    agentId: `${record.id}:agent:${nextAgentNumber}`,
-    label: `Agent ${nextAgentNumber}`,
-    arms: {},
-    behaviorDiverged: false,
-  };
-  record.agentCount = nextAgentNumber;
-  record.summaryMetrics.activeAgents += 1;
-  record.agents.push(agent);
-  appendRecordEvent(
-    record,
-    createRecordEvent(record, "agent_started", `Operator added Agent ${nextAgentNumber}.`, {
-      agentId: agent.agentId,
-      payload: { source: "operator_add_agent" },
-    }),
-  );
+  const runner = activeRunners.get(id);
+  if (!runner) return { status: 409, body: { ok: false, error: "session is not running" } };
+  let agent;
+  try {
+    agent = runner.addAgent();
+  } catch (err) {
+    return { status: 409, body: { ok: false, error: err?.message ?? String(err) } };
+  }
   return { status: 202, body: { ok: true, session: summarizeSession(record), agent } };
 }
 
-const server = createServer(async (req, res) => {
+export const server = createServer(async (req, res) => {
   const pathname = decodeURIComponent((req.url ?? "/").split("?")[0]);
   const method = req.method ?? "GET";
 
@@ -620,8 +708,21 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `dashboard: static=${DIST} api=/api/dashboard substrate=${process.env.SUBSTRATE_BASE_URL ?? "http://127.0.0.1:4100"} on http://0.0.0.0:${PORT}`,
-  );
-});
+export function startDashboardServer(port = PORT, host = "0.0.0.0") {
+  return server.listen(port, host, () => {
+    const address = server.address();
+    const actualPort =
+      typeof address === "object" && address !== null ? address.port : port;
+    console.log(
+      `dashboard: static=${DIST} api=/api/dashboard substrate=${process.env.SUBSTRATE_BASE_URL ?? "http://127.0.0.1:4100"} on http://${host}:${actualPort}`,
+    );
+  });
+}
+
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isEntrypoint) {
+  startDashboardServer();
+}

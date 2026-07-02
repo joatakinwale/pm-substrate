@@ -1,7 +1,7 @@
--- 0090_agent_state_tombstone_history_checkpoint_admission_witness_authority_transitions.sql
+-- 0090_agent_state_th_checkpoint_aw_authority_transitions.sql
 -- Durable authority transitions for tombstone-history checkpoint admission witness topology.
 
-CREATE TABLE IF NOT EXISTS agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions (
+CREATE TABLE IF NOT EXISTS agent_state.th_checkpoint_aw_authority_transitions (
   tenant_id TEXT NOT NULL,
   checkpoint_admission_witness_authority_topology_id TEXT NOT NULL,
   authority_scope TEXT NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS agent_state.tombstone_history_checkpoint_admission_wi
 );
 
 CREATE INDEX IF NOT EXISTS tombstone_history_checkpoint_admission_witness_authority_scope_idx
-  ON agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions (
+  ON agent_state.th_checkpoint_aw_authority_transitions (
     tenant_id,
     checkpoint_admission_witness_authority_topology_id,
     authority_scope,
@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS tombstone_history_checkpoint_admission_witness_author
   );
 
 CREATE INDEX IF NOT EXISTS tombstone_history_checkpoint_admission_witness_authority_effective_idx
-  ON agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions (
+  ON agent_state.th_checkpoint_aw_authority_transitions (
     tenant_id,
     authority_scope,
     effective_from_admission_sequence,
@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS tombstone_history_checkpoint_admission_witness_author
   );
 
 CREATE INDEX IF NOT EXISTS tombstone_history_checkpoint_admission_witness_authority_principal_idx
-  ON agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions (
+  ON agent_state.th_checkpoint_aw_authority_transitions (
     tenant_id,
     authority_scope,
     principal_id,
@@ -72,23 +72,23 @@ END;
 $$;
 
 DROP TRIGGER IF EXISTS prevent_tombstone_history_checkpoint_admission_witness_authority_rewrite
-  ON agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions;
+  ON agent_state.th_checkpoint_aw_authority_transitions;
 
 CREATE TRIGGER prevent_tombstone_history_checkpoint_admission_witness_authority_rewrite
-  BEFORE UPDATE OR DELETE ON agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions
+  BEFORE UPDATE OR DELETE ON agent_state.th_checkpoint_aw_authority_transitions
   FOR EACH ROW
   EXECUTE FUNCTION agent_state.prevent_tombstone_history_checkpoint_admission_witness_authority_rewrite();
 
-REVOKE INSERT, UPDATE, DELETE ON agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions FROM PUBLIC;
+REVOKE INSERT, UPDATE, DELETE ON agent_state.th_checkpoint_aw_authority_transitions FROM PUBLIC;
 
-COMMENT ON TABLE agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions IS
+COMMENT ON TABLE agent_state.th_checkpoint_aw_authority_transitions IS
   'Append-only authority transitions for tombstone-history checkpoint admission witness topology. Replaying this ledger reconstructs which principals may witness tombstone-history checkpoint admission rows and what quorum threshold they must satisfy.';
 
-COMMENT ON COLUMN agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions.authority_record_hash IS
+COMMENT ON COLUMN agent_state.th_checkpoint_aw_authority_transitions.authority_record_hash IS
   'Deterministic hash of the authority transition, chained by previous_authority_record_hash so tombstone-history checkpoint witness eligibility cannot be supplied from agent memory or connector cache.';
 
-COMMENT ON COLUMN agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions.effective_from_admission_sequence IS
+COMMENT ON COLUMN agent_state.th_checkpoint_aw_authority_transitions.effective_from_admission_sequence IS
   'First tombstone-history checkpoint admission sequence for which this authority transition may authorize witness certificates.';
 
-COMMENT ON COLUMN agent_state.tombstone_history_checkpoint_admission_witness_authority_transitions.transition IS
+COMMENT ON COLUMN agent_state.th_checkpoint_aw_authority_transitions.transition IS
   'Hash-bound transition payload used to replay the tombstone-history checkpoint admission witness authority topology.';

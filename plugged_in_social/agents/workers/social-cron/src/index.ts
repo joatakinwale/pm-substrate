@@ -5,11 +5,11 @@
  *   - publish_scheduled_posts: sweep due rows, fan out to social-publisher
  *   - refresh_engagement_metrics: nightly metrics pull
  *
- * Flow (hourly, 0 * * * *):
- *   1. Cron Trigger fires scheduled() with controller.cron = "0 * * * *".
+ * Flow (every 5 minutes):
+ *   1. Cron Trigger fires scheduled() with the five-minute cron expression.
  *   2. POST /internal/social/scheduled/sweep on FastAPI. Backend flips
  *      due posts from 'scheduled' → 'publishing' under one transaction
- *      and returns the list of {post_id, org_id}.
+ *      and returns the list of {post_id, org_id, expected_content_hash}.
  *   3. For each entry, POST a social.post.publish message to the
  *      queue-producer Worker's /enqueue/stevie-social-publisher route.
  *
@@ -30,12 +30,17 @@
  *
  * Idempotency for scheduled fanout: each social.post.publish carries an
  * idempotency_key of ``social-publish:<post_id>:<sweep-iso>``. If the
- * cron fires twice in the same hour (CF retry, manual re-trigger), the
+ * cron fires twice in the same sweep window (CF retry, manual re-trigger), the
  * status flip from 'scheduled' → 'publishing' has already happened on
  * the first run, so the second sweep returns an empty list. The key
  * shape is belt-and-suspenders for any consumer-side dedupe.
  */
-import { assertEnv, type BaseEnv } from "@stevie/shared";
+import {
+  assertEnv,
+  type BaseEnv,
+  validateMessage,
+  type VirtualAgencyMessage,
+} from "@stevie/shared";
 import {
   BackendCallError,
   BackendClient,
@@ -50,7 +55,7 @@ interface Env extends BaseEnv {
 // Cron expressions used in wrangler.toml. We dispatch on these literally
 // so a typo in the dispatch table is caught by the type system the next
 // time we read this file rather than at runtime when a cron fires.
-const CRON_SCHEDULED_SWEEP = "0 * * * *";
+const CRON_SCHEDULED_SWEEP = "*/5 * * * *";
 const CRON_METRICS_REFRESH = "*/30 * * * *";
 
 export default {
@@ -76,7 +81,7 @@ export default {
     if (controller.cron === CRON_SCHEDULED_SWEEP) {
       ctx.waitUntil(runScheduledSweep(backend, env));
     } else if (controller.cron === CRON_METRICS_REFRESH) {
-      ctx.waitUntil(runMetricsRefresh(backend));
+      ctx.waitUntil(runMetricsRefresh(backend, env));
     } else {
       // An unknown cron expression is a wrangler.toml bug — log loudly
       // so we notice on the first tick. Don't throw; the cron daemon
@@ -136,6 +141,7 @@ export async function runScheduledSweep(
       idempotency_key: `social-publish:${p.post_id}:${sweepIso}`,
       emitted_at: sweepIso,
       post_id: p.post_id,
+      expected_content_hash: p.expected_content_hash,
     };
 
     try {
@@ -180,14 +186,24 @@ export async function runScheduledSweep(
  * (non-default) so tests can exercise it directly.
  */
 export async function runMetricsRefresh(
-  backend: BackendClient
-): Promise<{ checked: number; updated: number; errored: number }> {
+  backend: BackendClient,
+  env: Pick<Env, "QUEUE_PRODUCER_URL" | "WEBHOOK_SECRET">
+): Promise<{ checked: number; updated: number; errored: number; fanned: number }> {
   try {
     const result = await backend.refreshSocialMetrics();
-    console.log(
-      `[social-cron] metrics-refresh checked=${result.checked} updated=${result.updated} errored=${result.errored}`
+    const fanned = await fanoutVirtualAgencyTasks(
+      result.virtual_agency_tasks,
+      env
     );
-    return result;
+    console.log(
+      `[social-cron] metrics-refresh checked=${result.checked} updated=${result.updated} errored=${result.errored} virtual_agency_fanned=${fanned}`
+    );
+    return {
+      checked: result.checked,
+      updated: result.updated,
+      errored: result.errored,
+      fanned,
+    };
   } catch (err) {
     if (err instanceof BackendCallError) {
       console.error(
@@ -200,4 +216,41 @@ export async function runMetricsRefresh(
     }
     throw err;
   }
+}
+
+async function fanoutVirtualAgencyTasks(
+  tasks: VirtualAgencyMessage[],
+  env: Pick<Env, "QUEUE_PRODUCER_URL" | "WEBHOOK_SECRET">
+): Promise<number> {
+  if (tasks.length === 0) {
+    return 0;
+  }
+  const enqueueUrl = `${env.QUEUE_PRODUCER_URL}/enqueue/stevie-virtual-agency`;
+  let fanned = 0;
+  for (const task of tasks) {
+    validateMessage<VirtualAgencyMessage>(task, "virtual_agency.task");
+    try {
+      const res = await fetch(enqueueUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-webhook-secret": env.WEBHOOK_SECRET,
+        },
+        body: JSON.stringify(task),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(
+          `[social-cron] virtual-agency enqueue failed for task ${task.orchestration_task_id} (${res.status}): ${text.slice(0, 300)}`
+        );
+        continue;
+      }
+      fanned += 1;
+    } catch (err) {
+      console.error(
+        `[social-cron] virtual-agency enqueue network error for task ${task.orchestration_task_id}: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+  return fanned;
 }

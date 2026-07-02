@@ -1,7 +1,7 @@
--- 0095_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions.sql
+-- 0095_agent_state_auth_epoch_seal_fin_aw_authority_transitions.sql
 -- Durable authority transitions for authority epoch seal finalizer-proof admission witness topology.
 
-CREATE TABLE IF NOT EXISTS agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions (
+CREATE TABLE IF NOT EXISTS agent_state.auth_epoch_seal_fin_aw_authority_transitions (
   tenant_id TEXT NOT NULL,
   finalizer_proof_admission_witness_authority_topology_id TEXT NOT NULL,
   authority_scope TEXT NOT NULL,
@@ -37,31 +37,31 @@ CREATE TABLE IF NOT EXISTS agent_state.authority_epoch_seal_finalizer_proof_admi
   )
 );
 
-CREATE INDEX IF NOT EXISTS authority_epoch_seal_finalizer_proof_admission_witness_authority_scope_idx
-  ON agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions (
+CREATE INDEX IF NOT EXISTS auth_epoch_seal_fin_aw_authority_scope_idx
+  ON agent_state.auth_epoch_seal_fin_aw_authority_transitions (
     tenant_id,
     finalizer_proof_admission_witness_authority_topology_id,
     authority_scope,
     authority_sequence
   );
 
-CREATE INDEX IF NOT EXISTS authority_epoch_seal_finalizer_proof_admission_witness_authority_effective_idx
-  ON agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions (
+CREATE INDEX IF NOT EXISTS auth_epoch_seal_fin_aw_authority_effective_idx
+  ON agent_state.auth_epoch_seal_fin_aw_authority_transitions (
     tenant_id,
     authority_scope,
     effective_from_admission_sequence,
     authority_sequence
   );
 
-CREATE INDEX IF NOT EXISTS authority_epoch_seal_finalizer_proof_admission_witness_authority_principal_idx
-  ON agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions (
+CREATE INDEX IF NOT EXISTS auth_epoch_seal_fin_aw_authority_principal_idx
+  ON agent_state.auth_epoch_seal_fin_aw_authority_transitions (
     tenant_id,
     authority_scope,
     principal_id,
     authority_sequence
   );
 
-CREATE OR REPLACE FUNCTION agent_state.prevent_authority_epoch_seal_finalizer_proof_admission_witness_authority_rewrite()
+CREATE OR REPLACE FUNCTION agent_state.prevent_auth_epoch_seal_fin_aw_authority_rewrite()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -71,24 +71,24 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS prevent_authority_epoch_seal_finalizer_proof_admission_witness_authority_rewrite
-  ON agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions;
+DROP TRIGGER IF EXISTS prevent_auth_epoch_seal_fin_aw_authority_rewrite
+  ON agent_state.auth_epoch_seal_fin_aw_authority_transitions;
 
-CREATE TRIGGER prevent_authority_epoch_seal_finalizer_proof_admission_witness_authority_rewrite
-  BEFORE UPDATE OR DELETE ON agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions
+CREATE TRIGGER prevent_auth_epoch_seal_fin_aw_authority_rewrite
+  BEFORE UPDATE OR DELETE ON agent_state.auth_epoch_seal_fin_aw_authority_transitions
   FOR EACH ROW
-  EXECUTE FUNCTION agent_state.prevent_authority_epoch_seal_finalizer_proof_admission_witness_authority_rewrite();
+  EXECUTE FUNCTION agent_state.prevent_auth_epoch_seal_fin_aw_authority_rewrite();
 
-REVOKE INSERT, UPDATE, DELETE ON agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions FROM PUBLIC;
+REVOKE INSERT, UPDATE, DELETE ON agent_state.auth_epoch_seal_fin_aw_authority_transitions FROM PUBLIC;
 
-COMMENT ON TABLE agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions IS
+COMMENT ON TABLE agent_state.auth_epoch_seal_fin_aw_authority_transitions IS
   'Append-only authority transitions for authority epoch seal finalizer-proof admission witness topology. Replaying this ledger reconstructs which principals may witness finalizer-proof admission rows and what quorum threshold they must satisfy.';
 
-COMMENT ON COLUMN agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions.authority_record_hash IS
+COMMENT ON COLUMN agent_state.auth_epoch_seal_fin_aw_authority_transitions.authority_record_hash IS
   'Deterministic hash of the authority transition, chained by previous_authority_record_hash so finalizer-proof admission witness eligibility cannot be supplied from agent memory or connector cache.';
 
-COMMENT ON COLUMN agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions.effective_from_admission_sequence IS
+COMMENT ON COLUMN agent_state.auth_epoch_seal_fin_aw_authority_transitions.effective_from_admission_sequence IS
   'First authority epoch seal finalizer-proof admission sequence for which this authority transition may authorize witness certificates.';
 
-COMMENT ON COLUMN agent_state.authority_epoch_seal_finalizer_proof_admission_witness_authority_transitions.transition IS
+COMMENT ON COLUMN agent_state.auth_epoch_seal_fin_aw_authority_transitions.transition IS
   'Hash-bound transition payload used to replay the authority epoch seal finalizer-proof admission witness authority topology.';

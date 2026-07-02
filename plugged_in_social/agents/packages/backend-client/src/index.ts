@@ -11,6 +11,7 @@
  * Worker: `X-Stevie-Internal-Secret: <WEBHOOK_SECRET>`. The header is checked
  * by app/api/internal/* dependencies on the FastAPI side.
  */
+import type { VirtualAgencyMessage } from "@stevie/shared";
 
 export interface BackendClientConfig {
   /** No trailing slash. */
@@ -374,10 +375,14 @@ export class BackendClient {
   async publishSocialPost(input: {
     post_id: string;
     org_id: string;
+    expected_content_hash: string;
   }): Promise<{ status: string; platform_post_id?: string | null }> {
     const result = await this.post(
       `/api/internal/social/posts/${input.post_id}/publish`,
-      { org_id: input.org_id }
+      {
+        org_id: input.org_id,
+        expected_content_hash: input.expected_content_hash,
+      }
     );
     const parsed = result as {
       status?: unknown;
@@ -419,11 +424,7 @@ export class BackendClient {
    *
    * Backend handler: POST /api/internal/social/metrics/refresh
    */
-  async refreshSocialMetrics(): Promise<{
-    checked: number;
-    updated: number;
-    errored: number;
-  }> {
+  async refreshSocialMetrics(): Promise<MetricsRefreshResult> {
     const result = await this.post(
       `/api/internal/social/metrics/refresh`,
       {}
@@ -432,11 +433,15 @@ export class BackendClient {
       checked?: unknown;
       updated?: unknown;
       errored?: unknown;
+      virtual_agency_tasks?: unknown;
     } | null;
     return {
       checked: typeof parsed?.checked === "number" ? parsed.checked : 0,
       updated: typeof parsed?.updated === "number" ? parsed.updated : 0,
       errored: typeof parsed?.errored === "number" ? parsed.errored : 0,
+      virtual_agency_tasks: Array.isArray(parsed?.virtual_agency_tasks)
+        ? (parsed.virtual_agency_tasks as VirtualAgencyMessage[])
+        : [],
     };
   }
 
@@ -537,6 +542,15 @@ export interface DueSocialPost {
   post_id: string;
   /** Stevie organization UUID — required by every queue message. */
   org_id: string;
+  /** SHA-256 digest captured when the post was scheduled. */
+  expected_content_hash: string;
+}
+
+export interface MetricsRefreshResult {
+  checked: number;
+  updated: number;
+  errored: number;
+  virtual_agency_tasks: VirtualAgencyMessage[];
 }
 
 /** Per-recipient row returned by /api/internal/email/campaigns/{id}/dispatch. */

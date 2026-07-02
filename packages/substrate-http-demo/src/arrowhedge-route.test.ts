@@ -12,7 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import type { Hono } from "hono";
+import { Hono } from "hono";
 import { PostgresEventStore } from "@pm/events";
 import { PostgresGraph } from "@pm/graph";
 import { PostgresProfileRegistry } from "@pm/profile-registry";
@@ -108,6 +108,193 @@ const cleanSnapshot = {
     signalSourceSnapshotId: "snap_aapl_2026_06_03_1400",
   },
 };
+
+const runEnvelope = {
+  schemaVersion: "arrowhedge.run-envelope.v1",
+  runId: "run_http_demo_001",
+  surface: "backtest",
+  substrateMode: "shadow",
+  observedAt: "2026-06-03T14:00:00.000Z",
+  scope: {
+    startDate: "2026-05-01",
+    endDate: "2026-06-03",
+    tickers: ["AAPL", "MSFT"],
+  },
+  graph: {
+    nodes: [{ id: "agent:ben_graham_agent", kind: "analyst" }],
+    edges: [
+      {
+        source: "agent:ben_graham_agent",
+        target: "ticker:AAPL",
+        type: "analyzes",
+      },
+    ],
+  },
+  modelConfig: { model: "gpt-4.1", temperature: 0.1 },
+  portfolio: {
+    cash: 250000,
+    equity: 1000000,
+    margin_requirement: 0.25,
+    margin_used: 0.11,
+  },
+  signals: [
+    {
+      id: "sig_ben_graham_AAPL",
+      ticker: "AAPL",
+      agentId: "ben_graham_agent",
+      signal: "bullish",
+      confidence: 0.74,
+    },
+    {
+      id: "sig_ben_graham_MSFT",
+      ticker: "MSFT",
+      agentId: "ben_graham_agent",
+      signal: "neutral",
+      confidence: 0.51,
+    },
+  ],
+  riskStates: [
+    {
+      ticker: "AAPL",
+      currentPrice: 189.25,
+      remainingPositionLimit: 50000,
+      maxShares: 120,
+      volatility: 0.21,
+      bindingConstraint: "position_limit",
+    },
+    {
+      ticker: "MSFT",
+      currentPrice: 415.5,
+      remainingPositionLimit: 40000,
+      maxShares: 96,
+      volatility: 0.18,
+      bindingConstraint: "position_limit",
+    },
+  ],
+  decisions: [
+    {
+      id: "dec_run_http_demo_001_AAPL",
+      ticker: "AAPL",
+      action: "buy",
+      quantity: 100,
+      confidence: 0.76,
+      reasoning: "AAPL passed the risk gate.",
+      allowedActions: { hold: 0, buy: 120 },
+    },
+    {
+      id: "dec_run_http_demo_001_MSFT",
+      ticker: "MSFT",
+      action: "hold",
+      quantity: 0,
+      confidence: 0.61,
+      reasoning: "MSFT signal is not decisive.",
+      allowedActions: { hold: 0, buy: 96 },
+    },
+  ],
+  evidence: [
+    {
+      id: "ev_run_seed",
+      sha256: "d".repeat(64),
+      mimeType: "application/json",
+      filename: "run-seed.json",
+      sourceUri: "arrowhedge://runs/run_http_demo_001/seed",
+      retrievedAt: "2026-06-03T14:00:00.000Z",
+      freshnessExpiresAt: "2026-06-03T14:00:00.000Z",
+    },
+  ],
+};
+
+describe("ArrowHedge run-envelope HTTP route contract", () => {
+  it("POST /run-envelopes expands and ingests every ticker snapshot", async () => {
+    const app = new Hono();
+    let graphNodeWrites = 0;
+    let graphEdgeWrites = 0;
+    let eventWrites = 0;
+    let catchUpCalls = 0;
+    const projectionState: ArrowHedgeCommonOperatingPictureState = {
+      tickers: {},
+      summary: {
+        validEventCount: 0,
+        authorityGatePassRate: null,
+        stateDisagreementRate: null,
+      },
+    };
+
+    app.route(
+      "/tenants/:tenantId/arrowhedge",
+      arrowhedgeRoutes({
+        pool: {
+          connect: async () => ({
+            query: async () => undefined,
+            release: () => undefined,
+          }),
+        } as unknown as pg.Pool,
+        graph: {
+          createNode: async (input: unknown) => {
+            graphNodeWrites += 1;
+            const node = input as {
+              id: string;
+              identity: Readonly<Record<string, unknown>>;
+              schemaVersion: number;
+              revision?: number;
+            };
+            return {
+              created: true,
+              node: {
+                id: node.id,
+                identity: node.identity,
+                schemaVersion: node.schemaVersion,
+                revision: node.revision ?? 1,
+              },
+            };
+          },
+          updateNode: async () => undefined,
+          createEdge: async () => {
+            graphEdgeWrites += 1;
+            return undefined;
+          },
+        },
+        events: {
+          publishWith: async (_tx: unknown, input: unknown) => {
+            eventWrites += 1;
+            const event = input as PMEvent;
+            return { ...event, id: `evt_${eventWrites}` } as PMEvent;
+          },
+        },
+        projections: {
+          register: async () => undefined,
+          catchUp: async () => {
+            catchUpCalls += 1;
+          },
+          getState: async () => projectionState,
+        } as unknown as ProjectionRunner,
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/run-envelopes", {
+        method: "POST",
+        body: JSON.stringify(runEnvelope),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    if (response.status !== 200) {
+      throw new Error(await response.text());
+    }
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      expanded: { snapshots: number; tickers: readonly string[] };
+      ingested: { nodesCreated: number; edgesCreated: number; eventsPublished: number };
+    };
+
+    expect(body.expanded).toEqual({ snapshots: 2, tickers: ["AAPL", "MSFT"] });
+    expect(body.ingested.nodesCreated).toBe(graphNodeWrites);
+    expect(body.ingested.edgesCreated).toBe(graphEdgeWrites);
+    expect(body.ingested.eventsPublished).toBe(eventWrites);
+    expect(catchUpCalls).toBe(1);
+  });
+});
 
 describeIfDb("ArrowHedge live-ingest HTTP route", () => {
   let pool: pg.Pool;

@@ -5,10 +5,16 @@
   "description": "Operational visualization dashboard for pm-substrate replay artifacts and evidence-admission metrics.",
   "type": "module",
   "scripts": {
+    "prebuild": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
     "build": "tsc -p tsconfig.json && vite build",
+    "predev": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
     "dev": "vite --host 127.0.0.1",
+    "preserve": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
+    "serve": "node server/server.mjs",
+    "prepreview": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc -p tsconfig.json",
+    "pretest": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {

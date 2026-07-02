@@ -38,6 +38,15 @@ export interface NodeBase {
   readonly schemaVersion: number;
 
   /**
+   * Monotonic row revision for optimistic concurrency.
+   *
+   * This is intentionally separate from schemaVersion: schemaVersion tracks the
+   * profile contract, while revision changes whenever the stored identity bag
+   * changes.
+   */
+  readonly revision: number;
+
+  /**
    * Stable identity attributes only. Profile-specific concrete shape
    * lives in the profile's specialized type, which extends NodeBase.
    *

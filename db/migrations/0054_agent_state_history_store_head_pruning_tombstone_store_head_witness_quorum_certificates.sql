@@ -2,7 +2,7 @@
 -- Durable proof records for history-store-head pruning tombstone-store head
 -- witness quorum certificates.
 
-CREATE TABLE IF NOT EXISTS agent_state.pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_quorum_certificates (
+CREATE TABLE IF NOT EXISTS agent_state.pt_hsh_ptsh_witness_quorum_certificates (
   tenant_id                                 TEXT NOT NULL,
   quorum_certificate_sequence               BIGINT NOT NULL,
   pruning_tombstone_sequence                BIGINT NOT NULL,
@@ -21,17 +21,17 @@ CREATE TABLE IF NOT EXISTS agent_state.pruning_tombstone_history_store_head_prun
 );
 
 CREATE INDEX IF NOT EXISTS history_store_head_pruning_tombstone_store_head_witness_qc_by_head
-  ON agent_state.pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_quorum_certificates (
+  ON agent_state.pt_hsh_ptsh_witness_quorum_certificates (
     tenant_id,
     pruning_tombstone_sequence,
     pruning_tombstone_record_hash
   );
 
-COMMENT ON TABLE agent_state.pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_quorum_certificates IS
+COMMENT ON TABLE agent_state.pt_hsh_ptsh_witness_quorum_certificates IS
   'Append-only durable proof records for history-store-head pruning tombstone-store head witness quorum certificates.';
 
-COMMENT ON COLUMN agent_state.pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_quorum_certificates.accepted_witness_evidence IS
+COMMENT ON COLUMN agent_state.pt_hsh_ptsh_witness_quorum_certificates.accepted_witness_evidence IS
   'Witness ids, witness ledger sequences, observation hashes, consistency proofs, and signatures that support the history-store-head pruning tombstone-store head quorum certificate.';
 
-COMMENT ON COLUMN agent_state.pruning_tombstone_history_store_head_pruning_tombstone_store_head_witness_quorum_certificates.authority_epoch_seal IS
+COMMENT ON COLUMN agent_state.pt_hsh_ptsh_witness_quorum_certificates.authority_epoch_seal IS
   'Optional seal_authority_epoch transition binding this history-store-head pruning tombstone-store head quorum certificate to an authority finality boundary.';

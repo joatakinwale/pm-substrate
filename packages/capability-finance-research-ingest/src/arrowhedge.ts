@@ -188,6 +188,9 @@ export const ARROWHEDGE_ENTITY_MAPPING: EntityMapping = {
         "reasoning",
         "accepted",
       ],
+      fieldMap: {
+        allowedActions: "allowedActions",
+      },
       optionalFields: ["rejectionReason"],
       schemaVersion: 1,
       edges: {
@@ -229,6 +232,7 @@ export interface ParsedArrowHedgeSnapshot {
   readonly riskFreshnessExpiresAt: Timestamp | null;
   readonly decisionRiskSourceSnapshotId: string | null;
   readonly decisionSignalSourceSnapshotId: string | null;
+  readonly signalSourceRecordIds: readonly string[];
   readonly records: readonly SourceEntityRecord[];
 }
 
@@ -265,6 +269,69 @@ export interface ArrowHedgeIngestionPlan {
   readonly operationalSample: ArrowHedgeOperationalSample;
 }
 
+export interface ArrowHedgeExpandedEvidenceDocument {
+  readonly id: string;
+  readonly sha256: string;
+  readonly mimeType: string;
+  readonly filename: string;
+  readonly ticker?: string;
+  readonly sourceUri?: string;
+  readonly retrievedAt?: Timestamp;
+  readonly freshnessExpiresAt?: Timestamp;
+}
+
+export interface ArrowHedgeExpandedRunSnapshot {
+  readonly snapshotId: string;
+  readonly observedAt: Timestamp;
+  readonly authority: string;
+  readonly backtestRun: Readonly<Record<string, unknown>>;
+  readonly researchRun: Readonly<Record<string, unknown>>;
+  readonly ticker: {
+    readonly symbol: string;
+    readonly assetClass: string;
+    readonly exchange?: string;
+    readonly currency: string;
+  };
+  readonly evidence: readonly ArrowHedgeExpandedEvidenceDocument[];
+  readonly signal: Readonly<Record<string, unknown>>;
+  readonly signals: readonly Readonly<Record<string, unknown>>[];
+  readonly risk: Readonly<Record<string, unknown>>;
+  readonly portfolio: Readonly<Record<string, unknown>>;
+  readonly decision: Readonly<Record<string, unknown>>;
+}
+
+export interface ArrowHedgeRunEnvelopeExpansionResult {
+  readonly valid: boolean;
+  readonly issues: readonly ArrowHedgeValidationIssue[];
+  readonly snapshots: readonly ArrowHedgeExpandedRunSnapshot[];
+}
+
+export interface ArrowHedgeRunEnvelopeOfflineReviewContext {
+  readonly tenantId: TenantId;
+  readonly profile: ProfileDefinition;
+  readonly adapterStartedAt: Timestamp;
+  readonly emittedBy?: string;
+  readonly projectionName?: string;
+  readonly scopeNodeIdsByTenant?: boolean;
+}
+
+export interface ArrowHedgeRunEnvelopeOfflineReview {
+  readonly valid: boolean;
+  readonly issues: readonly ArrowHedgeValidationIssue[];
+  readonly expanded: {
+    readonly snapshots: number;
+    readonly tickers: readonly string[];
+  };
+  readonly ingested: {
+    readonly nodesCreated: number;
+    readonly edgesCreated: number;
+    readonly eventsPublished: number;
+    readonly eventIds: readonly string[];
+    readonly blockedEventIds: readonly string[];
+  };
+  readonly cop: ArrowHedgeCommonOperatingPictureState;
+}
+
 export interface ArrowHedgePlanContext {
   readonly tenantId: TenantId;
   readonly profile: ProfileDefinition;
@@ -296,17 +363,19 @@ export interface ArrowHedgeExecutionPorts<TTx = unknown> {
       tx: TTx,
     ): Promise<{
       readonly created: boolean;
-      readonly node: {
-        readonly id: EntityId;
-        readonly identity: Readonly<Record<string, unknown>>;
-        readonly schemaVersion: number;
-      };
-    }>;
+        readonly node: {
+          readonly id: EntityId;
+          readonly identity: Readonly<Record<string, unknown>>;
+          readonly schemaVersion: number;
+          readonly revision: number;
+        };
+      }>;
     updateNode(
       input: {
         readonly tenantId: TenantId;
         readonly id: EntityId;
         readonly identity: Readonly<Record<string, unknown>>;
+        readonly expectedRevision?: number;
         readonly expectedSchemaVersion: number;
       },
       tx: TTx,
@@ -348,6 +417,8 @@ const ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMA_FILES = {
     "portfolio-decision-accepted.v1.json",
   "finance-research/workflow-blocked-stale-state.v1":
     "workflow-blocked-stale-state.v1.json",
+  "finance-research/workflow-blocked-invalid-action.v1":
+    "workflow-blocked-invalid-action.v1.json",
 } as const;
 
 const ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMAS: Readonly<
@@ -359,6 +430,205 @@ const ARROWHEDGE_TYPED_EVENT_PAYLOAD_SCHEMAS: Readonly<
     ),
   ),
 );
+
+export function expandArrowHedgeRunEnvelope(
+  input: unknown,
+): ArrowHedgeRunEnvelopeExpansionResult {
+  const issues: ArrowHedgeValidationIssue[] = [];
+  if (!isRecord(input)) {
+    return {
+      valid: false,
+      issues: [{ path: "", message: "expected object" }],
+      snapshots: [],
+    };
+  }
+
+  const schemaVersion = stringAt(input, "/schemaVersion", issues);
+  if (
+    schemaVersion !== null &&
+    schemaVersion !== "arrowhedge.run-envelope.v1"
+  ) {
+    issues.push({
+      path: "/schemaVersion",
+      message: "expected arrowhedge.run-envelope.v1",
+    });
+  }
+  const runId = stringAt(input, "/runId", issues);
+  const surface = stringAt(input, "/surface", issues);
+  const substrateMode = stringAt(input, "/substrateMode", issues);
+  const observedAt = timestampAt(input, "/observedAt", issues);
+  const scope = objectAt(input, "/scope", issues);
+  const graph = objectAt(input, "/graph", issues);
+  const modelConfig = objectAt(input, "/modelConfig", issues);
+  const portfolioInput = objectAt(input, "/portfolio", issues);
+  const signalsInput = arrayAt(input, "/signals", issues);
+  const riskStatesInput = arrayAt(input, "/riskStates", issues);
+  const decisionsInput = arrayAt(input, "/decisions", issues);
+  const evidenceInput = arrayAt(input, "/evidence", issues);
+
+  if (issues.length > 0) {
+    return { valid: false, issues, snapshots: [] };
+  }
+
+  const startDate = stringAt(scope!, "/scope/startDate", issues);
+  const endDate = stringAt(scope!, "/scope/endDate", issues);
+  const rawTickers = arrayField(scope!, "tickers", "/scope/tickers", issues);
+  const tickers = rawTickers.flatMap((item, index) => {
+    if (typeof item !== "string" || item.trim().length === 0) {
+      issues.push({
+        path: `/scope/tickers/${index}`,
+        message: "expected non-empty string",
+      });
+      return [];
+    }
+    return [item];
+  });
+
+  const runEvidence = [
+    ...normalizeRunEnvelopeEvidence(evidenceInput!, issues),
+    runEnvelopeEvidenceDocument({
+      runId: runId!,
+      kind: "graph",
+      payload: graph!,
+      observedAt: observedAt!,
+    }),
+    runEnvelopeEvidenceDocument({
+      runId: runId!,
+      kind: "model_config",
+      payload: modelConfig!,
+      observedAt: observedAt!,
+    }),
+  ];
+
+  const snapshots = tickers.flatMap((ticker) => {
+    const snapshot = expandTickerRunEnvelopeSnapshot({
+      runId: runId!,
+      surface: surface!,
+      substrateMode: substrateMode!,
+      observedAt: observedAt!,
+      startDate: startDate!,
+      endDate: endDate!,
+      ticker,
+      modelConfig: modelConfig!,
+      portfolioInput: portfolioInput!,
+      signalsInput: signalsInput!,
+      riskStatesInput: riskStatesInput!,
+      decisionsInput: decisionsInput!,
+      evidence: runEvidence,
+      issues,
+    });
+    return snapshot ? [snapshot] : [];
+  });
+
+  if (issues.length > 0) {
+    return { valid: false, issues, snapshots: [] };
+  }
+
+  return {
+    valid: true,
+    issues: [],
+    snapshots,
+  };
+}
+
+export async function reviewArrowHedgeRunEnvelopeOffline(
+  input: unknown,
+  ctx: ArrowHedgeRunEnvelopeOfflineReviewContext,
+): Promise<ArrowHedgeRunEnvelopeOfflineReview> {
+  const expanded = expandArrowHedgeRunEnvelope(input);
+  const projection = createArrowHedgeCommonOperatingPictureProjection(
+    ctx.projectionName ?? "arrowhedge_cop_offline_review",
+  );
+  let cop = projection.initial();
+  const eventIds: string[] = [];
+  const blockedEventIds: string[] = [];
+  let nodesCreated = 0;
+  let edgesCreated = 0;
+  let eventsPublished = 0;
+  const issues: ArrowHedgeValidationIssue[] = [...expanded.issues];
+  const runId = isRecord(input) && typeof input["runId"] === "string"
+    ? input["runId"]
+    : "unknown_run";
+
+  if (!expanded.valid) {
+    return {
+      valid: false,
+      issues,
+      expanded: { snapshots: 0, tickers: [] },
+      ingested: {
+        nodesCreated: 0,
+        edgesCreated: 0,
+        eventsPublished: 0,
+        eventIds: [],
+        blockedEventIds: [],
+      },
+      cop,
+    };
+  }
+
+  for (const [snapshotIndex, snapshot] of expanded.snapshots.entries()) {
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId: ctx.tenantId,
+      profile: ctx.profile,
+      adapterStartedAt: ctx.adapterStartedAt,
+      ...(ctx.emittedBy !== undefined ? { emittedBy: ctx.emittedBy } : {}),
+      scopeNodeIdsByTenant: ctx.scopeNodeIdsByTenant ?? true,
+    });
+    if (!plan.valid) {
+      issues.push(
+        ...plan.issues.map((issue) => ({
+          path: `/snapshots/${snapshotIndex}${issue.path}`,
+          message: issue.message,
+        })),
+      );
+      continue;
+    }
+
+    nodesCreated += plan.mapping.items.length;
+    edgesCreated += plan.edges.length;
+    eventsPublished += plan.mapping.items.length + plan.typedEvents.length;
+    for (const [index, event] of plan.typedEvents.entries()) {
+      const id = offlineReviewEventId(runId, snapshotIndex, index, event.type);
+      eventIds.push(id);
+      if (event.type.startsWith("workflow.blocked.")) {
+        blockedEventIds.push(id);
+      }
+      cop = await projection.apply(cop, {
+        id: id as EventId,
+        tenantId: event.tenantId,
+        type: event.type,
+        entityId: event.entityId,
+        emittedBy: event.emittedBy,
+        payloadSchema: event.payloadSchema,
+        payload: event.payload,
+        schemaVersion: 1,
+        authority: event.authority ?? event.emittedBy,
+        contentHash: sha256StableJson(event),
+        priorEventHash: null,
+        occurredAt: event.occurredAt!,
+        recordedAt: event.occurredAt!,
+        causedBy: null,
+      });
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    expanded: {
+      snapshots: expanded.snapshots.length,
+      tickers: expanded.snapshots.map((snapshot) => snapshot.ticker.symbol),
+    },
+    ingested: {
+      nodesCreated,
+      edgesCreated,
+      eventsPublished,
+      eventIds,
+      blockedEventIds,
+    },
+    cop,
+  };
+}
 
 /**
  * Parse + map an ArrowHedge snapshot into source entity records.
@@ -391,6 +661,7 @@ export function parseArrowHedgeSnapshot(
   const researchRun = objectAt(input, "/researchRun", issues);
   const ticker = objectAt(input, "/ticker", issues);
   const signal = objectAt(input, "/signal", issues);
+  const signals = optionalArrayAt(input, "/signals", issues);
   const risk = objectAt(input, "/risk", issues);
   const portfolio = objectAt(input, "/portfolio", issues);
   const decision = objectAt(input, "/decision", issues);
@@ -418,6 +689,7 @@ export function parseArrowHedgeSnapshot(
   );
 
   const records: SourceEntityRecord[] = [];
+  const signalSourceRecordIds: string[] = [];
   const pushRecord = (
     sourceName: string,
     sourceRecordId: string,
@@ -490,20 +762,35 @@ export function parseArrowHedgeSnapshot(
       marginUsed: numberAt(portfolio!, "/portfolio/marginUsed", issues),
       sourceSnapshotId: snapshotId,
     });
-    pushRecord("AnalystSignalSource", `signal:${stringAt(signal!, "/signal/id", issues)}`, {
-      kind: "analyst_signal",
-      occurredAt: observedAt,
-      agentId: stringAt(signal!, "/signal/agentId", issues),
-      signal: stringAt(signal!, "/signal/signal", issues),
-      confidence: numberAt(signal!, "/signal/confidence", issues),
-      evidenceWindowStart: optionalTimestampAt(
-        signal!,
-        "/signal/evidenceWindowStart",
-        issues,
-      ),
-      evidenceWindowEnd: optionalTimestampAt(signal!, "/signal/evidenceWindowEnd", issues),
-      sourceSnapshotId: snapshotId,
-    });
+    const signalRecords = signals && signals.length > 0 ? signals : [signal!];
+    for (const [index, rawSignal] of signalRecords.entries()) {
+      const signalPath = signals && signals.length > 0 ? `/signals/${index}` : "/signal";
+      if (!isRecord(rawSignal)) {
+        issues.push({ path: signalPath, message: "expected object" });
+        continue;
+      }
+      const signalId = stringAt(rawSignal, `${signalPath}/id`, issues);
+      const sourceRecordId = `signal:${signalId ?? index}`;
+      signalSourceRecordIds.push(sourceRecordId);
+      pushRecord("AnalystSignalSource", sourceRecordId, {
+        kind: "analyst_signal",
+        occurredAt: observedAt,
+        agentId: stringAt(rawSignal, `${signalPath}/agentId`, issues),
+        signal: stringAt(rawSignal, `${signalPath}/signal`, issues),
+        confidence: numberAt(rawSignal, `${signalPath}/confidence`, issues),
+        evidenceWindowStart: optionalTimestampAt(
+          rawSignal,
+          `${signalPath}/evidenceWindowStart`,
+          issues,
+        ),
+        evidenceWindowEnd: optionalTimestampAt(
+          rawSignal,
+          `${signalPath}/evidenceWindowEnd`,
+          issues,
+        ),
+        sourceSnapshotId: snapshotId,
+      });
+    }
     pushRecord("RiskStateSource", `risk:${stringAt(risk!, "/risk/id", issues)}`, {
       kind: "risk_state",
       occurredAt: observedAt,
@@ -523,6 +810,11 @@ export function parseArrowHedgeSnapshot(
       reasoning: stringAt(decision!, "/decision/reasoning", issues),
       accepted: booleanAt(decision!, "/decision/accepted", issues),
       rejectionReason: optionalStringAt(decision!, "/decision/rejectionReason", issues),
+      allowedActions: optionalAllowedActionsAt(
+        decision!,
+        "/decision/allowedActions",
+        issues,
+      ),
     });
   }
 
@@ -542,6 +834,7 @@ export function parseArrowHedgeSnapshot(
       riskFreshnessExpiresAt,
       decisionRiskSourceSnapshotId,
       decisionSignalSourceSnapshotId,
+      signalSourceRecordIds,
       records,
     },
   };
@@ -656,7 +949,8 @@ export async function executeArrowHedgeIngestionPlan<TTx>(
             tenantId: item.node.tenantId,
             id: result.node.id,
             identity: item.node.identity,
-            expectedSchemaVersion: result.node.schemaVersion,
+            expectedSchemaVersion: item.node.schemaVersion,
+            expectedRevision: result.node.revision,
           },
           tx,
         );
@@ -722,6 +1016,7 @@ export interface ArrowHedgeTickerCop {
   };
   readonly stateDisagreements: number;
   readonly staleBlocks: number;
+  readonly invalidActionBlocks: number;
 }
 
 export interface ArrowHedgeCommonOperatingPictureState {
@@ -1655,6 +1950,7 @@ function omitLatestRiskState(
     authorityGate: ticker.authorityGate,
     stateDisagreements: ticker.stateDisagreements,
     staleBlocks: ticker.staleBlocks,
+    invalidActionBlocks: ticker.invalidActionBlocks,
   };
   return {
     ...state,
@@ -1830,7 +2126,11 @@ function buildEdges(
   const backtest = one(bySourceName, "BacktestRunSource");
   const research = one(bySourceName, "ResearchRunSource");
   const ticker = one(bySourceName, "TickerSource");
-  const signal = one(bySourceName, "AnalystSignalSource");
+  const signals = bySourceName.get("AnalystSignalSource") ?? [];
+  if (signals.length === 0) {
+    throw new Error("expected at least one AnalystSignalSource record");
+  }
+  const primarySignal = signals[0]!;
   const risk = one(bySourceName, "RiskStateSource");
   const portfolio = one(bySourceName, "PortfolioStateSource");
   const decision = one(bySourceName, "PortfolioDecisionSource");
@@ -1839,17 +2139,19 @@ function buildEdges(
   const edgeSpecs = [
     spec("BacktestRunSource", "researchRun", backtest, research),
     spec("ResearchRunSource", "ticker", research, ticker),
-    spec("ResearchRunSource", "signal", research, signal),
+    ...signals.map((signal) => spec("ResearchRunSource", "signal", research, signal)),
     spec("ResearchRunSource", "riskState", research, risk),
     spec("ResearchRunSource", "portfolioState", research, portfolio),
     spec("ResearchRunSource", "decision", research, decision),
-    spec("AnalystSignalSource", "ticker", signal, ticker),
-    ...evidence.map((item) => spec("AnalystSignalSource", "evidence", signal, item)),
+    ...signals.flatMap((signal) => [
+      spec("AnalystSignalSource", "ticker", signal, ticker),
+      ...evidence.map((item) => spec("AnalystSignalSource", "evidence", signal, item)),
+    ]),
     spec("RiskStateSource", "ticker", risk, ticker),
     ...evidence.map((item) => spec("RiskStateSource", "evidence", risk, item)),
     spec("PortfolioDecisionSource", "ticker", decision, ticker),
     spec("PortfolioDecisionSource", "riskState", decision, risk),
-    spec("PortfolioDecisionSource", "signal", decision, signal),
+    spec("PortfolioDecisionSource", "signal", decision, primarySignal),
   ];
 
   return edgeSpecs.map((edgeSpec) => ({
@@ -1882,7 +2184,7 @@ function buildTypedEvents(
   const bySource = new Map(items.map((item) => [item.sourceName, item]));
   const research = bySource.get("ResearchRunSource")!;
   const ticker = bySource.get("TickerSource")!;
-  const signal = bySource.get("AnalystSignalSource")!;
+  const signals = items.filter((item) => item.sourceName === "AnalystSignalSource");
   const risk = bySource.get("RiskStateSource")!;
   const decision = bySource.get("PortfolioDecisionSource")!;
   const researchRunId = research.event.entityId;
@@ -1904,12 +2206,18 @@ function buildTypedEvents(
     confidence: decision.node.identity["confidence"],
     reasoning: decision.node.identity["reasoning"],
     accepted: decision.node.identity["accepted"],
+    allowedActions: decision.node.identity["allowedActions"] ?? null,
     riskSourceSnapshotId: snapshot.decisionRiskSourceSnapshotId,
     signalSourceSnapshotId: snapshot.decisionSignalSourceSnapshotId,
     currentPrice: risk.node.identity["currentPrice"],
     occurredAt: snapshot.observedAt,
   };
-  const events: MappingEventInput[] = [
+  const invalidActionBlock = buildInvalidActionBlock({
+    action: decision.node.identity["action"],
+    quantity: decision.node.identity["quantity"],
+    allowedActions: decision.node.identity["allowedActions"],
+  });
+  const signalEvents = signals.map((signal) =>
     typedEvent({
       tenantId,
       type: "analyst.signal.created",
@@ -1930,6 +2238,9 @@ function buildTypedEvents(
         evidenceDocumentIds,
       },
     }),
+  );
+  const events: MappingEventInput[] = [
+    ...signalEvents,
     typedEvent({
       tenantId,
       type: "risk.state.validated",
@@ -1973,7 +2284,8 @@ function buildTypedEvents(
   if (
     decision.node.identity["accepted"] === true &&
     !hasStateDisagreement(snapshot) &&
-    !isStale(snapshot)
+    !isStale(snapshot) &&
+    invalidActionBlock === null
   ) {
     events.push(
       typedEvent({
@@ -2009,6 +2321,32 @@ function buildTypedEvents(
           riskSourceSnapshotId: snapshot.decisionRiskSourceSnapshotId,
           signalSourceSnapshotId: snapshot.decisionSignalSourceSnapshotId,
           riskFreshnessExpiresAt: snapshot.riskFreshnessExpiresAt,
+          occurredAt: snapshot.observedAt,
+        },
+      }),
+    );
+  }
+
+  if (invalidActionBlock !== null) {
+    events.push(
+      typedEvent({
+        tenantId,
+        type: "workflow.blocked.invalid_action",
+        entityId: bySource.get("ResearchRunSource")!.event.entityId,
+        emittedBy,
+        authority: snapshot.authority,
+        occurredAt: snapshot.observedAt,
+        payloadSchema: "finance-research/workflow-blocked-invalid-action.v1",
+        payload: {
+          researchRunId,
+          blockedEntityId: decisionId,
+          reason: invalidActionBlock.reason,
+          sourceSnapshotId: snapshot.snapshotId,
+          tickerSymbol: snapshot.tickerSymbol,
+          action: invalidActionBlock.action,
+          quantity: invalidActionBlock.quantity,
+          allowedQuantity: invalidActionBlock.allowedQuantity,
+          allowedActions: invalidActionBlock.allowedActions,
           occurredAt: snapshot.observedAt,
         },
       }),
@@ -2102,6 +2440,15 @@ function updateCop(
     next = {
       ...current,
       staleBlocks: current.staleBlocks + 1,
+      authorityGate: {
+        ...current.authorityGate,
+        failures: current.authorityGate.failures + 1,
+      },
+    };
+  } else if (event.type === "workflow.blocked.invalid_action") {
+    next = {
+      ...current,
+      invalidActionBlocks: current.invalidActionBlocks + 1,
       authorityGate: {
         ...current.authorityGate,
         failures: current.authorityGate.failures + 1,
@@ -2218,6 +2565,9 @@ function tickerWorkflowPosition(
   conflicts: readonly StateConflict[],
   asOf: Timestamp,
 ): string {
+  if (ticker.invalidActionBlocks > 0) {
+    return "blocked_invalid_action";
+  }
   if (ticker.staleBlocks > 0 || conflicts.length > 0 || tickerRiskStateIsStale(ticker, asOf)) {
     return "blocked_stale_state";
   }
@@ -2608,6 +2958,494 @@ function stringArray(value: unknown): readonly string[] {
     : [];
 }
 
+interface ExpandTickerRunEnvelopeSnapshotInput {
+  readonly runId: string;
+  readonly surface: string;
+  readonly substrateMode: string;
+  readonly observedAt: Timestamp;
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly ticker: string;
+  readonly modelConfig: Readonly<Record<string, unknown>>;
+  readonly portfolioInput: Readonly<Record<string, unknown>>;
+  readonly signalsInput: readonly unknown[];
+  readonly riskStatesInput: readonly unknown[];
+  readonly decisionsInput: readonly unknown[];
+  readonly evidence: readonly ArrowHedgeExpandedEvidenceDocument[];
+  readonly issues: ArrowHedgeValidationIssue[];
+}
+
+function expandTickerRunEnvelopeSnapshot(
+  input: ExpandTickerRunEnvelopeSnapshotInput,
+): ArrowHedgeExpandedRunSnapshot | null {
+  const tickerPath = `/scope/tickers/${input.ticker}`;
+  const signals = recordsForTicker(
+    input.signalsInput,
+    input.ticker,
+    "/signals",
+    input.issues,
+  ).flatMap((rawSignal, index) => {
+    const path = `${tickerPath}/signals/${index}`;
+    const signal = expandRunEnvelopeSignal(
+      rawSignal,
+      input.runId,
+      input.ticker,
+      input.observedAt,
+      path,
+      input.issues,
+    );
+    return signal ? [signal] : [];
+  });
+  if (signals.length === 0) {
+    input.issues.push({
+      path: `${tickerPath}/signals`,
+      message: "expected at least one signal for ticker",
+    });
+    return null;
+  }
+
+  const riskState = firstRecordForTicker(
+    input.riskStatesInput,
+    input.ticker,
+    "/riskStates",
+    input.issues,
+  );
+  const decision = firstRecordForTicker(
+    input.decisionsInput,
+    input.ticker,
+    "/decisions",
+    input.issues,
+  );
+  if (!riskState || !decision) return null;
+
+  const snapshotId = `snap_${input.runId}_${idToken(input.ticker)}`;
+  const risk = expandRunEnvelopeRiskState(
+    riskState,
+    input.runId,
+    input.ticker,
+    input.observedAt,
+    input.issues,
+  );
+  const portfolio = expandRunEnvelopePortfolio(
+    input.portfolioInput,
+    snapshotId,
+    input.issues,
+  );
+  const expandedDecision = expandRunEnvelopeDecision(
+    decision,
+    input.runId,
+    input.ticker,
+    snapshotId,
+    input.issues,
+  );
+  if (!risk || !portfolio || !expandedDecision) return null;
+
+  return {
+    snapshotId,
+    observedAt: input.observedAt,
+    authority: `arrowhedge:${input.surface}:${input.runId}`,
+    backtestRun: {
+      id: input.runId,
+      title: `ArrowHedge ${input.surface} ${input.runId}`,
+      scopeStart: input.startDate,
+      scopeEnd: input.endDate,
+      state: "completed",
+      datasetRef: `arrowhedge://runs/${input.runId}`,
+      seed: input.runId,
+    },
+    researchRun: {
+      id: `rr_${input.runId}_${idToken(input.ticker)}`,
+      title: `ArrowHedge ${input.ticker} ${input.surface} research`,
+      scopeStart: input.startDate,
+      scopeEnd: input.endDate,
+      state: "deciding",
+      strategy: `${input.surface}:${input.substrateMode}`,
+      modelLock: stableJsonString(input.modelConfig),
+      seed: input.runId,
+    },
+    ticker: {
+      symbol: input.ticker,
+      assetClass: "equity",
+      exchange: "NASDAQ",
+      currency: "USD",
+    },
+    evidence: input.evidence.filter(
+      (item) => item.ticker === undefined || item.ticker === input.ticker,
+    ),
+    signal: signals[0]!,
+    signals,
+    risk,
+    portfolio,
+    decision: expandedDecision,
+  };
+}
+
+function expandRunEnvelopeSignal(
+  rawSignal: Readonly<Record<string, unknown>>,
+  runId: string,
+  ticker: string,
+  observedAt: Timestamp,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): Readonly<Record<string, unknown>> | null {
+  const agentId = stringAt(rawSignal, `${path}/agentId`, issues);
+  const signal = stringAt(rawSignal, `${path}/signal`, issues);
+  const confidence = numberAt(rawSignal, `${path}/confidence`, issues);
+  const id = optionalStringAt(rawSignal, `${path}/id`, issues);
+  const evidenceWindowStart = optionalTimestampAt(
+    rawSignal,
+    `${path}/evidenceWindowStart`,
+    issues,
+  );
+  const evidenceWindowEnd = optionalTimestampAt(
+    rawSignal,
+    `${path}/evidenceWindowEnd`,
+    issues,
+  );
+  if (!agentId || !signal || confidence === null) return null;
+
+  return {
+    id: id ?? `sig_${idToken(agentId)}_${idToken(ticker)}_${idToken(runId)}`,
+    agentId,
+    signal,
+    confidence,
+    ...(evidenceWindowStart !== null ? { evidenceWindowStart } : {}),
+    ...(evidenceWindowEnd !== null ? { evidenceWindowEnd } : {}),
+    ticker,
+    observedAt,
+  };
+}
+
+function expandRunEnvelopeRiskState(
+  rawRisk: Readonly<Record<string, unknown>>,
+  runId: string,
+  ticker: string,
+  observedAt: Timestamp,
+  issues: ArrowHedgeValidationIssue[],
+): Readonly<Record<string, unknown>> | null {
+  const path = `/riskStates/${ticker}`;
+  const currentPrice = numberAt(rawRisk, `${path}/currentPrice`, issues);
+  const remainingPositionLimit = numberAt(
+    rawRisk,
+    `${path}/remainingPositionLimit`,
+    issues,
+  );
+  const maxShares = numberAt(rawRisk, `${path}/maxShares`, issues);
+  const id = optionalStringAt(rawRisk, `${path}/id`, issues);
+  const volatility = optionalNumberAt(rawRisk, `${path}/volatility`, issues);
+  const bindingConstraint = optionalStringAt(
+    rawRisk,
+    `${path}/bindingConstraint`,
+    issues,
+  );
+  const freshnessExpiresAt =
+    optionalTimestampAt(rawRisk, `${path}/freshnessExpiresAt`, issues) ?? observedAt;
+  if (
+    currentPrice === null ||
+    remainingPositionLimit === null ||
+    maxShares === null
+  ) {
+    return null;
+  }
+
+  return {
+    id: id ?? `risk_${runId}_${idToken(ticker)}`,
+    currentPrice,
+    remainingPositionLimit,
+    maxShares,
+    ...(volatility !== null ? { volatility } : {}),
+    ...(bindingConstraint !== null ? { bindingConstraint } : {}),
+    freshnessExpiresAt,
+  };
+}
+
+function expandRunEnvelopePortfolio(
+  rawPortfolio: Readonly<Record<string, unknown>>,
+  snapshotId: string,
+  issues: ArrowHedgeValidationIssue[],
+): Readonly<Record<string, unknown>> | null {
+  const cash = numberAt(rawPortfolio, "/portfolio/cash", issues);
+  const equity = numberAt(rawPortfolio, "/portfolio/equity", issues);
+  const marginRequirement = numberFromFirstField(
+    rawPortfolio,
+    ["marginRequirement", "margin_requirement"],
+    "/portfolio/marginRequirement",
+    issues,
+  );
+  const marginUsed = numberFromFirstField(
+    rawPortfolio,
+    ["marginUsed", "margin_used"],
+    "/portfolio/marginUsed",
+    issues,
+  );
+  if (
+    cash === null ||
+    equity === null ||
+    marginRequirement === null ||
+    marginUsed === null
+  ) {
+    return null;
+  }
+
+  return {
+    id: `portfolio_${snapshotId}`,
+    cash,
+    equity,
+    marginRequirement,
+    marginUsed,
+  };
+}
+
+function expandRunEnvelopeDecision(
+  rawDecision: Readonly<Record<string, unknown>>,
+  runId: string,
+  ticker: string,
+  snapshotId: string,
+  issues: ArrowHedgeValidationIssue[],
+): Readonly<Record<string, unknown>> | null {
+  const path = `/decisions/${ticker}`;
+  const action = stringAt(rawDecision, `${path}/action`, issues);
+  const quantity = numberAt(rawDecision, `${path}/quantity`, issues);
+  const confidence = numberAt(rawDecision, `${path}/confidence`, issues);
+  const id = optionalStringAt(rawDecision, `${path}/id`, issues);
+  const rawReasoning = optionalStringAt(rawDecision, `${path}/reasoning`, issues);
+  const allowedActions = requiredAllowedActionsAt(
+    rawDecision,
+    `${path}/allowedActions`,
+    issues,
+  );
+  const accepted = optionalBooleanField(
+    rawDecision,
+    "accepted",
+    `${path}/accepted`,
+    issues,
+  );
+  const rejectionReason = optionalStringAt(
+    rawDecision,
+    `${path}/rejectionReason`,
+    issues,
+  );
+  if (
+    action === null ||
+    quantity === null ||
+    confidence === null ||
+    allowedActions === null
+  ) {
+    return null;
+  }
+
+  const inferredAccepted = action !== "hold" && quantity > 0;
+  return {
+    id: id ?? `dec_${runId}_${idToken(ticker)}`,
+    action,
+    quantity,
+    confidence,
+    reasoning:
+      rawReasoning && rawReasoning.trim().length > 0
+        ? rawReasoning
+        : `ArrowHedge ${ticker} ${action} decision`,
+    accepted: accepted ?? inferredAccepted,
+    ...(rejectionReason !== null ? { rejectionReason } : {}),
+    allowedActions,
+    riskSourceSnapshotId: snapshotId,
+    signalSourceSnapshotId: snapshotId,
+  };
+}
+
+function normalizeRunEnvelopeEvidence(
+  rawEvidence: readonly unknown[],
+  issues: ArrowHedgeValidationIssue[],
+): readonly ArrowHedgeExpandedEvidenceDocument[] {
+  return rawEvidence.flatMap((item, index) => {
+    const path = `/evidence/${index}`;
+    if (!isRecord(item)) {
+      issues.push({ path, message: "expected object" });
+      return [];
+    }
+    const id = stringAt(item, `${path}/id`, issues);
+    const sha256 = stringAt(item, `${path}/sha256`, issues);
+    const mimeType = stringAt(item, `${path}/mimeType`, issues);
+    const filename = stringAt(item, `${path}/filename`, issues);
+    const ticker = optionalStringAt(item, `${path}/ticker`, issues);
+    const sourceUri = optionalStringAt(item, `${path}/sourceUri`, issues);
+    const retrievedAt = optionalTimestampAt(item, `${path}/retrievedAt`, issues);
+    const freshnessExpiresAt = optionalTimestampAt(
+      item,
+      `${path}/freshnessExpiresAt`,
+      issues,
+    );
+    if (!id || !sha256 || !mimeType || !filename) return [];
+
+    return [
+      {
+        id,
+        sha256,
+        mimeType,
+        filename,
+        ...(ticker !== null ? { ticker } : {}),
+        ...(sourceUri !== null ? { sourceUri } : {}),
+        ...(retrievedAt !== null ? { retrievedAt } : {}),
+        ...(freshnessExpiresAt !== null ? { freshnessExpiresAt } : {}),
+      },
+    ];
+  });
+}
+
+function runEnvelopeEvidenceDocument(input: {
+  readonly runId: string;
+  readonly kind: "graph" | "model_config";
+  readonly payload: unknown;
+  readonly observedAt: Timestamp;
+}): ArrowHedgeExpandedEvidenceDocument {
+  return {
+    id: `ev_run_${input.kind}_${input.runId}`,
+    sha256: sha256StableJson(input.payload),
+    mimeType: "application/json",
+    filename: `${input.runId}-${input.kind}.json`,
+    sourceUri: `arrowhedge://runs/${input.runId}/${input.kind}`,
+    retrievedAt: input.observedAt,
+    freshnessExpiresAt: input.observedAt,
+  };
+}
+
+function recordsForTicker(
+  input: readonly unknown[],
+  ticker: string,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): readonly Readonly<Record<string, unknown>>[] {
+  return input.flatMap((item, index) => {
+    if (!isRecord(item)) {
+      issues.push({ path: `${path}/${index}`, message: "expected object" });
+      return [];
+    }
+    const itemTicker = optionalStringAt(item, `${path}/${index}/ticker`, issues);
+    if (itemTicker !== ticker) return [];
+    return [item];
+  });
+}
+
+function firstRecordForTicker(
+  input: readonly unknown[],
+  ticker: string,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): Readonly<Record<string, unknown>> | null {
+  const matches = recordsForTicker(input, ticker, path, issues);
+  if (matches.length === 0) {
+    issues.push({
+      path,
+      message: `expected record for ticker ${ticker}`,
+    });
+    return null;
+  }
+  return matches[0]!;
+}
+
+function arrayField(
+  input: Readonly<Record<string, unknown>>,
+  field: string,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): readonly unknown[] {
+  const value = input[field];
+  if (!Array.isArray(value)) {
+    issues.push({ path, message: "expected array" });
+    return [];
+  }
+  return value;
+}
+
+function optionalBooleanField(
+  input: Readonly<Record<string, unknown>>,
+  field: string,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): boolean | null {
+  const value = input[field];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "boolean") {
+    issues.push({ path, message: "expected boolean when present" });
+    return null;
+  }
+  return value;
+}
+
+function numberFromFirstField(
+  input: Readonly<Record<string, unknown>>,
+  fields: readonly string[],
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): number | null {
+  for (const field of fields) {
+    const value = input[field];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      issues.push({ path, message: "expected finite number" });
+      return null;
+    }
+    return value;
+  }
+  issues.push({ path, message: "expected finite number" });
+  return null;
+}
+
+function requiredAllowedActionsAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): Readonly<Record<string, number>> | null {
+  const allowedActions = optionalAllowedActionsAt(input, path, issues);
+  if (allowedActions === null && input[path.split("/").at(-1)!] === undefined) {
+    issues.push({
+      path,
+      message: "expected object with finite numeric action limits",
+    });
+  }
+  return allowedActions;
+}
+
+function sha256StableJson(value: unknown): string {
+  return createHash("sha256").update(stableJsonString(value)).digest("hex");
+}
+
+function offlineReviewEventId(
+  runId: string,
+  snapshotIndex: number,
+  eventIndex: number,
+  eventType: string,
+): string {
+  return [
+    "evt",
+    idToken(runId),
+    String(snapshotIndex),
+    String(eventIndex),
+    idToken(eventType).replaceAll(".", "_"),
+  ].join("_");
+}
+
+function stableJsonString(value: unknown): string {
+  return JSON.stringify(stableJsonValue(value));
+}
+
+function stableJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => stableJsonValue(item));
+  }
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, stableJsonValue(item)]),
+    );
+  }
+  return value;
+}
+
+function idToken(value: string): string {
+  return value.replace(/[^A-Za-z0-9_.-]+/g, "_");
+}
+
 function invalidPlan(
   issues: readonly ArrowHedgeValidationIssue[],
   ctx: ArrowHedgePlanContext,
@@ -2768,6 +3606,66 @@ function blockedReason(snapshot: ParsedArrowHedgeSnapshot): string {
   return reasons.length === 0 ? "state_blocked" : reasons.join("+");
 }
 
+interface ArrowHedgeInvalidActionBlock {
+  readonly reason: "action_not_allowed" | "quantity_exceeds_allowed_action";
+  readonly action: string;
+  readonly quantity: number;
+  readonly allowedQuantity: number | null;
+  readonly allowedActions: Readonly<Record<string, number>>;
+}
+
+function buildInvalidActionBlock(input: {
+  readonly action: unknown;
+  readonly quantity: unknown;
+  readonly allowedActions: unknown;
+}): ArrowHedgeInvalidActionBlock | null {
+  const allowedActions = allowedActionsFromUnknown(input.allowedActions);
+  if (allowedActions === null) return null;
+  if (typeof input.action !== "string") return null;
+  if (typeof input.quantity !== "number" || !Number.isFinite(input.quantity)) {
+    return null;
+  }
+
+  const allowedQuantity = allowedActions[input.action];
+  if (allowedQuantity === undefined) {
+    return {
+      reason: "action_not_allowed",
+      action: input.action,
+      quantity: input.quantity,
+      allowedQuantity: null,
+      allowedActions,
+    };
+  }
+  if (input.quantity > allowedQuantity) {
+    return {
+      reason: "quantity_exceeds_allowed_action",
+      action: input.action,
+      quantity: input.quantity,
+      allowedQuantity,
+      allowedActions,
+    };
+  }
+  return null;
+}
+
+function allowedActionsFromUnknown(
+  value: unknown,
+): Readonly<Record<string, number>> | null {
+  if (!isRecord(value)) return null;
+  const out: Record<string, number> = {};
+  for (const [action, quantity] of Object.entries(value)) {
+    if (
+      action.trim().length === 0 ||
+      typeof quantity !== "number" ||
+      !Number.isFinite(quantity)
+    ) {
+      return null;
+    }
+    out[action] = quantity;
+  }
+  return out;
+}
+
 function stableEntityId(input: string): EntityId {
   const hex = createHash("sha256").update(`arrowhedge:${input}`).digest("hex");
   return [
@@ -2840,6 +3738,7 @@ function emptyTicker(symbol: string): ArrowHedgeTickerCop {
     authorityGate: { passes: 0, failures: 0 },
     stateDisagreements: 0,
     staleBlocks: 0,
+    invalidActionBlocks: 0,
   };
 }
 
@@ -2904,6 +3803,20 @@ function arrayAt(
   return value;
 }
 
+function optionalArrayAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): readonly unknown[] | null {
+  const value = input[path.slice(1)];
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value)) {
+    issues.push({ path, message: "expected array when present" });
+    return null;
+  }
+  return value;
+}
+
 function stringAt(
   input: Record<string, unknown>,
   path: string,
@@ -2956,6 +3869,24 @@ function optionalNumberAt(
     return null;
   }
   return value;
+}
+
+function optionalAllowedActionsAt(
+  input: Record<string, unknown>,
+  path: string,
+  issues: ArrowHedgeValidationIssue[],
+): Readonly<Record<string, number>> | null {
+  const value = input[path.split("/").at(-1)!];
+  if (value === undefined || value === null) return null;
+  const allowedActions = allowedActionsFromUnknown(value);
+  if (allowedActions === null) {
+    issues.push({
+      path,
+      message: "expected object with finite numeric action limits when present",
+    });
+    return null;
+  }
+  return allowedActions;
 }
 
 function booleanAt(

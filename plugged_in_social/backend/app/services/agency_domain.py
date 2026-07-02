@@ -647,6 +647,84 @@ async def create_access_request(
     return access_request
 
 
+async def decide_access_request(
+    db: AsyncSession,
+    *,
+    access_request: AgencyAccessRequest,
+    decision: str,
+    resolved_by_user_id: uuid.UUID | None,
+    decision_note: str | None = None,
+    resolution_payload: dict[str, Any] | None = None,
+) -> AgencyAccessRequest:
+    if decision not in {
+        AgencyAccessRequestStatus.granted.value,
+        AgencyAccessRequestStatus.blocked.value,
+        AgencyAccessRequestStatus.revoked.value,
+    }:
+        raise ValueError("decision must be granted, blocked, or revoked")
+
+    resolved_at = datetime.now(timezone.utc)
+    access_request.status = decision
+    access_request.resolved_by_user_id = resolved_by_user_id
+    access_request.resolved_at = resolved_at
+    access_request.instructions = {
+        **dict(access_request.instructions or {}),
+        "resolution": {
+            "decision": decision,
+            "decision_note": decision_note,
+            "resolution_payload": dict(resolution_payload or {}),
+            "resolved_at": resolved_at.isoformat(),
+        },
+    }
+
+    run = await _get_access_request_run(db, access_request)
+    if run is not None:
+        if decision == AgencyAccessRequestStatus.blocked.value:
+            run.status = MarketingRunStatus.blocked.value
+            run.current_blocker = {
+                "type": "access_request",
+                "access_request_id": str(access_request.id),
+                "request_type": access_request.request_type,
+                "provider": access_request.provider,
+                "status": decision,
+                "reason": access_request.reason,
+                "decision_note": decision_note,
+                "resolved_at": resolved_at.isoformat(),
+            }
+            db.add(run)
+        elif _current_blocker_access_request_id(run) == str(access_request.id):
+            run.current_blocker = None
+            if run.status == MarketingRunStatus.blocked.value:
+                run.status = MarketingRunStatus.active.value
+            db.add(run)
+
+    db.add(access_request)
+    await db.flush()
+    return access_request
+
+
+async def _get_access_request_run(
+    db: AsyncSession,
+    access_request: AgencyAccessRequest,
+) -> MarketingRun | None:
+    if access_request.marketing_run_id is None:
+        return None
+    run = await db.get(MarketingRun, access_request.marketing_run_id)
+    if run is None or run.org_id != access_request.org_id:
+        return None
+    return run
+
+
+def _current_blocker_access_request_id(run: MarketingRun) -> str | None:
+    blocker = run.current_blocker
+    if not isinstance(blocker, dict):
+        return None
+    if blocker.get("type") != "access_request":
+        return None
+    request_id = blocker.get("access_request_id")
+    return str(request_id) if request_id is not None else None
+
+
 async def decide_approval_request(
     db: AsyncSession,
     *,

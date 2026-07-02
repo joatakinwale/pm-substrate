@@ -1,0 +1,199 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link "stevie." [ref=e5] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e6]:
+        - link "Dashboard" [ref=e7] [cursor=pointer]:
+          - /url: /admin
+          - img [ref=e8]
+          - text: Dashboard
+        - link "Agency" [ref=e13] [cursor=pointer]:
+          - /url: /admin/agency
+          - img [ref=e14]
+          - text: Agency
+        - link "Leads" [ref=e17] [cursor=pointer]:
+          - /url: /admin/leads
+          - img [ref=e18]
+          - text: Leads
+        - link "Bookings" [ref=e23] [cursor=pointer]:
+          - /url: /admin/bookings
+          - img [ref=e24]
+          - text: Bookings
+        - link "Analytics" [ref=e26] [cursor=pointer]:
+          - /url: /admin/analytics
+          - img [ref=e27]
+          - text: Analytics
+        - link "Pages" [ref=e29] [cursor=pointer]:
+          - /url: /admin/pages
+          - img [ref=e30]
+          - text: Pages
+        - link "Blog" [ref=e33] [cursor=pointer]:
+          - /url: /admin/blog
+          - img [ref=e34]
+          - text: Blog
+        - link "Proposals" [ref=e36] [cursor=pointer]:
+          - /url: /admin/proposals
+          - img [ref=e37]
+          - text: Proposals
+        - link "Projects" [ref=e41] [cursor=pointer]:
+          - /url: /admin/projects
+          - img [ref=e42]
+          - text: Projects
+        - link "Work" [ref=e44] [cursor=pointer]:
+          - /url: /admin/work
+          - img [ref=e45]
+          - text: Work
+        - link "Billing" [ref=e48] [cursor=pointer]:
+          - /url: /admin/billing
+          - img [ref=e49]
+          - text: Billing
+        - link "Email" [ref=e51] [cursor=pointer]:
+          - /url: /admin/email
+          - img [ref=e52]
+          - text: Email
+        - link "Forms" [ref=e55] [cursor=pointer]:
+          - /url: /admin/forms
+          - img [ref=e56]
+          - text: Forms
+        - link "Automations" [ref=e59] [cursor=pointer]:
+          - /url: /admin/automations
+          - img [ref=e60]
+          - text: Automations
+        - link "Social" [ref=e64] [cursor=pointer]:
+          - /url: /admin/social
+          - img [ref=e65]
+          - text: Social
+        - link "AI Content" [ref=e71] [cursor=pointer]:
+          - /url: /admin/ai-content
+          - img [ref=e72]
+          - text: AI Content
+        - link "Video" [ref=e75] [cursor=pointer]:
+          - /url: /admin/video
+          - img [ref=e76]
+          - text: Video
+        - link "Contacts" [ref=e79] [cursor=pointer]:
+          - /url: /admin/contacts
+          - img [ref=e80]
+          - text: Contacts
+        - link "Settings" [ref=e83] [cursor=pointer]:
+          - /url: /admin/settings
+          - img [ref=e84]
+          - text: Settings
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - generic [ref=e89]: ·
+          - generic [ref=e90]:
+            - paragraph [ref=e91]: Loading…
+            - paragraph [ref=e92]
+        - button "Sign out" [ref=e93]:
+          - img [ref=e94]
+          - text: Sign out
+    - main [ref=e97]:
+      - generic [ref=e100]:
+        - generic [ref=e101]:
+          - generic [ref=e102]:
+            - heading "Autonomous Agency" [level=1] [ref=e103]
+            - paragraph [ref=e104]: Client strategy, durable evidence, approvals, and access blockers.
+          - button "Refresh" [ref=e105]:
+            - img [ref=e106]
+            - text: Refresh
+        - generic [ref=e111]:
+          - generic [ref=e112]:
+            - img [ref=e114]
+            - paragraph [ref=e117]: Engagements
+            - paragraph [ref=e118]: ...
+          - generic [ref=e119]:
+            - img [ref=e121]
+            - paragraph [ref=e124]: Strategy Runs
+            - paragraph [ref=e125]: ...
+          - generic [ref=e126]:
+            - img [ref=e128]
+            - paragraph [ref=e131]: Evidence Artifacts
+            - paragraph [ref=e132]: ...
+          - generic [ref=e133]:
+            - img [ref=e135]
+            - paragraph [ref=e138]: Open Gates
+            - paragraph [ref=e139]: ...
+        - generic [ref=e140]:
+          - complementary [ref=e141]:
+            - generic [ref=e142]:
+              - heading "New Client Engagement" [level=2] [ref=e144]
+              - generic [ref=e145]:
+                - textbox "Client or platform name" [ref=e146]
+                - textbox "https://client-site.com" [ref=e147]
+                - textbox "Repository URL" [ref=e148]
+                - textbox "Client email" [ref=e149]
+                - textbox "Client contact name" [ref=e150]
+                - textbox "Primary offer" [ref=e151]
+                - generic [ref=e152]:
+                  - textbox "Analytics provider" [ref=e153]: umami
+                  - textbox "Social channels, one per line" [ref=e154]: linkedin
+                - textbox "Existing copy or source documents, one per line" [ref=e155]: Homepage Sales deck Existing campaign copy
+                - textbox [ref=e156]: Increase qualified leads
+                - textbox [ref=e157]: Approval required before publishing
+                - button "Create Engagement" [ref=e158]:
+                  - img [ref=e159]
+                  - text: Create Engagement
+            - generic [ref=e161]:
+              - heading "Engagements" [level=2] [ref=e162]
+              - generic [ref=e163]: "0"
+          - main [ref=e165]:
+            - generic [ref=e168]:
+              - heading "No engagement selected" [level=2] [ref=e169]
+              - paragraph [ref=e170]: "-"
+            - generic [ref=e171]:
+              - generic [ref=e173]:
+                - heading "Run Monitor" [level=2] [ref=e174]
+                - paragraph [ref=e175]: No active strategy run
+              - generic [ref=e176]: No active run.
+            - generic [ref=e177]:
+              - generic [ref=e178]:
+                - heading "Strategy Run" [level=2] [ref=e180]
+                - generic [ref=e181]:
+                  - textbox [ref=e182]: Build a 30-day autonomous marketing strategy
+                  - button "Start" [disabled] [ref=e183]
+                - generic [ref=e185]: No strategy runs.
+              - generic [ref=e186]:
+                - heading "Evidence Artifacts" [level=2] [ref=e188]
+                - generic [ref=e189]:
+                  - textbox [ref=e190]: research_brief
+                  - textbox [ref=e191]: research_strategist
+                - textbox [ref=e192]: Research brief
+                - textbox "Artifact body" [ref=e193]
+                - textbox [ref=e194]: "{ \"summary\": \"\" }"
+                - generic [ref=e195]:
+                  - textbox "Evidence URL" [ref=e196]
+                  - textbox "Evidence label" [ref=e197]
+                - button "Add Artifact" [disabled] [ref=e198]:
+                  - img [ref=e199]
+                  - text: Add Artifact
+                - generic [ref=e201]: No artifacts.
+            - generic [ref=e202]:
+              - generic [ref=e203]:
+                - generic [ref=e204]:
+                  - heading "Approvals" [level=2] [ref=e205]
+                  - img [ref=e206]
+                - generic [ref=e209]:
+                  - textbox [ref=e210]: strategy
+                  - combobox [ref=e211]
+                - textbox [ref=e212]: Approve before production begins
+                - button "Request Approval" [disabled] [ref=e213]:
+                  - img [ref=e214]
+                  - text: Request Approval
+                - generic [ref=e218]: No approvals.
+              - generic [ref=e219]:
+                - generic [ref=e220]:
+                  - heading "Access Requests" [level=2] [ref=e221]
+                  - img [ref=e222]
+                - generic [ref=e225]:
+                  - textbox [ref=e226]: analytics
+                  - textbox [ref=e227]: umami
+                - textbox [ref=e228]: Metrics reporting needs analytics access
+                - textbox [ref=e229]: "{ \"website_id\": \"required\" }"
+                - button "Add Access Request" [disabled] [ref=e230]:
+                  - img [ref=e231]
+                  - text: Add Access Request
+                - generic [ref=e235]: No access requests.
+  - button "Open Next.js Dev Tools" [ref=e241] [cursor=pointer]:
+    - img [ref=e242]

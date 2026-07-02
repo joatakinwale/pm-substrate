@@ -157,6 +157,12 @@ class AgencyAccessRequestCreate(BaseModel):
     instructions: dict = Field(default_factory=dict)
 
 
+class AgencyAccessRequestDecision(BaseModel):
+    decision: Literal["granted", "blocked", "revoked"]
+    decision_note: str | None = None
+    resolution_payload: dict = Field(default_factory=dict)
+
+
 class AgencyAccessRequestResponse(BaseModel):
     id: uuid.UUID
     org_id: uuid.UUID

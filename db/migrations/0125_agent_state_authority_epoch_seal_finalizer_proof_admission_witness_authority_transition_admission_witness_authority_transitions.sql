@@ -1,4 +1,4 @@
--- 0125_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transitions.sql
+-- 0125_agent_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transitions.sql
 -- Durable authority transitions for finalizer-proof transition-admission witness certificates.
 
 CREATE TABLE IF NOT EXISTS agent_state.finalizer_proof_trans_adm_wit_auth_transitions (

@@ -1,4 +1,4 @@
--- 0133_agent_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0133_agent_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for authority-topology transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.auth_top_cp_adm_wit_auth_trans_adm_wit_auth_trans_adms (

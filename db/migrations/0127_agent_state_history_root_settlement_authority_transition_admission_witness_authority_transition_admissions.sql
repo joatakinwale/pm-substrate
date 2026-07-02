@@ -1,4 +1,4 @@
--- 0127_agent_state_history_root_settlement_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0127_agent_state_history_root_settle_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for history-root settlement transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.hist_root_settle_trans_adm_wit_auth_transition_admissions (

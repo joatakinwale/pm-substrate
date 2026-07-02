@@ -178,6 +178,35 @@ describeIfDb("PostgresGraph validator wiring", () => {
     ).rejects.toBeInstanceOf(ProfileValidationError);
   });
 
+  it("keeps profile schema version stable across repeated profile-bound updates", async () => {
+    const { node: run } = await graph.createNode({
+      tenantId,
+      profile: RESEARCH_RUN,
+      identity: researchRunIdentity("Revision Test research"),
+      schemaVersion: 1,
+    });
+
+    const first = await graph.updateNode({
+      tenantId,
+      id: run.id,
+      identity: researchRunIdentity("Revision Test research v2"),
+      expectedSchemaVersion: run.revision,
+    });
+
+    expect(first.schemaVersion).toBe(1);
+    expect(first.revision).toBe(2);
+
+    const second = await graph.updateNode({
+      tenantId,
+      id: run.id,
+      identity: researchRunIdentity("Revision Test research v3"),
+      expectedRevision: first.revision,
+    });
+
+    expect(second.schemaVersion).toBe(1);
+    expect(second.revision).toBe(3);
+  });
+
   it("permits raw Tier-1 writes (no profile binding) regardless of installed profiles", async () => {
     // Layered ontology rule: raw Tier-1 stays usable even when profiles are
     // installed. The validator passes profile=null through with no checks.

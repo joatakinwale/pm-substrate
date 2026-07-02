@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.deps import get_current_user, get_db_with_rls_dep
 from app.models.agency import (
+    AgencyAccessRequest,
     AgencyApprovalRequest,
     AgencyArtifact,
     ClientEngagement,
@@ -20,6 +21,8 @@ from app.models.virtual_agency import VirtualAgencyEvent, VirtualAgencyTask
 from app.schemas.agency import AgencyArtifactCreate
 from app.schemas.integration import (
     IntegrationAcceptedResponse,
+    IntegrationAccessDecision,
+    IntegrationAccessRequestEnvelope,
     IntegrationApprovalDecision,
     IntegrationApprovalEnvelope,
     IntegrationArtifactEnvelope,
@@ -43,6 +46,7 @@ from app.schemas.integration import (
 from app.services.agency_domain import (
     compute_payload_hash,
     create_agency_artifact,
+    decide_access_request,
     decide_approval_request,
 )
 from app.services.virtual_agency_orchestration import AGENT_CAPABILITIES
@@ -92,6 +96,10 @@ def _run_links(run_id: uuid.UUID) -> list[IntegrationLink]:
         _link("artifacts", f"/api/integration/v1/marketing-runs/{run_id}/artifacts"),
         _link("tasks", f"/api/integration/v1/marketing-runs/{run_id}/tasks"),
         _link("approvals", f"/api/integration/v1/marketing-runs/{run_id}/approvals"),
+        _link(
+            "access_requests",
+            f"/api/integration/v1/marketing-runs/{run_id}/access-requests",
+        ),
     ]
 
 
@@ -100,6 +108,15 @@ def _approval_links(approval_id: uuid.UUID) -> list[IntegrationLink]:
         _link(
             "decision",
             f"/api/integration/v1/approvals/{approval_id}/decision",
+        ),
+    ]
+
+
+def _access_request_links(access_request_id: uuid.UUID) -> list[IntegrationLink]:
+    return [
+        _link(
+            "decision",
+            f"/api/integration/v1/access-requests/{access_request_id}/decision",
         ),
     ]
 
@@ -248,6 +265,26 @@ def _to_approval(item: AgencyApprovalRequest) -> IntegrationApprovalEnvelope:
     )
 
 
+def _to_access_request(item: AgencyAccessRequest) -> IntegrationAccessRequestEnvelope:
+    return IntegrationAccessRequestEnvelope(
+        id=item.id,
+        org_id=item.org_id,
+        engagement_id=item.engagement_id,
+        marketing_run_id=item.marketing_run_id,
+        request_type=item.request_type,
+        provider=item.provider,
+        status=item.status,
+        scope=dict(item.scope or {}),
+        reason=item.reason,
+        instructions=dict(item.instructions or {}),
+        resolved_at=item.resolved_at,
+        resolved_by_user_id=item.resolved_by_user_id,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        links=_access_request_links(item.id),
+    )
+
+
 async def _get_engagement(
     db: AsyncSession,
     *,
@@ -299,6 +336,24 @@ async def _get_approval(
     item = result.scalar_one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="Approval not found")
+    return item
+
+
+async def _get_access_request(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    access_request_id: uuid.UUID,
+) -> AgencyAccessRequest:
+    result = await db.execute(
+        select(AgencyAccessRequest).where(
+            AgencyAccessRequest.id == access_request_id,
+            AgencyAccessRequest.org_id == org_id,
+        )
+    )
+    item = result.scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Access request not found")
     return item
 
 
@@ -428,9 +483,16 @@ def _capabilities() -> list[IntegrationCapability]:
             resources=["agency_approval_request"],
         ),
         IntegrationCapability(
+            id="access_request.read",
+            name="Read access gates",
+            description="Inspect requested, blocked, granted, and revoked client access gates.",
+            methods=["GET"],
+            resources=["agency_access_request"],
+        ),
+        IntegrationCapability(
             id="evidence_summary.read",
             name="Read marketing run evidence summary",
-            description="Inspect run-level artifact, task, event, approval, and hash counts.",
+            description="Inspect run-level artifact, task, event, approval, access-gate, and hash counts.",
             methods=["GET"],
             resources=["marketing_run"],
         ),
@@ -455,6 +517,15 @@ def _capabilities() -> list[IntegrationCapability]:
             methods=["POST"],
             resources=["agency_approval_request"],
             events=["approval.decided"],
+            requires_approval=True,
+        ),
+        IntegrationCapability(
+            id="access_request.decide",
+            name="Resolve access gates",
+            description="Grant, block, or revoke client access requests for a marketing run.",
+            methods=["POST"],
+            resources=["agency_access_request"],
+            events=["access_request.decided"],
             requires_approval=True,
         ),
         IntegrationCapability(
@@ -617,6 +688,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             capability_ids=["evidence_summary.read"],
         ),
         IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/access-requests",
+            boundary="public_rls",
+            capability_ids=["access_request.read"],
+        ),
+        IntegrationEndpointManifest(
             method="POST",
             path="/api/internal/virtual-agency/task",
             boundary="internal_system_rls",
@@ -633,6 +710,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             path="/api/integration/v1/approvals/{approval_id}/decision",
             boundary="public_rls",
             capability_ids=["approval.decide"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/access-requests/{access_request_id}/decision",
+            boundary="public_rls",
+            capability_ids=["access_request.decide"],
         ),
         IntegrationEndpointManifest(
             method="POST",
@@ -710,6 +793,19 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
             ],
             read_capability_ids=["approval.read"],
             write_capability_ids=["approval.decide"],
+        ),
+        IntegrationDataResourceManifest(
+            id="agency_access_request",
+            table="agency_access_requests",
+            resource_type="agency_access_request",
+            durable_evidence_fields=[
+                "scope",
+                "instructions",
+                "resolved_at",
+                "resolved_by_user_id",
+            ],
+            read_capability_ids=["access_request.read"],
+            write_capability_ids=["access_request.decide"],
         ),
         IntegrationDataResourceManifest(
             id="social_post",
@@ -939,6 +1035,28 @@ async def list_run_approvals(
 
 
 @router.get(
+    "/marketing-runs/{run_id}/access-requests",
+    response_model=list[IntegrationAccessRequestEnvelope],
+)
+async def list_run_access_requests(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_run(db, org_id=org_id, run_id=run_id)
+    result = await db.execute(
+        select(AgencyAccessRequest)
+        .where(
+            AgencyAccessRequest.org_id == org_id,
+            AgencyAccessRequest.marketing_run_id == run_id,
+        )
+        .order_by(AgencyAccessRequest.created_at.desc())
+    )
+    return [_to_access_request(item) for item in result.scalars().all()]
+
+
+@router.get(
     "/marketing-runs/{run_id}/evidence-summary",
     response_model=IntegrationEvidenceSummaryEnvelope,
 )
@@ -966,6 +1084,14 @@ async def get_run_evidence_summary(
     )
     approvals = list(approval_result.scalars().all())
 
+    access_result = await db.execute(
+        select(AgencyAccessRequest).where(
+            AgencyAccessRequest.org_id == org_id,
+            AgencyAccessRequest.marketing_run_id == run_id,
+        )
+    )
+    access_requests = list(access_result.scalars().all())
+
     tasks = await _list_run_tasks(db, org_id=org_id, run=run)
     events = await _list_run_events(db, org_id=org_id, run=run)
     event_items = [event for event, _task in events]
@@ -983,6 +1109,10 @@ async def get_run_evidence_summary(
         event_type_counts=_count_by(event_items, "event_type"),
         approval_count=len(approvals),
         pending_approval_count=sum(1 for item in approvals if item.status == "pending"),
+        access_request_count=len(access_requests),
+        open_access_request_count=sum(
+            1 for item in access_requests if item.status in {"requested", "blocked"}
+        ),
         evidence_hashes={
             "artifact_payload_hashes": sorted(
                 {item.payload_hash for item in artifacts if item.payload_hash}
@@ -992,6 +1122,22 @@ async def get_run_evidence_summary(
                     item.approval_payload_hash
                     for item in approvals
                     if item.approval_payload_hash
+                }
+            ),
+            "access_request_hashes": sorted(
+                {
+                    compute_payload_hash(
+                        {
+                            "id": str(item.id),
+                            "request_type": item.request_type,
+                            "provider": item.provider,
+                            "status": item.status,
+                            "scope": dict(item.scope or {}),
+                            "instructions": dict(item.instructions or {}),
+                            "resolved_at": item.resolved_at,
+                        }
+                    )
+                    for item in access_requests
                 }
             ),
             "event_hashes": sorted(
@@ -1027,6 +1173,35 @@ async def decide_approval(
     await db.commit()
     await db.refresh(decided)
     return _to_approval(decided)
+
+
+@router.post(
+    "/access-requests/{access_request_id}/decision",
+    response_model=IntegrationAccessRequestEnvelope,
+)
+async def decide_access(
+    access_request_id: uuid.UUID,
+    body: IntegrationAccessDecision,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    access_request = await _get_access_request(
+        db,
+        org_id=org_id,
+        access_request_id=access_request_id,
+    )
+    decided = await decide_access_request(
+        db,
+        access_request=access_request,
+        decision=body.decision,
+        resolved_by_user_id=_user_id_from_user(current_user),
+        decision_note=body.decision_note,
+        resolution_payload=body.resolution_payload,
+    )
+    await db.commit()
+    await db.refresh(decided)
+    return _to_access_request(decided)
 
 
 async def _persist_integration_artifact(

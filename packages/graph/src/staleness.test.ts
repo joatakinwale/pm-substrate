@@ -30,6 +30,7 @@ const sampleNode: NodeBase = {
   createdAt: ts("2026-05-01T10:00:00.000Z"),
   updatedAt: ts("2026-05-10T12:00:00.000Z"),
   schemaVersion: 1,
+  revision: 1,
 };
 
 const sampleEdge: Edge = {

@@ -19,6 +19,7 @@ import {
   buildArrowHedgeIngestionPlan,
   executeArrowHedgeIngestionPlan,
   createArrowHedgeCommonOperatingPictureProjection,
+  expandArrowHedgeRunEnvelope,
   type ArrowHedgeCommonOperatingPictureState,
 } from "@pm/capability-finance-research-ingest";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
@@ -71,6 +72,70 @@ export const arrowhedgeRoutes = (deps: ArrowHedgeIngestDeps): Hono => {
     registered = true;
   };
 
+  const executeSnapshotIngestion = async (
+    tenantId: TenantId,
+    snapshot: unknown,
+  ) => {
+    const plan = buildArrowHedgeIngestionPlan(snapshot, {
+      tenantId,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: new Date().toISOString() as Timestamp,
+      // Live route is multi-tenant in one process: namespace node ids by
+      // tenant so shared real-world entities (e.g. ticker:AAPL) don't
+      // collide on the globally-unique graph node id space.
+      scopeNodeIdsByTenant: true,
+    });
+
+    if (!plan.valid) {
+      return {
+        valid: false as const,
+        issues: plan.issues,
+      };
+    }
+
+    const result = await executeArrowHedgeIngestionPlan(plan, {
+      withTransaction: async (fn) => {
+        const client = await deps.pool.connect();
+        try {
+          await client.query("BEGIN");
+          const value = await fn(client);
+          await client.query("COMMIT");
+          return value;
+        } catch (err) {
+          await client.query("ROLLBACK").catch(() => {});
+          throw err;
+        } finally {
+          client.release();
+        }
+      },
+      graph: {
+        createNode: (input, tx) =>
+          deps.graph.createNode(input, tx as pg.ClientBase) as never,
+        updateNode: (input, tx) =>
+          deps.graph.updateNode(input, tx as pg.ClientBase) as never,
+        createEdge: (input, tx) =>
+          deps.graph.createEdge(input, tx as pg.ClientBase) as never,
+      },
+      events: {
+        publishWith: (tx, input) =>
+          deps.events.publishWith(tx as pg.ClientBase, input),
+      },
+    });
+
+    return {
+      valid: true as const,
+      result,
+    };
+  };
+
+  const getCop = async (tenantId: TenantId) => {
+    await deps.projections.catchUp(tenantId, projection.name);
+    return deps.projections.getState<ArrowHedgeCommonOperatingPictureState>(
+      tenantId,
+      projection.name,
+    );
+  };
+
   // POST /tenants/:tenantId/arrowhedge/snapshots
   // Body: one ArrowHedge snapshot (see design doc for the contract).
   app.post("/snapshots", async (c) => {
@@ -85,58 +150,16 @@ export const arrowhedgeRoutes = (deps: ArrowHedgeIngestDeps): Hono => {
     try {
       await ensureProjection();
 
-      const plan = buildArrowHedgeIngestionPlan(snapshot, {
-        tenantId,
-        profile: FINANCE_RESEARCH_PROFILE,
-        adapterStartedAt: new Date().toISOString() as Timestamp,
-        // Live route is multi-tenant in one process: namespace node ids by
-        // tenant so shared real-world entities (e.g. ticker:AAPL) don't
-        // collide on the globally-unique graph node id space.
-        scopeNodeIdsByTenant: true,
-      });
-
-      if (!plan.valid) {
+      const ingested = await executeSnapshotIngestion(tenantId, snapshot);
+      if (!ingested.valid) {
         return c.json(
-          { error: "invalid snapshot", issues: plan.issues },
+          { error: "invalid snapshot", issues: ingested.issues },
           422,
         );
       }
 
-      const result = await executeArrowHedgeIngestionPlan(plan, {
-        withTransaction: async (fn) => {
-          const client = await deps.pool.connect();
-          try {
-            await client.query("BEGIN");
-            const value = await fn(client);
-            await client.query("COMMIT");
-            return value;
-          } catch (err) {
-            await client.query("ROLLBACK").catch(() => {});
-            throw err;
-          } finally {
-            client.release();
-          }
-        },
-        graph: {
-          createNode: (input, tx) =>
-            deps.graph.createNode(input, tx as pg.ClientBase) as never,
-          updateNode: (input, tx) =>
-            deps.graph.updateNode(input, tx as pg.ClientBase) as never,
-          createEdge: (input, tx) =>
-            deps.graph.createEdge(input, tx as pg.ClientBase) as never,
-        },
-        events: {
-          publishWith: (tx, input) =>
-            deps.events.publishWith(tx as pg.ClientBase, input),
-        },
-      });
-
-      await deps.projections.catchUp(tenantId, projection.name);
-      const cop =
-        await deps.projections.getState<ArrowHedgeCommonOperatingPictureState>(
-          tenantId,
-          projection.name,
-        );
+      const cop = await getCop(tenantId);
+      const result = ingested.result;
 
       return c.json({
         ingested: {
@@ -154,17 +177,82 @@ export const arrowhedgeRoutes = (deps: ArrowHedgeIngestDeps): Hono => {
     }
   });
 
+  // POST /tenants/:tenantId/arrowhedge/run-envelopes
+  // Body: one full ArrowHedge run envelope. The adapter expands it into the
+  // same validated per-ticker snapshots used by /snapshots, preserving graph
+  // and model configuration as evidence documents on each ticker snapshot.
+  app.post("/run-envelopes", async (c) => {
+    const tenantId = c.req.param("tenantId") as TenantId;
+    let envelope: unknown;
+    try {
+      envelope = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON body" }, 400);
+    }
+
+    try {
+      await ensureProjection();
+
+      const expanded = expandArrowHedgeRunEnvelope(envelope);
+      if (!expanded.valid) {
+        return c.json(
+          { error: "invalid run envelope", issues: expanded.issues },
+          422,
+        );
+      }
+
+      const totals = {
+        nodesCreated: 0,
+        nodesUpdated: 0,
+        edgesCreated: 0,
+        eventsPublished: 0,
+        eventIds: [] as string[],
+      };
+
+      for (const [index, snapshot] of expanded.snapshots.entries()) {
+        const ingested = await executeSnapshotIngestion(tenantId, snapshot);
+        if (!ingested.valid) {
+          return c.json(
+            {
+              error: "invalid expanded snapshot",
+              snapshotIndex: index,
+              issues: ingested.issues,
+            },
+            422,
+          );
+        }
+
+        totals.nodesCreated += ingested.result.nodesCreated;
+        totals.nodesUpdated += ingested.result.nodesUpdated;
+        totals.edgesCreated += ingested.result.edgesCreated;
+        totals.eventsPublished += ingested.result.eventsPublished.length;
+        totals.eventIds.push(
+          ...ingested.result.eventsPublished.map((event) => event.id),
+        );
+      }
+
+      const cop = await getCop(tenantId);
+
+      return c.json({
+        expanded: {
+          snapshots: expanded.snapshots.length,
+          tickers: expanded.snapshots.map((snapshot) => snapshot.ticker.symbol),
+        },
+        ingested: totals,
+        cop,
+      });
+    } catch (err) {
+      const { status, body } = errorResponse(err);
+      return c.json(body, status);
+    }
+  });
+
   // GET /tenants/:tenantId/arrowhedge/cop — read current COP without ingesting.
   app.get("/cop", async (c) => {
     const tenantId = c.req.param("tenantId") as TenantId;
     try {
       await ensureProjection();
-      await deps.projections.catchUp(tenantId, projection.name);
-      const cop =
-        await deps.projections.getState<ArrowHedgeCommonOperatingPictureState>(
-          tenantId,
-          projection.name,
-        );
+      const cop = await getCop(tenantId);
       return c.json({ cop });
     } catch (err) {
       const { status, body } = errorResponse(err);

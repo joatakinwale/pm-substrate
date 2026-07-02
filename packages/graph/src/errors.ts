@@ -13,7 +13,7 @@ export class NotFoundError extends Error {
 export class OptimisticConcurrencyError extends Error {
   constructor(id: string, expected: number, actual: number) {
     super(
-      `optimistic concurrency conflict on ${id}: expected schemaVersion ${expected}, found ${actual}`,
+      `optimistic concurrency conflict on ${id}: expected revision ${expected}, found ${actual}`,
     );
     this.name = "OptimisticConcurrencyError";
   }

@@ -1,4 +1,4 @@
--- 0119_agent_state_storage_mutation_guard_authorization_admission_witness_authority_transition_admission_witness_authority_transitions.sql
+-- 0119_agent_state_smga_adm_witness_authority_transition_witness_authority_transitions.sql
 -- Durable authority transitions for storage mutation guard transition-admission witness certificates.
 
 CREATE TABLE IF NOT EXISTS agent_state.storage_guard_trans_adm_wit_auth_transitions (

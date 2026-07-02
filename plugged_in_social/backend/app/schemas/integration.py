@@ -11,7 +11,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.agency import AgencyApprovalDecision, EvidenceRef
+from app.schemas.agency import (
+    AgencyAccessRequestDecision,
+    AgencyApprovalDecision,
+    EvidenceRef,
+)
 
 
 class IntegrationLink(BaseModel):
@@ -221,6 +225,25 @@ class IntegrationApprovalEnvelope(BaseModel):
     links: list[IntegrationLink]
 
 
+class IntegrationAccessRequestEnvelope(BaseModel):
+    resource_type: Literal["agency_access_request"] = "agency_access_request"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    engagement_id: uuid.UUID
+    marketing_run_id: uuid.UUID | None
+    request_type: str
+    provider: str | None
+    status: str
+    scope: dict[str, Any]
+    reason: str
+    instructions: dict[str, Any]
+    resolved_at: datetime | None
+    resolved_by_user_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
 class IntegrationEvidenceSummaryEnvelope(BaseModel):
     resource_type: Literal["marketing_run_evidence_summary"] = (
         "marketing_run_evidence_summary"
@@ -237,6 +260,8 @@ class IntegrationEvidenceSummaryEnvelope(BaseModel):
     event_type_counts: dict[str, int]
     approval_count: int
     pending_approval_count: int
+    access_request_count: int
+    open_access_request_count: int
     evidence_hashes: dict[str, list[str]]
     links: list[IntegrationLink]
 
@@ -268,4 +293,5 @@ class IntegrationAcceptedResponse(BaseModel):
     links: list[IntegrationLink] = Field(default_factory=list)
 
 
+IntegrationAccessDecision = AgencyAccessRequestDecision
 IntegrationApprovalDecision = AgencyApprovalDecision

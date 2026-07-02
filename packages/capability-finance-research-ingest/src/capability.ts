@@ -11,6 +11,7 @@ export const FINANCE_RESEARCH_EVENT_TYPES = [
   "portfolio.decision.proposed",
   "portfolio.decision.accepted",
   "workflow.blocked.stale_state",
+  "workflow.blocked.invalid_action",
 ] as const;
 
 export type FinanceResearchEventType = (typeof FINANCE_RESEARCH_EVENT_TYPES)[number];
@@ -154,6 +155,14 @@ export const FINANCE_RESEARCH_INGEST_CAPABILITY = {
         type: "workflow.blocked.stale_state",
         version: { major: 1, minor: 0, patch: 0 },
         schemaPath: "schemas/workflow-blocked-stale-state.v1.json",
+      },
+      affectsEntities: ["ResearchRun", "RiskState", "PortfolioDecision"],
+    },
+    {
+      schema: {
+        type: "workflow.blocked.invalid_action",
+        version: { major: 1, minor: 0, patch: 0 },
+        schemaPath: "schemas/workflow-blocked-invalid-action.v1.json",
       },
       affectsEntities: ["ResearchRun", "RiskState", "PortfolioDecision"],
     },

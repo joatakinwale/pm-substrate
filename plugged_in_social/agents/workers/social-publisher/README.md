@@ -6,7 +6,8 @@ Cloudflare Worker. Replaces `backend/app/tasks/social_tasks.py::publish_post`.
 
 Consumes `SocialPublishMessage` from the `stevie-social-publisher` queue and
 POSTs it to FastAPI's `POST /api/internal/social/posts/{post_id}/publish` with
-body `{org_id}`. FastAPI dispatches to the right platform publisher
+body `{org_id, expected_content_hash}`. FastAPI verifies the scheduled content
+hash, dispatches to the right platform publisher
 (Meta/LinkedIn/X/TikTok/YouTube/Pinterest), refreshes the OAuth token if near
 expiry, persists the result on the `SocialPost` row, and logs an `Activity`
 entry under RLS.
@@ -43,6 +44,7 @@ and translating the response into `ack` / `retry`.
 | 200 (`status: "published"`) | `ack` — terminal: post is live          |
 | 200 (`status: "failed"`)    | `ack` — terminal: backend recorded failure |
 | 404                    | `PermanentError` → `ack` (post or account deleted) |
+| 409                    | `PermanentError` → `ack` (scheduled content hash mismatch) |
 | 422                    | `PermanentError` → `ack` (unknown platform / config / auth refresh) |
 | Other 4xx              | `PermanentError` → `ack` (validation/contract bug) |
 | 5xx                    | `RetryableError` → CF Queues retries          |

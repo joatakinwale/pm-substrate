@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-06-27
+Last updated: 2026-07-01
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -385,6 +385,8 @@ v227 update: SQ174 is closed by adding signature-verifier role settlement proofs
 
 v228 update: SQ175 is closed by adding authority epoch seal accountable finality evidence in `@pm/agent-state` plus migration `0145`. Strict authority epoch seal finalizer evaluation can now consume replayable evidence that two certified finalizer-proof admissions conflict over the same sealed subject frontier: the evidence binds both admitted records, both finalizer proof hashes, both admission record hashes, both admission certificate hashes, finalized subject identity, conflict kinds, shared accepted witnesses, conflict hash, and evidence hash. Evaluation rejects hash-invalid evidence, wrong tenant/scope/boundary, wrong finalizer-proof admission boundary, mismatched certificate subjects, uncertified or under-quorum certificates, non-conflicting finality output, and disjoint witness sets, so known conflicting finalizer quorums become operational obstructions instead of private dispute. The next substrate question is SQ185: what finality-evidence gossip, custody, or retention primitive proves accountable finality evidence cannot be withheld, aged out, or hidden from amnesiac recovery?
 
+v229 update: No new recursive proof layer was added. The research lane now has a primitive back-map and recursion stop rule that projects v62-v228 into eight substrate primitive families: state identity, admission calculus, recovery cut, policy compiler, authority topology, obstruction evidence, settlement/finality, and replay semantics. Future Arrowsmith substrate work must declare which primitive family it strengthens, replaces, or falsifies before adding another proof/admission/witness layer; `new_primitive_required` must explain why all eight families are insufficient. SQ176-SQ185 remain open and are annotated by primitive family so the next implementation starts from compression rather than proof-layer recursion.
+
 ## Active 10-Question Substrate Backlog
 
 1. SQ176: What bootstrap-settlement transparency or head-gossip primitive prevents split bootstrap settlement histories from authorizing competing genesis histories for the same authority topology?
@@ -607,6 +609,7 @@ v228 update: SQ175 is closed by adding authority epoch seal accountable finality
 | v226 | 2026-06-27 | `research/daily-arrowsmith-agent-state/v226-operational-state-authority-topology-settlement-proof-2026-06-27.md` | Operational state authority-topology settlement proof research and implementation | Closed SQ173 by requiring strict authority-topology compaction to consume a settlement proof before choosing between competing replay-valid topology branches. |
 | v227 | 2026-06-27 | `research/daily-arrowsmith-agent-state/v227-operational-state-signature-verifier-role-settlement-proof-2026-06-27.md` | Operational state signature-verifier role settlement proof research and implementation | Closed SQ174 by requiring strict signature-verifier proof evaluation to consume settled verifier-role metadata and transparency evidence instead of local verifier allowlists. |
 | v228 | 2026-06-27 | `research/daily-arrowsmith-agent-state/v228-operational-state-authority-epoch-seal-accountable-finality-evidence-2026-06-27.md` | Operational state authority epoch seal accountable finality evidence research and implementation | Closed SQ175 by requiring known conflicting admitted finalizer quorums to become replayable obstruction evidence before strict seal finality can be accepted. |
+| v229 | 2026-07-01 | `research/daily-arrowsmith-agent-state/v229-substrate-primitive-backmap-2026-07-01.md` | Substrate primitive back-map and recursion stop rule | Consolidated v62-v228 into eight primitive families and required future substrate work to map to a primitive family before adding new proof/admission/witness layers. |
 | v123 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v123-pruning-tombstone-history-store-head-pruning-tombstone-store-head-witness-ledger-2026-06-26.md` | Pruning tombstone history-store head pruning tombstone-store head witness ledger research and implementation | Closed SQ70 by making the v122 required head recoverable from replayed witness records after amnesia, with tamper rejection and durable fork obstruction. |
 | v122 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v122-pruning-tombstone-history-store-head-pruning-tombstone-currentness-2026-06-26.md` | Pruning tombstone history-store head pruning tombstone currentness research and implementation | Closed SQ69 by deriving a required-head currentness object for v121 tombstone history and rejecting missing, stale, forked, unwitnessed, or hash-invalid histories. |
 | v121 | 2026-06-26 | `research/daily-arrowsmith-agent-state/v121-pruning-tombstone-history-store-head-pruning-tombstone-store-api-2026-06-26.md` | Pruning tombstone history-store head pruning tombstone store API research and implementation | Closed SQ68 by making actual history-store-head witness, authority/key/seal, and QC-row deletion replayable through durable pruning tombstones and tombstone-gated prune APIs. |
@@ -2198,16 +2201,17 @@ v228 update: SQ175 is closed by adding authority epoch seal accountable finality
 137. Adopt SQ173 authority-topology settlement proofs in strict authority-topology compaction paths so independently admitted topology histories cannot select competing recovery branches from private memory.
 138. Adopt SQ174 signature-verifier role settlement proofs in strict signature-verifier paths so local verifier allowlists cannot become operational signature authority.
 139. Adopt SQ175 accountable finality evidence in runtime seal-finality paths so conflicting authority epoch seal finalizer quorums become replayable obstruction evidence rather than private dispute.
-140. Investigate SQ176 bootstrap-settlement transparency or head gossip so split settlement histories become obstruction evidence instead of competing genesis authority.
-141. Investigate SQ177 signer/witness/quorum authority for bootstrap settlement records so settlement rows cannot remain self-authored root authority.
-142. Investigate SQ178 verifier-authority admission for privacy-preserving policy-proof verifiers so proof verification does not become self-authored authority.
-143. Investigate SQ179 verifier-authority admission for separation-of-duty proof verifiers so role-separation checks cannot become self-authored authority.
-144. Investigate SQ180 compaction-checkpoint witness/currentness so authority-transition ledger checkpoint-admission histories cannot split across agents, restarts, or compaction stores.
-145. Investigate SQ181 quorum-subsumption or heterogeneous-composition proofs so pairwise intersection does not overclaim composition safety for heterogeneous authority topologies.
-146. Investigate SQ182 semantics-migration/state-transformer admission proofs so legitimate replay-algebra upgrades cannot happen through silent reinterpretation of admitted history.
-147. Investigate SQ183 settlement-authority admission/currentness proofs so topology-settlement proofs cannot become self-authored or split across settlement masters.
-148. Investigate SQ184 transparency-head gossip/currentness proofs so verifier-role settlement proofs cannot accept split key-transparency log heads.
-149. Investigate SQ185 finality-evidence gossip/custody/retention proofs so accountable finality evidence cannot be withheld, aged out, or hidden from amnesiac recovery.
+140. Use v229 primitive back-map as the admission rule for future substrate research: every new mechanism must map to state identity, admission calculus, recovery cut, policy compiler, authority topology, obstruction evidence, settlement/finality, replay semantics, or justify `new_primitive_required`.
+141. Investigate SQ176 bootstrap-settlement transparency or head gossip as settlement/finality plus obstruction evidence, so split settlement histories become obstruction evidence instead of competing genesis authority.
+142. Investigate SQ177 signer/witness/quorum authority for bootstrap settlement records as authority topology plus admission calculus, so settlement rows cannot remain self-authored root authority.
+143. Investigate SQ178 verifier-authority admission for privacy-preserving policy-proof verifiers as authority topology plus admission calculus, so proof verification does not become self-authored authority.
+144. Investigate SQ179 verifier-authority admission for separation-of-duty proof verifiers as authority topology plus admission calculus, so role-separation checks cannot become self-authored authority.
+145. Investigate SQ180 compaction-checkpoint witness/currentness as replay semantics plus obstruction evidence, so authority-transition ledger checkpoint-admission histories cannot split across agents, restarts, or compaction stores.
+146. Investigate SQ181 quorum-subsumption or heterogeneous-composition as authority topology plus settlement/finality, so pairwise intersection does not overclaim composition safety for heterogeneous authority topologies.
+147. Investigate SQ182 semantics-migration/state-transformer admission as replay semantics plus admission calculus, so legitimate replay-algebra upgrades cannot happen through silent reinterpretation of admitted history.
+148. Investigate SQ183 settlement-authority admission/currentness as settlement/finality plus authority topology, so topology-settlement proofs cannot become self-authored or split across settlement masters.
+149. Investigate SQ184 transparency-head gossip/currentness as obstruction evidence plus settlement/finality, so verifier-role settlement proofs cannot accept split key-transparency log heads.
+150. Investigate SQ185 finality-evidence gossip/custody/retention as obstruction evidence plus settlement/finality, so accountable finality evidence cannot be withheld, aged out, or hidden from amnesiac recovery.
 
 ## Metrics Queue
 

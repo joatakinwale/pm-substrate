@@ -1,4 +1,4 @@
--- 0058_agent_state_history_store_head_pruning_tombstone_store_head_pruning_tombstone_store_head_witness_authority.sql
+-- 0058_agent_state_pt_hsh_ptsh_ptsh_witness_authority.sql
 -- Durable authority transitions for history-store-head pruning tombstone-store
 -- head pruning tombstone-store head witness topology.
 
