@@ -407,9 +407,15 @@ function buildExternalAdapters(
   sourceRoot: string,
 ): readonly PluggedInSocialExternalAdapterManifest[] {
   const sourcePath = "backend/app/api/integration.py";
+  const contractSource = readSource(
+    sourceRoot,
+    "backend/app/services/external_adapter_contracts.py",
+  );
   const apiSource = readSource(sourceRoot, sourcePath);
   const schemaSource = readSource(sourceRoot, "backend/app/schemas/integration.py");
   const hasAdapterContract =
+    contractSource.includes("EXTERNAL_ADAPTER_CONTRACTS") &&
+    contractSource.includes("ExternalAdapterContract") &&
     schemaSource.includes("IntegrationExternalAdapterManifest") &&
     schemaSource.includes("IntegrationExternalAdapterRunIngest") &&
     schemaSource.includes("external_adapters") &&
@@ -426,7 +432,7 @@ function buildExternalAdapters(
   const adapters: PluggedInSocialExternalAdapterManifest[] = [];
 
   if (
-    sourceIncludesAll(apiSource, [
+    sourceIncludesAll(contractSource, [
       "browser_qa_harness",
       "sandboxed_process",
       "affected_flow_detection",
@@ -435,7 +441,7 @@ function buildExternalAdapters(
       "trace_zip",
       "evidence_hash_gate",
       "no_secret_exfiltration",
-      "script_hash",
+      "playwright_script_hash",
       "console_error_count",
     ])
   ) {
@@ -475,18 +481,27 @@ function buildExternalAdapters(
         "no_secret_exfiltration",
       ],
       evidenceFields: [
+        "session_id",
+        "session_phase",
+        "run_count",
+        "artifact_manifest_path",
         "artifact_payload_hash",
         "report_uri",
         "trace_uri",
         "har_uri",
-        "script_hash",
+        "report_html_hash",
+        "playwright_script_hash",
+        "trace_zip_hash",
+        "network_har_hash",
+        "console_log_hash",
+        "screenshot_hashes",
         "console_error_count",
       ],
     });
   }
 
   if (
-    sourceIncludesAll(apiSource, [
+    sourceIncludesAll(contractSource, [
       "agent_harness",
       "containerized_process",
       "multi_provider_llm",
@@ -539,8 +554,15 @@ function buildExternalAdapters(
         "durable_event_hash",
       ],
       evidenceFields: [
+        "instance_id",
         "session_id",
+        "session_file",
+        "agent_event_hash",
+        "turn_id",
+        "tool_call_id",
         "tool_call_hash",
+        "tool_result_hash",
+        "rpc_command_hash",
         "state_ref",
         "approval_payload_hash",
         "output_payload_hash",
@@ -781,6 +803,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     sourceRoot,
     "backend/app/schemas/integration.py",
   );
+  const externalAdapterContracts = readSource(
+    sourceRoot,
+    "backend/app/services/external_adapter_contracts.py",
+  );
   const integrationTests = readSource(
     sourceRoot,
     "backend/tests/test_integration_api_contract.py",
@@ -1007,16 +1033,17 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     externalAdapterBoundary:
       integrationApi.includes("_external_adapter_manifest") &&
       integrationApi.includes("get_external_adapters") &&
+      integrationApi.includes("list_external_adapter_contracts") &&
       integrationApi.includes("external_adapter_manifest.read") &&
-      integrationApi.includes("browser_qa_harness") &&
-      integrationApi.includes("agent_harness") &&
-      integrationApi.includes("sandboxed_process") &&
-      integrationApi.includes("containerized_process") &&
-      integrationApi.includes("evidence_hash_gate") &&
-      integrationApi.includes("sandbox_boundary") &&
-      integrationApi.includes("no_secret_exfiltration") &&
-      integrationApi.includes("tool_call_hash") &&
-      integrationApi.includes("network_har") &&
+      externalAdapterContracts.includes("browser_qa_harness") &&
+      externalAdapterContracts.includes("agent_harness") &&
+      externalAdapterContracts.includes("sandboxed_process") &&
+      externalAdapterContracts.includes("containerized_process") &&
+      externalAdapterContracts.includes("evidence_hash_gate") &&
+      externalAdapterContracts.includes("sandbox_boundary") &&
+      externalAdapterContracts.includes("no_secret_exfiltration") &&
+      externalAdapterContracts.includes("tool_call_hash") &&
+      externalAdapterContracts.includes("network_har") &&
       integrationApi.includes('"/marketing-runs/{run_id}/external-adapter-runs"') &&
       integrationApi.includes("external_adapter_run.read") &&
       integrationApi.includes("external_adapter_run.ingest") &&

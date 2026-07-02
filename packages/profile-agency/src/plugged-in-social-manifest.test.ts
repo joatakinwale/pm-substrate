@@ -333,7 +333,7 @@ describe("PluggedInSocial source manifest", () => {
             "no_secret_exfiltration",
           ]),
           evidenceFields: expect.arrayContaining([
-            "script_hash",
+            "playwright_script_hash",
             "console_error_count",
           ]),
         }),

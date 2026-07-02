@@ -342,6 +342,32 @@ export interface PluggedInSocialIntegrationClientReportEnvelope {
   readonly updated_at: string;
 }
 
+export interface PluggedInSocialIntegrationAdapterReadinessItemEnvelope {
+  readonly adapter_id: string;
+  readonly status: "ready" | "missing" | "incomplete" | "failed";
+  readonly run_status: string | null;
+  readonly artifact_id: string | null;
+  readonly artifact_payload_hash: string | null;
+  readonly adapter_run_id: string | null;
+  readonly required_gates: readonly string[];
+  readonly missing_or_failed_gates: readonly string[];
+  readonly required_evidence_fields: readonly string[];
+  readonly present_evidence_fields: readonly string[];
+  readonly missing_evidence_fields: readonly string[];
+}
+
+export interface PluggedInSocialIntegrationStrategyAdapterReadinessEnvelope {
+  readonly strategy_artifact_present: boolean;
+  readonly strategy_artifact_id: string | null;
+  readonly strategy_artifact_payload_hash: string | null;
+  readonly ready: boolean;
+  readonly required_adapter_ids: readonly string[];
+  readonly succeeded_adapter_ids: readonly string[];
+  readonly missing_adapter_ids: readonly string[];
+  readonly blocked_adapter_ids: readonly string[];
+  readonly adapters: readonly PluggedInSocialIntegrationAdapterReadinessItemEnvelope[];
+}
+
 export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly resource_type: "marketing_run_evidence_summary";
   readonly run_id: string;
@@ -362,6 +388,7 @@ export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly social_post_status_counts: Record<string, number>;
   readonly report_count: number;
   readonly report_status_counts: Record<string, number>;
+  readonly adapter_readiness: PluggedInSocialIntegrationStrategyAdapterReadinessEnvelope;
   readonly evidence_hashes: Record<string, readonly string[]>;
 }
 
@@ -715,6 +742,16 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
   const gateResults = Object.fromEntries(
     adapter.required_gates.map((gate) => [gate, true]),
   ) as Record<string, boolean>;
+  const adapterEvidence = Object.fromEntries(
+    adapter.evidence_fields.map((field) => [
+      field,
+      field.endsWith("_hash") || field === "output_payload_hash"
+        ? createHash("sha256")
+            .update(`axis-b-smoke:${run.id}:${adapter.id}:${field}`)
+            .digest("hex")
+        : `axis-b-smoke:${run.id}:${adapter.id}:${field}`,
+    ]),
+  ) as Record<string, string>;
   const adapterArtifact =
     await requestIntegrationJson<PluggedInSocialIntegrationArtifactEnvelope>(
       client,
@@ -742,6 +779,7 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
             },
           ],
           evidence: {
+            ...adapterEvidence,
             adapter_boundary: adapter.boundary,
             required_gate_count: adapter.required_gates.length,
           },
@@ -789,6 +827,32 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
     ).includes(adapterArtifact.payload_hash)
   ) {
     issues.add("external adapter run hash missing from evidence summary");
+  }
+  const readiness = snapshot.summary.adapter_readiness;
+  if (readiness === undefined) {
+    issues.add("adapter readiness summary missing");
+  } else {
+    const adapterReadiness = readiness.adapters.find(
+      (item) =>
+        item.adapter_id === adapter.id && item.artifact_id === adapterArtifact.id,
+    );
+    if (!readiness.succeeded_adapter_ids.includes(adapter.id)) {
+      issues.add(`external adapter readiness missing succeeded adapter: ${adapter.id}`);
+    }
+    if (adapterReadiness === undefined) {
+      issues.add(`external adapter readiness missing artifact: ${adapter.id}`);
+    } else {
+      if (adapterReadiness.status !== "ready") {
+        issues.add(
+          `external adapter ${adapterReadiness.adapter_id} readiness is ${adapterReadiness.status}`,
+        );
+      }
+      if (adapterReadiness.artifact_payload_hash !== adapterArtifact.payload_hash) {
+        issues.add(
+          `external adapter ${adapter.id} readiness payload hash does not match ingested artifact`,
+        );
+      }
+    }
   }
 
   return {
@@ -891,6 +955,90 @@ function manifestReadinessIssues(
   return [...issues].sort();
 }
 
+function adapterReadinessIssues(
+  summary: PluggedInSocialIntegrationEvidenceSummaryEnvelope,
+): readonly string[] {
+  const issues = new Set<string>();
+  const readiness = summary.adapter_readiness;
+  if (readiness === undefined) {
+    issues.add("adapter readiness summary missing");
+    return [...issues].sort();
+  }
+
+  if (readiness.strategy_artifact_present !== true) {
+    issues.add("strategy adapter readiness missing strategy artifact");
+  }
+  if (readiness.ready !== true) {
+    issues.add("adapter readiness gate is not ready");
+  }
+
+  const artifactPayloadHashes = new Set(
+    summary.evidence_hashes.artifact_payload_hashes ?? [],
+  );
+  if (
+    readiness.strategy_artifact_payload_hash !== null &&
+    !artifactPayloadHashes.has(readiness.strategy_artifact_payload_hash)
+  ) {
+    issues.add("strategy adapter readiness hash missing from evidence summary");
+  }
+
+  for (const adapterId of readiness.missing_adapter_ids) {
+    issues.add(`required external adapter evidence missing: ${adapterId}`);
+  }
+  for (const adapterId of readiness.blocked_adapter_ids) {
+    issues.add(`required external adapter evidence blocked: ${adapterId}`);
+  }
+
+  const readinessByAdapterId = new Map(
+    readiness.adapters.map((item) => [item.adapter_id, item]),
+  );
+  for (const adapterId of readiness.required_adapter_ids) {
+    if (!readinessByAdapterId.has(adapterId)) {
+      issues.add(`external adapter readiness item missing: ${adapterId}`);
+    }
+  }
+
+  const externalAdapterRunHashes = new Set(
+    summary.evidence_hashes.external_adapter_run_hashes ?? [],
+  );
+  for (const item of readiness.adapters) {
+    if (item.status !== "ready") {
+      issues.add(`external adapter ${item.adapter_id} readiness is ${item.status}`);
+    }
+    if (item.missing_or_failed_gates.length > 0) {
+      issues.add(
+        `external adapter ${item.adapter_id} missing or failed gates: ${item.missing_or_failed_gates.join(", ")}`,
+      );
+    }
+    if (item.missing_evidence_fields.length > 0) {
+      issues.add(
+        `external adapter ${item.adapter_id} missing evidence fields: ${item.missing_evidence_fields.join(", ")}`,
+      );
+    }
+    if (item.status === "ready" && item.run_status !== "succeeded") {
+      issues.add(`external adapter ${item.adapter_id} ready without succeeded run`);
+    }
+    if (item.status === "ready" && item.artifact_id === null) {
+      issues.add(`external adapter ${item.adapter_id} ready without artifact id`);
+    }
+    if (item.status === "ready" && item.artifact_payload_hash === null) {
+      issues.add(
+        `external adapter ${item.adapter_id} ready without artifact payload hash`,
+      );
+    }
+    if (
+      item.artifact_payload_hash !== null &&
+      !externalAdapterRunHashes.has(item.artifact_payload_hash)
+    ) {
+      issues.add(
+        `external adapter ${item.adapter_id} payload hash missing from evidence summary`,
+      );
+    }
+  }
+
+  return [...issues].sort();
+}
+
 function liveRunEvidenceIssues(
   snapshot: PluggedInSocialLiveRunEvidenceSnapshot,
 ): readonly string[] {
@@ -914,6 +1062,9 @@ function liveRunEvidenceIssues(
   }
   if (summary.org_id !== run.org_id) {
     issues.add("evidence summary org_id does not match marketing run");
+  }
+  for (const issue of adapterReadinessIssues(summary)) {
+    issues.add(issue);
   }
   for (const item of [
     ...events,

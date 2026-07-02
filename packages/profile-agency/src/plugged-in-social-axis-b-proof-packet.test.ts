@@ -43,6 +43,7 @@ const liveAccessRequestHash = "d".repeat(64);
 const liveSocialPostHash = "e".repeat(64);
 const liveReportHash = "f".repeat(64);
 const liveReportMetricsHash = "a1".repeat(32);
+const liveStrategyArtifactId = "99999999-9999-4999-8999-999999999999";
 
 const closedLoopStages = [
   "intake",
@@ -398,7 +399,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       status: "completed",
       stage: "next_action",
       artifact_count: 1,
-      artifact_type_counts: { strategy_plan: 1 },
+      artifact_type_counts: { strategy_research_brief: 1 },
       task_count: 1,
       task_status_counts: { done: 1 },
       event_count: 2,
@@ -411,6 +412,17 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       social_post_status_counts: { scheduled: 1 },
       report_count: 1,
       report_status_counts: { generated: 1 },
+      adapter_readiness: {
+        strategy_artifact_present: true,
+        strategy_artifact_id: liveStrategyArtifactId,
+        strategy_artifact_payload_hash: liveArtifactHash,
+        ready: true,
+        required_adapter_ids: [],
+        succeeded_adapter_ids: [],
+        missing_adapter_ids: [],
+        blocked_adapter_ids: [],
+        adapters: [],
+      },
       evidence_hashes: {
         artifact_payload_hashes: [liveArtifactHash],
         access_request_hashes: [liveAccessRequestHash],
@@ -487,13 +499,13 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
     artifacts: [
       {
         resource_type: "agency_artifact",
-        id: "99999999-9999-4999-8999-999999999999",
+        id: liveStrategyArtifactId,
         org_id: liveOrgId,
         engagement_id: "66666666-6666-4666-8666-666666666666",
         marketing_run_id: liveRunId,
         virtual_agency_task_id: liveTaskId,
-        artifact_type: "strategy_plan",
-        title: "Launch conversion plan",
+        artifact_type: "strategy_research_brief",
+        title: "Launch conversion research brief",
         payload_hash: liveArtifactHash,
         version: 1,
         evidence_refs: [],

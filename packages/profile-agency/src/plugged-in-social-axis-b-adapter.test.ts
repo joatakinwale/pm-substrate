@@ -42,6 +42,8 @@ const liveSocialPostHash = "e".repeat(64);
 const liveReportHash = "f".repeat(64);
 const liveReportMetricsHash = "a1".repeat(32);
 const liveExternalAdapterRunHash = "b1".repeat(32);
+const liveStrategyArtifactId = "99999999-9999-4999-8999-999999999999";
+const liveExternalAdapterArtifactId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
 function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
   return {
@@ -405,7 +407,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       status: "completed",
       stage: "next_action",
       artifact_count: 1,
-      artifact_type_counts: { strategy_plan: 1 },
+      artifact_type_counts: { strategy_research_brief: 1 },
       task_count: 1,
       task_status_counts: { done: 1 },
       event_count: 2,
@@ -418,6 +420,17 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       social_post_status_counts: { scheduled: 1 },
       report_count: 1,
       report_status_counts: { generated: 1 },
+      adapter_readiness: {
+        strategy_artifact_present: true,
+        strategy_artifact_id: liveStrategyArtifactId,
+        strategy_artifact_payload_hash: liveArtifactHash,
+        ready: true,
+        required_adapter_ids: [],
+        succeeded_adapter_ids: [],
+        missing_adapter_ids: [],
+        blocked_adapter_ids: [],
+        adapters: [],
+      },
       evidence_hashes: {
         artifact_payload_hashes: [liveArtifactHash],
         access_request_hashes: [liveAccessRequestHash],
@@ -494,13 +507,13 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
     artifacts: [
       {
         resource_type: "agency_artifact",
-        id: "99999999-9999-4999-8999-999999999999",
+        id: liveStrategyArtifactId,
         org_id: liveOrgId,
         engagement_id: "66666666-6666-4666-8666-666666666666",
         marketing_run_id: liveRunId,
         virtual_agency_task_id: liveTaskId,
-        artifact_type: "strategy_plan",
-        title: "Launch conversion plan",
+        artifact_type: "strategy_research_brief",
+        title: "Launch conversion research brief",
         payload_hash: liveArtifactHash,
         version: 1,
         evidence_refs: [],
@@ -821,7 +834,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     };
     const adapterArtifact = {
       resource_type: "agency_artifact",
-      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      id: liveExternalAdapterArtifactId,
       org_id: liveOrgId,
       engagement_id: engagement.id,
       marketing_run_id: liveRunId,
@@ -851,6 +864,29 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         evidence_hashes: {
           ...snapshot.summary.evidence_hashes,
           external_adapter_run_hashes: [liveExternalAdapterRunHash],
+        },
+        adapter_readiness: {
+          ...snapshot.summary.adapter_readiness,
+          ready: true,
+          required_adapter_ids: ["agent_harness"],
+          succeeded_adapter_ids: ["agent_harness"],
+          missing_adapter_ids: [],
+          blocked_adapter_ids: [],
+          adapters: [
+            {
+              adapter_id: "agent_harness",
+              status: "ready",
+              run_status: "succeeded",
+              artifact_id: liveExternalAdapterArtifactId,
+              artifact_payload_hash: liveExternalAdapterRunHash,
+              adapter_run_id: `axis-b-smoke:${liveRunId}:agent_harness`,
+              required_gates: externalAdapter.required_gates,
+              missing_or_failed_gates: [],
+              required_evidence_fields: externalAdapter.evidence_fields,
+              present_evidence_fields: externalAdapter.evidence_fields,
+              missing_evidence_fields: [],
+            },
+          ],
         },
       },
       artifacts: [...snapshot.artifacts, adapterArtifact],
@@ -995,6 +1031,65 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         "chief_of_staff is not bound to stevie-virtual-agency",
         "platform manifest missing stevie-virtual-agency queue",
         "missing platform governance gate: content_hash_gate",
+      ]),
+    );
+  });
+
+  it("blocks live run evidence when backend adapter readiness reports missing evidence", () => {
+    const snapshot = liveSnapshotFixture();
+    const result = buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult({
+      snapshot: {
+        ...snapshot,
+        summary: {
+          ...snapshot.summary,
+          adapter_readiness: {
+            ...snapshot.summary.adapter_readiness,
+            ready: false,
+            required_adapter_ids: ["browser_qa_harness"],
+            succeeded_adapter_ids: [],
+            missing_adapter_ids: ["browser_qa_harness"],
+            blocked_adapter_ids: ["browser_qa_harness"],
+            adapters: [
+              {
+                adapter_id: "browser_qa_harness",
+                status: "incomplete",
+                run_status: "succeeded",
+                artifact_id: liveExternalAdapterArtifactId,
+                artifact_payload_hash: liveExternalAdapterRunHash,
+                adapter_run_id: "browser-session-1",
+                required_gates: ["tenant_rls", "no_secret_exfiltration"],
+                missing_or_failed_gates: ["no_secret_exfiltration"],
+                required_evidence_fields: [
+                  "session_id",
+                  "report_html_hash",
+                  "console_error_count",
+                ],
+                present_evidence_fields: ["session_id"],
+                missing_evidence_fields: [
+                  "report_html_hash",
+                  "console_error_count",
+                ],
+              },
+            ],
+          },
+          evidence_hashes: {
+            ...snapshot.summary.evidence_hashes,
+            external_adapter_run_hashes: [liveExternalAdapterRunHash],
+          },
+        },
+      },
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.terminalOutcome).toBe("blocked");
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        "adapter readiness gate is not ready",
+        "required external adapter evidence missing: browser_qa_harness",
+        "required external adapter evidence blocked: browser_qa_harness",
+        "external adapter browser_qa_harness readiness is incomplete",
+        "external adapter browser_qa_harness missing or failed gates: no_secret_exfiltration",
+        "external adapter browser_qa_harness missing evidence fields: report_html_hash, console_error_count",
       ]),
     );
   });
