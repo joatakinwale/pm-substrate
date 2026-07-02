@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  writeArrowHedgePairedBundleBatchFromIntegration,
   writeArrowHedgePairedBundleFromIntegration,
   verifyArrowHedgePairedBundleDirectory,
   writeArrowHedgePairedBundleFiles,
@@ -222,6 +223,128 @@ describe("build-arrowhedge-paired-bundle script", () => {
     expect(
       verifyArrowHedgePairedBundleDirectory({
         bundleDir: join(dir, "integration-bundle"),
+      }),
+    ).toMatchObject({ valid: true, issues: [] });
+  });
+
+  it("writes a batch report across multiple ArrowHedge integration pairs", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "arrowhedge-paired-batch-"));
+    const planPath = join(dir, "batch-plan.json");
+    writeJson(planPath, {
+      schemaVersion: "arrowhedge.paired-bundle-batch-plan.v1",
+      integrationBaseUrl: "https://arrow.example",
+      generatedAt: "2026-06-03T14:10:00.000Z",
+      experiments: [
+        {
+          experimentId: "exp_batch_allowed",
+          baseline: {
+            runId: 11,
+            flowId: 7,
+            metrics: {
+              endingEquity: 1000000,
+              realizedPnl: 0,
+              returnPct: 0,
+              falsePositiveBlockCount: 0,
+              falseNegativeBlockCount: 0,
+            },
+          },
+          substrate: {
+            runId: 11,
+            flowId: 7,
+            metrics: {
+              endingEquity: 1002500,
+              realizedPnl: 2500,
+              returnPct: 0.0025,
+              falsePositiveBlockCount: 0,
+              falseNegativeBlockCount: 0,
+            },
+          },
+        },
+        {
+          experimentId: "exp_batch_denied",
+          baseline: {
+            runId: 11,
+            flowId: 7,
+            metrics: {
+              endingEquity: 1000000,
+              realizedPnl: 0,
+              returnPct: 0,
+              falsePositiveBlockCount: 0,
+              falseNegativeBlockCount: 0,
+            },
+          },
+          substrate: {
+            runId: 11,
+            flowId: 7,
+            metrics: {
+              endingEquity: 999000,
+              realizedPnl: -1000,
+              returnPct: -0.001,
+              falsePositiveBlockCount: 1,
+              falseNegativeBlockCount: 0,
+            },
+          },
+        },
+      ],
+    });
+    const responses = integrationResponses();
+    const fetchFn: ArrowHedgeIntegrationFetch = async (url) =>
+      jsonResponse(
+        responses.get(url) ?? { error: "not found" },
+        responses.has(url) ? 200 : 404,
+      );
+
+    const result = await writeArrowHedgePairedBundleBatchFromIntegration({
+      planPath,
+      outputDir: join(dir, "batch"),
+      fetchFn,
+    });
+
+    expect(result.outputPaths.bundleDirs).toHaveLength(2);
+    expect(result.report).toMatchObject({
+      schemaVersion: "arrowhedge.paired-experiment-batch-report.v1",
+      generatedAt: "2026-06-03T14:10:00.000Z",
+      experimentCount: 2,
+      validBundleCount: 2,
+      readyCount: 2,
+      marketWinClaimAllowedCount: 1,
+      claimDeniedCount: 1,
+      market: {
+        metricsAvailableCount: 2,
+        substrateOutperformedCount: 1,
+        deltaSums: {
+          endingEquity: 1500,
+          realizedPnl: 1500,
+          returnPct: 0.0015,
+        },
+      },
+      governance: {
+        gates: {
+          falsePositiveBlocksZeroCount: 1,
+          falseNegativeBlocksZeroCount: 2,
+        },
+      },
+    });
+    expect(result.report.issues).toEqual(
+      expect.arrayContaining([
+        {
+          experimentId: "exp_batch_denied",
+          issue: "substrate arm did not outperform baseline on supplied market metrics",
+        },
+        {
+          experimentId: "exp_batch_denied",
+          issue: "substrate false-positive blocks must be zero",
+        },
+      ]),
+    );
+    expect(readJson(result.outputPaths.batchReport)).toMatchObject({
+      schemaVersion: "arrowhedge.paired-experiment-batch-report.v1",
+      marketWinClaimAllowedCount: 1,
+      claimDeniedCount: 1,
+    });
+    expect(
+      verifyArrowHedgePairedBundleDirectory({
+        bundleDir: join(dir, "batch", "exp_batch_allowed"),
       }),
     ).toMatchObject({ valid: true, issues: [] });
   });

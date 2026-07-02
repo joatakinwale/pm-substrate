@@ -114,6 +114,22 @@ pnpm arrowhedge:paired-bundle -- from-integration \
   --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001
 ```
 
+Batch many historical pairs from one plan:
+
+```bash
+pnpm arrowhedge:paired-bundle -- batch-from-integration \
+  --plan artifacts/arrowhedge/paired-batch-plan.json \
+  --out artifacts/arrowhedge/batch_axis_a_001
+```
+
+The batch plan is a JSON object with `integrationBaseUrl`, optional
+`bearerToken`/`generatedAt`, and an `experiments` array. Each experiment
+declares `experimentId`, `baseline.runId`, `substrate.runId`, optional flow or
+backtest IDs, optional modes, and explicit baseline/substrate governance metric
+controls. The command writes one verified bundle directory per experiment plus
+`batch-report.json`, which keeps market/PnL aggregates separate from governance
+gate aggregates and records denied claim issues per experiment.
+
 ## False-Positive Controls
 
 The market-win hypothesis cannot be claimed from a single run or from governance-only tests. A valid paired experiment requires:
@@ -128,7 +144,7 @@ The market-win hypothesis cannot be claimed from a single run or from governance
 
 ## Next Implementation Order
 
-1. Add an automated paired experiment runner that calls the readiness and bundle endpoints, runs or ingests admitted baseline/substrate arms, and invokes the replayable bundle writer for independent verification.
+1. Add an automated paired experiment runner that executes or selects baseline/substrate arms from ArrowHedgeLab and emits the batch plan automatically.
 2. Run paired contract tests against the fresh upstream clone, then run substrate-side TypeScript tests for envelope expansion, COP projection, stale-state blocking, invalid-action blocking, clean-current acceptance, bundle claim gating, and bundle directory verification.
 3. Collect enough saved historical windows to estimate market/PnL deltas separately from governance/protection deltas without claiming improvement from governance-only wins.
 

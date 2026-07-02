@@ -564,6 +564,10 @@ function writeJsonFile(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function sanitizePathSegment(value: string): string {
+  return value.replace(/[^A-Za-z0-9_.-]+/g, "_");
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -571,6 +575,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function parseArgs(argv: readonly string[]):
   | { readonly command: "write"; readonly input: WriteArrowHedgePairedBundleFilesInput }
   | { readonly command: "from-integration"; readonly input: WriteArrowHedgePairedBundleFromIntegrationInput }
+  | { readonly command: "batch-from-integration"; readonly input: WriteArrowHedgePairedBundleBatchFromIntegrationInput }
   | { readonly command: "verify"; readonly bundleDir: string } {
   const [command, ...rest] = argv;
   const args = new Map<string, string>();
@@ -654,6 +659,24 @@ function parseArgs(argv: readonly string[]):
     };
   }
 
+  if (command === "batch-from-integration") {
+    const planPath = args.get("--plan");
+    const outputDir = args.get("--out");
+    if (!planPath || !outputDir) {
+      throw new Error(usage());
+    }
+    return {
+      command,
+      input: {
+        planPath,
+        outputDir,
+        ...(args.has("--bearer-token")
+          ? { bearerToken: args.get("--bearer-token")! }
+          : {}),
+      },
+    };
+  }
+
   if (command === "verify") {
     const bundleDir = args.get("--bundle-dir");
     if (!bundleDir) {
@@ -689,6 +712,7 @@ function usage(): string {
     "usage:",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts write --experiment-id <id> --baseline-envelope <path> --substrate-envelope <path> --out <dir> [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts from-integration --experiment-id <id> --base-url <url> --baseline-run-id <id> --substrate-run-id <id> --out <dir> [--bearer-token <token>] [--baseline-flow-id <id>] [--substrate-flow-id <id>] [--baseline-backtest-run-id <id>] [--substrate-backtest-run-id <id>] [--baseline-mode <mode>] [--substrate-mode <mode>] [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
+    "  tsx scripts/build-arrowhedge-paired-bundle.ts batch-from-integration --plan <path> --out <dir> [--bearer-token <token>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts verify --bundle-dir <dir>",
   ].join("\n");
 }
@@ -723,6 +747,28 @@ async function main(): Promise<void> {
           marketWinClaimAllowed: result.bundle.report.marketWinClaimAllowed,
           claimIssues: result.bundle.report.claimIssues,
           manifestPath: result.outputPaths.manifest,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  if (parsed.command === "batch-from-integration") {
+    const result = await writeArrowHedgePairedBundleBatchFromIntegration(
+      parsed.input,
+    );
+    console.log(
+      JSON.stringify(
+        {
+          schemaVersion: result.report.schemaVersion,
+          experimentCount: result.report.experimentCount,
+          marketWinClaimAllowedCount:
+            result.report.marketWinClaimAllowedCount,
+          claimDeniedCount: result.report.claimDeniedCount,
+          issueCount: result.report.issueCount,
+          batchReportPath: result.outputPaths.batchReport,
         },
         null,
         2,
