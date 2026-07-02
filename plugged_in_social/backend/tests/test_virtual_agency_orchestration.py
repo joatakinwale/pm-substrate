@@ -764,6 +764,70 @@ async def test_handoff_dependency_claim_mismatch_is_rejected(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_handoff_marketing_run_lineage_mismatch_is_rejected():
+    db = _FakeSession()
+    org_id = uuid.uuid4()
+    project_id = uuid.uuid4()
+    legacy_task_id = uuid.uuid4()
+    orchestration_task_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    marketing_run_id = uuid.uuid4()
+    task = VirtualAgencyTask(
+        id=orchestration_task_id,
+        org_id=org_id,
+        project_id=project_id,
+        source_task_id=legacy_task_id,
+        title="Generate Campaign Content",
+        description="Write the first campaign post",
+        reason="Approved strategy is ready",
+        agent_role=AGENT_CONTENT,
+        task_type="content_generation",
+        status="todo",
+        task_version=1,
+        approved_version=1,
+        approval_active=True,
+        approval_payload_hash="9" * 64,
+        creation_idempotency_key="va-task:content:1",
+        context={"client_name": "Acme"},
+        lineage={
+            "client_request": "Launch a June campaign",
+            "project_id": str(project_id),
+            "legacy_task_id": str(legacy_task_id),
+            "orchestration_task_id": str(orchestration_task_id),
+            "engagement_id": str(engagement_id),
+            "marketing_run_id": str(marketing_run_id),
+        },
+    )
+    db.add(task)
+
+    with pytest.raises(ExecutionScopeError, match="marketing_run_id"):
+        await route_virtual_agency_task(
+            db=db,
+            org_id=org_id,
+            agent_role=AGENT_CONTENT,
+            project_id=project_id,
+            task_id=legacy_task_id,
+            orchestration_task_id=orchestration_task_id,
+            task_version=1,
+            approval_version=1,
+            approval_payload_hash="9" * 64,
+            idempotency_key="agency-run:handoff:lineage-mismatch",
+            lineage={
+                **task.lineage,
+                "marketing_run_id": str(uuid.uuid4()),
+            },
+            context={"client_name": "Acme"},
+            emitted_at="2026-07-02T12:00:00Z",
+            type="virtual_agency.task",
+            dependency_ids=[],
+        )
+
+    assert db.find_event_by_idempotency_key(
+        "agency-run:handoff:lineage-mismatch"
+    ) is None
+
+
+@pytest.mark.asyncio
 async def test_conflicting_write_is_rejected():
     db = _FakeSession()
     org_id = uuid.uuid4()

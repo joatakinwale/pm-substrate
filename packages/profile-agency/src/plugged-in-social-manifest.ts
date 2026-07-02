@@ -951,6 +951,9 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       ) &&
       orchestrationTests.includes(
         "test_handoff_dependency_claim_mismatch_is_rejected",
+      ) &&
+      orchestrationTests.includes(
+        "test_handoff_marketing_run_lineage_mismatch_is_rejected",
       ),
     approvalHashGate:
       orchestration.includes("approval_payload_hash") &&

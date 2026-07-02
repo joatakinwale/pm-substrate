@@ -92,6 +92,7 @@ def _ensure_handoff_lineage_scope(
     *,
     lineage: dict[str, Any],
 ) -> None:
+    task_lineage = task.lineage if isinstance(task.lineage, dict) else {}
     lineage_project_id = _parse_uuid(lineage.get("project_id"), "lineage.project_id")
     lineage_source_task_id = _parse_uuid(
         lineage.get("legacy_task_id"),
@@ -118,6 +119,21 @@ def _ensure_handoff_lineage_scope(
         raise ExecutionScopeError(
             "Handoff lineage orchestration_task_id does not match task"
         )
+    for field_name in ("engagement_id", "marketing_run_id"):
+        claimed = _parse_uuid(lineage.get(field_name), f"lineage.{field_name}")
+        expected = _parse_uuid(
+            task_lineage.get(field_name),
+            f"task.lineage.{field_name}",
+        )
+        if expected is not None and claimed != expected:
+            raise ExecutionScopeError(
+                f"Handoff lineage {field_name} does not match task"
+            )
+        if expected is None and claimed is not None:
+            raise ExecutionScopeError(
+                f"Handoff lineage {field_name} was provided for task without "
+                f"{field_name}"
+            )
 
 
 def _ensure_dependency_scope(
