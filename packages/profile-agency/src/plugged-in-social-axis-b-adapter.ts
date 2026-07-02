@@ -1311,6 +1311,18 @@ function liveRunEvidenceIssues(
   }
   if (
     socialPostResource !== undefined &&
+    !socialPostResource.durable_evidence_fields.includes("published_content_hash")
+  ) {
+    issues.add("social_posts resource lacks published_content_hash evidence field");
+  }
+  if (
+    socialPostResource !== undefined &&
+    !socialPostResource.durable_evidence_fields.includes("engagement_rate")
+  ) {
+    issues.add("social_posts resource lacks engagement_rate evidence field");
+  }
+  if (
+    socialPostResource !== undefined &&
     !socialPostResource.durable_evidence_fields.includes("lineage")
   ) {
     issues.add("social_posts resource lacks lineage evidence field");
@@ -1448,6 +1460,18 @@ function liveRunEvidenceIssues(
     (summary.evidence_hashes.social_post_content_hashes ?? []).length === 0
   ) {
     issues.add("missing evidence hashes: social_post_content_hashes");
+  }
+  if (
+    publishedSocialPosts.length > 0 &&
+    (summary.evidence_hashes.published_social_post_content_hashes ?? []).length === 0
+  ) {
+    issues.add("missing evidence hashes: published_social_post_content_hashes");
+  }
+  if (
+    publishedSocialPosts.some(socialPostHasMetricEvidence) &&
+    (summary.evidence_hashes.social_post_metric_hashes ?? []).length === 0
+  ) {
+    issues.add("missing evidence hashes: social_post_metric_hashes");
   }
   if (
     summary.report_count > 0 &&

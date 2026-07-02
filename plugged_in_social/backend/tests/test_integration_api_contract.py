@@ -1455,6 +1455,63 @@ def test_social_post_integration_envelope_derives_hash_and_lineage():
     assert envelope.scheduled_content_hash == "a" * 64
 
 
+def test_published_social_post_metric_hash_requires_metric_evidence():
+    import app.api.integration as module
+    from app.models.social_media import SocialPost
+
+    now = datetime.now(timezone.utc)
+    post = SocialPost(
+        id=uuid.uuid4(),
+        org_id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        social_account_id=uuid.uuid4(),
+        platform="linkedin",
+        status="published",
+        caption="Published campaign post",
+        scheduled_at=now,
+        published_at=now,
+        platform_post_id="urn:li:share:123",
+        version=3,
+        scheduled_content_hash="a" * 64,
+        published_content_hash="a" * 64,
+        likes=7,
+        comments=2,
+        shares=1,
+        impressions=420,
+        reach=360,
+        engagement_rate=0.027,
+        created_at=now,
+        updated_at=now,
+    )
+    empty_metrics_post = SocialPost(
+        id=uuid.uuid4(),
+        org_id=post.org_id,
+        project_id=post.project_id,
+        social_account_id=post.social_account_id,
+        platform="linkedin",
+        status="published",
+        caption="Published but not measured",
+        scheduled_at=now,
+        published_at=now,
+        platform_post_id="urn:li:share:456",
+        version=3,
+        scheduled_content_hash="b" * 64,
+        published_content_hash="b" * 64,
+        likes=0,
+        comments=0,
+        shares=0,
+        impressions=0,
+        reach=0,
+        engagement_rate=None,
+        created_at=now,
+        updated_at=now,
+    )
+
+    assert module._social_post_has_metric_evidence(post)
+    assert len(module._social_post_metric_hash(post)) == 64
+    assert not module._social_post_has_metric_evidence(empty_metrics_post)
+
+
 def test_client_report_integration_envelope_derives_hashes_without_private_fields():
     import app.api.integration as module
     from app.models.report import ClientReport, ReportCadence, ReportStatus

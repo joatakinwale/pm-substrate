@@ -41,6 +41,7 @@ const liveEventHashB = "b".repeat(64);
 const liveArtifactHash = "c".repeat(64);
 const liveAccessRequestHash = "d".repeat(64);
 const liveSocialPostHash = "e".repeat(64);
+const liveSocialPostMetricHash = "c1".repeat(32);
 const liveReportHash = "f".repeat(64);
 const liveReportMetricsHash = "a1".repeat(32);
 const liveStrategyArtifactId = "99999999-9999-4999-8999-999999999999";
@@ -338,6 +339,15 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           durable_evidence_fields: [
             "current_content_hash",
             "scheduled_content_hash",
+            "published_content_hash",
+            "published_at",
+            "platform_post_id",
+            "likes",
+            "comments",
+            "shares",
+            "impressions",
+            "reach",
+            "engagement_rate",
             "lineage",
           ],
           read_capability_ids: ["social_post.read"],
@@ -429,6 +439,8 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         event_hashes: [liveEventHashA, liveEventHashB],
         task_latest_event_hashes: [liveEventHashB],
         social_post_content_hashes: [liveSocialPostHash],
+        published_social_post_content_hashes: [liveSocialPostHash],
+        social_post_metric_hashes: [liveSocialPostMetricHash],
         client_report_hashes: [liveReportHash],
         client_report_metrics_hashes: [liveReportMetricsHash],
       },

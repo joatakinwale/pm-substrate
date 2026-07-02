@@ -291,6 +291,38 @@ def _to_social_post(item: SocialPost) -> IntegrationSocialPostEnvelope:
     )
 
 
+def _social_post_has_metric_evidence(item: SocialPost) -> bool:
+    return any(
+        [
+            item.likes,
+            item.comments,
+            item.shares,
+            item.impressions,
+            item.reach,
+            item.engagement_rate is not None,
+        ]
+    )
+
+
+def _social_post_metric_hash(item: SocialPost) -> str:
+    return compute_payload_hash(
+        {
+            "id": str(item.id),
+            "org_id": str(item.org_id),
+            "project_id": str(item.project_id) if item.project_id else None,
+            "platform": item.platform,
+            "platform_post_id": item.platform_post_id,
+            "published_at": item.published_at,
+            "likes": item.likes,
+            "comments": item.comments,
+            "shares": item.shares,
+            "impressions": item.impressions,
+            "reach": item.reach,
+            "engagement_rate": item.engagement_rate,
+        }
+    )
+
+
 def _report_metrics_snapshot_hash(item: ClientReport) -> str:
     return compute_payload_hash(dict(item.metrics_snapshot or {}))
 
@@ -990,6 +1022,21 @@ async def _build_run_evidence_snapshot_rows(
                     if item.scheduled_content_hash or item.published_content_hash
                 }
             ),
+            "published_social_post_content_hashes": sorted(
+                {
+                    item.published_content_hash
+                    for item in social_posts
+                    if item.status == "published" and item.published_content_hash
+                }
+            ),
+            "social_post_metric_hashes": sorted(
+                {
+                    _social_post_metric_hash(item)
+                    for item in social_posts
+                    if item.status == "published"
+                    and _social_post_has_metric_evidence(item)
+                }
+            ),
             "client_report_hashes": sorted(
                 {_client_report_hash(item) for item in reports}
             ),
@@ -1570,8 +1617,15 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
                 "current_content_hash",
                 "scheduled_content_hash",
                 "published_content_hash",
+                "published_at",
                 "platform_post_id",
                 "platform_url",
+                "likes",
+                "comments",
+                "shares",
+                "impressions",
+                "reach",
+                "engagement_rate",
                 "lineage",
             ],
             read_capability_ids=["social_post.read"],
