@@ -164,6 +164,7 @@ const REQUIRED_SOURCE_FILES = [
   "AGENTS.md",
   "backend/app/api/integration.py",
   "backend/app/schemas/integration.py",
+  "backend/app/services/external_adapter_contracts.py",
   "backend/app/api/virtual_agency.py",
   "backend/app/api/internal/virtual_agency.py",
   "backend/app/services/virtual_agency.py",
@@ -406,12 +407,13 @@ function sourceIncludesAll(source: string, values: readonly string[]): boolean {
 function buildExternalAdapters(
   sourceRoot: string,
 ): readonly PluggedInSocialExternalAdapterManifest[] {
-  const sourcePath = "backend/app/api/integration.py";
+  const sourcePath = "backend/app/services/external_adapter_contracts.py";
+  const apiSourcePath = "backend/app/api/integration.py";
   const contractSource = readSource(
     sourceRoot,
-    "backend/app/services/external_adapter_contracts.py",
+    sourcePath,
   );
-  const apiSource = readSource(sourceRoot, sourcePath);
+  const apiSource = readSource(sourceRoot, apiSourcePath);
   const schemaSource = readSource(sourceRoot, "backend/app/schemas/integration.py");
   const hasAdapterContract =
     contractSource.includes("EXTERNAL_ADAPTER_CONTRACTS") &&
@@ -1305,9 +1307,21 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
     },
     {
       kind: "source_record",
+      id: "plugged_in_social:shared-contract:queue-message",
+      label: "Shared Worker queue message contract",
+      path: "agents/packages/shared/src/messages.ts",
+    },
+    {
+      kind: "source_record",
       id: "plugged_in_social:api:virtual-agency",
       label: "Virtual agency FastAPI routes",
       path: "backend/app/api/virtual_agency.py",
+    },
+    {
+      kind: "source_record",
+      id: "plugged_in_social:api:internal-virtual-agency",
+      label: "Internal virtual-agency system-RLS endpoint",
+      path: "backend/app/api/internal/virtual_agency.py",
     },
     {
       kind: "source_record",
@@ -1317,9 +1331,21 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
     },
     {
       kind: "source_record",
-      id: "plugged_in_social:api:external-adapter-manifest",
-      label: "External QA and agent harness adapter manifest",
-      path: "backend/app/api/integration.py",
+      id: "plugged_in_social:schema:integration-v1",
+      label: "Neutral integration API schema contract",
+      path: "backend/app/schemas/integration.py",
+    },
+    {
+      kind: "source_record",
+      id: "plugged_in_social:contract:external-adapters",
+      label: "External browser and agent harness adapter contracts",
+      path: "backend/app/services/external_adapter_contracts.py",
+    },
+    {
+      kind: "source_record",
+      id: "plugged_in_social:service:virtual-agency-orchestration",
+      label: "Virtual agency orchestration and evidence gates",
+      path: "backend/app/services/virtual_agency_orchestration.py",
     },
     {
       kind: "source_record",
@@ -1350,6 +1376,24 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
       id: "plugged_in_social:data-model:virtual-agency-tasks",
       label: "Virtual agency task data model and ledger fields",
       path: "backend/app/models/virtual_agency.py",
+    },
+    {
+      kind: "source_record",
+      id: "plugged_in_social:data-model:social-posts",
+      label: "Social post content hash and publication data model",
+      path: "backend/app/models/social_media.py",
+    },
+    {
+      kind: "source_record",
+      id: "plugged_in_social:data-model:client-reports",
+      label: "Client report metrics and report data model",
+      path: "backend/app/models/report.py",
+    },
+    {
+      kind: "source_record",
+      id: "plugged_in_social:ui:operator-run-monitor",
+      label: "Autonomous agency operator run monitor",
+      path: "frontend/src/app/admin/agency/page.tsx",
     },
   ];
 }

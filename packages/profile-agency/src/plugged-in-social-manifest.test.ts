@@ -294,7 +294,7 @@ describe("PluggedInSocial source manifest", () => {
           id: "agent_harness",
           adapterType: "agent_harness",
           boundary: "containerized_process",
-          sourcePath: "backend/app/api/integration.py",
+          sourcePath: "backend/app/services/external_adapter_contracts.py",
           inputContracts: expect.arrayContaining([
             "virtual_agency_task",
             "approval_payload_hash",
@@ -320,7 +320,7 @@ describe("PluggedInSocial source manifest", () => {
           id: "browser_qa_harness",
           adapterType: "browser_qa_harness",
           boundary: "sandboxed_process",
-          sourcePath: "backend/app/api/integration.py",
+          sourcePath: "backend/app/services/external_adapter_contracts.py",
           outputArtifacts: expect.arrayContaining([
             "report_html",
             "playwright_script",
@@ -424,8 +424,26 @@ describe("PluggedInSocial source manifest", () => {
     );
     expect(manifest.evidenceRefs).toContainEqual(
       expect.objectContaining({
-        id: "plugged_in_social:api:external-adapter-manifest",
-        path: "backend/app/api/integration.py",
+        id: "plugged_in_social:contract:external-adapters",
+        path: "backend/app/services/external_adapter_contracts.py",
+      }),
+    );
+    expect(manifest.evidenceRefs).toContainEqual(
+      expect.objectContaining({
+        id: "plugged_in_social:shared-contract:queue-message",
+        path: "agents/packages/shared/src/messages.ts",
+      }),
+    );
+    expect(manifest.evidenceRefs).toContainEqual(
+      expect.objectContaining({
+        id: "plugged_in_social:api:internal-virtual-agency",
+        path: "backend/app/api/internal/virtual_agency.py",
+      }),
+    );
+    expect(manifest.evidenceRefs).toContainEqual(
+      expect.objectContaining({
+        id: "plugged_in_social:ui:operator-run-monitor",
+        path: "frontend/src/app/admin/agency/page.tsx",
       }),
     );
   });
@@ -456,6 +474,15 @@ describe("PluggedInSocial source manifest", () => {
     );
     expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
       "plugged_in_social:api:integration-v1",
+    );
+    expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
+      "plugged_in_social:contract:external-adapters",
+    );
+    expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
+      "plugged_in_social:shared-contract:queue-message",
+    );
+    expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
+      "plugged_in_social:ui:operator-run-monitor",
     );
     expect(event.substrateRefs.map((ref) => ref.id)).toContain(
       "pm_substrate:profile-agency:publication-terminal",

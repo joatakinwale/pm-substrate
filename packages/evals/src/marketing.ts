@@ -145,6 +145,19 @@ export const MARKETING_AXIS_B_REQUIRED_ANCHORS: readonly MarketingAxisBAnchor[] 
     ],
   },
   {
+    id: "plugged_in_social.external_adapter_contracts",
+    label: "External browser and agent harness adapter contracts",
+    base: "plugged_in_social",
+    path: "backend/app/services/external_adapter_contracts.py",
+    requiredContent: [
+      "EXTERNAL_ADAPTER_CONTRACTS",
+      "browser_qa_harness",
+      "agent_harness",
+      "required_evidence_fields",
+      "source_commit",
+    ],
+  },
+  {
     id: "plugged_in_social.queue_producer_config",
     label: "Queue producer virtual-agency binding",
     base: "plugged_in_social",

@@ -43,6 +43,7 @@ describe("marketing Axis B blocker eval", () => {
       "plugged_in_social.virtual_agency_worker",
       "plugged_in_social.virtual_agency_worker_config",
       "plugged_in_social.shared_queue_contract",
+      "plugged_in_social.external_adapter_contracts",
       "plugged_in_social.queue_producer_config",
       "plugged_in_social.deploy_script",
       "plugged_in_social.agent_inbox_ui",
