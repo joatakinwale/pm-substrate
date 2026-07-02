@@ -45,11 +45,13 @@ describe("ArrowHedge integration API client", () => {
             "/integration/v1/agents",
             "/integration/v1/graphs/effective",
             "/integration/v1/data/cache/summary",
+            "/integration/v1/data/source-artifacts",
             "/integration/v1/flows",
             "/integration/v1/flows/{id}",
             "/integration/v1/flows/{id}/runs",
             "/integration/v1/runs/{id}",
             "/integration/v1/runs/{id}/events",
+            "/integration/v1/runs/{id}/source-artifacts",
             "/integration/v1/backtests",
             "/integration/v1/backtests/{id}",
             "/integration/v1/backtests/{id}/days",
@@ -132,6 +134,37 @@ describe("ArrowHedge integration API client", () => {
               sha256: "a".repeat(64),
             },
           ],
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/data/source-artifacts",
+        {
+          schemaVersion: "arrowhedgelab.integration.source-artifacts.v1",
+          provider: "financialdatasets.ai",
+          count: 1,
+          artifacts: [
+            {
+              id: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+              schemaVersion: "arrowhedgelab.integration.source-artifact.v1",
+              provider: "financialdatasets.ai",
+              kind: "prices",
+              cache_key: "AAPL_2024-01-01_2024-01-02",
+              ticker: "AAPL",
+              request: {
+                ticker: "AAPL",
+                start_date: "2024-01-01",
+                end_date: "2024-01-02",
+              },
+              observed: {
+                date_field: "time",
+                min_observed_at: "2024-01-01",
+                max_observed_at: "2024-01-02",
+              },
+              row_count: 2,
+              sha256: "c1".repeat(32),
+            },
+          ],
+          hashes: { artifactsSha256: "d1".repeat(32) },
         },
       ],
       [
@@ -241,6 +274,44 @@ describe("ArrowHedge integration API client", () => {
             },
           ],
           hashes: { eventsSha256: "6".repeat(64) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/runs/11/source-artifacts",
+        {
+          schemaVersion: "arrowhedgelab.integration.run-source-artifacts.v1",
+          run_id: 11,
+          flow_id: 7,
+          request: {
+            tickers: ["AAPL"],
+            start_date: "2024-01-01",
+            end_date: "2024-01-02",
+          },
+          count: 1,
+          artifacts: [
+            {
+              id: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+              schemaVersion: "arrowhedgelab.integration.source-artifact.v1",
+              provider: "financialdatasets.ai",
+              kind: "prices",
+              cache_key: "AAPL_2024-01-01_2024-01-02",
+              ticker: "AAPL",
+              request: {
+                ticker: "AAPL",
+                start_date: "2024-01-01",
+                end_date: "2024-01-02",
+              },
+              observed: {
+                date_field: "time",
+                min_observed_at: "2024-01-01",
+                max_observed_at: "2024-01-02",
+              },
+              row_count: 2,
+              sha256: "c1".repeat(32),
+              matched_by: ["ticker", "start_date", "end_date"],
+            },
+          ],
+          hashes: { artifactsSha256: "e1".repeat(32) },
         },
       ],
       [
@@ -361,6 +432,7 @@ describe("ArrowHedge integration API client", () => {
       "https://arrow.example/integration/v1/agents",
       "https://arrow.example/integration/v1/graphs/effective",
       "https://arrow.example/integration/v1/data/cache/summary",
+      "https://arrow.example/integration/v1/data/source-artifacts",
       "https://arrow.example/integration/v1/flows",
       "https://arrow.example/integration/v1/backtests",
       "https://arrow.example/integration/v1/config/models",
@@ -368,6 +440,7 @@ describe("ArrowHedge integration API client", () => {
       "https://arrow.example/integration/v1/flows/7",
       "https://arrow.example/integration/v1/runs/11",
       "https://arrow.example/integration/v1/runs/11/events",
+      "https://arrow.example/integration/v1/runs/11/source-artifacts",
       "https://arrow.example/integration/v1/backtests/11",
       "https://arrow.example/integration/v1/backtests/11/days",
     ]);
@@ -392,6 +465,12 @@ describe("ArrowHedge integration API client", () => {
     expect(snapshot.flowDetails).toHaveLength(1);
     expect(snapshot.runDetails).toHaveLength(1);
     expect(snapshot.runEvents).toHaveLength(1);
+    expect(snapshot.sourceArtifacts.artifacts).toHaveLength(1);
+    expect(snapshot.runSourceArtifacts[0]?.artifacts[0]?.matched_by).toEqual([
+      "ticker",
+      "start_date",
+      "end_date",
+    ]);
     expect(snapshot.backtests.backtests).toHaveLength(1);
     expect(snapshot.backtestDetails).toHaveLength(1);
     expect(snapshot.backtestDays[0]?.days[0]?.decisions).toEqual({
@@ -404,12 +483,15 @@ describe("ArrowHedge integration API client", () => {
         "arrowhedgelab:integration_api:agents",
         "arrowhedgelab:integration_api:effective_graph",
         "arrowhedgelab:integration_api:flows",
+        "arrowhedgelab:integration_api:source_artifacts",
         "arrowhedgelab:integration_api:model_config",
         "arrowhedgelab:integration_api:backtests",
         "arrowhedgelab:integration_api:api_key_summary",
         "arrowhedgelab:flow:7",
         "arrowhedgelab:flow-run:11",
         `arrowhedgelab:flow-run-event:11:1:${"3".repeat(64)}`,
+        `arrowhedgelab:source-artifact:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+        `arrowhedgelab:run-source-artifact:11:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
         "arrowhedgelab:backtest:11",
         `arrowhedgelab:backtest-day:11:2024-01-02:${"a1".repeat(32)}`,
         `arrowhedgelab:cache:prices:AAPL_2024-01-01_2024-01-02:${"a".repeat(64)}`,
@@ -455,6 +537,26 @@ describe("ArrowHedge integration API client", () => {
           },
         ],
       },
+      sourceArtifacts: {
+        schemaVersion: "arrowhedgelab.integration.source-artifacts.v1",
+        provider: "financialdatasets.ai",
+        count: 1,
+        artifacts: [
+          {
+            id: "financialdatasets.ai:prices:AAPL",
+            schemaVersion: "arrowhedgelab.integration.source-artifact.v1",
+            provider: "financialdatasets.ai",
+            kind: "prices",
+            cache_key: "AAPL",
+            ticker: "AAPL",
+            request: { ticker: "AAPL" },
+            observed: { date_field: "time" },
+            row_count: 1,
+            sha256: "",
+            rows: [{ close: 185 }],
+          },
+        ],
+      },
       flows: {
         schemaVersion: "arrowhedgelab.integration.flows.v1",
         count: 1,
@@ -470,6 +572,7 @@ describe("ArrowHedge integration API client", () => {
       flowDetails: [],
       runDetails: [],
       runEvents: [],
+      runSourceArtifacts: [],
       backtests: {
         schemaVersion: "arrowhedgelab.integration.backtests.v1",
         count: 0,
@@ -502,6 +605,8 @@ describe("ArrowHedge integration API client", () => {
         "effectiveGraph.validation.issues must be empty",
         "cacheSummary.records[0].sha256 is required",
         "cacheSummary.records[0] must not include raw rows",
+        "sourceArtifacts.artifacts[0].sha256 is required",
+        "sourceArtifacts.artifacts[0] must not include raw rows",
         "flows.flows[0].hashes.nodesSha256 is required",
         "modelConfig.defaults.model_name is required",
         "modelConfig.models must include at least one model",

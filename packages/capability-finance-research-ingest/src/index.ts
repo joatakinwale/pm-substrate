@@ -39,8 +39,11 @@ export {
   type ArrowHedgeIntegrationModelRecord,
   type ArrowHedgeIntegrationRunEvent,
   type ArrowHedgeIntegrationRunEvents,
+  type ArrowHedgeIntegrationRunSourceArtifacts,
   type ArrowHedgeIntegrationSnapshot,
   type ArrowHedgeIntegrationSnapshotFetchInput,
+  type ArrowHedgeIntegrationSourceArtifact,
+  type ArrowHedgeIntegrationSourceArtifacts,
   type ArrowHedgeIntegrationValidationIssue,
   type ArrowHedgeIntegrationValidationResult,
 } from "./arrowhedge-integration.js";

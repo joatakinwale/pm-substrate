@@ -116,6 +116,41 @@ export interface ArrowHedgeIntegrationCacheSummary {
   readonly [key: string]: unknown;
 }
 
+export interface ArrowHedgeIntegrationSourceArtifact {
+  readonly id: string;
+  readonly schemaVersion: string;
+  readonly provider: string;
+  readonly kind: string;
+  readonly cache_key: string;
+  readonly ticker?: string | null;
+  readonly request: Record<string, unknown>;
+  readonly observed: Record<string, unknown>;
+  readonly row_count: number;
+  readonly sha256: string;
+  readonly matched_by?: readonly string[];
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationSourceArtifacts {
+  readonly schemaVersion: string;
+  readonly provider: string;
+  readonly artifacts: readonly ArrowHedgeIntegrationSourceArtifact[];
+  readonly count: number;
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationRunSourceArtifacts {
+  readonly schemaVersion: string;
+  readonly run_id: number;
+  readonly flow_id?: number;
+  readonly request: Record<string, unknown>;
+  readonly artifacts: readonly ArrowHedgeIntegrationSourceArtifact[];
+  readonly count: number;
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
 export interface ArrowHedgeIntegrationFlowSummary {
   readonly schemaVersion: string;
   readonly id: number;
@@ -260,10 +295,12 @@ export interface ArrowHedgeIntegrationSnapshot {
   readonly agents: ArrowHedgeIntegrationAgents;
   readonly effectiveGraph: ArrowHedgeIntegrationEffectiveGraph;
   readonly cacheSummary: ArrowHedgeIntegrationCacheSummary;
+  readonly sourceArtifacts: ArrowHedgeIntegrationSourceArtifacts;
   readonly flows: ArrowHedgeIntegrationFlows;
   readonly flowDetails: readonly ArrowHedgeIntegrationFlow[];
   readonly runDetails: readonly ArrowHedgeIntegrationFlowRun[];
   readonly runEvents: readonly ArrowHedgeIntegrationRunEvents[];
+  readonly runSourceArtifacts: readonly ArrowHedgeIntegrationRunSourceArtifacts[];
   readonly backtests: ArrowHedgeIntegrationBacktests;
   readonly backtestDetails: readonly ArrowHedgeIntegrationBacktest[];
   readonly backtestDays: readonly ArrowHedgeIntegrationBacktestDays[];
@@ -295,6 +332,9 @@ const CAPABILITIES_SCHEMA = "arrowhedgelab.integration.capabilities.v1";
 const AGENTS_SCHEMA = "arrowhedgelab.integration.agents.v1";
 const EFFECTIVE_GRAPH_SCHEMA = "arrowhedgelab.integration.effective-graph.v1";
 const CACHE_SUMMARY_SCHEMA = "arrowhedgelab.integration.cache-summary.v1";
+const SOURCE_ARTIFACTS_SCHEMA = "arrowhedgelab.integration.source-artifacts.v1";
+const SOURCE_ARTIFACT_SCHEMA = "arrowhedgelab.integration.source-artifact.v1";
+const RUN_SOURCE_ARTIFACTS_SCHEMA = "arrowhedgelab.integration.run-source-artifacts.v1";
 const FLOWS_SCHEMA = "arrowhedgelab.integration.flows.v1";
 const FLOW_SCHEMA = "arrowhedgelab.integration.flow.v1";
 const FLOW_RUN_SCHEMA = "arrowhedgelab.integration.flow-run.v1";
@@ -311,11 +351,13 @@ const REQUIRED_SURFACES = [
   "/integration/v1/agents",
   "/integration/v1/graphs/effective",
   "/integration/v1/data/cache/summary",
+  "/integration/v1/data/source-artifacts",
   "/integration/v1/flows",
   "/integration/v1/flows/{id}",
   "/integration/v1/flows/{id}/runs",
   "/integration/v1/runs/{id}",
   "/integration/v1/runs/{id}/events",
+  "/integration/v1/runs/{id}/source-artifacts",
   "/integration/v1/backtests",
   "/integration/v1/backtests/{id}",
   "/integration/v1/backtests/{id}/days",
@@ -338,6 +380,7 @@ export async function fetchArrowHedgeIntegrationSnapshot(
     agents,
     effectiveGraph,
     cacheSummary,
+    sourceArtifacts,
     flows,
     backtests,
     modelConfig,
@@ -356,6 +399,10 @@ export async function fetchArrowHedgeIntegrationSnapshot(
     fetchIntegrationJson<ArrowHedgeIntegrationCacheSummary>(
       client,
       "/data/cache/summary",
+    ),
+    fetchIntegrationJson<ArrowHedgeIntegrationSourceArtifacts>(
+      client,
+      "/data/source-artifacts",
     ),
     fetchIntegrationJson<ArrowHedgeIntegrationFlows>(client, "/flows"),
     fetchIntegrationJson<ArrowHedgeIntegrationBacktests>(client, "/backtests"),
@@ -377,6 +424,7 @@ export async function fetchArrowHedgeIntegrationSnapshot(
     flowDetails,
     runDetails,
     runEvents,
+    runSourceArtifacts,
     backtestDetails,
     backtestDays,
   ] = await Promise.all([
@@ -405,6 +453,14 @@ export async function fetchArrowHedgeIntegrationSnapshot(
       ),
     ),
     Promise.all(
+      runEventIds.map((runId) =>
+        fetchIntegrationJson<ArrowHedgeIntegrationRunSourceArtifacts>(
+          client,
+          `/runs/${encodeURIComponent(String(runId))}/source-artifacts`,
+        ),
+      ),
+    ),
+    Promise.all(
       backtestRunIds.map((runId) =>
         fetchIntegrationJson<ArrowHedgeIntegrationBacktest>(
           client,
@@ -426,10 +482,12 @@ export async function fetchArrowHedgeIntegrationSnapshot(
     agents,
     effectiveGraph,
     cacheSummary,
+    sourceArtifacts,
     flows,
     flowDetails,
     runDetails,
     runEvents,
+    runSourceArtifacts,
     backtests,
     backtestDetails,
     backtestDays,
@@ -514,6 +572,26 @@ export function validateArrowHedgeIntegrationSnapshot(
     if (Object.prototype.hasOwnProperty.call(record, "rows")) {
       issues.push(`cacheSummary.records[${index}] must not include raw rows`);
     }
+  });
+  if (snapshot.sourceArtifacts.schemaVersion !== SOURCE_ARTIFACTS_SCHEMA) {
+    issues.push(`sourceArtifacts.schemaVersion must be ${SOURCE_ARTIFACTS_SCHEMA}`);
+  }
+  if (snapshot.sourceArtifacts.count !== snapshot.sourceArtifacts.artifacts.length) {
+    issues.push("sourceArtifacts.count must match artifacts.length");
+  }
+  validateSourceArtifacts("sourceArtifacts.artifacts", snapshot.sourceArtifacts.artifacts, issues);
+  snapshot.runSourceArtifacts.forEach((sourceArtifacts, index) => {
+    if (sourceArtifacts.schemaVersion !== RUN_SOURCE_ARTIFACTS_SCHEMA) {
+      issues.push(`runSourceArtifacts[${index}].schemaVersion must be ${RUN_SOURCE_ARTIFACTS_SCHEMA}`);
+    }
+    if (sourceArtifacts.count !== sourceArtifacts.artifacts.length) {
+      issues.push(`runSourceArtifacts[${index}].count must match artifacts.length`);
+    }
+    validateSourceArtifacts(
+      `runSourceArtifacts[${index}].artifacts`,
+      sourceArtifacts.artifacts,
+      issues,
+    );
   });
 
   if (snapshot.flows.schemaVersion !== FLOWS_SCHEMA) {
@@ -674,6 +752,11 @@ export function buildArrowHedgeIntegrationEvidenceRefs(
     ),
     stateRef(
       "source_record",
+      "arrowhedgelab:integration_api:source_artifacts",
+      "ArrowHedgeLab source artifact inventory",
+    ),
+    stateRef(
+      "source_record",
       "arrowhedgelab:integration_api:model_config",
       "ArrowHedgeLab model configuration inventory",
     ),
@@ -714,6 +797,22 @@ export function buildArrowHedgeIntegrationEvidenceRefs(
           "source_record",
           `arrowhedgelab:flow-run-event:${runEvents.run_id}:${event.sequence}:${event.payload_sha256}`,
           "ArrowHedgeLab saved flow run event",
+        ),
+      ),
+    ),
+    ...snapshot.sourceArtifacts.artifacts.map((artifact) =>
+      stateRef(
+        "source_record",
+        `arrowhedgelab:source-artifact:${artifact.kind}:${artifact.cache_key}:${artifact.sha256}`,
+        "ArrowHedgeLab source artifact",
+      ),
+    ),
+    ...snapshot.runSourceArtifacts.flatMap((sourceArtifacts) =>
+      sourceArtifacts.artifacts.map((artifact) =>
+        stateRef(
+          "source_record",
+          `arrowhedgelab:run-source-artifact:${sourceArtifacts.run_id}:${artifact.kind}:${artifact.cache_key}:${artifact.sha256}`,
+          "ArrowHedgeLab run source artifact",
         ),
       ),
     ),
@@ -833,4 +932,37 @@ function uniqueNumbers(values: readonly number[]): readonly number[] {
 
 function includesRawSecret(value: unknown): boolean {
   return JSON.stringify(value)?.includes("sk-") ?? false;
+}
+
+function validateSourceArtifacts(
+  path: string,
+  artifacts: readonly ArrowHedgeIntegrationSourceArtifact[],
+  issues: string[],
+): void {
+  artifacts.forEach((artifact, index) => {
+    if (artifact.schemaVersion !== SOURCE_ARTIFACT_SCHEMA) {
+      issues.push(`${path}[${index}].schemaVersion must be ${SOURCE_ARTIFACT_SCHEMA}`);
+    }
+    if (artifact.provider === "") {
+      issues.push(`${path}[${index}].provider is required`);
+    }
+    if (artifact.kind === "") {
+      issues.push(`${path}[${index}].kind is required`);
+    }
+    if (artifact.cache_key === "") {
+      issues.push(`${path}[${index}].cache_key is required`);
+    }
+    if (artifact.row_count < 0) {
+      issues.push(`${path}[${index}].row_count must be non-negative`);
+    }
+    if (artifact.sha256 === "") {
+      issues.push(`${path}[${index}].sha256 is required`);
+    }
+    if (Object.prototype.hasOwnProperty.call(artifact, "rows")) {
+      issues.push(`${path}[${index}] must not include raw rows`);
+    }
+    if (includesRawSecret(artifact)) {
+      issues.push(`${path}[${index}] must not expose raw API keys`);
+    }
+  });
 }
