@@ -30,7 +30,13 @@
     "evals:local-agent-lab:live": "tsx scripts/run-local-agent-lab-live-evals.ts",
     "validate:budgets": "tsx scripts/validate-budgets.ts",
     "validate:zero-edit": "tsx scripts/validate-zero-edit-plugin.ts",
-    "evals:amnesia": "tsx scripts/measure-amnesia-resume.ts"
+    "evals:amnesia": "tsx scripts/measure-amnesia-resume.ts",
+    "dev:resume": "tsx scripts/dev-session.ts resume",
+    "dev:checkpoint": "tsx scripts/dev-session.ts checkpoint",
+    "dev:handoff": "tsx scripts/dev-session.ts handoff",
+    "dev:cost": "tsx scripts/dev-session.ts cost",
+    "dev:status": "tsx scripts/dev-session.ts status",
+    "dev:seed-dogfood": "tsx scripts/dev-session.ts seed-dogfood"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
