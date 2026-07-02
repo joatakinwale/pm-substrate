@@ -2,6 +2,14 @@
 
 Date: 2026-07-01
 
+Status: superseded for current implementation planning. After this audit was
+written, the local `arrowhedgelab` tree was archived and replaced with a fresh
+upstream clone from `https://github.com/virattt/ai-hedge-fund.git`; the local
+`arrowhedgelab/src/substrate/*` bridge described below is no longer present in
+the active ArrowHedgeLab tree. Use
+`docs/arrowhedgelab-upstream-integration-review-2026-07-01.md` as the current
+review and adapter contract.
+
 Scope: `arrowhedgelab` after cleanup. The active tree now contains the upstream-style ArrowHedgeLab app, CLI, tests, v2 research modules, and the local `src/substrate` bridge. The separate `ArrowDexter-main` repo was moved to `trash/arrowhedgelab-cleanup-20260701-092540` because it is not part of the latest upstream `virattt/ai-hedge-fund` tree and ArrowHedgeLab source/app/tests/v2 do not reference it.
 
 ## Executive Evaluation

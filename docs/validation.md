@@ -88,154 +88,32 @@ Market-win claims require a saved paired run with:
 - replayable event ids for every substrate-blocked decision;
 - backtest/PnL deltas reported separately from governance deltas.
 
-The preferred historical experiment path is a paired backtest run from one
-locked `BacktestRequest` JSON. A starter request lives at
-`arrowhedgelab/examples/substrate/backtest-request.axis-a.sample.json`; copy or
-edit it for the target tickers/window. It intentionally leaves `api_keys` empty
-so keys come from environment variables or the app key store rather than from a
-checked-in file.
+Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
 
-After Postgres and the substrate tables are available, seed the ArrowHedge
-tenant/profile from the pm-substrate root:
+- `arrowhedgelab` is now a submodule-style external repo reference to
+  `https://github.com/virattt/ai-hedge-fund.git` at commit `65a0349`.
+- The previous local Python bridge under `arrowhedgelab/src/substrate/*` and the
+  sample request under `arrowhedgelab/examples/substrate/*` are no longer
+  present in the fresh upstream tree.
+- The TypeScript substrate side still supports `arrowhedge.run-envelope.v1`
+  through `packages/capability-finance-research-ingest` and
+  `packages/substrate-http-demo`, but ArrowHedgeLab must expose or generate
+  source artifacts again before paired live/backtest experiments can run.
 
-```bash
-PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate \
-PM_ARROWHEDGE_TENANT_ID=tnt_arrowhedge \
-pnpm arrowhedge:seed
-```
+The next valid historical experiment path is:
 
-Then start the substrate HTTP demo. Use another `PORT` if `4000` is already
-serving a different local app:
+1. Add a neutral ArrowHedgeLab `/integration/v1/*` adapter that exposes agents,
+   effective graphs, flows, runs, backtest days, redacted config, data/cache
+   summaries, source hashes, freshness windows, and evidence refs.
+2. Add a pm-substrate-side connector that pulls that adapter and builds
+   `arrowhedge.run-envelope.v1` or its successor without importing pm-substrate
+   into ArrowHedgeLab core.
+3. Reintroduce paired experiment commands only after the adapter can prove that
+   baseline and substrate arms share identical request, graph, model, portfolio,
+   and source-data hashes.
 
-```bash
-PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate \
-PORT=4000 \
-pnpm --filter @pm/substrate-http-demo dev
-```
-
-Start by checking the local environment from `arrowhedgelab/`:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.backtest_experiment check-env \
-  --request examples/substrate/backtest-request.axis-a.sample.json \
-  --substrate-url http://127.0.0.1:4000 \
-  --substrate-tenant tnt_arrowhedge \
-  --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001/readiness.json
-```
-
-`check-env` runs the redacted request preflight and probes all required
-substrate readiness gates: `/healthz`, `/tenants/{tenant}`,
-`/tenants/{tenant}/profiles/finance-research`, and
-`/tenants/{tenant}/arrowhedge/cop`. It returns non-zero if the substrate service
-is not reachable, the tenant/profile is not ready, the ArrowHedge route is not
-mounted, or required key names are missing.
-
-Then run a dry-run preflight:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.backtest_experiment \
-  --request examples/substrate/backtest-request.axis-a.sample.json \
-  --experiment-id exp_arrowhedge_axis_a_001 \
-  --substrate-url http://127.0.0.1:4000 \
-  --substrate-tenant tnt_arrowhedge \
-  --out-dir artifacts/arrowhedge/exp_arrowhedge_axis_a_001 \
-  --dry-run
-```
-
-The dry run writes `preflight.json` without executing models or data calls. It
-fails the request if required fields are missing: tickers, valid dates, graph
-nodes, at least one analyst connected to a portfolio manager, substrate URL and
-tenant, and required API key names. API key values are redacted in the artifact.
-
-After preflight passes, run the paired experiment:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.backtest_experiment \
-  --request examples/substrate/backtest-request.axis-a.sample.json \
-  --experiment-id exp_arrowhedge_axis_a_001 \
-  --substrate-url http://127.0.0.1:4000 \
-  --substrate-tenant tnt_arrowhedge \
-  --out-dir artifacts/arrowhedge/exp_arrowhedge_axis_a_001
-```
-
-This writes raw off/blocking backtest outputs, normalized off/blocking
-artifacts, `paired-report.json`, and `manifest.json`. Each backtest day now
-stores the canonical `substrate_envelope` even when `substrate_mode=off`, so
-staleness, source data, graph/config, and raw-decision hashes can be checked
-independently of the blocking COP.
-
-Verify the completed bundle before reading the claim status:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.backtest_experiment verify-bundle \
-  --bundle-dir artifacts/arrowhedge/exp_arrowhedge_axis_a_001 \
-  --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001/verification.json
-```
-
-`verify-bundle` recomputes artifact hashes and the paired report, checks raw
-off/blocking runs for day-level `substrate_envelope` records, checks manifest
-claim status against `paired-report.json`, and returns non-zero unless the
-bundle is both untampered and claim-ready.
-
-When starting from a single saved ArrowHedge run envelope, first produce normalized
-off/blocking artifacts. A substrate response can be generated by a live
-`/arrowhedge/run-envelopes` call or by the deterministic offline reviewer:
-
-```bash
-pnpm tsx scripts/review-arrowhedge-envelope-offline.ts \
-  --envelope artifacts/arrowhedge/run-envelope.json \
-  --tenant tnt_arrowhedge \
-  --adapter-started-at 2026-06-03T13:59:58.500Z \
-  --out artifacts/arrowhedge/substrate-response.json
-```
-
-Then build a locked paired-run bundle from the same envelope and response:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.compare_modes bundle-from-envelope \
-  --experiment-id exp_arrowhedge_axis_a_001 \
-  --envelope artifacts/arrowhedge/run-envelope.json \
-  --substrate-result artifacts/arrowhedge/substrate-response.json \
-  --out-dir artifacts/arrowhedge/exp_arrowhedge_axis_a_001
-```
-
-The single-envelope bundle writes `off-run.json`, `blocking-run.json`, `paired-report.json`,
-and `manifest.json`. The manifest hashes the source envelope, substrate
-response, and generated artifacts so mismatched manual comparisons cannot
-quietly pass.
-
-Staleness is derived from the envelope risk freshness window, while blocking
-and replay ids come from the substrate response. Market-win claims are
-deliberately denied unless the paired artifacts have historical run provenance,
-matching raw-decision hashes, replayable blocked event ids, zero false
-positives, zero false negatives, and positive market/PnL delta:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.compare_modes artifact-from-envelope \
-  --envelope artifacts/arrowhedge/run-envelope.json \
-  --mode off \
-  --out artifacts/arrowhedge/off-run.json
-
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.compare_modes artifact-from-envelope \
-  --envelope artifacts/arrowhedge/run-envelope.json \
-  --mode blocking \
-  --substrate-result artifacts/arrowhedge/substrate-response.json \
-  --out artifacts/arrowhedge/blocking-run.json
-```
-
-Then build the saved paired-run report from archived JSON outputs with:
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m src.substrate.compare_modes \
-  --experiment-id exp_arrowhedge_axis_a_001 \
-  --off artifacts/arrowhedge/off-run.json \
-  --blocking artifacts/arrowhedge/blocking-run.json \
-  --out artifacts/arrowhedge/paired-report.json
-```
-
-The report builder accepts envelope-derived artifacts, already-normalized
-comparison rows, or raw ArrowHedge web/backtest result JSON containing
-`results`, `raw_decisions`, `decisions`, `substrate`, and `executed_trades`.
+See `docs/arrowhedgelab-upstream-integration-review-2026-07-01.md` for the
+current adapter contract and integration review.
 
 ---
 
