@@ -9,7 +9,7 @@ import uuid
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.agency import (
     AgencyAccessRequestDecision,
@@ -410,6 +410,12 @@ class IntegrationExternalAdapterRunIngest(BaseModel):
     evidence: dict[str, Any] = Field(default_factory=dict)
     metrics: dict[str, Any] = Field(default_factory=dict)
     idempotency_key: str | None = Field(default=None, max_length=160)
+
+    @model_validator(mode="after")
+    def _require_retry_identity(self) -> "IntegrationExternalAdapterRunIngest":
+        if not self.idempotency_key and not self.adapter_run_id:
+            raise ValueError("idempotency_key or adapter_run_id is required")
+        return self
 
 
 class IntegrationAcceptedResponse(BaseModel):

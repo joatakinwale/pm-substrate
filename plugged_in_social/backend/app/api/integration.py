@@ -6,7 +6,7 @@ import uuid
 from collections import Counter
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,6 +56,8 @@ from app.schemas.integration import (
 )
 from app.services.agency_domain import (
     approve_and_dispatch_marketing_run,
+    build_agency_artifact_lineage,
+    compute_agency_artifact_payload_hash,
     compute_payload_hash,
     create_agency_artifact,
     create_client_engagement,
@@ -63,6 +65,7 @@ from app.services.agency_domain import (
     decide_approval_request,
     kickoff_marketing_run,
     MarketingRunAccessGateError,
+    normalize_agency_artifact_evidence_refs,
     start_marketing_run,
 )
 from app.services.virtual_agency_orchestration import (
@@ -1515,6 +1518,75 @@ def _missing_external_adapter_gates(
     ]
 
 
+def _external_adapter_run_idempotency_key(
+    body: IntegrationExternalAdapterRunIngest,
+) -> str:
+    key = body.idempotency_key or body.adapter_run_id
+    if not key:
+        raise ValueError("idempotency_key or adapter_run_id is required")
+    return str(key)
+
+
+async def _list_external_adapter_run_artifacts(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+    adapter_id: str | None = None,
+) -> list[AgencyArtifact]:
+    if hasattr(db, "list_external_adapter_run_artifacts"):
+        artifacts = list(
+            db.list_external_adapter_run_artifacts(
+                org_id=org_id,
+                run_id=run_id,
+            )
+        )
+    else:
+        result = await db.execute(
+            select(AgencyArtifact)
+            .where(
+                AgencyArtifact.org_id == org_id,
+                AgencyArtifact.marketing_run_id == run_id,
+                AgencyArtifact.artifact_type == "external_adapter_run",
+            )
+            .order_by(AgencyArtifact.created_at.desc())
+        )
+        artifacts = list(result.scalars().all())
+
+    if adapter_id is None:
+        return artifacts
+    return [
+        artifact
+        for artifact in artifacts
+        if dict(artifact.lineage or {}).get("adapter_id") == adapter_id
+    ]
+
+
+async def _find_external_adapter_run_artifact_by_idempotency_key(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run_id: uuid.UUID,
+    adapter_id: str,
+    idempotency_key: str,
+) -> AgencyArtifact | None:
+    artifacts = await _list_external_adapter_run_artifacts(
+        db,
+        org_id=org_id,
+        run_id=run_id,
+        adapter_id=adapter_id,
+    )
+    return next(
+        (
+            artifact
+            for artifact in artifacts
+            if dict(artifact.lineage or {}).get("idempotency_key")
+            == idempotency_key
+        ),
+        None,
+    )
+
+
 def _platform_manifest() -> IntegrationPlatformManifestEnvelope:
     return IntegrationPlatformManifestEnvelope(
         closed_loop_stages=_CLOSED_LOOP_STAGES,
@@ -1861,22 +1933,12 @@ async def list_run_external_adapter_runs(
 ):
     org_id = _org_id_from_user(current_user)
     await _get_run(db, org_id=org_id, run_id=run_id)
-    result = await db.execute(
-        select(AgencyArtifact)
-        .where(
-            AgencyArtifact.org_id == org_id,
-            AgencyArtifact.marketing_run_id == run_id,
-            AgencyArtifact.artifact_type == "external_adapter_run",
-        )
-        .order_by(AgencyArtifact.created_at.desc())
+    artifacts = await _list_external_adapter_run_artifacts(
+        db,
+        org_id=org_id,
+        run_id=run_id,
+        adapter_id=adapter_id,
     )
-    artifacts = list(result.scalars().all())
-    if adapter_id:
-        artifacts = [
-            artifact
-            for artifact in artifacts
-            if dict(artifact.lineage or {}).get("adapter_id") == adapter_id
-        ]
     return [_to_artifact(item) for item in artifacts]
 
 
@@ -1888,6 +1950,7 @@ async def list_run_external_adapter_runs(
 async def ingest_run_external_adapter_run(
     run_id: uuid.UUID,
     body: IntegrationExternalAdapterRunIngest,
+    response: Response,
     db: AsyncSession = Depends(get_db_with_rls_dep),
     current_user: dict = Depends(get_current_user),
 ):
@@ -1915,6 +1978,7 @@ async def ingest_run_external_adapter_run(
             },
         )
 
+    idempotency_key = _external_adapter_run_idempotency_key(body)
     engagement = await _get_engagement(
         db,
         org_id=org_id,
@@ -1931,7 +1995,8 @@ async def ingest_run_external_adapter_run(
         "output_artifacts": body.output_artifacts,
         "evidence": body.evidence,
         "metrics": body.metrics,
-        "idempotency_key": body.idempotency_key,
+        "idempotency_key": idempotency_key,
+        "client_idempotency_key": body.idempotency_key,
         "adapter_contract": {
             "boundary": adapter.boundary,
             "required_gates": adapter.required_gates,
@@ -1939,35 +2004,73 @@ async def ingest_run_external_adapter_run(
             "output_artifacts": adapter.output_artifacts,
         },
     }
+    artifact_body = AgencyArtifactCreate(
+        marketing_run_id=run.id,
+        artifact_type="external_adapter_run",
+        title=f"External adapter run: {adapter.id}",
+        payload=payload,
+        evidence_refs=list(body.input_refs),
+        lineage={
+            "source": "external_adapter",
+            "adapter_id": adapter.id,
+            "adapter_type": adapter.adapter_type,
+            "adapter_run_id": body.adapter_run_id,
+            "boundary": adapter.boundary,
+            "status": body.status,
+            "gate_results_hash": compute_payload_hash(body.gate_results),
+            "output_payload_hash": compute_payload_hash(
+                {
+                    "output_artifacts": body.output_artifacts,
+                    "evidence": body.evidence,
+                    "metrics": body.metrics,
+                }
+            ),
+            "idempotency_key": idempotency_key,
+            "client_idempotency_key": body.idempotency_key,
+        },
+        author_role="external_adapter",
+    )
+    expected_payload_hash = compute_agency_artifact_payload_hash(
+        body=artifact_body,
+        evidence_refs=normalize_agency_artifact_evidence_refs(
+            artifact_body.evidence_refs
+        ),
+        lineage=build_agency_artifact_lineage(
+            engagement=engagement,
+            body=artifact_body,
+        ),
+        payload=dict(artifact_body.payload),
+    )
+    existing = await _find_external_adapter_run_artifact_by_idempotency_key(
+        db,
+        org_id=org_id,
+        run_id=run.id,
+        adapter_id=adapter.id,
+        idempotency_key=idempotency_key,
+    )
+    if existing is not None:
+        if existing.payload_hash != expected_payload_hash:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "external_adapter_idempotency_conflict",
+                    "message": (
+                        "External adapter idempotency key was reused with a "
+                        "different payload."
+                    ),
+                    "adapter_id": adapter.id,
+                    "idempotency_key": idempotency_key,
+                    "existing_artifact_id": str(existing.id),
+                },
+            )
+        response.status_code = status.HTTP_200_OK
+        return _to_artifact(existing)
+
     artifact = await create_agency_artifact(
         db,
         org_id=org_id,
         engagement=engagement,
-        body=AgencyArtifactCreate(
-            marketing_run_id=run.id,
-            artifact_type="external_adapter_run",
-            title=f"External adapter run: {adapter.id}",
-            payload=payload,
-            evidence_refs=list(body.input_refs),
-            lineage={
-                "source": "external_adapter",
-                "adapter_id": adapter.id,
-                "adapter_type": adapter.adapter_type,
-                "adapter_run_id": body.adapter_run_id,
-                "boundary": adapter.boundary,
-                "status": body.status,
-                "gate_results_hash": compute_payload_hash(body.gate_results),
-                "output_payload_hash": compute_payload_hash(
-                    {
-                        "output_artifacts": body.output_artifacts,
-                        "evidence": body.evidence,
-                        "metrics": body.metrics,
-                    }
-                ),
-                "idempotency_key": body.idempotency_key,
-            },
-            author_role="external_adapter",
-        ),
+        body=artifact_body,
     )
     await db.commit()
     await db.refresh(artifact)

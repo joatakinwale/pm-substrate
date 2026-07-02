@@ -1021,12 +1021,21 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes("external_adapter_run.read") &&
       integrationApi.includes("external_adapter_run.ingest") &&
       integrationApi.includes("_missing_external_adapter_gates") &&
+      integrationApi.includes("_find_external_adapter_run_artifact_by_idempotency_key") &&
+      integrationApi.includes("external_adapter_idempotency_conflict") &&
       integrationApi.includes("external_adapter_run_hashes") &&
       integrationSchemas.includes("IntegrationExternalAdapterManifest") &&
       integrationSchemas.includes("IntegrationExternalAdapterRunIngest") &&
+      integrationSchemas.includes("idempotency_key or adapter_run_id is required") &&
       integrationSchemas.includes("external_adapters") &&
       integrationTests.includes("external_adapter_manifest.read") &&
       integrationTests.includes("external_adapter_run.ingest") &&
+      integrationTests.includes(
+        "test_external_adapter_run_ingest_is_idempotent_for_matching_payload",
+      ) &&
+      integrationTests.includes(
+        "test_external_adapter_run_ingest_rejects_idempotency_conflict",
+      ) &&
       integrationTests.includes("browser_qa_harness") &&
       integrationTests.includes("sandbox_boundary"),
     operatorRunMonitorSurface:

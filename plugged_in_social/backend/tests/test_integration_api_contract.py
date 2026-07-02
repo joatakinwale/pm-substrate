@@ -3,6 +3,11 @@ from __future__ import annotations
 import inspect
 import uuid
 from datetime import date, datetime, timezone
+from types import SimpleNamespace
+
+import pytest
+from fastapi import HTTPException, Response
+from pydantic import ValidationError
 
 
 def test_integration_router_imports_with_neutral_v1_prefix():
@@ -388,6 +393,202 @@ def test_integration_schemas_expose_stable_external_envelopes():
     assert {"ok", "status", "payload_hash", "artifact_id"}.issubset(
         accepted_fields
     )
+
+
+def test_external_adapter_run_ingest_requires_retry_identity():
+    from app.schemas.integration import IntegrationExternalAdapterRunIngest
+
+    with pytest.raises(ValidationError):
+        IntegrationExternalAdapterRunIngest.model_validate(
+            {
+                "adapter_id": "agent_harness",
+                "status": "succeeded",
+                "gate_results": {},
+            }
+        )
+
+    request = IntegrationExternalAdapterRunIngest.model_validate(
+        {
+            "adapter_id": "agent_harness",
+            "adapter_run_id": "external-session-1",
+            "status": "succeeded",
+            "gate_results": {},
+        }
+    )
+
+    assert request.adapter_run_id == "external-session-1"
+
+
+class _FakeExternalAdapterRunDb:
+    def __init__(self):
+        self.artifacts = []
+        self.commit_count = 0
+
+    def list_external_adapter_run_artifacts(self, *, org_id, run_id):
+        return [
+            artifact
+            for artifact in self.artifacts
+            if artifact.org_id == org_id
+            and artifact.marketing_run_id == run_id
+            and artifact.artifact_type == "external_adapter_run"
+        ]
+
+    def add(self, obj):
+        if getattr(obj, "id", None) is None:
+            obj.id = uuid.uuid4()
+        if getattr(obj, "version", None) is None:
+            obj.version = 1
+        now = datetime.now(timezone.utc)
+        if getattr(obj, "created_at", None) is None:
+            obj.created_at = now
+        if getattr(obj, "updated_at", None) is None:
+            obj.updated_at = now
+        self.artifacts.append(obj)
+
+    async def flush(self):
+        return None
+
+    async def commit(self):
+        self.commit_count += 1
+
+    async def refresh(self, _obj):
+        return None
+
+
+def _external_adapter_body(**overrides):
+    from app.schemas.integration import IntegrationExternalAdapterRunIngest
+
+    values = {
+        "adapter_id": "agent_harness",
+        "adapter_run_id": "agent-session-1",
+        "status": "succeeded",
+        "gate_results": {
+            "tenant_rls": True,
+            "capability_gate": True,
+            "approval_payload_hash": True,
+            "content_hash_gate": True,
+            "sandbox_boundary": True,
+            "durable_event_hash": True,
+        },
+        "input_refs": [
+            {
+                "kind": "source_record",
+                "id": "plugged_in_social:marketing_runs:run-1",
+                "label": "Marketing run",
+            }
+        ],
+        "output_artifacts": [{"kind": "agent_session_tree"}],
+        "evidence": {"session_id": "agent-session-1"},
+        "metrics": {"tool_calls": 3},
+        "idempotency_key": "adapter-retry-1",
+    }
+    values.update(overrides)
+    return IntegrationExternalAdapterRunIngest.model_validate(values)
+
+
+@pytest.mark.asyncio
+async def test_external_adapter_run_ingest_is_idempotent_for_matching_payload(
+    monkeypatch,
+):
+    import app.api.integration as module
+
+    org_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    db = _FakeExternalAdapterRunDb()
+
+    async def _fake_get_run(_db, *, org_id: uuid.UUID, run_id: uuid.UUID):
+        return SimpleNamespace(
+            id=run_id,
+            org_id=org_id,
+            engagement_id=engagement_id,
+        )
+
+    async def _fake_get_engagement(
+        _db,
+        *,
+        org_id: uuid.UUID,
+        engagement_id: uuid.UUID,
+    ):
+        return SimpleNamespace(id=engagement_id, org_id=org_id)
+
+    monkeypatch.setattr(module, "_get_run", _fake_get_run)
+    monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+
+    body = _external_adapter_body()
+    first = await module.ingest_run_external_adapter_run(
+        run_id=run_id,
+        body=body,
+        response=Response(),
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+    retry_response = Response()
+    second = await module.ingest_run_external_adapter_run(
+        run_id=run_id,
+        body=body,
+        response=retry_response,
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+
+    assert first.id == second.id
+    assert len(db.artifacts) == 1
+    assert db.commit_count == 1
+    assert retry_response.status_code == 200
+    assert second.lineage["idempotency_key"] == "adapter-retry-1"
+    assert second.payload["client_idempotency_key"] == "adapter-retry-1"
+
+
+@pytest.mark.asyncio
+async def test_external_adapter_run_ingest_rejects_idempotency_conflict(
+    monkeypatch,
+):
+    import app.api.integration as module
+
+    org_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    db = _FakeExternalAdapterRunDb()
+
+    async def _fake_get_run(_db, *, org_id: uuid.UUID, run_id: uuid.UUID):
+        return SimpleNamespace(
+            id=run_id,
+            org_id=org_id,
+            engagement_id=engagement_id,
+        )
+
+    async def _fake_get_engagement(
+        _db,
+        *,
+        org_id: uuid.UUID,
+        engagement_id: uuid.UUID,
+    ):
+        return SimpleNamespace(id=engagement_id, org_id=org_id)
+
+    monkeypatch.setattr(module, "_get_run", _fake_get_run)
+    monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+
+    await module.ingest_run_external_adapter_run(
+        run_id=run_id,
+        body=_external_adapter_body(),
+        response=Response(),
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await module.ingest_run_external_adapter_run(
+            run_id=run_id,
+            body=_external_adapter_body(metrics={"tool_calls": 4}),
+            response=Response(),
+            db=db,
+            current_user={"org_id": str(org_id)},
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "external_adapter_idempotency_conflict"
+    assert len(db.artifacts) == 1
 
 
 def test_platform_manifest_exposes_agents_config_data_and_gates():

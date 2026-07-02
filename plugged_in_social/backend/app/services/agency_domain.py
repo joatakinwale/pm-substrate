@@ -570,29 +570,14 @@ async def create_agency_artifact(
     engagement: ClientEngagement,
     body: AgencyArtifactCreate,
 ) -> AgencyArtifact:
-    evidence_refs = [
-        ref.model_dump() if hasattr(ref, "model_dump") else dict(ref)
-        for ref in body.evidence_refs
-    ]
-    lineage = {
-        **dict(body.lineage),
-        "engagement_id": str(engagement.id),
-    }
-    if body.marketing_run_id is not None:
-        lineage["marketing_run_id"] = str(body.marketing_run_id)
-    if body.virtual_agency_task_id is not None:
-        lineage["virtual_agency_task_id"] = str(body.virtual_agency_task_id)
+    evidence_refs = normalize_agency_artifact_evidence_refs(body.evidence_refs)
+    lineage = build_agency_artifact_lineage(engagement=engagement, body=body)
     payload = dict(body.payload)
-    payload_hash = compute_payload_hash(
-        {
-            "artifact_type": body.artifact_type,
-            "title": body.title,
-            "body": body.body,
-            "payload": payload,
-            "evidence_refs": evidence_refs,
-            "lineage": lineage,
-            "author_role": body.author_role,
-        }
+    payload_hash = compute_agency_artifact_payload_hash(
+        body=body,
+        evidence_refs=evidence_refs,
+        lineage=lineage,
+        payload=payload,
     )
     artifact = AgencyArtifact(
         org_id=org_id,
@@ -611,6 +596,50 @@ async def create_agency_artifact(
     db.add(artifact)
     await db.flush()
     return artifact
+
+
+def normalize_agency_artifact_evidence_refs(evidence_refs: list[Any]) -> list[dict]:
+    evidence_refs = [
+        ref.model_dump() if hasattr(ref, "model_dump") else dict(ref)
+        for ref in evidence_refs
+    ]
+    return evidence_refs
+
+
+def build_agency_artifact_lineage(
+    *,
+    engagement: ClientEngagement,
+    body: AgencyArtifactCreate,
+) -> dict:
+    lineage = {
+        **dict(body.lineage),
+        "engagement_id": str(engagement.id),
+    }
+    if body.marketing_run_id is not None:
+        lineage["marketing_run_id"] = str(body.marketing_run_id)
+    if body.virtual_agency_task_id is not None:
+        lineage["virtual_agency_task_id"] = str(body.virtual_agency_task_id)
+    return lineage
+
+
+def compute_agency_artifact_payload_hash(
+    *,
+    body: AgencyArtifactCreate,
+    evidence_refs: list[dict],
+    lineage: dict,
+    payload: dict,
+) -> str:
+    return compute_payload_hash(
+        {
+            "artifact_type": body.artifact_type,
+            "title": body.title,
+            "body": body.body,
+            "payload": payload,
+            "evidence_refs": evidence_refs,
+            "lineage": lineage,
+            "author_role": body.author_role,
+        }
+    )
 
 
 async def create_approval_request(
