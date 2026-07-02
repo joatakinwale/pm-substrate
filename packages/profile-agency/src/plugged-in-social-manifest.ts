@@ -949,6 +949,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes('"/platform-manifest"') &&
       integrationApi.includes('"/external-adapters"') &&
       integrationApi.includes('"/engagements"') &&
+      integrationApi.includes('"/engagements/{engagement_id}/marketing-runs"') &&
+      integrationApi.includes('"/engagements/{engagement_id}/artifacts"') &&
+      integrationApi.includes('"/engagements/{engagement_id}/approvals"') &&
+      integrationApi.includes('"/engagements/{engagement_id}/access-requests"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/artifacts"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/tasks"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/events"') &&

@@ -1507,6 +1507,94 @@ async def get_engagement(
 
 
 @router.get(
+    "/engagements/{engagement_id}/marketing-runs",
+    response_model=list[IntegrationMarketingRunEnvelope],
+)
+async def list_engagement_marketing_runs(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(MarketingRun)
+        .where(
+            MarketingRun.org_id == org_id,
+            MarketingRun.engagement_id == engagement_id,
+        )
+        .order_by(MarketingRun.created_at.desc())
+    )
+    return [_to_run(item) for item in result.scalars().all()]
+
+
+@router.get(
+    "/engagements/{engagement_id}/artifacts",
+    response_model=list[IntegrationArtifactEnvelope],
+)
+async def list_engagement_artifacts(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(AgencyArtifact)
+        .where(
+            AgencyArtifact.org_id == org_id,
+            AgencyArtifact.engagement_id == engagement_id,
+        )
+        .order_by(AgencyArtifact.created_at.desc())
+    )
+    return [_to_artifact(item) for item in result.scalars().all()]
+
+
+@router.get(
+    "/engagements/{engagement_id}/approvals",
+    response_model=list[IntegrationApprovalEnvelope],
+)
+async def list_engagement_approvals(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(AgencyApprovalRequest)
+        .where(
+            AgencyApprovalRequest.org_id == org_id,
+            AgencyApprovalRequest.engagement_id == engagement_id,
+        )
+        .order_by(AgencyApprovalRequest.created_at.desc())
+    )
+    return [_to_approval(item) for item in result.scalars().all()]
+
+
+@router.get(
+    "/engagements/{engagement_id}/access-requests",
+    response_model=list[IntegrationAccessRequestEnvelope],
+)
+async def list_engagement_access_requests(
+    engagement_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
+    result = await db.execute(
+        select(AgencyAccessRequest)
+        .where(
+            AgencyAccessRequest.org_id == org_id,
+            AgencyAccessRequest.engagement_id == engagement_id,
+        )
+        .order_by(AgencyAccessRequest.created_at.desc())
+    )
+    return [_to_access_request(item) for item in result.scalars().all()]
+
+
+@router.get(
     "/marketing-runs/{run_id}",
     response_model=IntegrationMarketingRunEnvelope,
 )

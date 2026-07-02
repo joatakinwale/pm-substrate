@@ -794,6 +794,30 @@ function liveRunEvidenceIssues(
   if (manifestEndpoint?.boundary !== "public_rls") {
     issues.add("platform manifest endpoint is not public-RLS scoped");
   }
+  const engagementRunsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/marketing-runs",
+  );
+  if (engagementRunsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement marketing-runs endpoint is not public-RLS scoped");
+  }
+  const engagementArtifactsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/artifacts",
+  );
+  if (engagementArtifactsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement artifacts endpoint is not public-RLS scoped");
+  }
+  const engagementApprovalsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/approvals",
+  );
+  if (engagementApprovalsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement approvals endpoint is not public-RLS scoped");
+  }
+  const engagementAccessRequestsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/access-requests",
+  );
+  if (engagementAccessRequestsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement access-requests endpoint is not public-RLS scoped");
+  }
   const dispatchEndpoint = endpoints.get(
     "POST /api/integration/v1/marketing-runs/{run_id}/dispatch",
   );

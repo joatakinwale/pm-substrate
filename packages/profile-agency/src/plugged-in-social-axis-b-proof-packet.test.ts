@@ -164,6 +164,30 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["platform_manifest.read"],
         },
         {
+          method: "GET",
+          path: "/api/integration/v1/engagements/{engagement_id}/marketing-runs",
+          boundary: "public_rls",
+          capability_ids: ["marketing_run.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/engagements/{engagement_id}/artifacts",
+          boundary: "public_rls",
+          capability_ids: ["artifact.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/engagements/{engagement_id}/approvals",
+          boundary: "public_rls",
+          capability_ids: ["approval.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/engagements/{engagement_id}/access-requests",
+          boundary: "public_rls",
+          capability_ids: ["access_request.read"],
+        },
+        {
           method: "POST",
           path: "/api/integration/v1/marketing-runs/{run_id}/dispatch",
           boundary: "public_rls",

@@ -81,6 +81,26 @@ describe("PluggedInSocial source manifest", () => {
         }),
         expect.objectContaining({
           method: "GET",
+          path: "/integration/v1/engagements/{engagement_id}/marketing-runs",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "GET",
+          path: "/integration/v1/engagements/{engagement_id}/artifacts",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "GET",
+          path: "/integration/v1/engagements/{engagement_id}/approvals",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "GET",
+          path: "/integration/v1/engagements/{engagement_id}/access-requests",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "GET",
           path: "/integration/v1/marketing-runs/{run_id}/artifacts",
           boundary: "public_rls",
         }),

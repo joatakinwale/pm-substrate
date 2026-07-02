@@ -24,6 +24,22 @@ def test_integration_router_imports_with_neutral_v1_prefix():
         frozenset({"GET"}),
     ) in route_methods
     assert (
+        "/integration/v1/engagements/{engagement_id}/marketing-runs",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/engagements/{engagement_id}/artifacts",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/engagements/{engagement_id}/approvals",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/engagements/{engagement_id}/access-requests",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
         "/integration/v1/marketing-runs/{run_id}",
         frozenset({"GET"}),
     ) in route_methods
@@ -104,6 +120,26 @@ def test_main_registers_neutral_integration_router():
 
     assert "from app.api.integration import router as integration_router" in src
     assert 'app.include_router(integration_router, prefix="/api")' in src
+
+
+def test_engagement_envelope_links_expose_neutral_related_resources():
+    import app.api.integration as module
+
+    engagement_id = uuid.uuid4()
+
+    links = {link.rel: link.href for link in module._engagement_links(engagement_id)}
+
+    assert links == {
+        "self": f"/api/integration/v1/engagements/{engagement_id}",
+        "marketing_runs": (
+            f"/api/integration/v1/engagements/{engagement_id}/marketing-runs"
+        ),
+        "artifacts": f"/api/integration/v1/engagements/{engagement_id}/artifacts",
+        "approvals": f"/api/integration/v1/engagements/{engagement_id}/approvals",
+        "access_requests": (
+            f"/api/integration/v1/engagements/{engagement_id}/access-requests"
+        ),
+    }
 
 
 def test_integration_schemas_expose_stable_external_envelopes():
@@ -350,6 +386,30 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         endpoint.path == "/api/integration/v1/external-adapters"
         and endpoint.boundary == "public_rls"
         and "external_adapter_manifest.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/engagements/{engagement_id}/marketing-runs"
+        and endpoint.boundary == "public_rls"
+        and "marketing_run.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/engagements/{engagement_id}/artifacts"
+        and endpoint.boundary == "public_rls"
+        and "artifact.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/engagements/{engagement_id}/approvals"
+        and endpoint.boundary == "public_rls"
+        and "approval.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/engagements/{engagement_id}/access-requests"
+        and endpoint.boundary == "public_rls"
+        and "access_request.read" in endpoint.capability_ids
         for endpoint in manifest.api_endpoints
     )
     assert any(
