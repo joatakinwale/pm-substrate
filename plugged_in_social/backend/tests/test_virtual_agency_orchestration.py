@@ -223,6 +223,12 @@ async def test_scheduling_completion_waits_for_metrics_before_analytics(monkeypa
     scheduling_message = sent[-1]["message"]
     assert scheduling_message["agent_role"] == AGENT_SCHEDULING
 
+    await trigger_department_agents_for_project(db, org_id, project.id)
+    assert [item["message"]["agent_role"] for item in sent] == [
+        AGENT_CONTENT,
+        AGENT_SCHEDULING,
+    ]
+
     await route_virtual_agency_task(db=db, **scheduling_message)
 
     assert [item["message"]["agent_role"] for item in sent] == [
@@ -556,6 +562,14 @@ async def test_duplicate_handoff_is_idempotent(monkeypatch):
 
     assert first["status"] == "done"
     assert second["status"] == "duplicate"
+    with pytest.raises(ExecutionScopeError, match="not executable"):
+        await route_virtual_agency_task(
+            db=db,
+            **{
+                **content_message,
+                "idempotency_key": f"va-exec:{uuid.uuid4()}:different",
+            },
+        )
     posts = list(db._store.get(SocialPost, {}).values())
     assert len(posts) == 1
 

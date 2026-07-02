@@ -794,11 +794,25 @@ async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_act
         "content_creative"
     ]
 
-    for role in [
-        "content_creative",
-        "scheduling_distribution",
-        "community_engagement",
-    ]:
+    content_message = sent[-1]["message"]
+    assert content_message["agent_role"] == "content_creative"
+    await route_virtual_agency_task(db=db, **content_message)
+    assert sent[-1]["message"]["agent_role"] == "scheduling_distribution"
+
+    repeated_dispatch = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="system:dispatcher-retry",
+    )
+    assert repeated_dispatch.dispatched_messages == []
+    assert [
+        item["message"]["agent_role"]
+        for item in sent
+        if item["message"]["agent_role"] == "scheduling_distribution"
+    ] == ["scheduling_distribution"]
+
+    for role in ["scheduling_distribution", "community_engagement"]:
         message = sent[-1]["message"]
         assert message["agent_role"] == role
         await route_virtual_agency_task(db=db, **message)

@@ -41,6 +41,7 @@ from app.services.virtual_agency import (
     AGENT_CONTENT,
     AGENT_COS,
     AGENT_SCHEDULING,
+    agent_task_handoff_idempotency_key,
     publish_agent_task,
 )
 from app.services.external_adapter_contracts import (
@@ -817,7 +818,7 @@ async def approve_and_dispatch_marketing_run(
         except DependencyNotSatisfiedError:
             continue
 
-        handoff_key = f"agency-run:handoff:{run.id}:{task.id}:{task.task_version}"
+        handoff_key = agent_task_handoff_idempotency_key(task)
         if await find_event_by_idempotency_key(db, f"handoff:{handoff_key}") is not None:
             continue
         dispatch = await publish_agent_task(

@@ -52,6 +52,15 @@ async def publish_agent_task(
     return dispatch
 
 
+def agent_task_handoff_idempotency_key(task: VirtualAgencyTask) -> str:
+    """Stable key shared by all dispatch paths for the same task/version."""
+    lineage = task.lineage if isinstance(task.lineage, dict) else {}
+    marketing_run_id = lineage.get("marketing_run_id")
+    if marketing_run_id:
+        return f"agency-run:handoff:{marketing_run_id}:{task.id}:{task.task_version}"
+    return f"virtual-agency:handoff:{task.id}:{task.task_version}"
+
+
 def build_agent_task_dispatch(
     *,
     task: VirtualAgencyTask,
@@ -232,27 +241,41 @@ async def trigger_department_agents_for_project(
     for task in tasks:
         if task.status == VirtualAgencyTaskStatus.superseded.value:
             continue
-        approval_event = approve_task(
-            task,
-            actor_id=actor_id,
-            idempotency_key=f"va-event:approve:{task.id}:{task.task_version}",
-        )
-        db.add(approval_event)
-        if task.source_task_id:
-            legacy_task = await db.get(Task, task.source_task_id)
-            if legacy_task:
-                legacy_task.client_approved = True
-                db.add(legacy_task)
+        if task.status != VirtualAgencyTaskStatus.todo.value:
+            continue
+        approval_key = f"va-event:approve:{task.id}:{task.task_version}"
+        if not task.approval_active and await find_event_by_idempotency_key(
+            db,
+            approval_key,
+        ) is None:
+            approval_event = approve_task(
+                task,
+                actor_id=actor_id,
+                idempotency_key=approval_key,
+            )
+            db.add(approval_event)
+            if task.source_task_id:
+                legacy_task = await db.get(Task, task.source_task_id)
+                if legacy_task:
+                    legacy_task.client_approved = True
+                    db.add(legacy_task)
         dependencies = await list_virtual_task_dependencies(db, task)
         try:
             ensure_dependencies_completed(dependencies)
             await ensure_task_evidence_ready(db, task)
         except DependencyNotSatisfiedError:
             continue
+        message_idempotency_key = agent_task_handoff_idempotency_key(task)
+        if await find_event_by_idempotency_key(
+            db,
+            f"handoff:{message_idempotency_key}",
+        ):
+            continue
         dispatch = await publish_agent_task(
             queue="stevie-virtual-agency",
             task=task,
             actor_id=actor_id,
+            idempotency_key=message_idempotency_key,
         )
         db.add(dispatch["event"])
         dispatched.append(dispatch["message"])
@@ -284,9 +307,7 @@ async def dispatch_metrics_ready_analytics_tasks(
                 await ensure_task_evidence_ready(db, task)
             except DependencyNotSatisfiedError:
                 continue
-            message_idempotency_key = (
-                f"virtual-agency:metrics-ready:{task.id}:{task.task_version}"
-            )
+            message_idempotency_key = agent_task_handoff_idempotency_key(task)
             if await find_event_by_idempotency_key(
                 db,
                 f"handoff:{message_idempotency_key}",

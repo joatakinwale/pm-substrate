@@ -12,7 +12,10 @@ from app.models.virtual_agency import (
     VirtualAgencyTask,
     VirtualAgencyTaskStatus,
 )
-from app.services.virtual_agency import publish_agent_task
+from app.services.virtual_agency import (
+    agent_task_handoff_idempotency_key,
+    publish_agent_task,
+)
 from app.services.virtual_agency_orchestration import (
     apply_mutations,
     build_next_action_proposal_completion_payload,
@@ -154,9 +157,16 @@ async def _dispatch_ready_dependents(
             await ensure_task_evidence_ready(db, dependent)
         except DependencyNotSatisfiedError:
             continue
+        message_idempotency_key = agent_task_handoff_idempotency_key(dependent)
+        if await find_event_by_idempotency_key(
+            db,
+            f"handoff:{message_idempotency_key}",
+        ):
+            continue
         dispatch = await publish_agent_task(
             queue="stevie-virtual-agency",
             task=dependent,
+            idempotency_key=message_idempotency_key,
         )
         db.add(dispatch["event"])
         dispatched.append(dispatch["message"])
@@ -209,6 +219,9 @@ async def route_virtual_agency_task(
         approval_version=approval_version,
         approval_payload_hash=approval_payload_hash,
     )
+    task_status = task.status or VirtualAgencyTaskStatus.todo.value
+    if task_status != VirtualAgencyTaskStatus.todo.value:
+        raise ExecutionScopeError(f"Task is not executable in status {task_status}")
     dependencies = await list_virtual_task_dependencies(db, task)
     _ensure_dependency_scope(
         claimed_dependency_ids=dependency_ids,
