@@ -538,6 +538,15 @@ async def test_external_adapter_run_ingest_is_idempotent_for_matching_payload(
     assert retry_response.status_code == 200
     assert second.lineage["idempotency_key"] == "adapter-retry-1"
     assert second.payload["client_idempotency_key"] == "adapter-retry-1"
+    assert second.payload["adapter_contract"]["compatible_protocols"] == [
+        "pi.orchestrator.spawn",
+        "pi.orchestrator.rpc",
+        "pi.agent_event_stream",
+    ]
+    assert "tool_execution_start" in second.payload["adapter_contract"][
+        "required_event_types"
+    ]
+    assert second.payload["adapter_contract"]["required_result_shape"] is None
 
 
 @pytest.mark.asyncio
@@ -796,10 +805,27 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     )
     assert agent_adapter.boundary == "containerized_process"
     assert "sandbox_boundary" in agent_adapter.required_gates
+    assert "pi_spawn_request" in agent_adapter.input_contracts
+    assert "agent_event_stream" in agent_adapter.output_artifacts
+    assert "tool_execution_events" in agent_adapter.output_artifacts
+    assert "pi.orchestrator.spawn" in agent_adapter.notes["compatible_protocols"]
+    assert "tool_execution_start" in agent_adapter.notes["required_event_types"]
+    assert "agent_event_hash" in agent_adapter.evidence_fields
     assert "tool_call_hash" in agent_adapter.evidence_fields
     assert browser_adapter.boundary == "sandboxed_process"
+    assert "canary_session_start" in browser_adapter.input_contracts
+    assert "session_manifest" in browser_adapter.output_artifacts
+    assert "results_json" in browser_adapter.output_artifacts
     assert "network_har" in browser_adapter.output_artifacts
     assert "evidence_hash_gate" in browser_adapter.required_gates
+    assert "canary.session-start" in browser_adapter.notes["compatible_protocols"]
+    assert browser_adapter.notes["required_result_shape"]["artifacts"] == [
+        "kind",
+        "path",
+        "bytes",
+    ]
+    assert "report_html_hash" in browser_adapter.evidence_fields
+    assert "network_har_hash" in browser_adapter.evidence_fields
     assert any(
         resource.table == "social_posts"
         and "current_content_hash" in resource.durable_evidence_fields

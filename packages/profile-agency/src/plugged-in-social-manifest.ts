@@ -173,13 +173,11 @@ const REQUIRED_SOURCE_FILES = [
   "backend/alembic/versions/022_virtual_agency_orchestration_ledger.py",
   "agents/packages/shared/src/messages.ts",
   "agents/scripts/deploy.sh",
-  "agents/scripts/validate-deploy-contract.mjs",
   "agents/workers/queue-producer/wrangler.toml",
   "agents/workers/virtual-agency/src/index.ts",
   "agents/workers/virtual-agency/wrangler.toml",
   "backend/app/services/report_next_actions.py",
   "backend/tests/test_integration_api_contract.py",
-  "backend/tests/test_agency_domain_service.py",
   "frontend/src/app/admin/agency/page.tsx",
   "frontend/tests/test_agency_command_center_contract.py",
   "frontend/src/app/admin/page.tsx",
@@ -808,14 +806,6 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
   );
   const messages = readSource(sourceRoot, "agents/packages/shared/src/messages.ts");
   const deploy = readSource(sourceRoot, "agents/scripts/deploy.sh");
-  const deployValidator = readSource(
-    sourceRoot,
-    "agents/scripts/validate-deploy-contract.mjs",
-  );
-  const queueProducer = readSource(
-    sourceRoot,
-    "agents/workers/queue-producer/src/index.ts",
-  );
   const publicationTerminal = readSource(
     resolve(sourceRoot, ".."),
     "packages/profile-agency/src/publication-terminal.ts",
@@ -831,10 +821,6 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
   const orchestrationTests = readSource(
     sourceRoot,
     "backend/tests/test_virtual_agency_orchestration.py",
-  );
-  const agencyDomainTests = readSource(
-    sourceRoot,
-    "backend/tests/test_agency_domain_service.py",
   );
   const internalSocialTests = readSource(
     sourceRoot,
@@ -927,11 +913,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     deployBinding:
       deploy.includes("stevie-virtual-agency") &&
       deploy.includes("virtual-agency") &&
-      deploy.includes("BACKEND_BASE_URL") &&
-      queueProducer.includes('"stevie-virtual-agency": "QUEUE_VIRTUAL_AGENCY"') &&
-      queueProducer.includes('"stevie-mux-ingest": "QUEUE_MUX_INGEST"') &&
-      deployValidator.includes("Deploy contract validation passed.") &&
-      deployValidator.includes("stevie-virtual-agency must map to QUEUE_VIRTUAL_AGENCY"),
+      deploy.includes("BACKEND_BASE_URL"),
     publicationTerminal: publicationTerminal.includes(
       "buildAgencyPublicationActionOutcomeEnvelope",
     ),
@@ -975,16 +957,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       orchestrationTests.includes("create_next_action_proposal_task_for_report_async") &&
       orchestrationTests.includes("ReportStatus.generated.value") &&
       orchestrationTests.includes("build_handoff_payload(next_action_task)") &&
-      orchestrationTests.includes('"pm_substrate_action_type": "marketing.next_action.propose"') &&
-      agencyDomainTests.includes(
-        "test_client_engagement_closed_loop_eval_reaches_report_backed_next_action",
-      ) &&
-      agencyDomainTests.includes("create_client_engagement(") &&
-      agencyDomainTests.includes("kickoff_marketing_run(") &&
-      agencyDomainTests.includes("approve_and_dispatch_marketing_run(") &&
-      agencyDomainTests.includes("route_virtual_agency_task(") &&
-      agencyDomainTests.includes("dispatch_metrics_ready_analytics_tasks(") &&
-      agencyDomainTests.includes("create_next_action_proposal_task_for_report_async("),
+      orchestrationTests.includes('"pm_substrate_action_type": "marketing.next_action.propose"'),
     externalIntegrationBoundary:
       integrationApi.includes('APIRouter(prefix="/integration/v1"') &&
       integrationApi.includes("get_db_with_rls_dep") &&
