@@ -82,7 +82,7 @@ Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, 
 
 Market-win claims require a saved paired run with:
 
-- identical tickers, dates, model config, and source data in off and blocking modes;
+- identical tickers, dates, effective graph, model config, starting portfolio, and source data in off and blocking modes;
 - false-positive blocks = 0 on fresh in-limit actions;
 - false-negative stale actions = 0 on stale or source-conflicted actions;
 - replayable event ids for every substrate-blocked decision;
@@ -119,7 +119,10 @@ Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
   `arrowhedge.run-envelope.v1` payloads without importing ArrowHedgeLab
   internals. Connector-built envelopes attach source-artifact/backtest-day
   evidence IDs to signal, risk, and decision records, and those IDs survive
-  expansion into analyst-signal typed events.
+  expansion into analyst-signal typed events. The connector also exposes
+  `compareArrowHedgeIntegrationRunEnvelopePair`, which rejects paired
+  baseline/substrate envelopes when request scope, graph, model config,
+  portfolio, or source-data hashes differ.
 - The TypeScript substrate side still supports `arrowhedge.run-envelope.v1`
   through `packages/capability-finance-research-ingest` and
   `packages/substrate-http-demo`, and the connector now builds canonical
@@ -133,9 +136,9 @@ The next valid historical experiment path is:
 1. Add deeper per-agent/per-tool provenance in ArrowHedge saved results at
    generation time so the connector does not have to infer source refs from
    ticker/date/source-artifact windows.
-2. Reintroduce paired experiment commands only after the adapter can prove that
-   baseline and substrate arms share identical request, graph, model, portfolio,
-   and source-data hashes.
+2. Wire the paired envelope readiness gate into experiment commands so baseline
+   and substrate arms are selected only when request, graph, model, portfolio,
+   and source-data hashes match.
 
 See `docs/arrowhedgelab-upstream-integration-review-2026-07-01.md` for the
 current adapter contract and integration review.
@@ -179,4 +182,4 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).
-- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, connector-side `arrowhedge.run-envelope.v1` generation, and per-record evidence IDs in expanded connector envelopes plus pm-substrate finance-ingest client landed.
+- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, connector-side `arrowhedge.run-envelope.v1` generation, per-record evidence IDs in expanded connector envelopes, and paired baseline/substrate envelope readiness gates plus pm-substrate finance-ingest client landed.

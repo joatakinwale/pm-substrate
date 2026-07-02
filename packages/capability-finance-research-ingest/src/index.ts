@@ -8,6 +8,7 @@ export {
 export {
   buildArrowHedgeIntegrationEvidenceRefs,
   buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
+  compareArrowHedgeIntegrationRunEnvelopePair,
   fetchArrowHedgeIntegrationSnapshot,
   validateArrowHedgeIntegrationSnapshot,
   ArrowHedgeIntegrationFetchError,
@@ -43,6 +44,9 @@ export {
   type ArrowHedgeIntegrationRunEnvelope,
   type ArrowHedgeIntegrationRunEnvelopeBuildInput,
   type ArrowHedgeIntegrationRunEnvelopeBuildResult,
+  type ArrowHedgeIntegrationRunEnvelopePairFingerprints,
+  type ArrowHedgeIntegrationRunEnvelopePairGate,
+  type ArrowHedgeIntegrationRunEnvelopePairInput,
   type ArrowHedgeIntegrationRunSourceArtifacts,
   type ArrowHedgeIntegrationSnapshot,
   type ArrowHedgeIntegrationSnapshotFetchInput,

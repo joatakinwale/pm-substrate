@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { stateRef, type StateRef } from "@pm/agent-state";
 
 export interface ArrowHedgeIntegrationFetchResponse {
@@ -343,6 +344,39 @@ export interface ArrowHedgeIntegrationRunEnvelopeBuildResult {
   readonly envelope?: ArrowHedgeIntegrationRunEnvelope;
 }
 
+export interface ArrowHedgeIntegrationRunEnvelopePairInput {
+  readonly baseline: ArrowHedgeIntegrationRunEnvelope;
+  readonly substrate: ArrowHedgeIntegrationRunEnvelope;
+}
+
+export interface ArrowHedgeIntegrationRunEnvelopePairFingerprints {
+  readonly scopeEqual: boolean;
+  readonly graphEqual: boolean;
+  readonly modelConfigEqual: boolean;
+  readonly portfolioEqual: boolean;
+  readonly sourceDataEqual: boolean;
+  readonly baseline: {
+    readonly scopeSha256: string;
+    readonly graphSha256: string;
+    readonly modelConfigSha256: string;
+    readonly portfolioSha256: string;
+    readonly sourceDataSha256: string;
+  };
+  readonly substrate: {
+    readonly scopeSha256: string;
+    readonly graphSha256: string;
+    readonly modelConfigSha256: string;
+    readonly portfolioSha256: string;
+    readonly sourceDataSha256: string;
+  };
+}
+
+export interface ArrowHedgeIntegrationRunEnvelopePairGate {
+  readonly ready: boolean;
+  readonly issues: readonly string[];
+  readonly fingerprints: ArrowHedgeIntegrationRunEnvelopePairFingerprints;
+}
+
 export interface ArrowHedgeIntegrationValidationResult {
   readonly ready: boolean;
   readonly issues: readonly string[];
@@ -656,6 +690,40 @@ export function buildArrowHedgeRunEnvelopeFromIntegrationSnapshot(
       decisions,
       evidence: envelopeEvidence,
     },
+  };
+}
+
+export function compareArrowHedgeIntegrationRunEnvelopePair(
+  input: ArrowHedgeIntegrationRunEnvelopePairInput,
+): ArrowHedgeIntegrationRunEnvelopePairGate {
+  const baseline = integrationEnvelopeFingerprints(input.baseline);
+  const substrate = integrationEnvelopeFingerprints(input.substrate);
+  const fingerprints = {
+    scopeEqual: baseline.scopeSha256 === substrate.scopeSha256,
+    graphEqual: baseline.graphSha256 === substrate.graphSha256,
+    modelConfigEqual: baseline.modelConfigSha256 === substrate.modelConfigSha256,
+    portfolioEqual: baseline.portfolioSha256 === substrate.portfolioSha256,
+    sourceDataEqual: baseline.sourceDataSha256 === substrate.sourceDataSha256,
+    baseline,
+    substrate,
+  };
+  const issues = [
+    ...(input.baseline.schemaVersion !== "arrowhedge.run-envelope.v1"
+      ? ["baseline schemaVersion must be arrowhedge.run-envelope.v1"]
+      : []),
+    ...(input.substrate.schemaVersion !== "arrowhedge.run-envelope.v1"
+      ? ["substrate schemaVersion must be arrowhedge.run-envelope.v1"]
+      : []),
+    ...(fingerprints.scopeEqual ? [] : ["scope hash mismatch"]),
+    ...(fingerprints.graphEqual ? [] : ["graph hash mismatch"]),
+    ...(fingerprints.modelConfigEqual ? [] : ["modelConfig hash mismatch"]),
+    ...(fingerprints.portfolioEqual ? [] : ["portfolio hash mismatch"]),
+    ...(fingerprints.sourceDataEqual ? [] : ["sourceData hash mismatch"]),
+  ];
+  return {
+    ready: issues.length === 0,
+    issues,
+    fingerprints,
   };
 }
 
@@ -1400,6 +1468,74 @@ function modelConfigToEnvelope(
     providers: modelConfig.providers,
     hashes: modelConfig.hashes ?? {},
   };
+}
+
+function integrationEnvelopeFingerprints(
+  envelope: ArrowHedgeIntegrationRunEnvelope,
+): ArrowHedgeIntegrationRunEnvelopePairFingerprints["baseline"] {
+  return {
+    scopeSha256: sha256StableJson({
+      startDate: envelope.scope.startDate,
+      endDate: envelope.scope.endDate,
+      tickers: [...envelope.scope.tickers].sort(),
+    }),
+    graphSha256: sha256StableJson(envelope.graph),
+    modelConfigSha256: sha256StableJson(envelope.modelConfig),
+    portfolioSha256: sha256StableJson(envelope.portfolio),
+    sourceDataSha256: sha256StableJson(
+      sourceDataEvidenceFingerprint(envelope.evidence),
+    ),
+  };
+}
+
+function sourceDataEvidenceFingerprint(
+  evidence: readonly Record<string, unknown>[],
+): readonly Record<string, unknown>[] {
+  return evidence
+    .filter((item) => isSourceArtifactEvidence(item))
+    .map((item) => ({
+      id: stringField(item, "id"),
+      sha256: stringField(item, "sha256"),
+      sourceUri: stringField(item, "sourceUri"),
+      ticker: stringField(item, "ticker"),
+    }))
+    .sort((left, right) => {
+      const leftKey = `${left.id ?? ""}:${left.ticker ?? ""}`;
+      const rightKey = `${right.id ?? ""}:${right.ticker ?? ""}`;
+      return leftKey.localeCompare(rightKey);
+    });
+}
+
+function isSourceArtifactEvidence(item: Record<string, unknown>): boolean {
+  const id = stringField(item, "id");
+  const sourceUri = stringField(item, "sourceUri");
+  return (
+    (id?.startsWith("ev_source_") ?? false) ||
+    (sourceUri?.startsWith("arrowhedge://source-artifacts/") ?? false)
+  );
+}
+
+function sha256StableJson(value: unknown): string {
+  return createHash("sha256").update(stableJsonString(value)).digest("hex");
+}
+
+function stableJsonString(value: unknown): string {
+  return JSON.stringify(stableJsonValue(value));
+}
+
+function stableJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => stableJsonValue(item));
+  }
+  const record = recordOrUndefined(value);
+  if (record !== undefined) {
+    return Object.fromEntries(
+      Object.entries(record)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, stableJsonValue(item)]),
+    );
+  }
+  return value;
 }
 
 function sanitizeToken(value: string): string {

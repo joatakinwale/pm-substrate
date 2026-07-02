@@ -4,6 +4,7 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
+  compareArrowHedgeIntegrationRunEnvelopePair,
   fetchArrowHedgeIntegrationSnapshot,
   validateArrowHedgeIntegrationSnapshot,
   type ArrowHedgeIntegrationFetch,
@@ -620,6 +621,49 @@ describe("ArrowHedge integration API client", () => {
         "evidenceDocumentIds"
       ],
     ).toHaveLength(2);
+
+    const baselineEnvelope = {
+      ...envelopeResult.envelope!,
+      substrateMode: "observe",
+    };
+    const pairedGate = compareArrowHedgeIntegrationRunEnvelopePair({
+      baseline: baselineEnvelope,
+      substrate: envelopeResult.envelope!,
+    });
+    expect(pairedGate).toMatchObject({
+      ready: true,
+      issues: [],
+      fingerprints: {
+        scopeEqual: true,
+        graphEqual: true,
+        modelConfigEqual: true,
+        portfolioEqual: true,
+        sourceDataEqual: true,
+      },
+    });
+
+    const mismatchedGate = compareArrowHedgeIntegrationRunEnvelopePair({
+      baseline: baselineEnvelope,
+      substrate: {
+        ...envelopeResult.envelope!,
+        modelConfig: {
+          ...envelopeResult.envelope!.modelConfig,
+          defaults: { model_name: "gpt-4o", provider: "OpenAI" },
+        },
+        evidence: envelopeResult.envelope!.evidence.map((item) =>
+          item.id === "ev_source_prices_AAPL_2024-01-01_2024-01-02"
+            ? { ...item, sha256: "9".repeat(64) }
+            : item,
+        ),
+      },
+    });
+    expect(mismatchedGate.ready).toBe(false);
+    expect(mismatchedGate.issues).toEqual(
+      expect.arrayContaining([
+        "modelConfig hash mismatch",
+        "sourceData hash mismatch",
+      ]),
+    );
   });
 
   it("reports contract issues instead of accepting a partial adapter surface", () => {
