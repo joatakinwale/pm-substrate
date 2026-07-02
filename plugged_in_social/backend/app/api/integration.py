@@ -1591,6 +1591,32 @@ def _missing_external_adapter_gates(
     ]
 
 
+def _missing_external_adapter_evidence_fields(
+    adapter: IntegrationExternalAdapterManifest,
+    body: IntegrationExternalAdapterRunIngest,
+) -> list[str]:
+    if body.status != "succeeded":
+        return []
+    return [
+        field
+        for field in adapter.evidence_fields
+        if not _has_evidence_value(body.evidence, field)
+    ]
+
+
+def _has_evidence_value(evidence: dict[str, Any], field: str) -> bool:
+    if field not in evidence:
+        return False
+    value = evidence[field]
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return len(value) > 0
+    return True
+
+
 def _external_adapter_run_idempotency_key(
     body: IntegrationExternalAdapterRunIngest,
 ) -> str:
@@ -2050,6 +2076,20 @@ async def ingest_run_external_adapter_run(
                 "message": "Resolve external adapter gates before recording evidence.",
                 "adapter_id": adapter.id,
                 "missing_or_failed_gates": missing_gates,
+            },
+        )
+    missing_evidence_fields = _missing_external_adapter_evidence_fields(adapter, body)
+    if missing_evidence_fields:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "external_adapter_evidence_missing",
+                "message": (
+                    "Succeeded external adapter runs must include all required "
+                    "evidence fields before they can unblock agency execution."
+                ),
+                "adapter_id": adapter.id,
+                "missing_evidence_fields": missing_evidence_fields,
             },
         )
 

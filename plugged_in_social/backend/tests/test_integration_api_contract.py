@@ -455,6 +455,22 @@ class _FakeExternalAdapterRunDb:
         return None
 
 
+AGENT_HARNESS_EVIDENCE = {
+    "instance_id": "agent-instance-1",
+    "session_id": "agent-session-1",
+    "session_file": "sessions/agent-session-1.jsonl",
+    "agent_event_hash": "a" * 64,
+    "turn_id": "turn-1",
+    "tool_call_id": "tool-call-1",
+    "tool_call_hash": "b" * 64,
+    "tool_result_hash": "c" * 64,
+    "rpc_command_hash": "d" * 64,
+    "state_ref": "pm://state/agent-session-1",
+    "approval_payload_hash": "e" * 64,
+    "output_payload_hash": "f" * 64,
+}
+
+
 def _external_adapter_body(**overrides):
     from app.schemas.integration import IntegrationExternalAdapterRunIngest
 
@@ -478,7 +494,7 @@ def _external_adapter_body(**overrides):
             }
         ],
         "output_artifacts": [{"kind": "agent_session_tree"}],
-        "evidence": {"session_id": "agent-session-1"},
+        "evidence": dict(AGENT_HARNESS_EVIDENCE),
         "metrics": {"tool_calls": 3},
         "idempotency_key": "adapter-retry-1",
     }
@@ -620,6 +636,93 @@ async def test_external_adapter_run_ingest_rejects_idempotency_conflict(
 
     assert exc_info.value.status_code == 409
     assert exc_info.value.detail["code"] == "external_adapter_idempotency_conflict"
+    assert len(db.artifacts) == 1
+
+
+@pytest.mark.asyncio
+async def test_external_adapter_run_ingest_rejects_succeeded_without_required_evidence(
+    monkeypatch,
+):
+    import app.api.integration as module
+
+    org_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    db = _FakeExternalAdapterRunDb()
+
+    async def _fake_get_run(_db, *, org_id: uuid.UUID, run_id: uuid.UUID):
+        return SimpleNamespace(
+            id=run_id,
+            org_id=org_id,
+            engagement_id=engagement_id,
+        )
+
+    monkeypatch.setattr(module, "_get_run", _fake_get_run)
+
+    evidence = dict(AGENT_HARNESS_EVIDENCE)
+    evidence.pop("agent_event_hash")
+
+    with pytest.raises(HTTPException) as exc_info:
+        await module.ingest_run_external_adapter_run(
+            run_id=run_id,
+            body=_external_adapter_body(evidence=evidence),
+            response=Response(),
+            db=db,
+            current_user={"org_id": str(org_id)},
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "external_adapter_evidence_missing"
+    assert exc_info.value.detail["missing_evidence_fields"] == ["agent_event_hash"]
+    assert db.artifacts == []
+
+
+@pytest.mark.asyncio
+async def test_external_adapter_run_ingest_allows_partial_without_full_evidence(
+    monkeypatch,
+):
+    import app.api.integration as module
+
+    org_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    db = _FakeExternalAdapterRunDb()
+
+    async def _fake_get_run(_db, *, org_id: uuid.UUID, run_id: uuid.UUID):
+        return SimpleNamespace(
+            id=run_id,
+            org_id=org_id,
+            engagement_id=engagement_id,
+        )
+
+    async def _fake_get_engagement(
+        _db,
+        *,
+        org_id: uuid.UUID,
+        engagement_id: uuid.UUID,
+    ):
+        return SimpleNamespace(id=engagement_id, org_id=org_id)
+
+    async def _fake_dispatch(_db, **_kwargs):
+        return SimpleNamespace(approved_tasks=[], dispatched_messages=[])
+
+    monkeypatch.setattr(module, "_get_run", _fake_get_run)
+    monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+    monkeypatch.setattr(module, "approve_and_dispatch_marketing_run", _fake_dispatch)
+
+    result = await module.ingest_run_external_adapter_run(
+        run_id=run_id,
+        body=_external_adapter_body(
+            status="partial",
+            evidence={"session_id": "agent-session-1"},
+            idempotency_key="adapter-partial-1",
+        ),
+        response=Response(),
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+
+    assert result.payload["status"] == "partial"
     assert len(db.artifacts) == 1
 
 
