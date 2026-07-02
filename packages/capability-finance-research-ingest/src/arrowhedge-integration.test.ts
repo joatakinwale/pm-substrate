@@ -49,6 +49,10 @@ describe("ArrowHedge integration API client", () => {
             "/integration/v1/flows/{id}",
             "/integration/v1/flows/{id}/runs",
             "/integration/v1/runs/{id}",
+            "/integration/v1/runs/{id}/events",
+            "/integration/v1/backtests",
+            "/integration/v1/backtests/{id}",
+            "/integration/v1/backtests/{id}/days",
             "/integration/v1/config/models",
             "/integration/v1/config/api-keys",
           ],
@@ -146,6 +150,28 @@ describe("ArrowHedge integration API client", () => {
         },
       ],
       [
+        "https://arrow.example/integration/v1/backtests",
+        {
+          schemaVersion: "arrowhedgelab.integration.backtests.v1",
+          count: 1,
+          backtests: [
+            {
+              schemaVersion: "arrowhedgelab.integration.backtest.v1",
+              id: 11,
+              run_id: 11,
+              flow_id: 7,
+              status: "COMPLETE",
+              day_count: 1,
+              first_date: "2024-01-02",
+              last_date: "2024-01-02",
+              performance_metrics: { sharpe_ratio: 1.25 },
+              final_portfolio: { cash: 99000 },
+              hashes: { daysSha256: "7".repeat(64) },
+            },
+          ],
+        },
+      ],
+      [
         "https://arrow.example/integration/v1/flows/7",
         {
           schemaVersion: "arrowhedgelab.integration.flow.v1",
@@ -183,6 +209,84 @@ describe("ArrowHedge integration API client", () => {
             requestDataSha256: "e".repeat(64),
             resultsSha256: "f".repeat(64),
           },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/runs/11/events",
+        {
+          schemaVersion: "arrowhedgelab.integration.run-events.v1",
+          run_id: 11,
+          flow_id: 7,
+          count: 2,
+          events: [
+            {
+              id: "flow-run-11-1-flow_run.created",
+              sequence: 1,
+              type: "flow_run.created",
+              occurred_at: "2024-01-02T09:30:00",
+              payload: { run_id: 11, flow_id: 7 },
+              payload_sha256: "3".repeat(64),
+            },
+            {
+              id: "flow-run-11-2-flow_run.results_recorded",
+              sequence: 2,
+              type: "flow_run.results_recorded",
+              occurred_at: "2024-01-02T16:00:00",
+              payload: {
+                run_id: 11,
+                resultsSha256: "4".repeat(64),
+                backtestDayCount: 1,
+              },
+              payload_sha256: "5".repeat(64),
+            },
+          ],
+          hashes: { eventsSha256: "6".repeat(64) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/backtests/11",
+        {
+          schemaVersion: "arrowhedgelab.integration.backtest.v1",
+          id: 11,
+          run_id: 11,
+          flow_id: 7,
+          status: "COMPLETE",
+          day_count: 1,
+          first_date: "2024-01-02",
+          last_date: "2024-01-02",
+          performance_metrics: { sharpe_ratio: 1.25 },
+          final_portfolio: { cash: 99000 },
+          portfolioValues: [{ Date: "2024-01-02", "Portfolio Value": 101500 }],
+          hashes: {
+            daysSha256: "7".repeat(64),
+            performanceMetricsSha256: "8".repeat(64),
+            finalPortfolioSha256: "9".repeat(64),
+            portfolioValuesSha256: "0".repeat(64),
+          },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/backtests/11/days",
+        {
+          schemaVersion: "arrowhedgelab.integration.backtest-days.v1",
+          run_id: 11,
+          flow_id: 7,
+          count: 1,
+          days: [
+            {
+              sequence: 1,
+              date: "2024-01-02",
+              portfolio_value: 101500,
+              decisions: { AAPL: { action: "buy", quantity: 3 } },
+              executed_trades: { AAPL: 3 },
+              analyst_signals: {
+                warren_buffett: { AAPL: { signal: "bullish" } },
+              },
+              current_prices: { AAPL: 185 },
+              sha256: "a1".repeat(32),
+            },
+          ],
+          hashes: { daysSha256: "b1".repeat(32) },
         },
       ],
       [
@@ -235,6 +339,7 @@ describe("ArrowHedge integration API client", () => {
       fetchFn,
       flowIds: [7],
       runIds: [11],
+      backtestRunIds: [11],
       graph: {
         nodes: [
           { id: "warren_buffett_ab12cd", type: "agent" },
@@ -257,10 +362,14 @@ describe("ArrowHedge integration API client", () => {
       "https://arrow.example/integration/v1/graphs/effective",
       "https://arrow.example/integration/v1/data/cache/summary",
       "https://arrow.example/integration/v1/flows",
+      "https://arrow.example/integration/v1/backtests",
       "https://arrow.example/integration/v1/config/models",
       "https://arrow.example/integration/v1/config/api-keys",
       "https://arrow.example/integration/v1/flows/7",
       "https://arrow.example/integration/v1/runs/11",
+      "https://arrow.example/integration/v1/runs/11/events",
+      "https://arrow.example/integration/v1/backtests/11",
+      "https://arrow.example/integration/v1/backtests/11/days",
     ]);
     expect(calls[2]).toMatchObject({
       method: "POST",
@@ -282,6 +391,12 @@ describe("ArrowHedge integration API client", () => {
     expect(validation).toEqual({ ready: true, issues: [] });
     expect(snapshot.flowDetails).toHaveLength(1);
     expect(snapshot.runDetails).toHaveLength(1);
+    expect(snapshot.runEvents).toHaveLength(1);
+    expect(snapshot.backtests.backtests).toHaveLength(1);
+    expect(snapshot.backtestDetails).toHaveLength(1);
+    expect(snapshot.backtestDays[0]?.days[0]?.decisions).toEqual({
+      AAPL: { action: "buy", quantity: 3 },
+    });
     expect(JSON.stringify(snapshot.apiKeySummary)).not.toContain("sk-");
     expect(snapshot.evidenceRefs.map((ref) => ref.id)).toEqual(
       expect.arrayContaining([
@@ -290,9 +405,13 @@ describe("ArrowHedge integration API client", () => {
         "arrowhedgelab:integration_api:effective_graph",
         "arrowhedgelab:integration_api:flows",
         "arrowhedgelab:integration_api:model_config",
+        "arrowhedgelab:integration_api:backtests",
         "arrowhedgelab:integration_api:api_key_summary",
         "arrowhedgelab:flow:7",
         "arrowhedgelab:flow-run:11",
+        `arrowhedgelab:flow-run-event:11:1:${"3".repeat(64)}`,
+        "arrowhedgelab:backtest:11",
+        `arrowhedgelab:backtest-day:11:2024-01-02:${"a1".repeat(32)}`,
         `arrowhedgelab:cache:prices:AAPL_2024-01-01_2024-01-02:${"a".repeat(64)}`,
       ]),
     );
@@ -350,6 +469,14 @@ describe("ArrowHedge integration API client", () => {
       },
       flowDetails: [],
       runDetails: [],
+      runEvents: [],
+      backtests: {
+        schemaVersion: "arrowhedgelab.integration.backtests.v1",
+        count: 0,
+        backtests: [],
+      },
+      backtestDetails: [],
+      backtestDays: [],
       modelConfig: {
         schemaVersion: "arrowhedgelab.integration.model-config.v1",
         defaults: { model_name: "", provider: "" },

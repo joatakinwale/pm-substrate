@@ -36,6 +36,8 @@ export interface ArrowHedgeIntegrationSnapshotFetchInput
   readonly graph?: ArrowHedgeIntegrationGraphPayload;
   readonly flowIds?: readonly number[];
   readonly runIds?: readonly number[];
+  readonly runEventIds?: readonly number[];
+  readonly backtestRunIds?: readonly number[];
 }
 
 export interface ArrowHedgeIntegrationCapabilities {
@@ -150,6 +152,70 @@ export interface ArrowHedgeIntegrationFlowRun extends ArrowHedgeIntegrationFlowR
   readonly results?: Record<string, unknown>;
 }
 
+export interface ArrowHedgeIntegrationRunEvent {
+  readonly id: string;
+  readonly sequence: number;
+  readonly type: string;
+  readonly occurred_at?: string | null;
+  readonly payload: Record<string, unknown>;
+  readonly payload_sha256: string;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationRunEvents {
+  readonly schemaVersion: string;
+  readonly run_id: number;
+  readonly flow_id?: number;
+  readonly count: number;
+  readonly events: readonly ArrowHedgeIntegrationRunEvent[];
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationBacktestSummary {
+  readonly schemaVersion: string;
+  readonly id: number;
+  readonly run_id: number;
+  readonly flow_id: number;
+  readonly status?: string;
+  readonly day_count: number;
+  readonly first_date?: string | null;
+  readonly last_date?: string | null;
+  readonly performance_metrics?: Record<string, unknown>;
+  readonly final_portfolio?: Record<string, unknown> | null;
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationBacktests {
+  readonly schemaVersion: string;
+  readonly backtests: readonly ArrowHedgeIntegrationBacktestSummary[];
+  readonly count: number;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationBacktest
+  extends ArrowHedgeIntegrationBacktestSummary {
+  readonly portfolioValues?: readonly Record<string, unknown>[];
+}
+
+export interface ArrowHedgeIntegrationBacktestDay {
+  readonly sequence: number;
+  readonly date?: string;
+  readonly sha256: string;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationBacktestDays {
+  readonly schemaVersion: string;
+  readonly run_id: number;
+  readonly flow_id?: number;
+  readonly count: number;
+  readonly days: readonly ArrowHedgeIntegrationBacktestDay[];
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
 export interface ArrowHedgeIntegrationModelRecord {
   readonly display_name: string;
   readonly model_name: string;
@@ -197,6 +263,10 @@ export interface ArrowHedgeIntegrationSnapshot {
   readonly flows: ArrowHedgeIntegrationFlows;
   readonly flowDetails: readonly ArrowHedgeIntegrationFlow[];
   readonly runDetails: readonly ArrowHedgeIntegrationFlowRun[];
+  readonly runEvents: readonly ArrowHedgeIntegrationRunEvents[];
+  readonly backtests: ArrowHedgeIntegrationBacktests;
+  readonly backtestDetails: readonly ArrowHedgeIntegrationBacktest[];
+  readonly backtestDays: readonly ArrowHedgeIntegrationBacktestDays[];
   readonly modelConfig: ArrowHedgeIntegrationModelConfig;
   readonly apiKeySummary: ArrowHedgeIntegrationApiKeySummary;
   readonly evidenceRefs: readonly StateRef[];
@@ -228,6 +298,10 @@ const CACHE_SUMMARY_SCHEMA = "arrowhedgelab.integration.cache-summary.v1";
 const FLOWS_SCHEMA = "arrowhedgelab.integration.flows.v1";
 const FLOW_SCHEMA = "arrowhedgelab.integration.flow.v1";
 const FLOW_RUN_SCHEMA = "arrowhedgelab.integration.flow-run.v1";
+const RUN_EVENTS_SCHEMA = "arrowhedgelab.integration.run-events.v1";
+const BACKTESTS_SCHEMA = "arrowhedgelab.integration.backtests.v1";
+const BACKTEST_SCHEMA = "arrowhedgelab.integration.backtest.v1";
+const BACKTEST_DAYS_SCHEMA = "arrowhedgelab.integration.backtest-days.v1";
 const MODEL_CONFIG_SCHEMA = "arrowhedgelab.integration.model-config.v1";
 const API_KEY_SUMMARY_SCHEMA = "arrowhedgelab.integration.api-key-summary.v1";
 const ADAPTER_VERSION = "integration.v1";
@@ -241,6 +315,10 @@ const REQUIRED_SURFACES = [
   "/integration/v1/flows/{id}",
   "/integration/v1/flows/{id}/runs",
   "/integration/v1/runs/{id}",
+  "/integration/v1/runs/{id}/events",
+  "/integration/v1/backtests",
+  "/integration/v1/backtests/{id}",
+  "/integration/v1/backtests/{id}/days",
   "/integration/v1/config/models",
   "/integration/v1/config/api-keys",
 ] as const;
@@ -261,6 +339,7 @@ export async function fetchArrowHedgeIntegrationSnapshot(
     effectiveGraph,
     cacheSummary,
     flows,
+    backtests,
     modelConfig,
     apiKeySummary,
   ] = await Promise.all([
@@ -279,6 +358,7 @@ export async function fetchArrowHedgeIntegrationSnapshot(
       "/data/cache/summary",
     ),
     fetchIntegrationJson<ArrowHedgeIntegrationFlows>(client, "/flows"),
+    fetchIntegrationJson<ArrowHedgeIntegrationBacktests>(client, "/backtests"),
     fetchIntegrationJson<ArrowHedgeIntegrationModelConfig>(
       client,
       "/config/models",
@@ -288,7 +368,18 @@ export async function fetchArrowHedgeIntegrationSnapshot(
       "/config/api-keys",
     ),
   ]);
-  const [flowDetails, runDetails] = await Promise.all([
+  const runEventIds = uniqueNumbers([
+    ...(input.runIds ?? []),
+    ...(input.runEventIds ?? []),
+  ]);
+  const backtestRunIds = uniqueNumbers(input.backtestRunIds ?? []);
+  const [
+    flowDetails,
+    runDetails,
+    runEvents,
+    backtestDetails,
+    backtestDays,
+  ] = await Promise.all([
     Promise.all(
       (input.flowIds ?? []).map((flowId) =>
         fetchIntegrationJson<ArrowHedgeIntegrationFlow>(
@@ -305,6 +396,30 @@ export async function fetchArrowHedgeIntegrationSnapshot(
         ),
       ),
     ),
+    Promise.all(
+      runEventIds.map((runId) =>
+        fetchIntegrationJson<ArrowHedgeIntegrationRunEvents>(
+          client,
+          `/runs/${encodeURIComponent(String(runId))}/events`,
+        ),
+      ),
+    ),
+    Promise.all(
+      backtestRunIds.map((runId) =>
+        fetchIntegrationJson<ArrowHedgeIntegrationBacktest>(
+          client,
+          `/backtests/${encodeURIComponent(String(runId))}`,
+        ),
+      ),
+    ),
+    Promise.all(
+      backtestRunIds.map((runId) =>
+        fetchIntegrationJson<ArrowHedgeIntegrationBacktestDays>(
+          client,
+          `/backtests/${encodeURIComponent(String(runId))}/days`,
+        ),
+      ),
+    ),
   ]);
   const snapshot = {
     capabilities,
@@ -314,6 +429,10 @@ export async function fetchArrowHedgeIntegrationSnapshot(
     flows,
     flowDetails,
     runDetails,
+    runEvents,
+    backtests,
+    backtestDetails,
+    backtestDays,
     modelConfig,
     apiKeySummary,
     evidenceRefs: [] as readonly StateRef[],
@@ -423,8 +542,72 @@ export function validateArrowHedgeIntegrationSnapshot(
     if (run.schemaVersion !== FLOW_RUN_SCHEMA) {
       issues.push(`runDetails[${index}].schemaVersion must be ${FLOW_RUN_SCHEMA}`);
     }
-    if (JSON.stringify(run).includes("sk-")) {
+    if (includesRawSecret(run)) {
       issues.push(`runDetails[${index}] must not expose raw API keys`);
+    }
+  });
+  snapshot.runEvents.forEach((runEvents, index) => {
+    if (runEvents.schemaVersion !== RUN_EVENTS_SCHEMA) {
+      issues.push(`runEvents[${index}].schemaVersion must be ${RUN_EVENTS_SCHEMA}`);
+    }
+    if (runEvents.count !== runEvents.events.length) {
+      issues.push(`runEvents[${index}].count must match events.length`);
+    }
+    runEvents.events.forEach((event, eventIndex) => {
+      if (event.payload_sha256 === "") {
+        issues.push(`runEvents[${index}].events[${eventIndex}].payload_sha256 is required`);
+      }
+    });
+    if (includesRawSecret(runEvents)) {
+      issues.push(`runEvents[${index}] must not expose raw API keys`);
+    }
+  });
+
+  if (snapshot.backtests.schemaVersion !== BACKTESTS_SCHEMA) {
+    issues.push(`backtests.schemaVersion must be ${BACKTESTS_SCHEMA}`);
+  }
+  if (snapshot.backtests.count !== snapshot.backtests.backtests.length) {
+    issues.push("backtests.count must match backtests.length");
+  }
+  snapshot.backtests.backtests.forEach((backtest, index) => {
+    if (backtest.schemaVersion !== BACKTEST_SCHEMA) {
+      issues.push(`backtests.backtests[${index}].schemaVersion must be ${BACKTEST_SCHEMA}`);
+    }
+    if (backtest.day_count < 0) {
+      issues.push(`backtests.backtests[${index}].day_count must be non-negative`);
+    }
+    if (backtest.hashes?.daysSha256 === undefined || backtest.hashes.daysSha256 === "") {
+      issues.push(`backtests.backtests[${index}].hashes.daysSha256 is required`);
+    }
+    if (includesRawSecret(backtest)) {
+      issues.push(`backtests.backtests[${index}] must not expose raw API keys`);
+    }
+  });
+  snapshot.backtestDetails.forEach((backtest, index) => {
+    if (backtest.schemaVersion !== BACKTEST_SCHEMA) {
+      issues.push(`backtestDetails[${index}].schemaVersion must be ${BACKTEST_SCHEMA}`);
+    }
+    if (backtest.hashes?.daysSha256 === undefined || backtest.hashes.daysSha256 === "") {
+      issues.push(`backtestDetails[${index}].hashes.daysSha256 is required`);
+    }
+    if (includesRawSecret(backtest)) {
+      issues.push(`backtestDetails[${index}] must not expose raw API keys`);
+    }
+  });
+  snapshot.backtestDays.forEach((days, index) => {
+    if (days.schemaVersion !== BACKTEST_DAYS_SCHEMA) {
+      issues.push(`backtestDays[${index}].schemaVersion must be ${BACKTEST_DAYS_SCHEMA}`);
+    }
+    if (days.count !== days.days.length) {
+      issues.push(`backtestDays[${index}].count must match days.length`);
+    }
+    days.days.forEach((day, dayIndex) => {
+      if (day.sha256 === "") {
+        issues.push(`backtestDays[${index}].days[${dayIndex}].sha256 is required`);
+      }
+    });
+    if (includesRawSecret(days)) {
+      issues.push(`backtestDays[${index}] must not expose raw API keys`);
     }
   });
 
@@ -454,7 +637,7 @@ export function validateArrowHedgeIntegrationSnapshot(
     if (Object.prototype.hasOwnProperty.call(apiKey, "key_value")) {
       issues.push(`apiKeySummary.apiKeys[${index}] must not expose key_value`);
     }
-    if (JSON.stringify(apiKey).includes("sk-")) {
+    if (includesRawSecret(apiKey)) {
       issues.push(`apiKeySummary.apiKeys[${index}] must not expose raw key values`);
     }
   });
@@ -496,6 +679,11 @@ export function buildArrowHedgeIntegrationEvidenceRefs(
     ),
     stateRef(
       "source_record",
+      "arrowhedgelab:integration_api:backtests",
+      "ArrowHedgeLab saved backtest inventory",
+    ),
+    stateRef(
+      "source_record",
       "arrowhedgelab:integration_api:api_key_summary",
       "ArrowHedgeLab redacted API key summary",
     ),
@@ -518,6 +706,38 @@ export function buildArrowHedgeIntegrationEvidenceRefs(
         "source_record",
         `arrowhedgelab:flow-run:${run.id}`,
         "ArrowHedgeLab saved flow run",
+      ),
+    ),
+    ...snapshot.runEvents.flatMap((runEvents) =>
+      runEvents.events.map((event) =>
+        stateRef(
+          "source_record",
+          `arrowhedgelab:flow-run-event:${runEvents.run_id}:${event.sequence}:${event.payload_sha256}`,
+          "ArrowHedgeLab saved flow run event",
+        ),
+      ),
+    ),
+    ...snapshot.backtests.backtests.map((backtest) =>
+      stateRef(
+        "source_record",
+        `arrowhedgelab:backtest:${backtest.run_id}`,
+        "ArrowHedgeLab saved backtest summary",
+      ),
+    ),
+    ...snapshot.backtestDetails.map((backtest) =>
+      stateRef(
+        "source_record",
+        `arrowhedgelab:backtest:${backtest.run_id}`,
+        "ArrowHedgeLab saved backtest",
+      ),
+    ),
+    ...snapshot.backtestDays.flatMap((days) =>
+      days.days.map((day) =>
+        stateRef(
+          "source_record",
+          `arrowhedgelab:backtest-day:${days.run_id}:${day.date ?? day.sequence}:${day.sha256}`,
+          "ArrowHedgeLab saved backtest day",
+        ),
       ),
     ),
     ...snapshot.cacheSummary.records.map((record) =>
@@ -605,4 +825,12 @@ async function fetchIntegrationJson<T>(
 
 function uniqueStateRefs(refs: readonly StateRef[]): readonly StateRef[] {
   return [...new Map(refs.map((ref) => [`${ref.kind}:${ref.id}`, ref])).values()];
+}
+
+function uniqueNumbers(values: readonly number[]): readonly number[] {
+  return [...new Set(values)];
+}
+
+function includesRawSecret(value: unknown): boolean {
+  return JSON.stringify(value)?.includes("sk-") ?? false;
 }
