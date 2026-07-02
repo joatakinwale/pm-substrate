@@ -1031,7 +1031,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       orchestration.includes("post_has_metric_evidence") &&
       executor.includes("ensure_task_evidence_ready") &&
       virtualAgency.includes("dispatch_metrics_ready_analytics_tasks") &&
-      virtualAgency.includes("virtual-agency:metrics-ready") &&
+      virtualAgency.includes("agent_task_handoff_idempotency_key") &&
       virtualAgency.includes("build_agent_task_dispatch") &&
       internalSocial.includes("_dispatch_ready_analytics_tasks_sync") &&
       internalSocial.includes("virtual_agency_tasks") &&
