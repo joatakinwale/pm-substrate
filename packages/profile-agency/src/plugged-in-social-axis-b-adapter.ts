@@ -26,6 +26,8 @@ export interface PluggedInSocialClientReportSnapshot {
   readonly updated_at?: string | null;
   readonly pdf_generated_at?: string | null;
   readonly metrics_observed_at?: string | null;
+  readonly metrics_snapshot_hash?: string;
+  readonly report_hash?: string;
 }
 
 export interface PluggedInSocialAxisBNextActionAdapterInput {
@@ -275,6 +277,32 @@ export interface PluggedInSocialIntegrationSocialPostEnvelope {
   readonly lineage: Record<string, unknown>;
 }
 
+export interface PluggedInSocialIntegrationClientReportEnvelope {
+  readonly resource_type: "client_report";
+  readonly id: string;
+  readonly org_id: string;
+  readonly project_id: string | null;
+  readonly lead_id: string | null;
+  readonly title: string;
+  readonly status: string;
+  readonly cadence: string;
+  readonly compound_phase: string | null;
+  readonly created_by_agent: string | null;
+  readonly client_name: string | null;
+  readonly client_email: string | null;
+  readonly period_start: string;
+  readonly period_end: string;
+  readonly sections: readonly unknown[];
+  readonly metrics_snapshot: Record<string, unknown>;
+  readonly metrics_snapshot_hash: string;
+  readonly report_hash: string;
+  readonly pdf_url: string | null;
+  readonly pdf_generated_at: string | null;
+  readonly sent_at: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+}
+
 export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly resource_type: "marketing_run_evidence_summary";
   readonly run_id: string;
@@ -293,6 +321,8 @@ export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly open_access_request_count: number;
   readonly social_post_count: number;
   readonly social_post_status_counts: Record<string, number>;
+  readonly report_count: number;
+  readonly report_status_counts: Record<string, number>;
   readonly evidence_hashes: Record<string, readonly string[]>;
 }
 
@@ -306,6 +336,7 @@ export interface PluggedInSocialIntegrationRunEvidenceSnapshotEnvelope {
   readonly approvals: readonly PluggedInSocialIntegrationApprovalEnvelope[];
   readonly access_requests: readonly PluggedInSocialIntegrationAccessRequestEnvelope[];
   readonly social_posts: readonly PluggedInSocialIntegrationSocialPostEnvelope[];
+  readonly reports: readonly PluggedInSocialIntegrationClientReportEnvelope[];
 }
 
 export interface PluggedInSocialLiveRunEvidenceSnapshot {
@@ -319,6 +350,7 @@ export interface PluggedInSocialLiveRunEvidenceSnapshot {
   readonly approvals: readonly PluggedInSocialIntegrationApprovalEnvelope[];
   readonly accessRequests: readonly PluggedInSocialIntegrationAccessRequestEnvelope[];
   readonly socialPosts: readonly PluggedInSocialIntegrationSocialPostEnvelope[];
+  readonly reports: readonly PluggedInSocialIntegrationClientReportEnvelope[];
 }
 
 export interface PluggedInSocialLiveRunEvidenceFetchInput
@@ -386,6 +418,7 @@ const REQUIRED_LIVE_CAPABILITIES = [
   "run_evidence_snapshot.read",
   "access_request.read",
   "social_post.read",
+  "report.read",
   "approval.decide",
   "access_request.decide",
   "event.ingest",
@@ -550,6 +583,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
     approvals: runSnapshot.approvals,
     accessRequests: runSnapshot.access_requests,
     socialPosts: runSnapshot.social_posts,
+    reports: runSnapshot.reports,
   };
 }
 
@@ -657,6 +691,7 @@ function liveRunEvidenceIssues(
     approvals,
     accessRequests,
     socialPosts,
+    reports,
   } = snapshot;
 
   if (summary.run_id !== run.id) {
@@ -672,6 +707,7 @@ function liveRunEvidenceIssues(
     ...approvals,
     ...accessRequests,
     ...socialPosts,
+    ...reports,
   ]) {
     if (item.org_id !== run.org_id) {
       issues.add(`cross-org integration envelope detected: ${item.resource_type}`);
@@ -770,6 +806,16 @@ function liveRunEvidenceIssues(
   if (socialPostsEndpoint?.boundary !== "public_rls") {
     issues.add("marketing run social-posts endpoint is not public-RLS scoped");
   }
+  const reportsEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/reports",
+  );
+  if (reportsEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run reports endpoint is not public-RLS scoped");
+  }
+  const reportEndpoint = endpoints.get("GET /api/integration/v1/reports/{report_id}");
+  if (reportEndpoint?.boundary !== "public_rls") {
+    issues.add("client report endpoint is not public-RLS scoped");
+  }
   const evidenceSnapshotEndpoint = endpoints.get(
     "GET /api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
   );
@@ -817,6 +863,15 @@ function liveRunEvidenceIssues(
     !socialPostResource.durable_evidence_fields.includes("lineage")
   ) {
     issues.add("social_posts resource lacks lineage evidence field");
+  }
+  const clientReportResource = platformManifest.data_resources.find(
+    (resource) => resource.table === "client_reports",
+  );
+  if (
+    clientReportResource !== undefined &&
+    !clientReportResource.durable_evidence_fields.includes("metrics_snapshot")
+  ) {
+    issues.add("client_reports resource lacks metrics_snapshot evidence field");
   }
 
   const configKeys = new Set(
@@ -868,6 +923,12 @@ function liveRunEvidenceIssues(
   if (socialPosts.length !== summary.social_post_count) {
     issues.add("social post response count does not match evidence summary count");
   }
+  if (summary.report_count <= 0 || reports.length <= 0) {
+    issues.add("marketing run has no client reports");
+  }
+  if (reports.length !== summary.report_count) {
+    issues.add("report response count does not match evidence summary count");
+  }
 
   for (const [group, hashes] of Object.entries(summary.evidence_hashes)) {
     if (!Array.isArray(hashes)) {
@@ -894,6 +955,18 @@ function liveRunEvidenceIssues(
     (summary.evidence_hashes.social_post_content_hashes ?? []).length === 0
   ) {
     issues.add("missing evidence hashes: social_post_content_hashes");
+  }
+  if (
+    summary.report_count > 0 &&
+    (summary.evidence_hashes.client_report_hashes ?? []).length === 0
+  ) {
+    issues.add("missing evidence hashes: client_report_hashes");
+  }
+  if (
+    summary.report_count > 0 &&
+    (summary.evidence_hashes.client_report_metrics_hashes ?? []).length === 0
+  ) {
+    issues.add("missing evidence hashes: client_report_metrics_hashes");
   }
 
   const seenEventHashes = new Set<string>();
@@ -939,6 +1012,20 @@ function liveRunEvidenceIssues(
       post.published_content_hash !== post.scheduled_content_hash
     ) {
       issues.add(`published social post hash does not match schedule: ${post.id}`);
+    }
+  }
+  for (const report of reports) {
+    if (report.project_id !== null && report.project_id !== run.project_id) {
+      issues.add(`client report is outside marketing-run project: ${report.id}`);
+    }
+    if (!GENERATED_REPORT_STATUSES.has(report.status)) {
+      issues.add(`client report not generated: ${report.status}`);
+    }
+    if (report.metrics_snapshot_hash.length !== 64) {
+      issues.add(`client report missing metrics snapshot hash: ${report.id}`);
+    }
+    if (report.report_hash.length !== 64) {
+      issues.add(`client report missing report hash: ${report.id}`);
     }
   }
 
@@ -1207,6 +1294,13 @@ function liveRunEvidenceRefs(
         "source_record",
         `plugged_in_social:social_posts:${post.id}`,
         `PluggedInSocial social post: ${post.platform}/${post.status}`,
+      ),
+    ),
+    ...snapshot.reports.map((report) =>
+      stateRef(
+        "source_record",
+        `plugged_in_social:client_reports:${report.id}`,
+        `PluggedInSocial client report: ${report.status}`,
       ),
     ),
     ...manifest.evidenceRefs.map(manifestRefToStateRef),

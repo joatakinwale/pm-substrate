@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 
 def test_integration_router_imports_with_neutral_v1_prefix():
@@ -37,6 +37,14 @@ def test_integration_router_imports_with_neutral_v1_prefix():
     ) in route_methods
     assert (
         "/integration/v1/marketing-runs/{run_id}/social-posts",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/marketing-runs/{run_id}/reports",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/reports/{report_id}",
         frozenset({"GET"}),
     ) in route_methods
     assert (
@@ -104,6 +112,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationAccessRequestEnvelope,
         IntegrationArtifactEnvelope,
         IntegrationCapabilityResponse,
+        IntegrationClientReportEnvelope,
         IntegrationPlatformManifestEnvelope,
         IntegrationEvidenceSummaryEnvelope,
         IntegrationEventIngest,
@@ -122,6 +131,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
     dispatch_fields = set(IntegrationRunDispatchEnvelope.model_fields)
     artifact_fields = set(IntegrationArtifactEnvelope.model_fields)
     social_post_fields = set(IntegrationSocialPostEnvelope.model_fields)
+    report_fields = set(IntegrationClientReportEnvelope.model_fields)
     task_fields = set(IntegrationTaskEnvelope.model_fields)
     access_request_fields = set(IntegrationAccessRequestEnvelope.model_fields)
     run_event_fields = set(IntegrationRunEventEnvelope.model_fields)
@@ -206,6 +216,25 @@ def test_integration_schemas_expose_stable_external_envelopes():
     }.issubset(social_post_fields)
     assert {
         "id",
+        "org_id",
+        "project_id",
+        "lead_id",
+        "title",
+        "status",
+        "cadence",
+        "period_start",
+        "period_end",
+        "sections",
+        "metrics_snapshot",
+        "metrics_snapshot_hash",
+        "report_hash",
+        "pdf_url",
+        "pdf_generated_at",
+        "sent_at",
+        "links",
+    }.issubset(report_fields)
+    assert {
+        "id",
         "agent_role",
         "task_type",
         "status",
@@ -251,6 +280,8 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "open_access_request_count",
         "social_post_count",
         "social_post_status_counts",
+        "report_count",
+        "report_status_counts",
         "evidence_hashes",
     }.issubset(evidence_summary_fields)
     assert {
@@ -263,6 +294,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "approvals",
         "access_requests",
         "social_posts",
+        "reports",
         "links",
     }.issubset(evidence_snapshot_fields)
     assert {"engagement_id", "event_type", "source", "payload"}.issubset(
@@ -347,6 +379,18 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for endpoint in manifest.api_endpoints
     )
     assert any(
+        endpoint.path == "/api/integration/v1/marketing-runs/{run_id}/reports"
+        and endpoint.boundary == "public_rls"
+        and "report.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/reports/{report_id}"
+        and endpoint.boundary == "public_rls"
+        and "report.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
         endpoint.path == "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot"
         and endpoint.boundary == "public_rls"
         and "run_evidence_snapshot.read" in endpoint.capability_ids
@@ -356,6 +400,12 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         capability.id == "run_evidence_snapshot.read"
         and "virtual_agency_task" in capability.resources
         and "social_post" in capability.resources
+        and "client_report" in capability.resources
+        for capability in module._capabilities()
+    )
+    assert any(
+        capability.id == "report.read"
+        and "client_report" in capability.resources
         for capability in module._capabilities()
     )
     assert any(
@@ -385,6 +435,12 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         resource.table == "social_posts"
         and "current_content_hash" in resource.durable_evidence_fields
         and "lineage" in resource.durable_evidence_fields
+        for resource in manifest.data_resources
+    )
+    assert any(
+        resource.table == "client_reports"
+        and "metrics_snapshot" in resource.durable_evidence_fields
+        and "report.read" in resource.read_capability_ids
         for resource in manifest.data_resources
     )
     assert any(
@@ -453,3 +509,50 @@ def test_social_post_integration_envelope_derives_hash_and_lineage():
     assert envelope.lineage["marketing_run_id"] == str(run_id)
     assert envelope.current_content_hash == social_post_content_hash(post)
     assert envelope.scheduled_content_hash == "a" * 64
+
+
+def test_client_report_integration_envelope_derives_hashes_without_private_fields():
+    import app.api.integration as module
+    from app.models.report import ClientReport, ReportCadence, ReportStatus
+
+    org_id = uuid.uuid4()
+    project_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    report = ClientReport(
+        id=uuid.uuid4(),
+        org_id=org_id,
+        project_id=project_id,
+        lead_id=uuid.uuid4(),
+        title="Launch conversion report",
+        status=ReportStatus.generated.value,
+        cadence=ReportCadence.weekly.value,
+        compound_phase="amplify",
+        created_by_agent="analytics_reporting",
+        client_name="Acme",
+        client_email="client@example.com",
+        period_start=date(2026, 6, 24),
+        period_end=date(2026, 7, 1),
+        sections=[{"type": "kpi_grid", "title": "Pipeline"}],
+        metrics_snapshot={
+            "qualified_leads_generated": 18,
+            "avg_engagement_rate": 7.3,
+        },
+        pdf_url="r2://reports/launch.pdf",
+        pdf_generated_at=now,
+        sent_at=None,
+        created_at=now,
+        updated_at=now,
+        share_token="private-share-token",
+        internal_notes="internal only",
+    )
+
+    envelope = module._to_report(report)
+    dumped = envelope.model_dump()
+
+    assert envelope.resource_type == "client_report"
+    assert envelope.metrics_snapshot == report.metrics_snapshot
+    assert len(envelope.metrics_snapshot_hash) == 64
+    assert len(envelope.report_hash) == 64
+    assert "share_token" not in dumped
+    assert "internal_notes" not in dumped
+    assert envelope.links[0].href == f"/api/integration/v1/reports/{report.id}"

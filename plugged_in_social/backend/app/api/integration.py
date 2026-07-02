@@ -18,6 +18,7 @@ from app.models.agency import (
     ClientEngagement,
     MarketingRun,
 )
+from app.models.report import ClientReport
 from app.models.social_media import SocialPost
 from app.models.virtual_agency import VirtualAgencyEvent, VirtualAgencyTask
 from app.schemas.agency import AgencyArtifactCreate
@@ -30,6 +31,7 @@ from app.schemas.integration import (
     IntegrationArtifactEnvelope,
     IntegrationCapability,
     IntegrationCapabilityResponse,
+    IntegrationClientReportEnvelope,
     IntegrationAgentManifest,
     IntegrationConfigurationRequirement,
     IntegrationDataResourceManifest,
@@ -109,6 +111,7 @@ def _run_links(run_id: uuid.UUID) -> list[IntegrationLink]:
             "social_posts",
             f"/api/integration/v1/marketing-runs/{run_id}/social-posts",
         ),
+        _link("reports", f"/api/integration/v1/marketing-runs/{run_id}/reports"),
         _link("tasks", f"/api/integration/v1/marketing-runs/{run_id}/tasks"),
         _link(
             "evidence_snapshot",
@@ -255,6 +258,56 @@ def _to_social_post(item: SocialPost) -> IntegrationSocialPostEnvelope:
     )
 
 
+def _report_metrics_snapshot_hash(item: ClientReport) -> str:
+    return compute_payload_hash(dict(item.metrics_snapshot or {}))
+
+
+def _client_report_hash(item: ClientReport) -> str:
+    metrics_snapshot_hash = _report_metrics_snapshot_hash(item)
+    return compute_payload_hash(
+        {
+            "client_report_id": str(item.id),
+            "org_id": str(item.org_id),
+            "project_id": str(item.project_id) if item.project_id else None,
+            "period_start": item.period_start,
+            "period_end": item.period_end,
+            "metrics_snapshot_hash": metrics_snapshot_hash,
+            "pdf_url": item.pdf_url,
+            "pdf_generated_at": item.pdf_generated_at,
+        }
+    )
+
+
+def _to_report(item: ClientReport) -> IntegrationClientReportEnvelope:
+    return IntegrationClientReportEnvelope(
+        id=item.id,
+        org_id=item.org_id,
+        project_id=item.project_id,
+        lead_id=item.lead_id,
+        title=item.title,
+        status=item.status,
+        cadence=item.cadence,
+        compound_phase=item.compound_phase,
+        created_by_agent=item.created_by_agent,
+        client_name=item.client_name,
+        client_email=item.client_email,
+        period_start=item.period_start,
+        period_end=item.period_end,
+        sections=list(item.sections or []),
+        metrics_snapshot=dict(item.metrics_snapshot or {}),
+        metrics_snapshot_hash=_report_metrics_snapshot_hash(item),
+        report_hash=_client_report_hash(item),
+        pdf_url=item.pdf_url,
+        pdf_generated_at=item.pdf_generated_at,
+        sent_at=item.sent_at,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        links=[
+            _link("self", f"/api/integration/v1/reports/{item.id}"),
+        ],
+    )
+
+
 def _to_task(item: VirtualAgencyTask) -> IntegrationTaskEnvelope:
     return IntegrationTaskEnvelope(
         id=item.id,
@@ -392,6 +445,24 @@ async def _get_run(
     return item
 
 
+async def _get_report(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    report_id: uuid.UUID,
+) -> ClientReport:
+    result = await db.execute(
+        select(ClientReport).where(
+            ClientReport.id == report_id,
+            ClientReport.org_id == org_id,
+        )
+    )
+    item = result.scalar_one_or_none()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Client report not found")
+    return item
+
+
 async def _get_approval(
     db: AsyncSession,
     *,
@@ -526,6 +597,25 @@ async def _list_run_social_posts(
     ]
 
 
+async def _list_run_reports(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run: MarketingRun,
+) -> list[ClientReport]:
+    if run.project_id is None:
+        return []
+    result = await db.execute(
+        select(ClientReport)
+        .where(
+            ClientReport.org_id == org_id,
+            ClientReport.project_id == run.project_id,
+        )
+        .order_by(ClientReport.period_end.desc(), ClientReport.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
 async def _build_run_evidence_snapshot_rows(
     db: AsyncSession,
     *,
@@ -560,6 +650,7 @@ async def _build_run_evidence_snapshot_rows(
     events = await _list_run_events(db, org_id=org_id, run=run)
     event_items = [event for event, _task in events]
     social_posts = await _list_run_social_posts(db, org_id=org_id, run=run)
+    reports = await _list_run_reports(db, org_id=org_id, run=run)
 
     summary = IntegrationEvidenceSummaryEnvelope(
         run_id=run.id,
@@ -580,6 +671,8 @@ async def _build_run_evidence_snapshot_rows(
         ),
         social_post_count=len(social_posts),
         social_post_status_counts=_count_by(social_posts, "status"),
+        report_count=len(reports),
+        report_status_counts=_count_by(reports, "status"),
         evidence_hashes={
             "artifact_payload_hashes": sorted(
                 {item.payload_hash for item in artifacts if item.payload_hash}
@@ -620,6 +713,12 @@ async def _build_run_evidence_snapshot_rows(
                     if item.scheduled_content_hash or item.published_content_hash
                 }
             ),
+            "client_report_hashes": sorted(
+                {_client_report_hash(item) for item in reports}
+            ),
+            "client_report_metrics_hashes": sorted(
+                {_report_metrics_snapshot_hash(item) for item in reports}
+            ),
         },
         links=_run_links(run.id),
     )
@@ -632,6 +731,7 @@ async def _build_run_evidence_snapshot_rows(
         "approvals": approvals,
         "access_requests": access_requests,
         "social_posts": social_posts,
+        "reports": reports,
     }
 
 
@@ -722,14 +822,14 @@ def _capabilities() -> list[IntegrationCapability]:
         IntegrationCapability(
             id="evidence_summary.read",
             name="Read marketing run evidence summary",
-            description="Inspect run-level artifact, task, event, approval, access-gate, and hash counts.",
+            description="Inspect run-level artifact, task, event, approval, access-gate, report, and hash counts.",
             methods=["GET"],
             resources=["marketing_run"],
         ),
         IntegrationCapability(
             id="run_evidence_snapshot.read",
             name="Read marketing run evidence snapshot",
-            description="Inspect the complete run monitor packet: run, summary, tasks, events, artifacts, approvals, access gates, and social posts.",
+            description="Inspect the complete run monitor packet: run, summary, tasks, events, artifacts, approvals, access gates, social posts, and reports.",
             methods=["GET"],
             resources=[
                 "marketing_run",
@@ -739,6 +839,7 @@ def _capabilities() -> list[IntegrationCapability]:
                 "agency_approval_request",
                 "agency_access_request",
                 "social_post",
+                "client_report",
             ],
         ),
         IntegrationCapability(
@@ -961,6 +1062,18 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             path="/api/integration/v1/marketing-runs/{run_id}/social-posts",
             boundary="public_rls",
             capability_ids=["social_post.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/reports",
+            boundary="public_rls",
+            capability_ids=["report.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/reports/{report_id}",
+            boundary="public_rls",
+            capability_ids=["report.read"],
         ),
         IntegrationEndpointManifest(
             method="POST",
@@ -1458,6 +1571,35 @@ async def list_run_social_posts(
 
 
 @router.get(
+    "/marketing-runs/{run_id}/reports",
+    response_model=list[IntegrationClientReportEnvelope],
+)
+async def list_run_reports(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    run = await _get_run(db, org_id=org_id, run_id=run_id)
+    reports = await _list_run_reports(db, org_id=org_id, run=run)
+    return [_to_report(item) for item in reports]
+
+
+@router.get(
+    "/reports/{report_id}",
+    response_model=IntegrationClientReportEnvelope,
+)
+async def get_report(
+    report_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    report = await _get_report(db, org_id=org_id, report_id=report_id)
+    return _to_report(report)
+
+
+@router.get(
     "/marketing-runs/{run_id}/tasks",
     response_model=list[IntegrationTaskEnvelope],
 )
@@ -1584,6 +1726,7 @@ async def get_run_evidence_snapshot(
         social_posts=[
             _to_social_post(item) for item in snapshot_rows["social_posts"]
         ],
+        reports=[_to_report(item) for item in snapshot_rows["reports"]],
         links=_run_links(run.id),
     )
 

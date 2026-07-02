@@ -41,6 +41,8 @@ const liveEventHashB = "b".repeat(64);
 const liveArtifactHash = "c".repeat(64);
 const liveAccessRequestHash = "d".repeat(64);
 const liveSocialPostHash = "e".repeat(64);
+const liveReportHash = "f".repeat(64);
+const liveReportMetricsHash = "a1".repeat(32);
 
 const closedLoopStages = [
   "intake",
@@ -71,6 +73,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "run_evidence_snapshot.read",
         "access_request.read",
         "social_post.read",
+        "report.read",
         "approval.decide",
         "access_request.decide",
         "event.ingest",
@@ -189,6 +192,18 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           path: "/api/integration/v1/marketing-runs/{run_id}/social-posts",
           boundary: "public_rls",
           capability_ids: ["social_post.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/reports",
+          boundary: "public_rls",
+          capability_ids: ["report.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/reports/{report_id}",
+          boundary: "public_rls",
+          capability_ids: ["report.read"],
         },
         {
           method: "POST",
@@ -341,12 +356,16 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       open_access_request_count: 0,
       social_post_count: 1,
       social_post_status_counts: { scheduled: 1 },
+      report_count: 1,
+      report_status_counts: { generated: 1 },
       evidence_hashes: {
         artifact_payload_hashes: [liveArtifactHash],
         access_request_hashes: [liveAccessRequestHash],
         event_hashes: [liveEventHashA, liveEventHashB],
         task_latest_event_hashes: [liveEventHashB],
         social_post_content_hashes: [liveSocialPostHash],
+        client_report_hashes: [liveReportHash],
+        client_report_metrics_hashes: [liveReportMetricsHash],
       },
     },
     events: [
@@ -480,6 +499,33 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         reach: 0,
         engagement_rate: null,
         lineage: { marketing_run_id: liveRunId },
+      },
+    ],
+    reports: [
+      {
+        resource_type: "client_report",
+        id: report.id,
+        org_id: liveOrgId,
+        project_id: report.project_id ?? null,
+        lead_id: null,
+        title: report.title,
+        status: report.status,
+        cadence: "weekly",
+        compound_phase: "amplify",
+        created_by_agent: "analytics_reporting",
+        client_name: "Acme",
+        client_email: "client@example.com",
+        period_start: report.period_start,
+        period_end: report.period_end,
+        sections: [],
+        metrics_snapshot: report.metrics_snapshot,
+        metrics_snapshot_hash: liveReportMetricsHash,
+        report_hash: liveReportHash,
+        pdf_url: "r2://reports/summer-pipeline.pdf",
+        pdf_generated_at: report.pdf_generated_at ?? null,
+        sent_at: null,
+        created_at: "2026-07-01T17:45:00.000Z",
+        updated_at: "2026-07-01T17:45:00.000Z",
       },
     ],
   };

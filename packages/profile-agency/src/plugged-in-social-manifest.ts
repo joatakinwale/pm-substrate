@@ -954,6 +954,8 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes('"/marketing-runs/{run_id}/events"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/evidence-summary"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/evidence-snapshot"') &&
+      integrationApi.includes('"/marketing-runs/{run_id}/reports"') &&
+      integrationApi.includes('"/reports/{report_id}"') &&
       integrationApi.includes('"/approvals/{approval_id}/decision"') &&
       integrationApi.includes('"/events"') &&
       integrationApi.includes('"/webhooks"') &&
@@ -969,6 +971,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationSchemas.includes("IntegrationRunEventEnvelope") &&
       integrationSchemas.includes("IntegrationEvidenceSummaryEnvelope") &&
       integrationSchemas.includes("IntegrationRunEvidenceSnapshotEnvelope") &&
+      integrationSchemas.includes("IntegrationClientReportEnvelope") &&
       integrationTests.includes("test_integration_router_uses_rls_and_has_no_substrate_imports") &&
       !integrationApi.includes("pm_substrate") &&
       !integrationApi.includes("packages.profile") &&
@@ -994,10 +997,13 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     operatorRunMonitorSurface:
       frontendApi.includes("export interface IntegrationTask") &&
       frontendApi.includes("export interface IntegrationRunEvidenceSnapshot") &&
+      frontendApi.includes("export interface IntegrationClientReport") &&
       frontendApi.includes("export interface IntegrationExternalAdapter") &&
       frontendApi.includes("listIntegrationRunTasks") &&
       frontendApi.includes("getIntegrationRunEvidenceSnapshot") &&
       frontendApi.includes("listIntegrationExternalAdapters") &&
+      frontendApi.includes("report_count") &&
+      frontendApi.includes("reports: IntegrationClientReport[]") &&
       frontendApi.includes("/api/integration/v1/marketing-runs/") &&
       frontendApi.includes("/tasks") &&
       frontendApi.includes("/evidence-snapshot") &&
@@ -1010,9 +1016,12 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       agencyCommandCenter.includes("externalAdapters") &&
       agencyCommandCenter.includes("getIntegrationRunEvidenceSnapshot") &&
       agencyCommandCenter.includes("listIntegrationExternalAdapters") &&
+      agencyCommandCenter.includes("clientReports") &&
       agencyCommandCenter.includes("approval_payload_hash") &&
       agencyCommandCenter.includes("latest_event_hash") &&
       agencyCommandCenter.includes("social_post_content_hashes") &&
+      agencyCommandCenter.includes("client_report_hashes") &&
+      agencyCommandCenter.includes("Report Status") &&
       agencyCommandCenterTests.includes(
         "test_agency_command_center_route_exposes_autonomous_run_monitor",
       ) &&

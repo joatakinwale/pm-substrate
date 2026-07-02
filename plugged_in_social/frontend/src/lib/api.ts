@@ -944,6 +944,8 @@ export interface IntegrationEvidenceSummary {
   open_access_request_count: number;
   social_post_count: number;
   social_post_status_counts: Record<string, number>;
+  report_count: number;
+  report_status_counts: Record<string, number>;
   evidence_hashes: Record<string, string[]>;
   links: Array<{ rel: string; href: string }>;
 }
@@ -982,6 +984,33 @@ export interface IntegrationSocialPost {
   links: Array<{ rel: string; href: string }>;
 }
 
+export interface IntegrationClientReport {
+  resource_type: "client_report";
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  lead_id: string | null;
+  title: string;
+  status: string;
+  cadence: string;
+  compound_phase: string | null;
+  created_by_agent: string | null;
+  client_name: string | null;
+  client_email: string | null;
+  period_start: string;
+  period_end: string;
+  sections: unknown[];
+  metrics_snapshot: Record<string, unknown>;
+  metrics_snapshot_hash: string;
+  report_hash: string;
+  pdf_url: string | null;
+  pdf_generated_at: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+  links: Array<{ rel: string; href: string }>;
+}
+
 export interface IntegrationRunEvidenceSnapshot {
   resource_type: "marketing_run_evidence_snapshot";
   run: MarketingRun;
@@ -992,6 +1021,7 @@ export interface IntegrationRunEvidenceSnapshot {
   approvals: AgencyApprovalRequest[];
   access_requests: AgencyAccessRequest[];
   social_posts: IntegrationSocialPost[];
+  reports: IntegrationClientReport[];
   links: Array<{ rel: string; href: string }>;
 }
 

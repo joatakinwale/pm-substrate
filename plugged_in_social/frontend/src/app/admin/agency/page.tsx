@@ -19,6 +19,7 @@ import {
   type AgencyApprovalRequest,
   type AgencyArtifact,
   type ClientEngagement,
+  type IntegrationClientReport,
   type IntegrationEvidenceSummary,
   type IntegrationExternalAdapter,
   type IntegrationRunEvent,
@@ -199,6 +200,7 @@ export default function AgencyCommandCenterPage() {
   const [accessRequests, setAccessRequests] = useState<AgencyAccessRequest[]>([]);
   const [runTasks, setRunTasks] = useState<IntegrationTask[]>([]);
   const [runEvents, setRunEvents] = useState<IntegrationRunEvent[]>([]);
+  const [clientReports, setClientReports] = useState<IntegrationClientReport[]>([]);
   const [evidenceSummary, setEvidenceSummary] =
     useState<IntegrationEvidenceSummary | null>(null);
   const [externalAdapters, setExternalAdapters] = useState<
@@ -299,11 +301,13 @@ export default function AgencyCommandCenterPage() {
     const socialStatusCounts = evidenceSummary?.social_post_status_counts || {};
     const hasScheduledPost = Number(socialStatusCounts.scheduled || 0) > 0;
     const hasPublishedPost = Number(socialStatusCounts.published || 0) > 0;
+    const reportCount = evidenceSummary?.report_count ?? clientReports.length;
     const hasReportArtifact = artifacts.some(
       (artifact) =>
         artifact.artifact_type === "client_report" ||
         artifact.artifact_type === "report"
     );
+    const hasReportEvidence = reportCount > 0 || hasReportArtifact;
     const hasNextAction =
       taskTypeSet.has("next_action_proposal") ||
       eventTypeSet.has("marketing.next_action.proposed");
@@ -341,9 +345,9 @@ export default function AgencyCommandCenterPage() {
           ? "Metrics/reporting task completed."
           : "Analytics task queued."
         : "Waiting for metrics task.",
-      report: hasReportArtifact
-        ? "Report artifact recorded."
-        : "Waiting for report artifact.",
+      report: hasReportEvidence
+        ? `${reportCount || 1} report evidence record${(reportCount || 1) === 1 ? "" : "s"} recorded.`
+        : "Waiting for report evidence.",
       next_action: hasNextAction
         ? "Next action proposal recorded."
         : "Waiting for next action proposal.",
@@ -379,7 +383,7 @@ export default function AgencyCommandCenterPage() {
       } else if (stage === "metrics" && taskTypeSet.has("analytics_reporting")) {
         status = "active";
       }
-      if (stage === "report" && hasReportArtifact) status = "complete";
+      if (stage === "report" && hasReportEvidence) status = "complete";
       if (stage === "next_action" && hasNextAction) status = "complete";
 
       return {
@@ -393,6 +397,7 @@ export default function AgencyCommandCenterPage() {
     activeRun,
     approvals.length,
     artifacts,
+    clientReports.length,
     completedTaskTypeSet,
     evidenceSummary,
     eventTypeSet,
@@ -407,6 +412,8 @@ export default function AgencyCommandCenterPage() {
       evidenceSummary?.evidence_hashes?.task_latest_event_hashes || [];
     const socialPostHashes =
       evidenceSummary?.evidence_hashes?.social_post_content_hashes || [];
+    const reportHashes =
+      evidenceSummary?.evidence_hashes?.client_report_hashes || [];
     const approvalHashes =
       evidenceSummary?.evidence_hashes?.approval_payload_hashes || [];
 
@@ -459,6 +466,12 @@ export default function AgencyCommandCenterPage() {
         detail: socialPostHashes[0] || null,
         tone: socialPostHashes.length > 0 ? "complete" : "waiting",
       },
+      {
+        label: "Report Hash",
+        status: reportHashes.length > 0 ? "recorded" : "not reached",
+        detail: reportHashes[0] || null,
+        tone: reportHashes.length > 0 ? "complete" : "waiting",
+      },
     ];
   }, [
     accessRequests.length,
@@ -504,6 +517,7 @@ export default function AgencyCommandCenterPage() {
       const latestRun = runData[0] || null;
       let eventData: IntegrationRunEvent[] = [];
       let taskData: IntegrationTask[] = [];
+      let reportData: IntegrationClientReport[] = [];
       let summaryData: IntegrationEvidenceSummary | null = null;
       let artifactsForDisplay = artifactData;
       let approvalsForDisplay = approvalData;
@@ -512,6 +526,7 @@ export default function AgencyCommandCenterPage() {
         const snapshot = await getIntegrationRunEvidenceSnapshot(latestRun.id);
         eventData = snapshot.events;
         taskData = snapshot.tasks;
+        reportData = snapshot.reports;
         summaryData = snapshot.summary;
         artifactsForDisplay = snapshot.artifacts;
         approvalsForDisplay = snapshot.approvals;
@@ -523,6 +538,7 @@ export default function AgencyCommandCenterPage() {
       setAccessRequests(accessRequestsForDisplay);
       setRunTasks(taskData);
       setRunEvents(eventData);
+      setClientReports(reportData);
       setEvidenceSummary(summaryData);
       setApprovalForm((current) => ({
         ...current,
@@ -556,6 +572,7 @@ export default function AgencyCommandCenterPage() {
         setAccessRequests([]);
         setRunTasks([]);
         setRunEvents([]);
+        setClientReports([]);
         setEvidenceSummary(null);
         return;
       }
@@ -1096,7 +1113,7 @@ export default function AgencyCommandCenterPage() {
               <div className="space-y-5">
                 {!activeRun && <EmptyState>No active run.</EmptyState>}
 
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                   {[
                     {
                       label: "Tasks",
@@ -1111,6 +1128,11 @@ export default function AgencyCommandCenterPage() {
                     {
                       label: "Artifacts",
                       value: evidenceSummary?.artifact_count ?? artifacts.length,
+                      icon: FileText,
+                    },
+                    {
+                      label: "Reports",
+                      value: evidenceSummary?.report_count ?? clientReports.length,
                       icon: FileText,
                     },
                     {
@@ -1358,6 +1380,10 @@ export default function AgencyCommandCenterPage() {
                       <CountMap
                         title="Event Types"
                         items={countEntries(evidenceSummary?.event_type_counts)}
+                      />
+                      <CountMap
+                        title="Report Status"
+                        items={countEntries(evidenceSummary?.report_status_counts)}
                       />
                     </div>
                   </div>

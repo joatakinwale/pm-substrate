@@ -15,6 +15,7 @@ def test_agency_api_types_and_helpers_are_declared():
     assert "export interface AgencyApprovalRequest" in source
     assert "export interface AgencyAccessRequest" in source
     assert "export interface IntegrationTask" in source
+    assert "export interface IntegrationClientReport" in source
     assert "export interface IntegrationRunEvidenceSnapshot" in source
     assert "export interface IntegrationExternalAdapter" in source
     assert "export async function listClientEngagements" in source
@@ -69,6 +70,9 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "approval_payload_hash" in source
     assert "latest_event_hash" in source
     assert "social_post_content_hashes" in source
+    assert "client_report_hashes" in source
+    assert "report_count" in source
+    assert "Report Status" in source
 
 
 def test_sidebar_links_to_agency_command_center():

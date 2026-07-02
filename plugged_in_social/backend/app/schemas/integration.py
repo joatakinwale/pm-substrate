@@ -6,7 +6,7 @@ stable API contracts over PluggedInSocial state, not ORM/table mirrors.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -221,6 +221,33 @@ class IntegrationSocialPostEnvelope(BaseModel):
     links: list[IntegrationLink]
 
 
+class IntegrationClientReportEnvelope(BaseModel):
+    resource_type: Literal["client_report"] = "client_report"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    project_id: uuid.UUID | None
+    lead_id: uuid.UUID | None
+    title: str
+    status: str
+    cadence: str
+    compound_phase: str | None
+    created_by_agent: str | None
+    client_name: str | None
+    client_email: str | None
+    period_start: date
+    period_end: date
+    sections: list[Any]
+    metrics_snapshot: dict[str, Any]
+    metrics_snapshot_hash: str
+    report_hash: str
+    pdf_url: str | None
+    pdf_generated_at: datetime | None
+    sent_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
 class IntegrationTaskEnvelope(BaseModel):
     resource_type: Literal["virtual_agency_task"] = "virtual_agency_task"
     id: uuid.UUID
@@ -330,6 +357,8 @@ class IntegrationEvidenceSummaryEnvelope(BaseModel):
     open_access_request_count: int
     social_post_count: int = 0
     social_post_status_counts: dict[str, int] = Field(default_factory=dict)
+    report_count: int = 0
+    report_status_counts: dict[str, int] = Field(default_factory=dict)
     evidence_hashes: dict[str, list[str]]
     links: list[IntegrationLink]
 
@@ -346,6 +375,7 @@ class IntegrationRunEvidenceSnapshotEnvelope(BaseModel):
     approvals: list[IntegrationApprovalEnvelope]
     access_requests: list[IntegrationAccessRequestEnvelope]
     social_posts: list[IntegrationSocialPostEnvelope]
+    reports: list[IntegrationClientReportEnvelope]
     links: list[IntegrationLink]
 
 
