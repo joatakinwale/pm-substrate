@@ -264,6 +264,23 @@ async def test_kickoff_marketing_run_builds_autonomous_agency_workbreakdown():
     assert all(task.context["client_url"] == "https://acme.example/" for task in tasks)
     assert all(task.context["repo_url"] == "https://github.com/acme/app" for task in tasks)
     assert "approval_payload_hash" in tasks[0].context["required_gates"]
+    assert tasks[0].context["research_requirements"]["source_urls"] == [
+        "https://acme.example/",
+    ]
+    assert tasks[0].context["research_requirements"]["copy_inputs"] == [
+        "homepage",
+        "sales deck",
+    ]
+    assert {
+        item["adapter_id"]
+        for item in tasks[0].context["external_adapter_requirements"]
+    } == {"browser_qa_harness", "agent_harness"}
+    assert "report_html_hash" in tasks[0].context[
+        "external_adapter_requirements"
+    ][0]["required_evidence_fields"]
+    assert "agent_event_hash" in tasks[0].context[
+        "external_adapter_requirements"
+    ][1]["required_evidence_fields"]
 
     events = list(db._store.get(VirtualAgencyEvent, {}).values())
     assert len(events) == 5
@@ -498,6 +515,19 @@ async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_act
         message = sent[-1]["message"]
         assert message["agent_role"] == role
         await route_virtual_agency_task(db=db, **message)
+
+    strategy_artifacts = [
+        artifact
+        for artifact in db._store.get(AgencyArtifact, {}).values()
+        if artifact.artifact_type == "strategy_research_brief"
+    ]
+    assert len(strategy_artifacts) == 1
+    assert strategy_artifacts[0].virtual_agency_task_id is not None
+    assert {
+        item["adapter_id"]
+        for item in strategy_artifacts[0].payload["external_adapter_requirements"]
+    } == {"browser_qa_harness", "agent_harness"}
+    assert strategy_artifacts[0].payload_hash
 
     posts = list(db._store.get(SocialPost, {}).values())
     assert len(posts) == 1

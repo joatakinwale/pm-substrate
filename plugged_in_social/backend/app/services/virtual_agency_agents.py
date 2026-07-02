@@ -20,6 +20,7 @@ from app.services.virtual_agency_orchestration import (
     create_analytics_mutations,
     create_content_mutations,
     create_scheduling_mutations,
+    create_strategy_research_mutations,
     DependencyNotSatisfiedError,
     ExecutionScopeError,
     ensure_approval_is_current,
@@ -230,7 +231,10 @@ async def route_virtual_agency_task(
     )
 
     if agent_role == AGENT_COS:
-        mutations = []
+        if task.task_type == "strategy_research":
+            mutations = create_strategy_research_mutations(task)
+        else:
+            mutations = []
     elif agent_role == "content_creative":
         account = await first_social_account(db, task.org_id)
         mutations = create_content_mutations(

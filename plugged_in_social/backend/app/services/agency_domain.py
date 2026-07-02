@@ -461,6 +461,15 @@ async def _create_kickoff_virtual_tasks(
             "access_request_ids": [str(item.id) for item in access_requests],
             "required_gates": KICKOFF_REQUIRED_GATES,
         }
+        if spec["task_type"] == "strategy_research":
+            context["research_requirements"] = _strategy_research_requirements(
+                engagement=engagement,
+                access_requests=access_requests,
+            )
+            context["external_adapter_requirements"] = (
+                _strategy_external_adapter_requirements(engagement)
+            )
+            context["evidence_refs"] = _engagement_evidence_refs(engagement)
         task = VirtualAgencyTask(
             org_id=engagement.org_id,
             project_id=project.id,
@@ -505,6 +514,100 @@ async def _create_kickoff_virtual_tasks(
             )
         )
     return tasks
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
+def _strategy_research_requirements(
+    *,
+    engagement: ClientEngagement,
+    access_requests: list[AgencyAccessRequest],
+) -> dict[str, Any]:
+    intake_payload = dict(engagement.intake_payload or {})
+    source_urls = _string_list(intake_payload.get("source_urls"))
+    if engagement.client_url and engagement.client_url not in source_urls:
+        source_urls.insert(0, engagement.client_url)
+
+    return {
+        "source_urls": source_urls,
+        "competitor_urls": _string_list(intake_payload.get("competitor_urls")),
+        "copy_inputs": _string_list(intake_payload.get("copy_inputs")),
+        "offer": intake_payload.get("offer"),
+        "required_access_request_ids": [str(item.id) for item in access_requests],
+        "research_questions": [
+            "What is the client's product, offer, audience, and conversion path?",
+            "What market/category claims are competitors using?",
+            "What website, repository, analytics, and social access is still missing?",
+            "What strategy should content and distribution agents execute first?",
+        ],
+    }
+
+
+def _strategy_external_adapter_requirements(
+    engagement: ClientEngagement,
+) -> list[dict[str, Any]]:
+    requirements: list[dict[str, Any]] = []
+    intake_payload = dict(engagement.intake_payload or {})
+    source_urls = _string_list(intake_payload.get("source_urls"))
+    competitor_urls = _string_list(intake_payload.get("competitor_urls"))
+    if engagement.client_url or source_urls or competitor_urls:
+        requirements.append(
+            {
+                "adapter_id": "browser_qa_harness",
+                "purpose": "client_platform_and_market_research",
+                "input_contracts": [
+                    "target_url",
+                    "operator_flow_prompt",
+                    "canary_session_start",
+                    "canary_execute_step",
+                    "canary_session_end",
+                ],
+                "expected_output_artifacts": [
+                    "session_manifest",
+                    "results_json",
+                    "report_html",
+                    "network_har",
+                    "step_screenshots",
+                ],
+                "required_evidence_fields": [
+                    "session_id",
+                    "report_html_hash",
+                    "network_har_hash",
+                    "screenshot_hashes",
+                ],
+            }
+        )
+    if engagement.repo_url:
+        requirements.append(
+            {
+                "adapter_id": "agent_harness",
+                "purpose": "repository_context_review",
+                "input_contracts": [
+                    "virtual_agency_task",
+                    "pi_spawn_request",
+                    "pi_rpc_command",
+                    "agent_event_stream",
+                ],
+                "expected_output_artifacts": [
+                    "agent_session_tree",
+                    "agent_event_stream",
+                    "tool_execution_events",
+                    "artifact_payload",
+                ],
+                "required_evidence_fields": [
+                    "instance_id",
+                    "session_id",
+                    "agent_event_hash",
+                    "tool_call_hash",
+                    "output_payload_hash",
+                ],
+            }
+        )
+    return requirements
 
 
 def _client_context(engagement: ClientEngagement) -> dict[str, Any]:

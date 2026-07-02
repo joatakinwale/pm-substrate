@@ -11,6 +11,7 @@ from typing import Any, Iterable
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.agency import AgencyArtifact
 from app.models.project import Task
 from app.models.report import ClientReport
 from app.models.social_media import SocialAccount, SocialPost
@@ -53,7 +54,7 @@ class ConcurrentMutationError(VirtualAgencyInvariantError):
 
 AGENT_CAPABILITIES: dict[str, dict[str, set[str]]] = {
     "chief_of_staff": {
-        "writes": set(),
+        "writes": {"agency_artifact.create"},
         "emits": {"strategy_research.completed"},
     },
     "content_creative": {
@@ -465,6 +466,42 @@ def create_content_mutations(
     ]
 
 
+def create_strategy_research_mutations(task: VirtualAgencyTask) -> list[MutationRequest]:
+    context = task.context or {}
+    payload = {
+        "client_context": {
+            "client_url": context.get("client_url"),
+            "repo_url": context.get("repo_url"),
+            "goals": context.get("goals") or [],
+            "constraints": context.get("constraints") or [],
+        },
+        "research_requirements": context.get("research_requirements") or {},
+        "external_adapter_requirements": (
+            context.get("external_adapter_requirements") or []
+        ),
+        "strategy_inputs": {
+            "intake_payload": context.get("intake_payload") or {},
+            "integration_state": context.get("integration_state") or {},
+        },
+    }
+    return [
+        MutationRequest(
+            write_kind="agency_artifact.create",
+            payload={
+                "artifact_type": "strategy_research_brief",
+                "title": "Strategy research brief",
+                "body": (
+                    "Research brief generated from intake, access gates, and "
+                    "external adapter requirements before content production."
+                ),
+                "payload": payload,
+                "evidence_refs": context.get("evidence_refs") or [],
+                "author_role": task.agent_role,
+            },
+        )
+    ]
+
+
 def create_scheduling_mutations(posts: Iterable[SocialPost]) -> list[MutationRequest]:
     base_time = datetime.now(timezone.utc)
     mutations: list[MutationRequest] = []
@@ -568,6 +605,44 @@ async def apply_mutations(
     ensure_capability(task.agent_role, mutations)
     created: list[Any] = []
     for mutation in mutations:
+        if mutation.write_kind == "agency_artifact.create":
+            engagement_id = _uuid_from_lineage(task.lineage, "engagement_id")
+            if engagement_id is None:
+                raise CapabilityViolationError(
+                    "Agency artifact mutation requires engagement lineage"
+                )
+            payload = dict(mutation.payload.get("payload") or {})
+            evidence_refs = list(mutation.payload.get("evidence_refs") or [])
+            lineage = {
+                **dict(task.lineage or {}),
+                "orchestration_task_id": str(task.id),
+                "payload_hash": compute_hash(payload),
+            }
+            artifact = AgencyArtifact(
+                org_id=task.org_id,
+                engagement_id=engagement_id,
+                marketing_run_id=_uuid_from_lineage(task.lineage, "marketing_run_id"),
+                virtual_agency_task_id=task.id,
+                artifact_type=str(mutation.payload["artifact_type"]),
+                title=str(mutation.payload["title"]),
+                body=mutation.payload.get("body"),
+                payload=payload,
+                payload_hash=compute_hash(
+                    {
+                        "artifact_type": mutation.payload["artifact_type"],
+                        "title": mutation.payload["title"],
+                        "payload": payload,
+                        "evidence_refs": evidence_refs,
+                        "lineage": lineage,
+                    }
+                ),
+                evidence_refs=evidence_refs,
+                lineage=lineage,
+                author_role=str(mutation.payload["author_role"]),
+            )
+            db.add(artifact)
+            created.append(artifact)
+            continue
         if mutation.write_kind == "social_post.create":
             post = SocialPost(
                 org_id=task.org_id,
