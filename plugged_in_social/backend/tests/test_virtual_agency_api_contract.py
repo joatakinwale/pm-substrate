@@ -146,6 +146,16 @@ def test_internal_virtual_agency_payload_rejects_contract_violations(patch):
         VirtualAgencyTaskRequest.model_validate(payload)
 
 
+def test_internal_virtual_agency_payload_requires_lineage_orchestration_task_id():
+    from app.api.internal.virtual_agency import VirtualAgencyTaskRequest
+
+    payload = _valid_internal_virtual_agency_payload()
+    payload["lineage"].pop("orchestration_task_id")
+
+    with pytest.raises(ValidationError):
+        VirtualAgencyTaskRequest.model_validate(payload)
+
+
 @pytest.mark.parametrize(
     ("lineage_field", "lineage_value"),
     [

@@ -49,6 +49,7 @@ const VALID_MSG: VirtualAgencyMessage = {
     client_request: "Launch a June campaign",
     project_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     legacy_task_id: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+    orchestration_task_id: "cccccccc-dddd-eeee-ffff-000000000000",
   },
   dependency_ids: [],
   context: { draft_type: "post", tone: "friendly" },
@@ -169,6 +170,61 @@ describe("validateMessage(virtual_agency.task)", () => {
           lineage: {
             client_request: "Launch a June campaign",
             project_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          },
+        },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects missing lineage orchestration task id", () => {
+    const { orchestration_task_id: _omit, ...lineage } = VALID_MSG.lineage;
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        { ...VALID_MSG, lineage },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects lineage project mismatch", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        {
+          ...VALID_MSG,
+          lineage: {
+            ...VALID_MSG.lineage,
+            project_id: "dddddddd-eeee-ffff-0000-111111111111",
+          },
+        },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects lineage legacy task mismatch when source task is present", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        {
+          ...VALID_MSG,
+          lineage: {
+            ...VALID_MSG.lineage,
+            legacy_task_id: "dddddddd-eeee-ffff-0000-111111111111",
+          },
+        },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects lineage orchestration task mismatch", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        {
+          ...VALID_MSG,
+          lineage: {
+            ...VALID_MSG.lineage,
+            orchestration_task_id: "dddddddd-eeee-ffff-0000-111111111111",
           },
         },
         "virtual_agency.task"

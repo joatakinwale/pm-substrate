@@ -97,7 +97,7 @@ export interface VirtualAgencyLineage {
   client_request: string;
   project_id: string;
   legacy_task_id: string;
-  orchestration_task_id?: string;
+  orchestration_task_id: string;
   artifact_id?: string;
   engagement_id?: string;
   marketing_run_id?: string;
@@ -272,7 +272,12 @@ function validateVirtualAgencyMessage(msg: Record<string, unknown>): void {
   if (!isRecord(lineage)) {
     throw new InvalidMessageError("missing or invalid lineage");
   }
-  for (const field of ["client_request", "project_id", "legacy_task_id"]) {
+  for (const field of [
+    "client_request",
+    "project_id",
+    "legacy_task_id",
+    "orchestration_task_id",
+  ]) {
     const value = lineage[field];
     if (typeof value !== "string" || value.length === 0) {
       throw new InvalidMessageError(`missing lineage.${field}`);
@@ -284,8 +289,21 @@ function validateVirtualAgencyMessage(msg: Record<string, unknown>): void {
   if (!UUID_RE.test(lineage["legacy_task_id"] as string)) {
     throw new InvalidMessageError("lineage.legacy_task_id must be a UUID");
   }
+  if (!UUID_RE.test(lineage["orchestration_task_id"] as string)) {
+    throw new InvalidMessageError("lineage.orchestration_task_id must be a UUID");
+  }
+  if (lineage["project_id"] !== msg["project_id"]) {
+    throw new InvalidMessageError("lineage.project_id must match project_id");
+  }
+  if (msg["task_id"] != null && lineage["legacy_task_id"] !== msg["task_id"]) {
+    throw new InvalidMessageError("lineage.legacy_task_id must match task_id");
+  }
+  if (lineage["orchestration_task_id"] !== msg["orchestration_task_id"]) {
+    throw new InvalidMessageError(
+      "lineage.orchestration_task_id must match orchestration_task_id"
+    );
+  }
   for (const field of [
-    "orchestration_task_id",
     "artifact_id",
     "engagement_id",
     "marketing_run_id",

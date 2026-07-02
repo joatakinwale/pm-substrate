@@ -266,6 +266,7 @@ describe("runMetricsRefresh", () => {
             client_request: "Launch a June campaign",
             project_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
             legacy_task_id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            orchestration_task_id: "11111111-1111-4111-8111-111111111111",
           },
           dependency_ids: ["dddddddd-dddd-dddd-dddd-dddddddddddd"],
           context: { client_name: "Client" },

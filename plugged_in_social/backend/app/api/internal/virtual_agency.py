@@ -19,9 +19,13 @@ router = APIRouter(prefix="/internal/virtual-agency", tags=["internal_virtual_ag
 
 
 SHA256_RE = r"^[0-9a-fA-F]{64}$"
-REQUIRED_LINEAGE_FIELDS = ("client_request", "project_id", "legacy_task_id")
-OPTIONAL_LINEAGE_UUID_FIELDS = (
+REQUIRED_LINEAGE_FIELDS = (
+    "client_request",
+    "project_id",
+    "legacy_task_id",
     "orchestration_task_id",
+)
+OPTIONAL_LINEAGE_UUID_FIELDS = (
     "artifact_id",
     "engagement_id",
     "marketing_run_id",
