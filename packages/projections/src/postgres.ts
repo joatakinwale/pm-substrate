@@ -52,6 +52,8 @@ const STATE_TABLE_DDL = `
   );
 `;
 
+const PROJECTION_STATE_DDL_LOCK = [741_942, 1] as const;
+
 interface CursorRow {
   last_event_id: string | null;
   last_event_seq: string | number | null;
@@ -356,8 +358,22 @@ export class PostgresProjectionRunner implements ProjectionRunner {
 
   async #ensureStateTable(): Promise<void> {
     if (this.#stateTableEnsured) return;
-    await this.#pool.query(STATE_TABLE_DDL);
-    this.#stateTableEnsured = true;
+    const client = await this.#pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock($1, $2)", [
+        PROJECTION_STATE_DDL_LOCK[0],
+        PROJECTION_STATE_DDL_LOCK[1],
+      ]);
+      await client.query(STATE_TABLE_DDL);
+      await client.query("COMMIT");
+      this.#stateTableEnsured = true;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async #ensureCursor(

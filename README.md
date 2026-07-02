@@ -25,8 +25,9 @@ Validation surface: the **ArrowHedgeLabs sandbox** (a multi-agent financial-rese
 2. **Event log** — append-only, tenant-partitioned, hash-chained provenance, `LISTEN/NOTIFY` bus. (`packages/events`)
 3. **Capability registry** — tools declare reads/emits/permissions; isolation enforced by test. (`packages/registry`, `packages/capability-kit`)
 4. **Workflow runtime** — per-tenant processes conditioned on events. (`packages/workflow`)
-5. **Agent operational state** — `CurrentStateView`, `ObservationContract` (v2: integrity hash, holder binding, allowed use), `ActionProposalReview` (warn-first), durable `StateReviewArtifact` with hash replay, observed read-set comparison, invariant-class policy, **external evidence admission** (MCP handles, memory, approvals, provider policy, traces, PM handoffs — evidence, never authority). (`packages/agent-state`)
-6. **Evals** — paired baseline/substrate scenarios, ArrowHedge fixture corpus, artifact-derived metrics, admission fixtures, run groups, role projections. (`packages/evals`)
+5. **Agent operational state** — `CurrentStateView`, `ObservationContract` (v2: integrity hash, holder binding, allowed use), `ActionProposalReview` (warn-first), durable `StateReviewArtifact` with hash replay, observed read-set comparison, invariant-class policy, `ActionOutcomeEnvelope`, and **external evidence admission** (MCP handles, memory, approvals, provider policy, traces, PM handoffs — evidence, never authority). (`packages/agent-state-core`; the witness/authority/quorum/seal tower is quarantined in `packages/agent-state-provenance` and gated by `PM_ENABLE_AGENT_STATE_PROVENANCE=1`)
+6. **Procedure admission** — deterministic scripts, Pi Harness runs, browser QA runs, and other repeated procedures become operational only after authority-scoped admission and replay. (`packages/procedure-admission`)
+7. **Evals** — paired baseline/substrate scenarios, ArrowHedge fixture corpus, artifact-derived metrics, admission fixtures, run groups, role projections. (`packages/evals`)
 
 Supporting: `entity-mapping` (declarative source→substrate mappings + profile-aware semantic validation), `continuity` (agent checkpoints), `tenants`, `projections`, `profile-registry`, `substrate-http` (+ demo).
 
@@ -46,12 +47,24 @@ Postgres-only: five schemas, `LISTEN/NOTIFY` as the bus, FTS for search, one pro
 
 ```bash
 pnpm install
-pnpm db:up        # Postgres via docker compose
-pnpm db:migrate
-pnpm db:seed
+pnpm db:up
+PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate pnpm db:migrate
+PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate pnpm db:seed
 pnpm build
 pnpm typecheck
-pnpm test         # full suite incl. DB-gated integration tests (PM_DATABASE_URL)
+PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate pnpm test
+pnpm validate:budgets
+pnpm validate:zero-edit
+pnpm validate:arrowsmith-primitives
+```
+
+The default migration path applies the lean core only. To apply the quarantined
+provenance tower for compatibility testing:
+
+```bash
+PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate \
+PM_ENABLE_AGENT_STATE_PROVENANCE=1 \
+pnpm db:migrate
 ```
 
 ## Research

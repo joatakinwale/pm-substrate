@@ -11,6 +11,9 @@
       "path": "./packages/agent-state-core"
     },
     {
+      "path": "./packages/procedure-admission"
+    },
+    {
       "path": "./packages/continuity"
     },
     {

@@ -32,6 +32,7 @@ const RUNTIME_CORE = new Set([
   "profile-registry",
   "tenants",
   "continuity",
+  "procedure-admission",
   "capability-kit",
   "substrate-http",
   "agent-state-core",

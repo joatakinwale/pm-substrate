@@ -55,6 +55,7 @@ const RUNTIME_CORE = [
   "profile-registry",
   "tenants",
   "continuity",
+  "procedure-admission",
   "capability-kit",
   "substrate-http",
 ];
