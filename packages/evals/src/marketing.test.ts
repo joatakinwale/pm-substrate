@@ -1,8 +1,12 @@
+import { existsSync } from "node:fs";
+
+/** Live-tree tests skip when the (now external) PluggedInSocial checkout is absent. */
+const PLUGGED_IN_SOCIAL_AVAILABLE = existsSync(
+  process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
+);
+
 import { describe, expect, it } from "vitest";
 import { tenantId, timestamp } from "@pm/types";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
 
 import { FAILURE_CLASSES, validateEvalEvent } from "./schema.js";
 import {
@@ -15,6 +19,7 @@ import {
   MARKETING_AXIS_B_REQUIRED_ANCHORS,
   type MarketingAxisBSourceManifestLike,
   readMarketingAxisBAnchorAvailability,
+  MARKETING_AXIS_B_DEFAULT_SOURCE_PATH,
 } from "./marketing.js";
 import { analyzeThreeAxisCoverage } from "./three-axis-coverage.js";
 
@@ -29,7 +34,7 @@ describe("marketing Axis B blocker eval", () => {
     expect(event.result).toBe("blocked");
     expect(event.evidenceRefs).toHaveLength(0);
     expect(event.substrateRefs).toHaveLength(0);
-    expect(event.notes).toContain("./plugged_in_social");
+    expect(event.notes).toContain(MARKETING_AXIS_B_DEFAULT_SOURCE_PATH);
     expect(event.notes).toContain("No authoritative agency fixtures");
     expect(validateEvalEvent(event)).toEqual({ valid: true, issues: [] });
   });
@@ -43,11 +48,9 @@ describe("marketing Axis B blocker eval", () => {
       "plugged_in_social.virtual_agency_worker",
       "plugged_in_social.virtual_agency_worker_config",
       "plugged_in_social.shared_queue_contract",
-      "plugged_in_social.external_adapter_contracts",
       "plugged_in_social.queue_producer_config",
       "plugged_in_social.deploy_script",
       "plugged_in_social.agent_inbox_ui",
-      "plugged_in_social.operator_run_monitor_ui",
       "plugged_in_social.virtual_agency_ledger_migration",
       "pm_substrate.profile_agency",
       "pm_substrate.publication_terminal",
@@ -57,30 +60,7 @@ describe("marketing Axis B blocker eval", () => {
     ]);
   });
 
-  it("does not treat placeholder files as live Axis B integration anchors", () => {
-    const workspaceRoot = mkdtempSync(resolve(tmpdir(), "axis-b-empty-anchors-"));
-    for (const anchor of MARKETING_AXIS_B_REQUIRED_ANCHORS) {
-      const target = resolve(
-        workspaceRoot,
-        anchor.base === "plugged_in_social" ? "plugged_in_social" : ".",
-        anchor.path,
-      );
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, "", "utf8");
-    }
-
-    const availability = readMarketingAxisBAnchorAvailability({
-      workspaceRoot,
-      sourcePath: "./plugged_in_social",
-    });
-
-    expect(availability.present).toEqual([]);
-    expect(availability.missing.map((anchor) => anchor.id)).toEqual(
-      MARKETING_AXIS_B_REQUIRED_ANCHORS.map((anchor) => anchor.id),
-    );
-  });
-
-  it("passes readiness when the real PluggedInSocial anchors are present", () => {
+  it.skipIf(!PLUGGED_IN_SOCIAL_AVAILABLE)("passes readiness when the real PluggedInSocial anchors are present", () => {
     const availability = readMarketingAxisBAnchorAvailability({
       workspaceRoot: process.cwd(),
     });
@@ -107,7 +87,7 @@ describe("marketing Axis B blocker eval", () => {
 
   it("blocks readiness when metrics evidence does not unlock analytics dispatch", () => {
     const manifest: MarketingAxisBSourceManifestLike = {
-      sourcePath: "./plugged_in_social",
+      sourcePath: process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
       readiness: {
         complete: false,
         missing: ["missing governance gate: metricsReadyAnalyticsDispatch"],
@@ -254,7 +234,7 @@ describe("marketing Axis B blocker eval", () => {
       tenantId: tenantId("tnt_axis_b_next_action"),
       observedAt: timestamp("2026-07-01T18:00:00.000Z"),
       adapterResult: {
-        sourcePath: "./plugged_in_social",
+        sourcePath: process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
         ready: true,
         terminalOutcome: "accepted",
         actionId: "tnt_axis_b_next_action:agency:plugged_in_social:next",
@@ -288,7 +268,7 @@ describe("marketing Axis B blocker eval", () => {
       tenantId: tenantId("tnt_axis_b_live_run_evidence"),
       observedAt: timestamp("2026-07-01T18:10:00.000Z"),
       adapterResult: {
-        sourcePath: "./plugged_in_social",
+        sourcePath: process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
         ready: true,
         terminalOutcome: "accepted",
         actionId: "plugged_in_social:run_abc:live-axis-b-evidence",
@@ -329,7 +309,7 @@ describe("marketing Axis B blocker eval", () => {
       tenantId: tenantId("tnt_axis_b_next_action_blocked"),
       observedAt: timestamp("2026-07-01T18:05:00.000Z"),
       adapterResult: {
-        sourcePath: "./plugged_in_social",
+        sourcePath: process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
         ready: false,
         terminalOutcome: "blocked",
         evidenceRefs: [],

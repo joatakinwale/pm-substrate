@@ -33,6 +33,7 @@ export const PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES = [
   "nextActionExecutionBoundary",
   "nextActionApprovalSurface",
   "metricsReadyAnalyticsDispatch",
+  "reportBuildRedrive",
   "closedLoopRuntimeFixture",
   "externalIntegrationBoundary",
   "externalAdapterBoundary",
@@ -113,13 +114,6 @@ export interface PluggedInSocialExternalAdapterManifest {
   readonly outputArtifacts: readonly string[];
   readonly requiredGates: readonly string[];
   readonly evidenceFields: readonly string[];
-  readonly sourceUrl: string;
-  readonly sourceCommit: string;
-  readonly compatibleProtocols: readonly string[];
-  readonly runnerCommands: readonly string[];
-  readonly providerPackages: readonly string[];
-  readonly requiredEventTypes: readonly string[];
-  readonly requiredResultShape: Record<string, unknown> | null;
 }
 
 export interface PluggedInSocialDataModelManifest {
@@ -165,18 +159,20 @@ export interface PluggedInSocialSourceManifestInput {
   readonly sourcePath?: string;
 }
 
-export const PLUGGED_IN_SOCIAL_DEFAULT_SOURCE_PATH = "./plugged_in_social";
+/** Overridable now that the app lives outside the substrate repo (plan §2.3). */
+export const PLUGGED_IN_SOCIAL_DEFAULT_SOURCE_PATH =
+  process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social";
 
 const REQUIRED_SOURCE_FILES = [
   "AGENTS.md",
   "backend/app/api/integration.py",
   "backend/app/schemas/integration.py",
-  "backend/app/services/external_adapter_contracts.py",
   "backend/app/api/virtual_agency.py",
   "backend/app/api/internal/virtual_agency.py",
   "backend/app/services/virtual_agency.py",
   "backend/app/services/virtual_agency_agents.py",
   "backend/app/services/virtual_agency_orchestration.py",
+  "backend/app/services/agency_domain.py",
   "backend/app/models/virtual_agency.py",
   "backend/alembic/versions/022_virtual_agency_orchestration_ledger.py",
   "agents/packages/shared/src/messages.ts",
@@ -184,7 +180,14 @@ const REQUIRED_SOURCE_FILES = [
   "agents/workers/queue-producer/wrangler.toml",
   "agents/workers/virtual-agency/src/index.ts",
   "agents/workers/virtual-agency/wrangler.toml",
+  "agents/packages/pi-runner/src/index.mjs",
+  "agents/packages/pi-runner/test/pi-runner.test.mjs",
+  "agents/packages/pi-runner/README.md",
+  "agents/packages/browser-runner/src/index.mjs",
+  "agents/packages/browser-runner/test/browser-runner.test.mjs",
+  "agents/packages/browser-runner/README.md",
   "backend/app/services/report_next_actions.py",
+  "backend/tests/test_agency_domain_service.py",
   "backend/tests/test_integration_api_contract.py",
   "frontend/src/app/admin/agency/page.tsx",
   "frontend/tests/test_agency_command_center_contract.py",
@@ -415,25 +418,28 @@ function buildExternalAdapters(
   sourceRoot: string,
 ): readonly PluggedInSocialExternalAdapterManifest[] {
   const sourcePath = "backend/app/services/external_adapter_contracts.py";
-  const apiSourcePath = "backend/app/api/integration.py";
-  const contractSource = readSource(
-    sourceRoot,
-    sourcePath,
-  );
-  const apiSource = readSource(sourceRoot, apiSourcePath);
+  const apiSource = readSource(sourceRoot, "backend/app/api/integration.py");
+  const contractSource = readSource(sourceRoot, sourcePath);
   const schemaSource = readSource(sourceRoot, "backend/app/schemas/integration.py");
   const hasAdapterContract =
     contractSource.includes("EXTERNAL_ADAPTER_CONTRACTS") &&
     contractSource.includes("ExternalAdapterContract") &&
     schemaSource.includes("IntegrationExternalAdapterManifest") &&
-    schemaSource.includes("source_url") &&
-    schemaSource.includes("compatible_protocols") &&
-    schemaSource.includes("required_result_shape") &&
+    schemaSource.includes("IntegrationExternalAdapterRunRequestCreate") &&
+    schemaSource.includes("IntegrationExternalAdapterRunClaimCreate") &&
+    schemaSource.includes("IntegrationExternalAdapterRunRequestEnvelope") &&
+    schemaSource.includes("IntegrationExternalAdapterRunAssignmentEnvelope") &&
     schemaSource.includes("IntegrationExternalAdapterRunIngest") &&
     schemaSource.includes("external_adapters") &&
     apiSource.includes("_external_adapter_manifest") &&
     apiSource.includes('"/external-adapters"') &&
     apiSource.includes('"/marketing-runs/{run_id}/external-adapter-runs"') &&
+    apiSource.includes('"/marketing-runs/{run_id}/external-adapter-run-requests"') &&
+    apiSource.includes('"/external-adapter-run-requests"') &&
+    apiSource.includes('"/external-adapter-run-requests/{request_id}/claim"') &&
+    apiSource.includes('"/external-adapter-run-requests/{request_id}/assignment"') &&
+    apiSource.includes("external_adapter_run.request") &&
+    apiSource.includes("external_adapter_run.claim") &&
     apiSource.includes("external_adapter_run.ingest") &&
     apiSource.includes("external_adapter_manifest.read");
 
@@ -455,9 +461,6 @@ function buildExternalAdapters(
       "no_secret_exfiltration",
       "playwright_script_hash",
       "console_error_count",
-      "source_url",
-      "compatible_protocols",
-      "required_result_shape",
     ])
   ) {
     adapters.push({
@@ -496,42 +499,13 @@ function buildExternalAdapters(
         "no_secret_exfiltration",
       ],
       evidenceFields: [
-        "session_id",
-        "session_phase",
-        "run_count",
-        "artifact_manifest_path",
         "artifact_payload_hash",
         "report_uri",
         "trace_uri",
         "har_uri",
-        "report_html_hash",
         "playwright_script_hash",
-        "trace_zip_hash",
-        "network_har_hash",
-        "console_log_hash",
-        "screenshot_hashes",
         "console_error_count",
       ],
-      sourceUrl: "https://github.com/LopeWale/canary",
-      sourceCommit: "36a29a052987aec11815422bd774368412e92b08",
-      compatibleProtocols: [
-        "canary.session-start",
-        "canary.execute",
-        "canary.session-end",
-      ],
-      runnerCommands: [
-        "canary session start",
-        "canary run",
-        "canary session end",
-        "canary-browser",
-      ],
-      providerPackages: [],
-      requiredEventTypes: [],
-      requiredResultShape: {
-        session: ["sessionId", "phase", "runCount", "artifactsDir"],
-        artifacts: ["kind", "path", "bytes"],
-        artifact_kinds: ["trace", "video", "har", "console", "screenshot"],
-      },
     });
   }
 
@@ -551,9 +525,6 @@ function buildExternalAdapters(
       "durable_event_hash",
       "tool_call_hash",
       "output_payload_hash",
-      "source_url",
-      "compatible_protocols",
-      "required_event_types",
     ])
   ) {
     adapters.push({
@@ -610,34 +581,6 @@ function buildExternalAdapters(
         "approval_payload_hash",
         "output_payload_hash",
       ],
-      sourceUrl: "https://github.com/earendil-works/pi",
-      sourceCommit: "e285e90fdbf9b05934ce90168156e2aa511d9a7c",
-      compatibleProtocols: [
-        "pi.orchestrator.spawn",
-        "pi.orchestrator.rpc",
-        "pi.agent_event_stream",
-      ],
-      runnerCommands: [
-        "pi orchestrator spawn",
-        "pi rpc",
-        "pi agent events",
-      ],
-      providerPackages: [
-        "@earendil-works/pi-agent-core",
-        "@earendil-works/pi-coding-agent",
-        "@earendil-works/pi-ai",
-      ],
-      requiredEventTypes: [
-        "agent_start",
-        "turn_start",
-        "message_start",
-        "message_end",
-        "tool_execution_start",
-        "tool_execution_end",
-        "turn_end",
-        "agent_end",
-      ],
-      requiredResultShape: null,
     });
   }
 
@@ -867,7 +810,10 @@ function extractDataModels(
   return models.sort((a, b) => a.table.localeCompare(b.table));
 }
 
-function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
+function buildGovernance(
+  sourceRoot: string,
+  workspaceRoot: string,
+): PluggedInSocialGovernance {
   const publicApi = readSource(sourceRoot, "backend/app/api/virtual_agency.py");
   const integrationApi = readSource(sourceRoot, "backend/app/api/integration.py");
   const integrationSchemas = readSource(
@@ -894,6 +840,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     sourceRoot,
     "backend/app/services/virtual_agency_orchestration.py",
   );
+  const agencyDomain = readSource(
+    sourceRoot,
+    "backend/app/services/agency_domain.py",
+  );
   const virtualAgency = readSource(sourceRoot, "backend/app/services/virtual_agency.py");
   const internalSocial = readSource(sourceRoot, "backend/app/api/internal/social.py");
   const socialCron = readSource(sourceRoot, "agents/workers/social-cron/src/index.ts");
@@ -904,7 +854,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
   const messages = readSource(sourceRoot, "agents/packages/shared/src/messages.ts");
   const deploy = readSource(sourceRoot, "agents/scripts/deploy.sh");
   const publicationTerminal = readSource(
-    resolve(sourceRoot, ".."),
+    workspaceRoot,
     "packages/profile-agency/src/publication-terminal.ts",
   );
   const nextActionService = readSource(
@@ -914,6 +864,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
   const internalReports = readSource(
     sourceRoot,
     "backend/app/api/internal/reports.py",
+  );
+  const queuePublisher = readSource(
+    sourceRoot,
+    "backend/app/services/queue_publisher.py",
   );
   const orchestrationTests = readSource(
     sourceRoot,
@@ -927,9 +881,34 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     sourceRoot,
     "backend/tests/test_virtual_agency_api_contract.py",
   );
+  const reportNextActionTests = readSource(
+    sourceRoot,
+    "backend/tests/test_report_next_action_proposals.py",
+  );
+  const queuePublisherTests = readSource(
+    sourceRoot,
+    "backend/tests/test_queue_publisher.py",
+  );
+  const agencyDomainTests = readSource(
+    sourceRoot,
+    "backend/tests/test_agency_domain_service.py",
+  );
   const virtualAgencyWorkerTests = readSource(
     sourceRoot,
     "agents/workers/virtual-agency/src/index.test.ts",
+  );
+  const piRunner = readSource(sourceRoot, "agents/packages/pi-runner/src/index.mjs");
+  const piRunnerTests = readSource(
+    sourceRoot,
+    "agents/packages/pi-runner/test/pi-runner.test.mjs",
+  );
+  const browserRunner = readSource(
+    sourceRoot,
+    "agents/packages/browser-runner/src/index.mjs",
+  );
+  const browserRunnerTests = readSource(
+    sourceRoot,
+    "agents/packages/browser-runner/test/browser-runner.test.mjs",
   );
   const frontendApi = readSource(sourceRoot, "frontend/src/lib/api.ts");
   const agencyCommandCenter = readSource(
@@ -960,9 +939,6 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       ) &&
       orchestrationTests.includes(
         "test_handoff_dependency_claim_mismatch_is_rejected",
-      ) &&
-      orchestrationTests.includes(
-        "test_handoff_marketing_run_lineage_mismatch_is_rejected",
       ),
     approvalHashGate:
       orchestration.includes("approval_payload_hash") &&
@@ -976,6 +952,8 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       ),
     publishContentHashGate:
       internalSocial.includes("scheduled_content_hash") &&
+      internalSocial.includes('post.status == "published"') &&
+      internalSocial.includes("post.published_content_hash == expected_content_hash") &&
       internalSocial.includes("content_hash_mismatch") &&
       socialCron.includes("expected_content_hash: p.expected_content_hash") &&
       socialPublisher.includes(
@@ -984,6 +962,9 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       messages.includes("validateSocialPublishMessage") &&
       internalSocialTests.includes(
         "test_publish_sync_rejects_scheduled_content_hash_mismatch",
+      ) &&
+      internalSocialTests.includes(
+        "test_publish_sync_is_idempotent_for_already_published_matching_hash",
       ),
     capabilityGate:
       orchestration.includes("AGENT_CAPABILITIES") &&
@@ -1037,7 +1018,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       publicApi.includes('if item_type == "orchestration_task":') &&
       publicApi.includes("VirtualAgencyTask.source_task_id.is_(None)") &&
       publicApi.includes('VirtualAgencyTask.status == "todo"') &&
-      publicApi.includes("publish_agent_task("),
+      publicApi.includes("publish_agent_task(") &&
+      publicApi.includes("agent_task_handoff_idempotency_key(orchestration_task)") &&
+      publicApi.includes("find_event_by_idempotency_key(") &&
+      internalVirtualAgencyTests.includes("idempotency_key=handoff_key"),
     metricsReadyAnalyticsDispatch:
       orchestration.includes("ensure_task_evidence_ready") &&
       orchestration.includes("post_has_metric_evidence") &&
@@ -1047,12 +1031,24 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       virtualAgency.includes("build_agent_task_dispatch") &&
       internalSocial.includes("_dispatch_ready_analytics_tasks_sync") &&
       internalSocial.includes("agent_task_handoff_idempotency_key") &&
-      internalSocialTests.includes(
-        "test_metrics_refresh_dispatch_uses_canonical_handoff_key",
-      ) &&
       internalSocial.includes("virtual_agency_tasks") &&
       socialCron.includes("virtual_agency_tasks") &&
       socialCron.includes("/enqueue/stevie-virtual-agency"),
+    reportBuildRedrive:
+      internalReports.includes("_collect_redrivable_report_builds") &&
+      internalReports.includes("_report_build_needs_redrive") &&
+      internalReports.includes("_PENDING_REPORT_REDRIVE_AFTER") &&
+      internalReports.includes("_GENERATING_REPORT_REDRIVE_AFTER") &&
+      queuePublisher.includes('"idempotency_key": f"report-build:{client_report_id}"') &&
+      reportNextActionTests.includes(
+        "test_report_build_redrives_stale_pending_or_failed_report",
+      ) &&
+      reportNextActionTests.includes(
+        "test_report_build_only_redrives_stalled_generating_report",
+      ) &&
+      queuePublisherTests.includes(
+        "test_publish_report_build_uses_stable_report_idempotency_key",
+      ),
     closedLoopRuntimeFixture:
       orchestrationTests.includes(
         "test_virtual_agency_closed_loop_reaches_next_action_with_durable_evidence",
@@ -1089,9 +1085,8 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes('"/approvals/{approval_id}/decision"') &&
       integrationApi.includes('"/events"') &&
       integrationApi.includes('"/webhooks"') &&
-      integrationApi.includes("_integration_artifact_idempotency_key") &&
-      integrationApi.includes("_find_integration_artifact_by_idempotency_key") &&
-      integrationApi.includes("client_idempotency_key") &&
+      integrationApi.includes("_run_access_blocker_includes") &&
+      integrationApi.includes("approve_and_dispatch_marketing_run(") &&
       integrationSchemas.includes("IntegrationCapabilityResponse") &&
       integrationSchemas.includes("IntegrationPlatformManifestEnvelope") &&
       integrationSchemas.includes("IntegrationAgentManifest") &&
@@ -1105,14 +1100,12 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationSchemas.includes("IntegrationEvidenceSummaryEnvelope") &&
       integrationSchemas.includes("IntegrationRunEvidenceSnapshotEnvelope") &&
       integrationSchemas.includes("IntegrationClientReportEnvelope") &&
-      integrationSchemas.includes("IntegrationWebhookIngest") &&
-      integrationSchemas.includes("idempotency_key") &&
       integrationTests.includes("test_integration_router_uses_rls_and_has_no_substrate_imports") &&
       integrationTests.includes(
-        "test_integration_event_ingest_is_idempotent_for_matching_payload",
+        "test_access_grant_resumes_marketing_run_blocked_on_dispatch_access",
       ) &&
       integrationTests.includes(
-        "test_integration_webhook_ingest_is_idempotent_for_matching_payload",
+        "test_access_grant_without_dispatch_blocker_does_not_resume_run",
       ) &&
       integrationTests.includes("engagement.create") &&
       integrationTests.includes("marketing_run.create") &&
@@ -1122,7 +1115,6 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     externalAdapterBoundary:
       integrationApi.includes("_external_adapter_manifest") &&
       integrationApi.includes("get_external_adapters") &&
-      integrationApi.includes("list_external_adapter_contracts") &&
       integrationApi.includes("external_adapter_manifest.read") &&
       externalAdapterContracts.includes("browser_qa_harness") &&
       externalAdapterContracts.includes("pi_harness") &&
@@ -1140,27 +1132,68 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       externalAdapterContracts.includes("runner_commands") &&
       externalAdapterContracts.includes("required_event_types") &&
       integrationApi.includes('"/marketing-runs/{run_id}/external-adapter-runs"') &&
+      integrationApi.includes('"/marketing-runs/{run_id}/external-adapter-run-requests"') &&
+      integrationApi.includes('"/external-adapter-run-requests"') &&
+      integrationApi.includes('"/external-adapter-run-requests/{request_id}/claim"') &&
+      integrationApi.includes('"/external-adapter-run-requests/{request_id}/assignment"') &&
       integrationApi.includes("external_adapter_run.read") &&
+      integrationApi.includes("external_adapter_run.request") &&
+      integrationApi.includes("external_adapter_run.claim") &&
       integrationApi.includes("external_adapter_run.ingest") &&
       integrationApi.includes("_missing_external_adapter_gates") &&
+      integrationApi.includes("_find_external_adapter_request_by_idempotency_key") &&
       integrationApi.includes("_find_external_adapter_run_artifact_by_idempotency_key") &&
+      integrationApi.includes("external_adapter_request_idempotency_conflict") &&
       integrationApi.includes("external_adapter_idempotency_conflict") &&
       integrationApi.includes("external_adapter_run_hashes") &&
       integrationSchemas.includes("IntegrationExternalAdapterManifest") &&
-      integrationSchemas.includes("source_url") &&
-      integrationSchemas.includes("source_commit") &&
-      integrationSchemas.includes("compatible_protocols") &&
-      integrationSchemas.includes("required_result_shape") &&
+      integrationSchemas.includes("IntegrationExternalAdapterRunRequestCreate") &&
+      integrationSchemas.includes("IntegrationExternalAdapterRunClaimCreate") &&
+      integrationSchemas.includes("IntegrationExternalAdapterRunRequestEnvelope") &&
+      integrationSchemas.includes("IntegrationExternalAdapterRunAssignmentEnvelope") &&
       integrationSchemas.includes("IntegrationExternalAdapterRunIngest") &&
       integrationSchemas.includes("idempotency_key or adapter_run_id is required") &&
       integrationSchemas.includes("external_adapters") &&
       integrationTests.includes("external_adapter_manifest.read") &&
+      integrationTests.includes("external_adapter_run.request") &&
+      integrationTests.includes("external_adapter_run.claim") &&
       integrationTests.includes("external_adapter_run.ingest") &&
+      integrationTests.includes("external_adapter_claim_runner_mismatch") &&
+      integrationTests.includes(
+        "test_external_adapter_request_can_be_created_claimed_and_completed",
+      ) &&
       integrationTests.includes(
         "test_external_adapter_run_ingest_is_idempotent_for_matching_payload",
       ) &&
       integrationTests.includes(
         "test_external_adapter_run_ingest_rejects_idempotency_conflict",
+      ) &&
+      agencyDomain.includes("_create_kickoff_external_adapter_requests") &&
+      agencyDomain.includes("EXTERNAL_ADAPTER_REQUEST_ARTIFACT_TYPE") &&
+      agencyDomain.includes('"external_adapter_run_request"') &&
+      agencyDomain.includes("external_adapter_request_count") &&
+      agencyDomainTests.includes("kickoff.adapter_requests") &&
+      agencyDomainTests.includes('"external_adapter_run_request"') &&
+      agencyDomainTests.includes('"pi_harness"') &&
+      piRunner.includes("runOnce") &&
+      piRunner.includes("claimRequest") &&
+      piRunner.includes("fetchAssignment") &&
+      piRunner.includes("executePiAssignment") &&
+      piRunner.includes("buildResultPayload") &&
+      piRunner.includes("PI_DRY_RUN") &&
+      piRunner.includes("PLUGGED_IN_SOCIAL_BEARER_TOKEN") &&
+      piRunnerTests.includes("claims, fetches assignment, and ingests") &&
+      piRunnerTests.includes("buildResultPayload emits required Pi harness evidence") &&
+      browserRunner.includes('DEFAULT_ADAPTER_ID = "browser_qa_harness"') &&
+      browserRunner.includes("canary.session-start") &&
+      browserRunner.includes("canary.execute") &&
+      browserRunner.includes("executeBrowserAssignment") &&
+      browserRunner.includes("buildResultPayload") &&
+      browserRunner.includes("BROWSER_DRY_RUN") &&
+      browserRunner.includes("PLUGGED_IN_SOCIAL_BEARER_TOKEN") &&
+      browserRunnerTests.includes("claims, fetches assignment, and ingests") &&
+      browserRunnerTests.includes(
+        "buildResultPayload emits required browser harness evidence",
       ) &&
       integrationTests.includes("browser_qa_harness") &&
       integrationTests.includes("sandbox_boundary"),
@@ -1169,21 +1202,22 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       frontendApi.includes("export interface IntegrationRunEvidenceSnapshot") &&
       frontendApi.includes("export interface IntegrationClientReport") &&
       frontendApi.includes("export interface IntegrationExternalAdapter") &&
-      frontendApi.includes("source_url: string") &&
-      frontendApi.includes("compatible_protocols: string[]") &&
-      frontendApi.includes("required_result_shape: Record<string, unknown> | null") &&
+      frontendApi.includes("export interface IntegrationExternalAdapterRunRequest") &&
       frontendApi.includes("listIntegrationRunTasks") &&
       frontendApi.includes("getIntegrationRunEvidenceSnapshot") &&
       frontendApi.includes("listIntegrationExternalAdapters") &&
+      frontendApi.includes("listIntegrationExternalAdapterRunRequests") &&
       frontendApi.includes("report_count") &&
       frontendApi.includes("reports: IntegrationClientReport[]") &&
       frontendApi.includes("/api/integration/v1/marketing-runs/") &&
       frontendApi.includes("/tasks") &&
       frontendApi.includes("/evidence-snapshot") &&
       frontendApi.includes("/api/integration/v1/external-adapters") &&
+      frontendApi.includes("/api/integration/v1/external-adapter-run-requests") &&
       agencyCommandCenter.includes("Closed-loop Progress") &&
       agencyCommandCenter.includes("Governance Gates") &&
       agencyCommandCenter.includes("External Adapter Boundary") &&
+      agencyCommandCenter.includes("Pi Execution Requests") &&
       agencyCommandCenter.includes("Agent Task Queue") &&
       agencyCommandCenter.includes("source_urls") &&
       agencyCommandCenter.includes("competitor_urls") &&
@@ -1195,18 +1229,23 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       agencyCommandCenter.includes("openAccessRequestCount > 0") &&
       agencyCommandCenter.includes("CLOSED_LOOP_STAGES") &&
       agencyCommandCenter.includes("externalAdapters") &&
-      agencyCommandCenter.includes("adapter.compatible_protocols") &&
-      agencyCommandCenter.includes("adapter.source_commit") &&
+      agencyCommandCenter.includes("activeRunExternalAdapterRequests") &&
+      agencyCommandCenter.includes("externalAdapterRunRequests") &&
       agencyCommandCenter.includes("externalAdapterRuns") &&
       agencyCommandCenter.includes("Adapter Run Evidence") &&
       agencyCommandCenter.includes("external_adapter_run") &&
       agencyCommandCenter.includes("gate_results_hash") &&
       agencyCommandCenter.includes("output_payload_hash") &&
-      agencyCommandCenter.includes("artifactIdempotencyValue") &&
-      agencyCommandCenter.includes("event.idempotency_key") &&
       agencyCommandCenter.includes("getIntegrationRunEvidenceSnapshot") &&
       agencyCommandCenter.includes("listIntegrationExternalAdapters") &&
       agencyCommandCenter.includes("clientReports") &&
+      agencyCommandCenter.includes("Report Re-drive") &&
+      agencyCommandCenter.includes("REPORT_PENDING_REDRIVE_MINUTES") &&
+      agencyCommandCenter.includes("REPORT_GENERATING_REDRIVE_MINUTES") &&
+      agencyCommandCenter.includes("reportBuildMonitor") &&
+      agencyCommandCenter.includes("reportBuildSummary.redriveReady") &&
+      agencyCommandCenter.includes("redriveReadyReportBuildCount") &&
+      agencyCommandCenter.includes("backend sweep will re-enqueue") &&
       agencyCommandCenter.includes("approval_payload_hash") &&
       agencyCommandCenter.includes("latest_event_hash") &&
       agencyCommandCenter.includes("social_post_content_hashes") &&
@@ -1225,17 +1264,20 @@ function evidenceForExisting(sourceRoot: string, paths: readonly string[]): stri
 
 function buildClosedLoopStages(
   sourceRoot: string,
+  workspaceRoot: string,
 ): readonly PluggedInSocialClosedLoopStage[] {
   const nextActionProposalPath =
-    "../packages/profile-agency/src/next-action-proposal.ts";
+    "packages/profile-agency/src/next-action-proposal.ts";
   const nextActionAdapterPath =
-    "../packages/profile-agency/src/plugged-in-social-axis-b-adapter.ts";
+    "packages/profile-agency/src/plugged-in-social-axis-b-adapter.ts";
   const nextActionServicePath = "backend/app/services/report_next_actions.py";
   const internalReportsPath = "backend/app/api/internal/reports.py";
-  const nextActionProposalSource = readSource(sourceRoot, nextActionProposalPath);
-  const nextActionAdapterSource = readSource(sourceRoot, nextActionAdapterPath);
+  const queuePublisherPath = "backend/app/services/queue_publisher.py";
+  const nextActionProposalSource = readSource(workspaceRoot, nextActionProposalPath);
+  const nextActionAdapterSource = readSource(workspaceRoot, nextActionAdapterPath);
   const nextActionServiceSource = readSource(sourceRoot, nextActionServicePath);
   const internalReportsSource = readSource(sourceRoot, internalReportsPath);
+  const queuePublisherSource = readSource(sourceRoot, queuePublisherPath);
   const hasNextActionProposal = nextActionProposalSource.includes(
     "buildAgencyMarketingNextActionProposal",
   );
@@ -1273,6 +1315,12 @@ function buildClosedLoopStages(
     ) &&
     readSource(sourceRoot, "agents/workers/social-cron/src/index.ts").includes(
       "/enqueue/stevie-virtual-agency",
+    );
+  const hasReportBuildRedrive =
+    internalReportsSource.includes("_collect_redrivable_report_builds") &&
+    internalReportsSource.includes("_report_build_needs_redrive") &&
+    queuePublisherSource.includes(
+      '"idempotency_key": f"report-build:{client_report_id}"',
     );
 
   return [
@@ -1315,10 +1363,10 @@ function buildClosedLoopStages(
         readSource(sourceRoot, "backend/app/api/virtual_agency.py").includes(
           "/inbox",
         ) &&
-        existsSync(resolve(sourceRoot, "../packages/profile-agency/src/publication-terminal.ts")),
+        existsSync(resolve(workspaceRoot, "packages/profile-agency/src/publication-terminal.ts")),
       evidence: [
         "backend/app/api/virtual_agency.py",
-        "../packages/profile-agency/src/publication-terminal.ts",
+        "packages/profile-agency/src/publication-terminal.ts",
       ],
     },
     {
@@ -1360,10 +1408,13 @@ function buildClosedLoopStages(
       stage: "report",
       present:
         existsSync(resolve(sourceRoot, "agents/workers/report-builder/src/index.ts")) &&
-        extractTables(sourceRoot).includes("client_reports"),
+        extractTables(sourceRoot).includes("client_reports") &&
+        hasReportBuildRedrive,
       evidence: [
         "agents/workers/report-builder/src/index.ts",
         "backend/app/models/report.py",
+        internalReportsPath,
+        queuePublisherPath,
       ],
     },
     {
@@ -1411,21 +1462,9 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
     },
     {
       kind: "source_record",
-      id: "plugged_in_social:shared-contract:queue-message",
-      label: "Shared Worker queue message contract",
-      path: "agents/packages/shared/src/messages.ts",
-    },
-    {
-      kind: "source_record",
       id: "plugged_in_social:api:virtual-agency",
       label: "Virtual agency FastAPI routes",
       path: "backend/app/api/virtual_agency.py",
-    },
-    {
-      kind: "source_record",
-      id: "plugged_in_social:api:internal-virtual-agency",
-      label: "Internal virtual-agency system-RLS endpoint",
-      path: "backend/app/api/internal/virtual_agency.py",
     },
     {
       kind: "source_record",
@@ -1435,21 +1474,21 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
     },
     {
       kind: "source_record",
-      id: "plugged_in_social:schema:integration-v1",
-      label: "Neutral integration API schema contract",
-      path: "backend/app/schemas/integration.py",
+      id: "plugged_in_social:api:external-adapter-manifest",
+      label: "External QA and agent harness adapter manifest",
+      path: "backend/app/api/integration.py",
     },
     {
       kind: "source_record",
-      id: "plugged_in_social:contract:external-adapters",
-      label: "External browser and agent harness adapter contracts",
-      path: "backend/app/services/external_adapter_contracts.py",
+      id: "plugged_in_social:runner:pi-harness",
+      label: "Portable Pi harness external adapter runner",
+      path: "agents/packages/pi-runner/src/index.mjs",
     },
     {
       kind: "source_record",
-      id: "plugged_in_social:service:virtual-agency-orchestration",
-      label: "Virtual agency orchestration and evidence gates",
-      path: "backend/app/services/virtual_agency_orchestration.py",
+      id: "plugged_in_social:runner:browser-qa-harness",
+      label: "Portable Canary browser QA external adapter runner",
+      path: "agents/packages/browser-runner/src/index.mjs",
     },
     {
       kind: "source_record",
@@ -1480,24 +1519,6 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
       id: "plugged_in_social:data-model:virtual-agency-tasks",
       label: "Virtual agency task data model and ledger fields",
       path: "backend/app/models/virtual_agency.py",
-    },
-    {
-      kind: "source_record",
-      id: "plugged_in_social:data-model:social-posts",
-      label: "Social post content hash and publication data model",
-      path: "backend/app/models/social_media.py",
-    },
-    {
-      kind: "source_record",
-      id: "plugged_in_social:data-model:client-reports",
-      label: "Client report metrics and report data model",
-      path: "backend/app/models/report.py",
-    },
-    {
-      kind: "source_record",
-      id: "plugged_in_social:ui:operator-run-monitor",
-      label: "Autonomous agency operator run monitor",
-      path: "frontend/src/app/admin/agency/page.tsx",
     },
   ];
 }
@@ -1624,8 +1645,8 @@ export function readPluggedInSocialSourceManifest(
     dataModels: extractDataModels(sourceRoot),
     configurations: buildConfigurations(sourceRoot),
     externalAdapters: buildExternalAdapters(sourceRoot),
-    governance: buildGovernance(sourceRoot),
-    closedLoopStages: buildClosedLoopStages(sourceRoot),
+    governance: buildGovernance(sourceRoot, workspaceRoot),
+    closedLoopStages: buildClosedLoopStages(sourceRoot, workspaceRoot),
     evidenceRefs: buildEvidenceRefs(),
     substrateRefs: buildSubstrateRefs(),
   };

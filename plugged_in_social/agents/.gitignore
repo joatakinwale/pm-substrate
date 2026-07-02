@@ -1,9 +1,0 @@
-node_modules/
-.wrangler/
-dist/
-*.log
-.dev.vars
-.env
-.env.local
-.DS_Store
-.mypy_cache

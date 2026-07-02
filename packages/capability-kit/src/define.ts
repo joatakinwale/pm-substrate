@@ -10,6 +10,10 @@
 
 import {
   assertGraphWriteAuthority,
+  freshnessGate,
+  readStalenessOf,
+  StaleReadError,
+  type ReadStaleness,
   type Graph,
   type GraphWriteAuthorityPolicy,
   type GraphWriteAuthorityRef,
@@ -197,6 +201,16 @@ export interface CapabilitySpec<TPayload, TApplyResult = void> {
   readonly emit?: (
     ctx: EmitContext<TPayload, TApplyResult>,
   ) => PublishInput | null;
+
+  /**
+   * Optional reality-quality gate (refactor plan Phase 1): before authority
+   * resolution and `apply`, the kit computes the locked target row's read
+   * staleness and refuses to act when it exceeds `maxAgeMs` — throwing
+   * `StaleReadError` (non-retryable; propagates to the dead-letter path).
+   * "Act on current state" becomes enforcement, not convention: no code
+   * path applies a stale read.
+   */
+  readonly freshness?: { readonly maxAgeMs: number };
 }
 
 /** Substrate-provided runtime deps every capability handler needs. */
@@ -232,6 +246,7 @@ interface NodeRow {
   id: string;
   identity: Identity;
   schema_version: number;
+  updated_at: Date;
 }
 
 /**
@@ -340,7 +355,7 @@ export function defineCapability<TPayload, TApplyResult = void>(
           | undefined;
         if (spec.apply && targetId !== null) {
           const sel = await c.query<NodeRow>(
-            `SELECT id, identity, schema_version
+            `SELECT id, identity, schema_version, updated_at
                FROM graph.nodes
               WHERE tenant_id = $1 AND id = $2
               FOR UPDATE`,
@@ -352,6 +367,28 @@ export function defineCapability<TPayload, TApplyResult = void>(
               `[capability-kit:${spec.name}] target node not found: ${targetId} (tenant=${tenantId})`,
             );
           }
+
+          // Reality-quality gate: refuse to act on a stale locked read.
+          let targetStaleness: ReadStaleness | undefined;
+          if (spec.freshness) {
+            const decision = freshnessGate(
+              row.updated_at instanceof Date
+                ? readStalenessOf({
+                    updatedAt: row.updated_at.toISOString() as never,
+                  })
+                : null, // missing timestamp = missing read: deny, never crash
+              spec.freshness.maxAgeMs,
+            );
+            if (!decision.authorized) {
+              throw new StaleReadError({
+                reason: decision.reason,
+                ageMs: decision.ageMs,
+                maxAgeMs: decision.maxAgeMs,
+              });
+            }
+            targetStaleness = decision.staleness;
+          }
+          void targetStaleness;
 
           const authorityContext: GraphWriteAuthorityContext<TPayload> = {
             tenantId,

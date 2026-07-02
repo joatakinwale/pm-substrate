@@ -427,5 +427,51 @@ describeIfDb("agency.lead-scoring capability", () => {
       [tenantId, atomicEventId],
     );
     expect(res.rowCount).toBe(0);
+
+});
+
+  it("refuses to score against a stale scoring config (freshness gate end-to-end)", async () => {
+    // Backdate the config's updated_at beyond a tiny freshness budget, then
+    // prove the kit's reality-quality gate blocks the rollup: no count bump,
+    // no emitted event, StaleReadError surfaced for the dead-letter path.
+    await pool.query(
+      `UPDATE graph.nodes SET updated_at = now() - interval '1 hour'
+        WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, scoringConfigOverrideId],
+    );
+    const before = await pool.query(
+      `SELECT identity->>'currentTotalLeadsScored' AS total
+         FROM graph.nodes WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, scoringConfigOverrideId],
+    );
+    const strictHandler = new LeadScoringHandler({
+      pool,
+      graph,
+      events,
+      freshnessMaxAgeMs: 1_000,
+    });
+    await expect(
+      strictHandler.handle(tenantId, {
+        leadId: leadOverrideId,
+        scoreDelta: 1,
+        scoringEventId: `sev_stale_${Date.now()}`,
+        recordedAt: new Date().toISOString(),
+      }),
+    ).rejects.toMatchObject({
+      name: "StaleReadError",
+      detail: { reason: "stale_read", maxAgeMs: 1_000 },
+    });
+    const after = await pool.query(
+      `SELECT identity->>'currentTotalLeadsScored' AS total
+         FROM graph.nodes WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, scoringConfigOverrideId],
+    );
+    expect(after.rows[0].total).toBe(before.rows[0].total);
+    // restore freshness for any later tests
+    await pool.query(
+      `UPDATE graph.nodes SET updated_at = now() WHERE tenant_id = $1 AND id = $2`,
+      [tenantId, scoringConfigOverrideId],
+    );
   });
+
 });

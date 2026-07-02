@@ -1,3 +1,10 @@
+import { existsSync } from "node:fs";
+
+/** Live-tree tests skip when the (now external) PluggedInSocial checkout is absent. */
+const PLUGGED_IN_SOCIAL_AVAILABLE = existsSync(
+  process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
+);
+
 import {
   existsSync,
   mkdtempSync,
@@ -43,7 +50,7 @@ describe("PluggedInSocial audit script", () => {
     }
   });
 
-  it("writes a durable JSON audit artifact from a ClientReport snapshot", async () => {
+  it.skipIf(!PLUGGED_IN_SOCIAL_AVAILABLE)("writes a durable JSON audit artifact from a ClientReport snapshot", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "pis-audit-"));
     tempDirs.push(tempDir);
     const reportPath = join(tempDir, "client-report.json");

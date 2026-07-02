@@ -69,6 +69,7 @@ const makeClient = (): FakeClient => {
               id: targetId,
               identity: { currentTotalLeadsScored: 4 },
               schema_version: 3,
+              updated_at: new Date(),
             },
           ],
         };

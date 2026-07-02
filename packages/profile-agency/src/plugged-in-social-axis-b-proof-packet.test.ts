@@ -1,11 +1,18 @@
+import { existsSync } from "node:fs";
+
+/** Live-tree tests skip when the (now external) PluggedInSocial checkout is absent. */
+const PLUGGED_IN_SOCIAL_AVAILABLE = existsSync(
+  process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
+);
+
 import { describe, expect, it } from "vitest";
 import { tenantId, timestamp } from "@pm/types";
-import { FAILURE_CLASSES } from "../../evals/src/schema.js";
+import { FAILURE_CLASSES } from "@pm/evals";
 import {
   buildMarketingAxisBCorePairedScenarios,
   buildMarketingAxisBLiveIntegrationSuite,
-} from "../../evals/src/marketing.js";
-import { buildThreeAxisProofPacket } from "../../evals/src/three-axis-proof-packet.js";
+} from "@pm/evals";
+import { buildThreeAxisProofPacket } from "@pm/evals";
 
 import {
   buildPluggedInSocialAxisBNextActionAdapterResult,
@@ -41,10 +48,8 @@ const liveEventHashB = "b".repeat(64);
 const liveArtifactHash = "c".repeat(64);
 const liveAccessRequestHash = "d".repeat(64);
 const liveSocialPostHash = "e".repeat(64);
-const liveSocialPostMetricHash = "c1".repeat(32);
 const liveReportHash = "f".repeat(64);
 const liveReportMetricsHash = "a1".repeat(32);
-const liveStrategyArtifactId = "99999999-9999-4999-8999-999999999999";
 
 const closedLoopStages = [
   "intake",
@@ -66,7 +71,6 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       closed_loop_stages: closedLoopStages,
       capabilities: [
         "platform_manifest.read",
-        "external_adapter_manifest.read",
         "engagement.read",
         "engagement.create",
         "external_adapter_run.read",
@@ -79,7 +83,6 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "event_timeline.read",
         "evidence_summary.read",
         "run_evidence_snapshot.read",
-        "approval.read",
         "access_request.read",
         "social_post.read",
         "report.read",
@@ -168,39 +171,15 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       api_endpoints: [
         {
           method: "GET",
-          path: "/api/integration/v1/capabilities",
-          boundary: "public_rls",
-          capability_ids: ["platform_manifest.read"],
-        },
-        {
-          method: "GET",
           path: "/api/integration/v1/platform-manifest",
           boundary: "public_rls",
           capability_ids: ["platform_manifest.read"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/external-adapters",
-          boundary: "public_rls",
-          capability_ids: ["external_adapter_manifest.read"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/engagements",
-          boundary: "public_rls",
-          capability_ids: ["engagement.read"],
         },
         {
           method: "POST",
           path: "/api/integration/v1/engagements",
           boundary: "public_rls",
           capability_ids: ["engagement.create"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/engagements/{engagement_id}",
-          boundary: "public_rls",
-          capability_ids: ["engagement.read"],
         },
         {
           method: "GET",
@@ -233,22 +212,10 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["access_request.read"],
         },
         {
-          method: "GET",
-          path: "/api/integration/v1/marketing-runs/{run_id}",
-          boundary: "public_rls",
-          capability_ids: ["marketing_run.read"],
-        },
-        {
           method: "POST",
           path: "/api/integration/v1/marketing-runs/{run_id}/dispatch",
           boundary: "public_rls",
           capability_ids: ["marketing_run.dispatch"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/marketing-runs/{run_id}/artifacts",
-          boundary: "public_rls",
-          capability_ids: ["artifact.read"],
         },
         {
           method: "GET",
@@ -269,40 +236,10 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["task.execute"],
         },
         {
-          method: "POST",
-          path: "/api/internal/social/posts/{post_id}/publish",
-          boundary: "internal_system_rls",
-          capability_ids: ["social_post.publish"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/marketing-runs/{run_id}/tasks",
-          boundary: "public_rls",
-          capability_ids: ["task.read"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/marketing-runs/{run_id}/events",
-          boundary: "public_rls",
-          capability_ids: ["event_timeline.read"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/marketing-runs/{run_id}/approvals",
-          boundary: "public_rls",
-          capability_ids: ["approval.read"],
-        },
-        {
           method: "GET",
           path: "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
           boundary: "public_rls",
           capability_ids: ["run_evidence_snapshot.read"],
-        },
-        {
-          method: "GET",
-          path: "/api/integration/v1/marketing-runs/{run_id}/evidence-summary",
-          boundary: "public_rls",
-          capability_ids: ["evidence_summary.read"],
         },
         {
           method: "GET",
@@ -330,27 +267,9 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         },
         {
           method: "POST",
-          path: "/api/integration/v1/approvals/{approval_id}/decision",
-          boundary: "public_rls",
-          capability_ids: ["approval.decide"],
-        },
-        {
-          method: "POST",
           path: "/api/integration/v1/access-requests/{access_request_id}/decision",
           boundary: "public_rls",
           capability_ids: ["access_request.decide"],
-        },
-        {
-          method: "POST",
-          path: "/api/integration/v1/events",
-          boundary: "public_rls",
-          capability_ids: ["event.ingest"],
-        },
-        {
-          method: "POST",
-          path: "/api/integration/v1/webhooks",
-          boundary: "public_rls",
-          capability_ids: ["event.ingest"],
         },
       ],
       data_resources: [
@@ -425,15 +344,6 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           durable_evidence_fields: [
             "current_content_hash",
             "scheduled_content_hash",
-            "published_content_hash",
-            "published_at",
-            "platform_post_id",
-            "likes",
-            "comments",
-            "shares",
-            "impressions",
-            "reach",
-            "engagement_rate",
             "lineage",
           ],
           read_capability_ids: ["social_post.read"],
@@ -495,7 +405,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       status: "completed",
       stage: "next_action",
       artifact_count: 1,
-      artifact_type_counts: { strategy_research_brief: 1 },
+      artifact_type_counts: { strategy_plan: 1 },
       task_count: 1,
       task_status_counts: { done: 1 },
       event_count: 2,
@@ -505,28 +415,15 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       access_request_count: 1,
       open_access_request_count: 0,
       social_post_count: 1,
-      social_post_status_counts: { published: 1 },
+      social_post_status_counts: { scheduled: 1 },
       report_count: 1,
       report_status_counts: { generated: 1 },
-      adapter_readiness: {
-        strategy_artifact_present: true,
-        strategy_artifact_id: liveStrategyArtifactId,
-        strategy_artifact_payload_hash: liveArtifactHash,
-        ready: true,
-        required_adapter_ids: [],
-        succeeded_adapter_ids: [],
-        missing_adapter_ids: [],
-        blocked_adapter_ids: [],
-        adapters: [],
-      },
       evidence_hashes: {
         artifact_payload_hashes: [liveArtifactHash],
         access_request_hashes: [liveAccessRequestHash],
         event_hashes: [liveEventHashA, liveEventHashB],
         task_latest_event_hashes: [liveEventHashB],
         social_post_content_hashes: [liveSocialPostHash],
-        published_social_post_content_hashes: [liveSocialPostHash],
-        social_post_metric_hashes: [liveSocialPostMetricHash],
         client_report_hashes: [liveReportHash],
         client_report_metrics_hashes: [liveReportMetricsHash],
       },
@@ -597,13 +494,13 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
     artifacts: [
       {
         resource_type: "agency_artifact",
-        id: liveStrategyArtifactId,
+        id: "99999999-9999-4999-8999-999999999999",
         org_id: liveOrgId,
         engagement_id: "66666666-6666-4666-8666-666666666666",
         marketing_run_id: liveRunId,
         virtual_agency_task_id: liveTaskId,
-        artifact_type: "strategy_research_brief",
-        title: "Launch conversion research brief",
+        artifact_type: "strategy_plan",
+        title: "Launch conversion plan",
         payload_hash: liveArtifactHash,
         version: 1,
         evidence_refs: [],
@@ -640,27 +537,27 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         project_id: "33333333-3333-4333-8333-333333333333",
         social_account_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         platform: "linkedin",
-        status: "published",
+        status: "scheduled",
         caption: "Approved launch campaign draft",
         hashtags: ["launch"],
         media_urls: [],
         media_type: null,
         scheduled_at: "2026-07-02T16:00:00.000Z",
-        published_at: "2026-07-02T16:05:00.000Z",
-        platform_post_id: "urn:li:share:123",
-        platform_url: "https://linkedin.example/posts/123",
+        published_at: null,
+        platform_post_id: null,
+        platform_url: null,
         compound_phase: "create",
         created_by_agent: "content_creative",
         version: 2,
         current_content_hash: liveSocialPostHash,
         scheduled_content_hash: liveSocialPostHash,
-        published_content_hash: liveSocialPostHash,
-        likes: 12,
-        comments: 3,
-        shares: 2,
-        impressions: 840,
-        reach: 650,
-        engagement_rate: 0.026,
+        published_content_hash: null,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        impressions: 0,
+        reach: 0,
+        engagement_rate: null,
         lineage: { marketing_run_id: liveRunId },
       },
     ],
@@ -695,7 +592,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
 }
 
 describe("PluggedInSocial Axis B proof packet integration", () => {
-  it("verifies live Axis B coverage without overclaiming the three-axis packet", () => {
+  it.skipIf(!PLUGGED_IN_SOCIAL_AVAILABLE)("verifies live Axis B coverage without overclaiming the three-axis packet", () => {
     const observedAt = timestamp("2026-07-01T19:15:00.000Z");
     const tenant = tenantId("tnt_plugged_in_social_axis_b_packet");
     const manifest = readPluggedInSocialSourceManifest({

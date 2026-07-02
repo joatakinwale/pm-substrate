@@ -238,3 +238,4 @@ export {
   type WriteBindingReplayMetrics,
   type WriteBindingReplayRecord,
 } from "./write-binding.js";
+export * from "./amnesia.js";

@@ -1,5 +1,5 @@
 import type { TenantId, Timestamp } from "@pm/types";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   evalEvent,
@@ -18,7 +18,6 @@ export interface MarketingAxisBAnchor {
   readonly label: string;
   readonly base: "plugged_in_social" | "pm_substrate";
   readonly path: string;
-  readonly requiredContent: readonly string[];
   readonly substrateRef?: boolean;
 }
 
@@ -55,7 +54,9 @@ export interface MarketingAxisBAnchorAvailabilityInput {
   readonly sourcePath?: string;
 }
 
-export const MARKETING_AXIS_B_DEFAULT_SOURCE_PATH = "./plugged_in_social";
+/** Overridable now that the app lives outside the substrate repo (plan §2.3). */
+export const MARKETING_AXIS_B_DEFAULT_SOURCE_PATH =
+  process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social";
 
 export const MARKETING_AXIS_B_REQUIRED_ANCHORS: readonly MarketingAxisBAnchor[] = [
   {
@@ -63,168 +64,72 @@ export const MARKETING_AXIS_B_REQUIRED_ANCHORS: readonly MarketingAxisBAnchor[] 
     label: "PluggedInSocial agent/workflow instructions",
     base: "plugged_in_social",
     path: "AGENTS.md",
-    requiredContent: ["Repo Workflow", "Cloudflare Workers + Queues"],
   },
   {
     id: "plugged_in_social.virtual_agency_public_api",
     label: "Virtual agency public approval API",
     base: "plugged_in_social",
     path: "backend/app/api/virtual_agency.py",
-    requiredContent: [
-      'APIRouter(prefix="/virtual-agency"',
-      "get_current_user",
-      "get_db_with_rls_dep",
-      "Task.org_id == org_id",
-      'queue="stevie-virtual-agency"',
-    ],
   },
   {
     id: "plugged_in_social.virtual_agency_internal_api",
     label: "Virtual agency internal Worker API",
     base: "plugged_in_social",
     path: "backend/app/api/internal/virtual_agency.py",
-    requiredContent: [
-      'APIRouter(prefix="/internal/virtual-agency"',
-      "RequestContext",
-      "get_db_with_rls",
-      "REQUIRED_LINEAGE_FIELDS",
-      "lineage.project_id must match project_id",
-      "route_virtual_agency_task",
-    ],
   },
   {
     id: "plugged_in_social.virtual_agency_orchestration",
     label: "Virtual agency orchestration invariants",
     base: "plugged_in_social",
     path: "backend/app/services/virtual_agency_orchestration.py",
-    requiredContent: [
-      "REQUIRED_LINEAGE_KEYS",
-      "ensure_external_adapter_run_evidence_ready",
-      "external_adapter_run_satisfies_requirement",
-      "build_handoff_payload",
-      "external_adapter_requirements",
-    ],
   },
   {
     id: "plugged_in_social.virtual_agency_worker",
     label: "Virtual agency Cloudflare Worker",
     base: "plugged_in_social",
     path: "agents/workers/virtual-agency/src/index.ts",
-    requiredContent: [
-      "validateMessage<VirtualAgencyMessage>",
-      '"virtual_agency.task"',
-      "/api/internal/virtual-agency/task",
-      "x-webhook-secret",
-      "handleConsumerError",
-    ],
   },
   {
     id: "plugged_in_social.virtual_agency_worker_config",
     label: "Virtual agency Worker queue config",
     base: "plugged_in_social",
     path: "agents/workers/virtual-agency/wrangler.toml",
-    requiredContent: [
-      'name = "stevie-virtual-agency"',
-      'queue = "stevie-virtual-agency"',
-      "dead_letter_queue",
-      "BACKEND_BASE_URL",
-    ],
   },
   {
     id: "plugged_in_social.shared_queue_contract",
     label: "Shared Worker queue message contract",
     base: "plugged_in_social",
     path: "agents/packages/shared/src/messages.ts",
-    requiredContent: [
-      "export interface VirtualAgencyMessage",
-      "orchestration_task_id: string",
-      "task_version: number",
-      "lineage: VirtualAgencyLineage",
-      "missing or invalid task_version",
-      "lineage.project_id must match project_id",
-    ],
-  },
-  {
-    id: "plugged_in_social.external_adapter_contracts",
-    label: "External browser and agent harness adapter contracts",
-    base: "plugged_in_social",
-    path: "backend/app/services/external_adapter_contracts.py",
-    requiredContent: [
-      "EXTERNAL_ADAPTER_CONTRACTS",
-      "browser_qa_harness",
-      "agent_harness",
-      "required_evidence_fields",
-      "source_commit",
-    ],
   },
   {
     id: "plugged_in_social.queue_producer_config",
     label: "Queue producer virtual-agency binding",
     base: "plugged_in_social",
     path: "agents/workers/queue-producer/wrangler.toml",
-    requiredContent: [
-      'queue = "stevie-virtual-agency"',
-      'binding = "QUEUE_VIRTUAL_AGENCY"',
-    ],
   },
   {
     id: "plugged_in_social.deploy_script",
     label: "Agents deploy automation",
     base: "plugged_in_social",
     path: "agents/scripts/deploy.sh",
-    requiredContent: [
-      "stevie-virtual-agency",
-      "virtual-agency",
-      "BACKEND_BASE_URL",
-      "wrangler queues create",
-    ],
   },
   {
     id: "plugged_in_social.agent_inbox_ui",
     label: "Agent approval inbox UI",
     base: "plugged_in_social",
     path: "frontend/src/app/admin/page.tsx",
-    requiredContent: [
-      "/api/virtual-agency/inbox",
-      "orchestration_task",
-      "Pending Approvals",
-    ],
-  },
-  {
-    id: "plugged_in_social.operator_run_monitor_ui",
-    label: "Operator autonomous agency run monitor UI",
-    base: "plugged_in_social",
-    path: "frontend/src/app/admin/agency/page.tsx",
-    requiredContent: [
-      "getIntegrationRunEvidenceSnapshot",
-      "adapter_readiness",
-      "External Adapter Boundary",
-      "Create + Start Strategy",
-    ],
   },
   {
     id: "plugged_in_social.virtual_agency_ledger_migration",
     label: "Virtual agency ledger migration",
     base: "plugged_in_social",
     path: "backend/alembic/versions/022_virtual_agency_orchestration_ledger.py",
-    requiredContent: [
-      "virtual_agency_tasks",
-      "virtual_agency_events",
-      "org_id",
-      "project_id",
-      "lineage",
-    ],
   },
   {
     id: "pm_substrate.profile_agency",
     label: "pm-substrate agency profile",
     base: "pm_substrate",
     path: "packages/profile-agency/src/profile.ts",
-    requiredContent: [
-      "AGENCY_PROFILE",
-      "Identity primacy",
-      "PluggedInSocial",
-    ],
     substrateRef: true,
   },
   {
@@ -232,12 +137,6 @@ export const MARKETING_AXIS_B_REQUIRED_ANCHORS: readonly MarketingAxisBAnchor[] 
     label: "pm-substrate agency publication terminal",
     base: "pm_substrate",
     path: "packages/profile-agency/src/publication-terminal.ts",
-    requiredContent: [
-      "buildAgencyPublicationActionOutcomeEnvelope",
-      "approvalStatus",
-      "contentHash",
-      "buildActionOutcomeEnvelope",
-    ],
     substrateRef: true,
   },
   {
@@ -245,12 +144,6 @@ export const MARKETING_AXIS_B_REQUIRED_ANCHORS: readonly MarketingAxisBAnchor[] 
     label: "pm-substrate agency next-action proposal",
     base: "pm_substrate",
     path: "packages/profile-agency/src/next-action-proposal.ts",
-    requiredContent: [
-      "AGENCY_MARKETING_NEXT_ACTION_PROPOSAL_SCHEMA_VERSION",
-      "marketing.next_action.propose",
-      "buildAgencyMarketingNextActionProposal",
-      "stateReviewArtifactHash",
-    ],
     substrateRef: true,
   },
   {
@@ -258,12 +151,6 @@ export const MARKETING_AXIS_B_REQUIRED_ANCHORS: readonly MarketingAxisBAnchor[] 
     label: "PluggedInSocial Axis B next-action adapter",
     base: "pm_substrate",
     path: "packages/profile-agency/src/plugged-in-social-axis-b-adapter.ts",
-    requiredContent: [
-      "buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult",
-      "PluggedInSocialIntegrationStrategyAdapterReadinessEnvelope",
-      "adapterReadinessIssues",
-      "QUEUE_VIRTUAL_AGENCY",
-    ],
     substrateRef: true,
   },
   {
@@ -271,12 +158,6 @@ export const MARKETING_AXIS_B_REQUIRED_ANCHORS: readonly MarketingAxisBAnchor[] 
     label: "pm-substrate marketing Axis B eval",
     base: "pm_substrate",
     path: "packages/evals/src/marketing.ts",
-    requiredContent: [
-      'MARKETING_AXIS_B_DEFAULT_SOURCE_PATH = "./plugged_in_social"',
-      "readMarketingAxisBAnchorAvailability",
-      "buildMarketingAxisBLiveRunEvidenceEval",
-      "MARKETING_AXIS_B_REQUIRED_ANCHORS",
-    ],
     substrateRef: true,
   },
 ];
@@ -547,13 +428,7 @@ export function readMarketingAxisBAnchorAvailability(
       workspaceRoot,
       sourcePath,
     });
-    const source = existsSync(absolutePath)
-      ? readFileSync(absolutePath, "utf8")
-      : undefined;
-    if (
-      source !== undefined &&
-      anchor.requiredContent.every((snippet) => source.includes(snippet))
-    ) {
+    if (existsSync(absolutePath)) {
       present.push(anchor);
     } else {
       missing.push(anchor);

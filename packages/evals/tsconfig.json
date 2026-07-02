@@ -9,6 +9,7 @@
   "exclude": ["**/*.test.ts", "dist"],
   "references": [
     { "path": "../agent-state-core" },
+    { "path": "../continuity" },
     { "path": "../graph" },
     { "path": "../registry" },
     { "path": "../types" },

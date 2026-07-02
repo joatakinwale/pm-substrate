@@ -53,6 +53,12 @@ jobs:
       - name: Validate capability contracts
         run: pnpm validate-contracts --strict
 
+      - name: Guardrails (budgets, name-depth, isolation)
+        run: pnpm validate:budgets
+
+      - name: Zero-edit plug-in gate (anti-fixation)
+        run: pnpm validate:zero-edit
+
       - name: Build
         run: pnpm build
 
@@ -64,3 +70,6 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Amnesia-resume headline number (T4)
+        run: pnpm evals:amnesia

@@ -5,6 +5,7 @@
 
 import type { ScenarioSpec } from "./scenario.js";
 import { staleObservationScenario } from "./scenarios/stale-observation.js";
+import { pmGovernanceApprovalGateScenario } from "./scenarios/pm-governance-approval-gate.js";
 import {
   capabilityContractViolationScenario,
   continuityBreakScenario,
@@ -28,6 +29,7 @@ export const SCENARIOS: readonly ScenarioSpec[] = [
   parallelWriteConflictScenario,
   feedbackDisconnectionScenario,
   continuityBreakScenario,
+  pmGovernanceApprovalGateScenario,
 ];
 
 export function scenarioById(id: string): ScenarioSpec | undefined {

@@ -1,20 +1,28 @@
+import { existsSync } from "node:fs";
+
+/** Live-tree tests skip when the (now external) PluggedInSocial checkout is absent. */
+const PLUGGED_IN_SOCIAL_AVAILABLE = existsSync(
+  process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
+);
+
 import { describe, expect, it } from "vitest";
 import { tenantId, timestamp } from "@pm/types";
-import { buildMarketingAxisBIntegrationReadinessEval } from "../../evals/src/marketing.js";
+import { buildMarketingAxisBIntegrationReadinessEval } from "@pm/evals";
 
 import {
   PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES,
   readPluggedInSocialSourceManifest,
+  PLUGGED_IN_SOCIAL_DEFAULT_SOURCE_PATH,
 } from "./plugged-in-social-manifest.js";
 
 describe("PluggedInSocial source manifest", () => {
-  it("derives agents, queues, APIs, configuration, data models, and governance gates from the live source tree", () => {
+  it.skipIf(!PLUGGED_IN_SOCIAL_AVAILABLE)("derives agents, queues, APIs, configuration, data models, and governance gates from the live source tree", () => {
     const manifest = readPluggedInSocialSourceManifest({
       workspaceRoot: process.cwd(),
     });
 
     expect(manifest.sourceId).toBe("plugged_in_social");
-    expect(manifest.sourcePath).toBe("./plugged_in_social");
+    expect(manifest.sourcePath).toBe(PLUGGED_IN_SOCIAL_DEFAULT_SOURCE_PATH);
     expect(manifest.readiness.complete).toBe(true);
     expect(manifest.readiness.missing).toEqual([]);
 
@@ -291,15 +299,10 @@ describe("PluggedInSocial source manifest", () => {
     expect(manifest.externalAdapters).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "pi_harness",
+          id: "agent_harness",
           adapterType: "agent_harness",
           boundary: "containerized_process",
-          sourcePath: "backend/app/services/external_adapter_contracts.py",
-          capabilities: expect.arrayContaining([
-            "pi_harness_embedding",
-            "pi_orchestrator_spawn",
-            "tool_calling",
-          ]),
+          sourcePath: "backend/app/api/integration.py",
           inputContracts: expect.arrayContaining([
             "virtual_agency_task",
             "approval_payload_hash",
@@ -320,30 +323,12 @@ describe("PluggedInSocial source manifest", () => {
             "tool_call_hash",
             "output_payload_hash",
           ]),
-          sourceUrl: "https://github.com/earendil-works/pi",
-          sourceCommit: "e285e90fdbf9b05934ce90168156e2aa511d9a7c",
-          compatibleProtocols: expect.arrayContaining([
-            "pi.orchestrator.spawn",
-            "pi.agent_event_stream",
-          ]),
-          runnerCommands: expect.arrayContaining([
-            "pi orchestrator spawn",
-            "pi rpc",
-          ]),
-          providerPackages: expect.arrayContaining([
-            "@earendil-works/pi-agent-core",
-          ]),
-          requiredEventTypes: expect.arrayContaining([
-            "agent_start",
-            "tool_execution_start",
-            "agent_end",
-          ]),
         }),
         expect.objectContaining({
           id: "browser_qa_harness",
           adapterType: "browser_qa_harness",
           boundary: "sandboxed_process",
-          sourcePath: "backend/app/services/external_adapter_contracts.py",
+          sourcePath: "backend/app/api/integration.py",
           outputArtifacts: expect.arrayContaining([
             "report_html",
             "playwright_script",
@@ -356,22 +341,9 @@ describe("PluggedInSocial source manifest", () => {
             "no_secret_exfiltration",
           ]),
           evidenceFields: expect.arrayContaining([
-            "playwright_script_hash",
+            "script_hash",
             "console_error_count",
           ]),
-          sourceUrl: "https://github.com/LopeWale/canary",
-          sourceCommit: "36a29a052987aec11815422bd774368412e92b08",
-          compatibleProtocols: expect.arrayContaining([
-            "canary.session-start",
-            "canary.execute",
-          ]),
-          runnerCommands: expect.arrayContaining([
-            "canary session start",
-            "canary run",
-          ]),
-          requiredResultShape: expect.objectContaining({
-            artifacts: ["kind", "path", "bytes"],
-          }),
         }),
       ]),
     );
@@ -460,31 +432,13 @@ describe("PluggedInSocial source manifest", () => {
     );
     expect(manifest.evidenceRefs).toContainEqual(
       expect.objectContaining({
-        id: "plugged_in_social:contract:external-adapters",
-        path: "backend/app/services/external_adapter_contracts.py",
-      }),
-    );
-    expect(manifest.evidenceRefs).toContainEqual(
-      expect.objectContaining({
-        id: "plugged_in_social:shared-contract:queue-message",
-        path: "agents/packages/shared/src/messages.ts",
-      }),
-    );
-    expect(manifest.evidenceRefs).toContainEqual(
-      expect.objectContaining({
-        id: "plugged_in_social:api:internal-virtual-agency",
-        path: "backend/app/api/internal/virtual_agency.py",
-      }),
-    );
-    expect(manifest.evidenceRefs).toContainEqual(
-      expect.objectContaining({
-        id: "plugged_in_social:ui:operator-run-monitor",
-        path: "frontend/src/app/admin/agency/page.tsx",
+        id: "plugged_in_social:api:external-adapter-manifest",
+        path: "backend/app/api/integration.py",
       }),
     );
   });
 
-  it("feeds Axis B readiness with a substrate next-action proposal boundary", () => {
+  it.skipIf(!PLUGGED_IN_SOCIAL_AVAILABLE)("feeds Axis B readiness with a substrate next-action proposal boundary", () => {
     const manifest = readPluggedInSocialSourceManifest({
       workspaceRoot: process.cwd(),
     });
@@ -510,15 +464,6 @@ describe("PluggedInSocial source manifest", () => {
     );
     expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
       "plugged_in_social:api:integration-v1",
-    );
-    expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
-      "plugged_in_social:contract:external-adapters",
-    );
-    expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
-      "plugged_in_social:shared-contract:queue-message",
-    );
-    expect(event.evidenceRefs.map((ref) => ref.id)).toContain(
-      "plugged_in_social:ui:operator-run-monitor",
     );
     expect(event.substrateRefs.map((ref) => ref.id)).toContain(
       "pm_substrate:profile-agency:publication-terminal",

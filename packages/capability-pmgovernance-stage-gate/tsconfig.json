@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "types": []
+  },
+  "include": ["src/**/*"],
+  "exclude": ["**/*.test.ts", "dist"],
+  "references": [
+    { "path": "../types" },
+    { "path": "../graph" },
+    { "path": "../events" },
+    { "path": "../registry" },
+    { "path": "../capability-kit" },
+    { "path": "../profile-registry" },
+    { "path": "../profile-pmgovernance" }
+  ]
+}
