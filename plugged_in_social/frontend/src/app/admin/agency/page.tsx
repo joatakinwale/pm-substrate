@@ -129,6 +129,14 @@ function objectValue(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function objectArrayValue(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value
+        .map(objectValue)
+        .filter((item): item is Record<string, unknown> => Boolean(item))
+    : [];
+}
+
 function stringValue(value: unknown) {
   return typeof value === "string" ? value : null;
 }
@@ -313,6 +321,32 @@ export default function AgencyCommandCenterPage() {
     () => artifacts.filter((item) => item.artifact_type === "external_adapter_run"),
     [artifacts]
   );
+  const strategyResearchEvidence = useMemo(() => {
+    const artifact =
+      artifacts.find((item) => item.artifact_type === "strategy_research_brief") ||
+      null;
+    const payload = objectValue(artifact?.payload);
+    const researchRequirements = objectValue(payload?.research_requirements);
+    const adapterRequirements = objectArrayValue(
+      payload?.external_adapter_requirements
+    );
+
+    return {
+      artifact,
+      payload,
+      researchRequirements,
+      adapterRequirements,
+      sourceUrls: stringArrayValue(researchRequirements?.source_urls),
+      competitorUrls: stringArrayValue(researchRequirements?.competitor_urls),
+      copyInputs: stringArrayValue(researchRequirements?.copy_inputs),
+      researchQuestions: stringArrayValue(
+        researchRequirements?.research_questions
+      ),
+      requiredAccessRequestIds: stringArrayValue(
+        researchRequirements?.required_access_request_ids
+      ),
+    };
+  }, [artifacts]);
   const recentRunEvents = useMemo(
     () => runEvents.slice(-8).reverse(),
     [runEvents]
@@ -374,18 +408,23 @@ export default function AgencyCommandCenterPage() {
       taskTypeSet.has("next_action_proposal") ||
       eventTypeSet.has("marketing.next_action.proposed") ||
       nextActionProposals.length > 0;
+    const hasStrategyResearchArtifact = Boolean(strategyResearchEvidence.artifact);
 
     const details: Record<(typeof CLOSED_LOOP_STAGES)[number], string> = {
       intake: selectedEngagement
         ? "Client URL, repository, goals, and constraints captured."
         : "Waiting for client intake.",
-      strategy: activeRun
-        ? `${activeRun.stage} run created.`
-        : "Waiting for a strategy run.",
+      strategy: hasStrategyResearchArtifact
+        ? `Strategy brief ${shortHash(strategyResearchEvidence.artifact?.payload_hash)} with ${strategyResearchEvidence.adapterRequirements.length} adapter requirement${strategyResearchEvidence.adapterRequirements.length === 1 ? "" : "s"}.`
+        : activeRun
+          ? "Strategy run waiting for research artifact evidence."
+          : "Waiting for a strategy run.",
       content: taskTypeSet.has("content_generation")
         ? completedTaskTypeSet.has("content_generation")
           ? "Content task completed."
-          : "Content task queued."
+          : hasStrategyResearchArtifact
+            ? "Content task queued."
+            : "Waiting for strategy artifact gate."
         : "Waiting for content task.",
       approval:
         pendingApprovals.length > 0
@@ -422,9 +461,22 @@ export default function AgencyCommandCenterPage() {
       let status: "complete" | "active" | "blocked" | "waiting" = "waiting";
 
       if (stage === "intake" && selectedEngagement) status = "complete";
-      if (stage === "strategy" && activeRun) status = "complete";
+      if (stage === "strategy" && hasStrategyResearchArtifact) {
+        status = "complete";
+      } else if (
+        stage === "strategy" &&
+        (activeRun || taskTypeSet.has("strategy_research"))
+      ) {
+        status = "active";
+      }
       if (stage === "content" && completedTaskTypeSet.has("content_generation")) {
         status = "complete";
+      } else if (
+        stage === "content" &&
+        taskTypeSet.has("content_generation") &&
+        !hasStrategyResearchArtifact
+      ) {
+        status = "blocked";
       } else if (stage === "content" && taskTypeSet.has("content_generation")) {
         status = "active";
       }
@@ -475,6 +527,7 @@ export default function AgencyCommandCenterPage() {
     pendingApprovals.length,
     runSocialPosts,
     selectedEngagement,
+    strategyResearchEvidence,
     taskTypeSet,
   ]);
   const governanceGates = useMemo(() => {
@@ -1349,6 +1402,198 @@ export default function AgencyCommandCenterPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Strategy Research Evidence
+                  </div>
+                  {!strategyResearchEvidence.artifact ? (
+                    <EmptyState>No strategy research artifact evidence.</EmptyState>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                      <div className="rounded-lg border border-border px-3 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">
+                              {strategyResearchEvidence.artifact.title}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {strategyResearchEvidence.artifact.author_role}
+                            </p>
+                          </div>
+                          <span className="w-fit rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            {shortHash(strategyResearchEvidence.artifact.payload_hash)}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                          <span>
+                            task{" "}
+                            {shortHash(
+                              strategyResearchEvidence.artifact
+                                .virtual_agency_task_id
+                            )}
+                          </span>
+                          <span>
+                            evidence{" "}
+                            {Array.isArray(
+                              strategyResearchEvidence.artifact.evidence_refs
+                            )
+                              ? strategyResearchEvidence.artifact.evidence_refs.length
+                              : 0}
+                          </span>
+                          <span>
+                            access{" "}
+                            {
+                              strategyResearchEvidence.requiredAccessRequestIds
+                                .length
+                            }
+                          </span>
+                          <span>
+                            created{" "}
+                            {compactDateTime(
+                              strategyResearchEvidence.artifact.created_at
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-border px-3 py-3">
+                        <p className="text-sm font-medium">Research Inputs</p>
+                        <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                          <div>
+                            <p className="font-medium text-foreground">Sources</p>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {strategyResearchEvidence.sourceUrls.length === 0 ? (
+                                <span>-</span>
+                              ) : (
+                                strategyResearchEvidence.sourceUrls
+                                  .slice(0, 4)
+                                  .map((url) => (
+                                    <span
+                                      key={url}
+                                      className="max-w-full truncate rounded bg-gray-100 px-1.5 py-0.5"
+                                    >
+                                      {url}
+                                    </span>
+                                  ))
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">Copy Inputs</p>
+                            <div className="mt-1 flex flex-wrap gap-1.5">
+                              {strategyResearchEvidence.copyInputs.length === 0 ? (
+                                <span>-</span>
+                              ) : (
+                                strategyResearchEvidence.copyInputs.map((item) => (
+                                  <span
+                                    key={item}
+                                    className="rounded bg-gray-100 px-1.5 py-0.5"
+                                  >
+                                    {item}
+                                  </span>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                          {strategyResearchEvidence.competitorUrls.length > 0 && (
+                            <div>
+                              <p className="font-medium text-foreground">
+                                Competitors
+                              </p>
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {strategyResearchEvidence.competitorUrls
+                                  .slice(0, 3)
+                                  .map((url) => (
+                                    <span
+                                      key={url}
+                                      className="max-w-full truncate rounded bg-gray-100 px-1.5 py-0.5"
+                                    >
+                                      {url}
+                                    </span>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-border px-3 py-3">
+                        <p className="text-sm font-medium">Adapter Requirements</p>
+                        {strategyResearchEvidence.adapterRequirements.length === 0 ? (
+                          <p className="mt-3 text-xs text-muted-foreground">-</p>
+                        ) : (
+                          <div className="mt-3 space-y-2">
+                            {strategyResearchEvidence.adapterRequirements.map(
+                              (requirement, index) => {
+                                const adapterId =
+                                  stringValue(requirement.adapter_id) ||
+                                  `adapter_${index + 1}`;
+                                const evidenceFields = stringArrayValue(
+                                  requirement.required_evidence_fields
+                                );
+                                const outputArtifacts = stringArrayValue(
+                                  requirement.expected_output_artifacts
+                                );
+
+                                return (
+                                  <div
+                                    key={`${adapterId}:${index}`}
+                                    className="rounded border border-border px-2 py-2"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="text-xs font-medium">
+                                          {adapterId.replaceAll("_", " ")}
+                                        </p>
+                                        <p className="mt-1 text-[11px] text-muted-foreground">
+                                          {stringValue(requirement.purpose) ||
+                                            "adapter requirement"}
+                                        </p>
+                                      </div>
+                                      <span className="text-[11px] text-muted-foreground">
+                                        {outputArtifacts.length} outputs
+                                      </span>
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {evidenceFields.slice(0, 5).map((field) => (
+                                        <span
+                                          key={`${adapterId}:${field}`}
+                                          className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                                        >
+                                          {field.replaceAll("_", " ")}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              }
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {strategyResearchEvidence.researchQuestions.length > 0 && (
+                        <div className="rounded-lg border border-border px-3 py-3 xl:col-span-3">
+                          <p className="text-sm font-medium">Research Questions</p>
+                          <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+                            {strategyResearchEvidence.researchQuestions.map(
+                              (question) => (
+                                <p
+                                  key={question}
+                                  className="rounded bg-gray-50 px-2 py-2 text-xs leading-5 text-muted-foreground"
+                                >
+                                  {question}
+                                </p>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
