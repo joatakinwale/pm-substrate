@@ -29,6 +29,7 @@ import {
   createMarketingRun,
   decideAgencyAccessRequest,
   decideAgencyApproval,
+  dispatchMarketingRun,
   getIntegrationEvidenceSummary,
   listAgencyAccessRequests,
   listAgencyApprovals,
@@ -372,6 +373,20 @@ export default function AgencyCommandCenterPage() {
       await Promise.all([loadEngagements(), loadEngagementDetail(selectedId)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start strategy run.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDispatchRun() {
+    if (!selectedId || !activeRun) return;
+    setActionLoading(`dispatch:${activeRun.id}`);
+    setError(null);
+    try {
+      await dispatchMarketingRun(selectedId, activeRun.id);
+      await Promise.all([loadEngagements(), loadEngagementDetail(selectedId)]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not dispatch agents.");
     } finally {
       setActionLoading(null);
     }
@@ -788,11 +803,29 @@ export default function AgencyCommandCenterPage() {
                 </p>
               </div>
               {activeRun && (
-                <span
-                  className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(activeRun.stage)}`}
-                >
-                  {activeRun.stage}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleDispatchRun()}
+                    disabled={
+                      openAccessRequests.length > 0 ||
+                      actionLoading === `dispatch:${activeRun.id}`
+                    }
+                    className="inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                  >
+                    {actionLoading === `dispatch:${activeRun.id}` && (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    )}
+                    {openAccessRequests.length > 0
+                      ? "Resolve Access"
+                      : "Dispatch Agents"}
+                  </button>
+                  <span
+                    className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(activeRun.stage)}`}
+                  >
+                    {activeRun.stage}
+                  </span>
+                </div>
               )}
             </div>
 
@@ -827,10 +860,12 @@ export default function AgencyCommandCenterPage() {
                       icon: FileText,
                     },
                     {
-                      label: "Pending",
+                      label: "Open Gates",
                       value:
-                        evidenceSummary?.pending_approval_count ??
-                        pendingApprovals.length,
+                        (evidenceSummary?.pending_approval_count ??
+                          pendingApprovals.length) +
+                        (evidenceSummary?.open_access_request_count ??
+                          openAccessRequests.length),
                       icon: ShieldCheck,
                     },
                   ].map((item) => (

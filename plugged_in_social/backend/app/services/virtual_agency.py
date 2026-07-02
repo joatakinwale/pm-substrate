@@ -40,9 +40,14 @@ async def publish_agent_task(
     queue: str,
     task: VirtualAgencyTask,
     actor_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> dict[str, Any]:
     """Dispatch work to a virtual-agency department agent."""
-    dispatch = build_agent_task_dispatch(task=task, actor_id=actor_id)
+    dispatch = build_agent_task_dispatch(
+        task=task,
+        actor_id=actor_id,
+        idempotency_key=idempotency_key,
+    )
     await _publish(queue=queue, message=dispatch["message"])
     return dispatch
 

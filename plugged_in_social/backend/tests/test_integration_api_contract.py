@@ -25,6 +25,10 @@ def test_integration_router_imports_with_neutral_v1_prefix():
         frozenset({"GET"}),
     ) in route_methods
     assert (
+        "/integration/v1/marketing-runs/{run_id}/dispatch",
+        frozenset({"POST"}),
+    ) in route_methods
+    assert (
         "/integration/v1/marketing-runs/{run_id}/artifacts",
         frozenset({"GET"}),
     ) in route_methods
@@ -92,6 +96,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationPlatformManifestEnvelope,
         IntegrationEvidenceSummaryEnvelope,
         IntegrationEventIngest,
+        IntegrationRunDispatchEnvelope,
         IntegrationRunEventEnvelope,
         IntegrationMarketingRunEnvelope,
         IntegrationTaskEnvelope,
@@ -100,6 +105,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
     capability_fields = set(IntegrationCapabilityResponse.model_fields)
     platform_manifest_fields = set(IntegrationPlatformManifestEnvelope.model_fields)
     run_fields = set(IntegrationMarketingRunEnvelope.model_fields)
+    dispatch_fields = set(IntegrationRunDispatchEnvelope.model_fields)
     artifact_fields = set(IntegrationArtifactEnvelope.model_fields)
     task_fields = set(IntegrationTaskEnvelope.model_fields)
     access_request_fields = set(IntegrationAccessRequestEnvelope.model_fields)
@@ -135,6 +141,16 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "current_blocker",
         "links",
     }.issubset(run_fields)
+    assert {
+        "run_id",
+        "org_id",
+        "status",
+        "stage",
+        "approved_count",
+        "dispatched_count",
+        "dispatched_task_ids",
+        "links",
+    }.issubset(dispatch_fields)
     assert {
         "id",
         "artifact_type",
@@ -234,6 +250,16 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         endpoint.path == "/api/internal/virtual-agency/task"
         and endpoint.boundary == "internal_system_rls"
         for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/marketing-runs/{run_id}/dispatch"
+        and "marketing_run.dispatch" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        resource.table == "marketing_runs"
+        and "marketing_run.dispatch" in resource.write_capability_ids
+        for resource in manifest.data_resources
     )
     assert any(
         resource.table == "virtual_agency_events"

@@ -11,6 +11,7 @@ def test_agency_router_imports_with_expected_prefix():
     assert "/agency/engagements" in route_paths
     assert "/agency/engagements/{engagement_id}" in route_paths
     assert "/agency/engagements/{engagement_id}/runs" in route_paths
+    assert "/agency/engagements/{engagement_id}/runs/{run_id}/dispatch" in route_paths
     assert "/agency/engagements/{engagement_id}/artifacts" in route_paths
     assert "/agency/engagements/{engagement_id}/approvals" in route_paths
     assert "/agency/engagements/{engagement_id}/access-requests" in route_paths
@@ -87,3 +88,14 @@ def test_marketing_run_creation_kicks_off_autonomous_agency_work():
     assert "start_marketing_run(" in src
     assert "kickoff_marketing_run(" in src
     assert src.index("start_marketing_run(") < src.index("kickoff_marketing_run(")
+
+
+def test_agency_router_dispatches_marketing_run_agents_with_access_gate_errors():
+    import app.api.agency as module
+
+    src = inspect.getsource(module.dispatch_marketing_run)
+
+    assert "approve_and_dispatch_marketing_run(" in src
+    assert "MarketingRunAccessGateError" in src
+    assert '\"code\": \"access_requests_open\"' in src
+    assert "status_code=409" in src

@@ -38,6 +38,42 @@ class _FakeAgencySession:
     async def get(self, model, item_id):
         return self._store.get(model, {}).get(item_id)
 
+    def get_by_id(self, model, item_id):
+        return self._store.get(model, {}).get(item_id)
+
+    def list_agency_access_requests_for_run(self, run_id):
+        return [
+            request
+            for request in self._store.get(AgencyAccessRequest, {}).values()
+            if request.marketing_run_id == run_id
+        ]
+
+    def list_virtual_tasks_for_marketing_run(self, run_id):
+        return [
+            task
+            for task in self._store.get(VirtualAgencyTask, {}).values()
+            if (task.lineage or {}).get("marketing_run_id") == str(run_id)
+        ]
+
+    def list_virtual_task_dependencies(self, task):
+        return list(task.dependencies)
+
+    def find_event_by_idempotency_key(self, idempotency_key):
+        for event in self._store.get(VirtualAgencyEvent, {}).values():
+            if event.idempotency_key == idempotency_key:
+                return event
+        return None
+
+
+async def _capture_publish(monkeypatch):
+    sent: list[dict] = []
+
+    async def _fake_publish(*, queue, message):
+        sent.append({"queue": queue, "message": message})
+
+    monkeypatch.setattr("app.services.virtual_agency._publish", _fake_publish)
+    return sent
+
 
 @pytest.mark.asyncio
 async def test_create_engagement_and_marketing_run():
@@ -180,6 +216,145 @@ async def test_kickoff_marketing_run_builds_autonomous_agency_workbreakdown():
     assert len(events) == 5
     assert all(event.event_type == "task_created" for event in events)
     assert len(kickoff.tasks) == 5
+
+
+@pytest.mark.asyncio
+async def test_dispatch_marketing_run_blocks_until_access_requests_are_resolved():
+    from app.services.agency_domain import (
+        MarketingRunAccessGateError,
+        approve_and_dispatch_marketing_run,
+        create_client_engagement,
+        kickoff_marketing_run,
+        start_marketing_run,
+    )
+
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(
+            name="Acme Launch",
+            client_url="https://acme.example",
+            integration_state={"preferred_social_channels": ["linkedin"]},
+        ),
+        created_by_agent="chief_of_staff",
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective="Build campaign",
+    )
+    await kickoff_marketing_run(db, engagement=engagement, run=run)
+
+    with pytest.raises(MarketingRunAccessGateError) as exc:
+        await approve_and_dispatch_marketing_run(
+            db,
+            engagement=engagement,
+            run=run,
+            actor_id="client-1",
+        )
+
+    open_ids = {request.id for request in exc.value.open_access_requests}
+    assert open_ids == {
+        request.id
+        for request in db._store.get(AgencyAccessRequest, {}).values()
+        if request.status == "requested"
+    }
+    assert run.status == "blocked"
+    assert run.current_blocker is not None
+    assert run.current_blocker["access_request_ids"] == sorted(
+        run.current_blocker["access_request_ids"]
+    )
+    assert run.current_blocker == {
+        "type": "access_requests",
+        "status": "blocked",
+        "access_request_ids": sorted(str(request_id) for request_id in open_ids),
+        "providers": ["analytics", "linkedin", "website"],
+        "request_types": ["analytics", "client_platform", "social_account"],
+        "reason": "Marketing run cannot dispatch until access requests are resolved.",
+    }
+    assert [
+        event.event_type
+        for event in db._store.get(VirtualAgencyEvent, {}).values()
+        if event.event_type == "approved"
+    ] == []
+
+
+@pytest.mark.asyncio
+async def test_dispatch_marketing_run_approves_tasks_and_dispatches_first_ready_agent(
+    monkeypatch,
+):
+    from app.services.agency_domain import (
+        approve_and_dispatch_marketing_run,
+        create_client_engagement,
+        kickoff_marketing_run,
+        start_marketing_run,
+    )
+
+    sent = await _capture_publish(monkeypatch)
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(
+            name="Acme Launch",
+            client_url="https://acme.example",
+            integration_state={"preferred_social_channels": ["linkedin"]},
+        ),
+        created_by_agent="chief_of_staff",
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective="Build campaign",
+    )
+    await kickoff_marketing_run(db, engagement=engagement, run=run)
+    for request in db._store.get(AgencyAccessRequest, {}).values():
+        request.status = "granted"
+
+    dispatch = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+
+    tasks = list(db._store.get(VirtualAgencyTask, {}).values())
+    assert len(dispatch.approved_tasks) == 5
+    assert len(dispatch.dispatched_messages) == 1
+    assert dispatch.dispatched_messages[0]["agent_role"] == "chief_of_staff"
+    assert dispatch.dispatched_messages[0]["idempotency_key"] == (
+        f"agency-run:handoff:{run.id}:{tasks[0].id}:{tasks[0].task_version}"
+    )
+    assert sent == [
+        {
+            "queue": "stevie-virtual-agency",
+            "message": dispatch.dispatched_messages[0],
+        }
+    ]
+    assert all(task.approval_active for task in tasks)
+    assert [task.status for task in tasks] == ["todo", "todo", "todo", "todo", "todo"]
+    events = list(db._store.get(VirtualAgencyEvent, {}).values())
+    assert [event.event_type for event in events].count("approved") == 5
+    assert [event.event_type for event in events].count("handoff_dispatched") == 1
+
+    second = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+
+    assert second.approved_tasks == []
+    assert second.dispatched_messages == []
+    events_after_second = list(db._store.get(VirtualAgencyEvent, {}).values())
+    assert [event.event_type for event in events_after_second].count("approved") == 5
+    assert (
+        [event.event_type for event in events_after_second].count("handoff_dispatched")
+        == 1
+    )
 
 
 @pytest.mark.asyncio

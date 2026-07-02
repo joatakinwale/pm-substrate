@@ -332,6 +332,7 @@ const REQUIRED_LIVE_CLOSED_LOOP_STAGES = [
 const REQUIRED_LIVE_CAPABILITIES = [
   "platform_manifest.read",
   "marketing_run.read",
+  "marketing_run.dispatch",
   "task.read",
   "artifact.read",
   "event_timeline.read",
@@ -736,6 +737,12 @@ function liveRunEvidenceIssues(
   if (manifestEndpoint?.boundary !== "public_rls") {
     issues.add("platform manifest endpoint is not public-RLS scoped");
   }
+  const dispatchEndpoint = endpoints.get(
+    "POST /api/integration/v1/marketing-runs/{run_id}/dispatch",
+  );
+  if (dispatchEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run dispatch endpoint is not public-RLS scoped");
+  }
 
   const dataTables = new Set(
     platformManifest.data_resources.map((resource) => resource.table),
@@ -753,6 +760,15 @@ function liveRunEvidenceIssues(
     !eventResource.durable_evidence_fields.includes("event_hash")
   ) {
     issues.add("virtual_agency_events resource lacks event_hash evidence field");
+  }
+  const marketingRunResource = platformManifest.data_resources.find(
+    (resource) => resource.table === "marketing_runs",
+  );
+  if (
+    marketingRunResource !== undefined &&
+    !marketingRunResource.write_capability_ids.includes("marketing_run.dispatch")
+  ) {
+    issues.add("marketing_runs resource lacks marketing_run.dispatch write capability");
   }
 
   const configKeys = new Set(

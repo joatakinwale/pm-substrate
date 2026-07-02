@@ -994,6 +994,25 @@ export async function createMarketingRun(
   );
 }
 
+export async function dispatchMarketingRun(
+  engagementId: string,
+  runId: string
+) {
+  return apiFetch<{
+    ok: boolean;
+    engagement_id: string;
+    marketing_run_id: string;
+    status: string;
+    stage: string;
+    approved_count: number;
+    dispatched_count: number;
+    dispatched_task_ids: string[];
+  }>(
+    `/api/agency/engagements/${encodeURIComponent(engagementId)}/runs/${encodeURIComponent(runId)}/dispatch`,
+    { method: "POST" }
+  );
+}
+
 export async function listAgencyArtifacts(engagementId: string) {
   return apiFetch<AgencyArtifact[]>(
     `/api/agency/engagements/${encodeURIComponent(engagementId)}/artifacts`

@@ -134,6 +134,18 @@ class IntegrationMarketingRunEnvelope(BaseModel):
     links: list[IntegrationLink]
 
 
+class IntegrationRunDispatchEnvelope(BaseModel):
+    resource_type: Literal["marketing_run_dispatch"] = "marketing_run_dispatch"
+    run_id: uuid.UUID
+    org_id: uuid.UUID
+    status: str
+    stage: str
+    approved_count: int
+    dispatched_count: int
+    dispatched_task_ids: list[uuid.UUID]
+    links: list[IntegrationLink]
+
+
 class IntegrationArtifactEnvelope(BaseModel):
     resource_type: Literal["agency_artifact"] = "agency_artifact"
     id: uuid.UUID

@@ -32,6 +32,7 @@ from app.schemas.agency import (
 )
 from app.schemas.common import PaginatedResponse
 from app.services.agency_domain import (
+    approve_and_dispatch_marketing_run,
     create_access_request,
     create_agency_artifact,
     create_approval_request,
@@ -39,6 +40,7 @@ from app.services.agency_domain import (
     decide_access_request,
     decide_approval_request,
     kickoff_marketing_run,
+    MarketingRunAccessGateError,
     start_marketing_run,
 )
 
@@ -189,6 +191,66 @@ async def create_marketing_run(
     await db.commit()
     await db.refresh(run)
     return MarketingRunResponse.model_validate(run)
+
+
+@router.post("/engagements/{engagement_id}/runs/{run_id}/dispatch")
+async def dispatch_marketing_run(
+    engagement_id: uuid.UUID,
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    engagement = await _get_engagement_or_404(
+        db,
+        org_id=org_id,
+        engagement_id=engagement_id,
+    )
+    result = await db.execute(
+        select(MarketingRun).where(
+            MarketingRun.id == run_id,
+            MarketingRun.org_id == org_id,
+            MarketingRun.engagement_id == engagement_id,
+        )
+    )
+    run = result.scalar_one_or_none()
+    if run is None:
+        raise HTTPException(status_code=404, detail="Marketing run not found")
+    try:
+        dispatch = await approve_and_dispatch_marketing_run(
+            db,
+            engagement=engagement,
+            run=run,
+            actor_id=str(current_user.get("id")) if current_user.get("id") else None,
+        )
+    except MarketingRunAccessGateError as exc:
+        await db.commit()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "access_requests_open",
+                "message": "Resolve access requests before dispatching agents.",
+                "access_request_ids": [
+                    str(request.id) for request in exc.open_access_requests
+                ],
+            },
+        ) from exc
+
+    await db.commit()
+    await db.refresh(run)
+    return {
+        "ok": True,
+        "engagement_id": str(engagement.id),
+        "marketing_run_id": str(run.id),
+        "status": run.status,
+        "stage": run.stage,
+        "approved_count": len(dispatch.approved_tasks),
+        "dispatched_count": len(dispatch.dispatched_messages),
+        "dispatched_task_ids": [
+            message["orchestration_task_id"]
+            for message in dispatch.dispatched_messages
+        ],
+    }
 
 
 @router.get(

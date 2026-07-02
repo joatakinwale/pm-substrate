@@ -39,15 +39,18 @@ from app.schemas.integration import (
     IntegrationMarketingRunEnvelope,
     IntegrationPlatformManifestEnvelope,
     IntegrationQueueManifest,
+    IntegrationRunDispatchEnvelope,
     IntegrationRunEventEnvelope,
     IntegrationTaskEnvelope,
     IntegrationWebhookIngest,
 )
 from app.services.agency_domain import (
+    approve_and_dispatch_marketing_run,
     compute_payload_hash,
     create_agency_artifact,
     decide_access_request,
     decide_approval_request,
+    MarketingRunAccessGateError,
 )
 from app.services.virtual_agency_orchestration import AGENT_CAPABILITIES
 
@@ -455,6 +458,15 @@ def _capabilities() -> list[IntegrationCapability]:
             resources=["marketing_run"],
         ),
         IntegrationCapability(
+            id="marketing_run.dispatch",
+            name="Dispatch marketing run agents",
+            description="Approve and enqueue dependency-ready virtual-agency tasks for a marketing run after access gates clear.",
+            methods=["POST"],
+            resources=["marketing_run", "virtual_agency_task"],
+            events=["approved", "handoff_dispatched"],
+            requires_approval=True,
+        ),
+        IntegrationCapability(
             id="artifact.read",
             name="Read agency artifacts",
             description="Inspect durable agent evidence, hashes, and lineage.",
@@ -676,6 +688,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             capability_ids=["marketing_run.read"],
         ),
         IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/marketing-runs/{run_id}/dispatch",
+            boundary="public_rls",
+            capability_ids=["marketing_run.dispatch"],
+        ),
+        IntegrationEndpointManifest(
             method="GET",
             path="/api/integration/v1/marketing-runs/{run_id}/events",
             boundary="public_rls",
@@ -741,6 +759,7 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
             resource_type="marketing_run",
             durable_evidence_fields=["strategy_summary", "current_blocker", "stage"],
             read_capability_ids=["marketing_run.read", "evidence_summary.read"],
+            write_capability_ids=["marketing_run.dispatch"],
         ),
         IntegrationDataResourceManifest(
             id="virtual_agency_task",
@@ -957,6 +976,60 @@ async def get_marketing_run(
 ):
     org_id = _org_id_from_user(current_user)
     return _to_run(await _get_run(db, org_id=org_id, run_id=run_id))
+
+
+@router.post(
+    "/marketing-runs/{run_id}/dispatch",
+    response_model=IntegrationRunDispatchEnvelope,
+)
+async def dispatch_marketing_run(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    run = await _get_run(db, org_id=org_id, run_id=run_id)
+    engagement = await _get_engagement(
+        db,
+        org_id=org_id,
+        engagement_id=run.engagement_id,
+    )
+    actor_id = _user_id_from_user(current_user)
+    try:
+        dispatch = await approve_and_dispatch_marketing_run(
+            db,
+            engagement=engagement,
+            run=run,
+            actor_id=str(actor_id) if actor_id else None,
+        )
+    except MarketingRunAccessGateError as exc:
+        await db.commit()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "access_requests_open",
+                "message": "Resolve access requests before dispatching agents.",
+                "access_request_ids": [
+                    str(request.id) for request in exc.open_access_requests
+                ],
+            },
+        ) from exc
+
+    await db.commit()
+    await db.refresh(run)
+    return IntegrationRunDispatchEnvelope(
+        run_id=run.id,
+        org_id=run.org_id,
+        status=run.status,
+        stage=run.stage,
+        approved_count=len(dispatch.approved_tasks),
+        dispatched_count=len(dispatch.dispatched_messages),
+        dispatched_task_ids=[
+            uuid.UUID(str(message["orchestration_task_id"]))
+            for message in dispatch.dispatched_messages
+        ],
+        links=_run_links(run.id),
+    )
 
 
 @router.get(

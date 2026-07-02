@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.agency import (
@@ -40,11 +41,19 @@ from app.services.virtual_agency import (
     AGENT_CONTENT,
     AGENT_COS,
     AGENT_SCHEDULING,
+    publish_agent_task,
 )
 from app.services.virtual_agency_orchestration import (
+    approve_task,
     build_event,
     build_handoff_payload,
     build_lineage,
+    DependencyNotSatisfiedError,
+    ensure_dependencies_completed,
+    ensure_task_evidence_ready,
+    find_event_by_idempotency_key,
+    list_virtual_task_dependencies,
+    list_virtual_tasks_for_project,
 )
 
 
@@ -54,6 +63,19 @@ class MarketingRunKickoff:
     artifact: AgencyArtifact
     access_requests: list[AgencyAccessRequest]
     tasks: list[VirtualAgencyTask]
+
+
+@dataclass(slots=True)
+class MarketingRunDispatch:
+    approved_tasks: list[VirtualAgencyTask]
+    dispatched_messages: list[dict[str, Any]]
+    open_access_requests: list[AgencyAccessRequest]
+
+
+class MarketingRunAccessGateError(ValueError):
+    def __init__(self, open_access_requests: list[AgencyAccessRequest]):
+        self.open_access_requests = open_access_requests
+        super().__init__("Marketing run has unresolved access requests")
 
 
 KICKOFF_REQUIRED_GATES = [
@@ -647,6 +669,80 @@ async def create_access_request(
     return access_request
 
 
+async def approve_and_dispatch_marketing_run(
+    db: AsyncSession,
+    *,
+    engagement: ClientEngagement,
+    run: MarketingRun,
+    actor_id: str | None = None,
+) -> MarketingRunDispatch:
+    if run.org_id != engagement.org_id or run.engagement_id != engagement.id:
+        raise ValueError("Marketing run does not belong to engagement")
+
+    open_access_requests = await _list_open_run_access_requests(db, run)
+    if open_access_requests:
+        _mark_run_blocked_by_access_requests(run, open_access_requests)
+        db.add(run)
+        await db.flush()
+        raise MarketingRunAccessGateError(open_access_requests)
+
+    if _current_blocker_type(run) in {"access_request", "access_requests"}:
+        run.current_blocker = None
+    if run.status == MarketingRunStatus.blocked.value:
+        run.status = MarketingRunStatus.active.value
+    db.add(run)
+
+    tasks = await _list_marketing_run_tasks(db, run)
+    approved_tasks: list[VirtualAgencyTask] = []
+    dispatched_messages: list[dict[str, Any]] = []
+    for task in tasks:
+        if task.status == VirtualAgencyTaskStatus.superseded.value:
+            continue
+        if not task.approval_active and task.status == VirtualAgencyTaskStatus.todo.value:
+            approval_key = f"agency-run:approve:{run.id}:{task.id}:{task.task_version}"
+            if await find_event_by_idempotency_key(db, approval_key) is None:
+                db.add(
+                    approve_task(
+                        task,
+                        actor_id=actor_id,
+                        idempotency_key=approval_key,
+                    )
+                )
+            approved_tasks.append(task)
+            legacy_task = await db.get(Task, task.source_task_id)
+            if legacy_task is not None:
+                legacy_task.client_approved = True
+                db.add(legacy_task)
+
+        if task.status != VirtualAgencyTaskStatus.todo.value or not task.approval_active:
+            continue
+        dependencies = await list_virtual_task_dependencies(db, task)
+        try:
+            ensure_dependencies_completed(dependencies)
+            await ensure_task_evidence_ready(db, task)
+        except DependencyNotSatisfiedError:
+            continue
+
+        handoff_key = f"agency-run:handoff:{run.id}:{task.id}:{task.task_version}"
+        if await find_event_by_idempotency_key(db, f"handoff:{handoff_key}") is not None:
+            continue
+        dispatch = await publish_agent_task(
+            queue="stevie-virtual-agency",
+            task=task,
+            actor_id=actor_id,
+            idempotency_key=handoff_key,
+        )
+        db.add(dispatch["event"])
+        dispatched_messages.append(dispatch["message"])
+
+    await db.flush()
+    return MarketingRunDispatch(
+        approved_tasks=approved_tasks,
+        dispatched_messages=dispatched_messages,
+        open_access_requests=[],
+    )
+
+
 async def decide_access_request(
     db: AsyncSession,
     *,
@@ -697,6 +793,13 @@ async def decide_access_request(
             if run.status == MarketingRunStatus.blocked.value:
                 run.status = MarketingRunStatus.active.value
             db.add(run)
+        elif _current_blocker_type(run) == "access_requests":
+            open_requests = await _list_open_run_access_requests(db, run)
+            if not open_requests:
+                run.current_blocker = None
+                if run.status == MarketingRunStatus.blocked.value:
+                    run.status = MarketingRunStatus.active.value
+                db.add(run)
 
     db.add(access_request)
     await db.flush()
@@ -723,6 +826,77 @@ def _current_blocker_access_request_id(run: MarketingRun) -> str | None:
         return None
     request_id = blocker.get("access_request_id")
     return str(request_id) if request_id is not None else None
+
+
+def _current_blocker_type(run: MarketingRun) -> str | None:
+    blocker = run.current_blocker
+    if not isinstance(blocker, dict):
+        return None
+    blocker_type = blocker.get("type")
+    return str(blocker_type) if blocker_type is not None else None
+
+
+async def _list_open_run_access_requests(
+    db: AsyncSession,
+    run: MarketingRun,
+) -> list[AgencyAccessRequest]:
+    if hasattr(db, "list_agency_access_requests_for_run"):
+        requests = list(db.list_agency_access_requests_for_run(run.id))
+    else:
+        result = await db.execute(
+            select(AgencyAccessRequest).where(
+                AgencyAccessRequest.org_id == run.org_id,
+                AgencyAccessRequest.marketing_run_id == run.id,
+            )
+        )
+        requests = list(result.scalars().all())
+    return [
+        request
+        for request in requests
+        if request.status
+        in {
+            AgencyAccessRequestStatus.requested.value,
+            AgencyAccessRequestStatus.blocked.value,
+        }
+    ]
+
+
+def _mark_run_blocked_by_access_requests(
+    run: MarketingRun,
+    access_requests: list[AgencyAccessRequest],
+) -> None:
+    run.status = MarketingRunStatus.blocked.value
+    run.current_blocker = {
+        "type": "access_requests",
+        "status": "blocked",
+        "access_request_ids": sorted(str(request.id) for request in access_requests),
+        "providers": sorted(
+            {
+                str(request.provider)
+                for request in access_requests
+                if request.provider is not None
+            }
+        ),
+        "request_types": sorted({request.request_type for request in access_requests}),
+        "reason": "Marketing run cannot dispatch until access requests are resolved.",
+    }
+
+
+async def _list_marketing_run_tasks(
+    db: AsyncSession,
+    run: MarketingRun,
+) -> list[VirtualAgencyTask]:
+    if run.project_id is None:
+        return []
+    if hasattr(db, "list_virtual_tasks_for_marketing_run"):
+        tasks = list(db.list_virtual_tasks_for_marketing_run(run.id))
+    else:
+        tasks = await list_virtual_tasks_for_project(db, run.project_id)
+    return [
+        task
+        for task in tasks
+        if str((task.lineage or {}).get("marketing_run_id") or "") == str(run.id)
+    ]
 
 
 async def decide_approval_request(

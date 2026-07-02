@@ -57,6 +57,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       capabilities: [
         "platform_manifest.read",
         "marketing_run.read",
+        "marketing_run.dispatch",
         "task.read",
         "artifact.read",
         "event_timeline.read",
@@ -163,6 +164,12 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         },
         {
           method: "POST",
+          path: "/api/integration/v1/marketing-runs/{run_id}/dispatch",
+          boundary: "public_rls",
+          capability_ids: ["marketing_run.dispatch"],
+        },
+        {
+          method: "POST",
           path: "/api/internal/virtual-agency/task",
           boundary: "internal_system_rls",
           capability_ids: ["task.execute"],
@@ -197,7 +204,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           org_scoped: true,
           durable_evidence_fields: ["strategy_summary"],
           read_capability_ids: ["marketing_run.read"],
-          write_capability_ids: [],
+          write_capability_ids: ["marketing_run.dispatch"],
         },
         {
           id: "virtual_agency_task",
