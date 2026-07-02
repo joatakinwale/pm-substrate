@@ -1073,6 +1073,9 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes('"/approvals/{approval_id}/decision"') &&
       integrationApi.includes('"/events"') &&
       integrationApi.includes('"/webhooks"') &&
+      integrationApi.includes("_integration_artifact_idempotency_key") &&
+      integrationApi.includes("_find_integration_artifact_by_idempotency_key") &&
+      integrationApi.includes("client_idempotency_key") &&
       integrationSchemas.includes("IntegrationCapabilityResponse") &&
       integrationSchemas.includes("IntegrationPlatformManifestEnvelope") &&
       integrationSchemas.includes("IntegrationAgentManifest") &&
@@ -1086,7 +1089,15 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationSchemas.includes("IntegrationEvidenceSummaryEnvelope") &&
       integrationSchemas.includes("IntegrationRunEvidenceSnapshotEnvelope") &&
       integrationSchemas.includes("IntegrationClientReportEnvelope") &&
+      integrationSchemas.includes("IntegrationWebhookIngest") &&
+      integrationSchemas.includes("idempotency_key") &&
       integrationTests.includes("test_integration_router_uses_rls_and_has_no_substrate_imports") &&
+      integrationTests.includes(
+        "test_integration_event_ingest_is_idempotent_for_matching_payload",
+      ) &&
+      integrationTests.includes(
+        "test_integration_webhook_ingest_is_idempotent_for_matching_payload",
+      ) &&
       integrationTests.includes("engagement.create") &&
       integrationTests.includes("marketing_run.create") &&
       !integrationApi.includes("pm_substrate") &&

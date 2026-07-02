@@ -432,6 +432,7 @@ class IntegrationWebhookIngest(BaseModel):
     event_type: str = Field(min_length=1, max_length=120)
     payload: dict[str, Any] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
+    idempotency_key: str | None = Field(default=None, max_length=160)
 
 
 class IntegrationExternalAdapterRunIngest(BaseModel):

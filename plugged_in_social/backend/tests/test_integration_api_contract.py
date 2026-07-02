@@ -199,6 +199,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationSocialPostEnvelope,
         IntegrationStrategyAdapterReadinessEnvelope,
         IntegrationTaskEnvelope,
+        IntegrationWebhookIngest,
     )
 
     capability_fields = set(IntegrationCapabilityResponse.model_fields)
@@ -220,6 +221,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
     )
     adapter_readiness_item_fields = set(IntegrationAdapterReadinessItem.model_fields)
     event_fields = set(IntegrationEventIngest.model_fields)
+    webhook_fields = set(IntegrationWebhookIngest.model_fields)
     external_adapter_fields = set(IntegrationExternalAdapterManifest.model_fields)
     external_adapter_run_fields = set(
         IntegrationExternalAdapterRunIngest.model_fields
@@ -425,9 +427,21 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "reports",
         "links",
     }.issubset(evidence_snapshot_fields)
-    assert {"engagement_id", "event_type", "source", "payload"}.issubset(
-        event_fields
-    )
+    assert {
+        "engagement_id",
+        "event_type",
+        "source",
+        "payload",
+        "idempotency_key",
+    }.issubset(event_fields)
+    assert {
+        "engagement_id",
+        "provider",
+        "event_type",
+        "payload",
+        "headers",
+        "idempotency_key",
+    }.issubset(webhook_fields)
     assert {"ok", "status", "payload_hash", "artifact_id"}.issubset(
         accepted_fields
     )
@@ -579,6 +593,169 @@ def _external_adapter_body(**overrides):
     }
     values.update(overrides)
     return IntegrationExternalAdapterRunIngest.model_validate(values)
+
+
+@pytest.mark.asyncio
+async def test_integration_event_ingest_is_idempotent_for_matching_payload(
+    monkeypatch,
+):
+    import app.api.integration as module
+    from app.schemas.integration import IntegrationEventIngest
+
+    org_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    db = _FakeExternalAdapterRunDb()
+
+    async def _fake_get_engagement(
+        _db,
+        *,
+        org_id: uuid.UUID,
+        engagement_id: uuid.UUID,
+    ):
+        return SimpleNamespace(id=engagement_id, org_id=org_id)
+
+    monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+
+    body = IntegrationEventIngest.model_validate(
+        {
+            "engagement_id": str(engagement_id),
+            "marketing_run_id": str(run_id),
+            "event_type": "crm.lead_qualified",
+            "source": "hubspot",
+            "payload": {"lead_id": "lead-1", "score": 91},
+            "idempotency_key": "hubspot-event-1",
+        }
+    )
+    first = await module.ingest_event(
+        body=body,
+        response=Response(),
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+    retry_response = Response()
+    second = await module.ingest_event(
+        body=body,
+        response=retry_response,
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+
+    assert first.artifact_id == second.artifact_id
+    assert len(db.artifacts) == 1
+    assert db.commit_count == 1
+    assert retry_response.status_code == 200
+    assert db.artifacts[0].lineage["idempotency_key"] == (
+        "integration_event:hubspot:hubspot-event-1"
+    )
+    assert db.artifacts[0].payload["client_idempotency_key"] == "hubspot-event-1"
+
+
+@pytest.mark.asyncio
+async def test_integration_event_ingest_rejects_idempotency_conflict(monkeypatch):
+    import app.api.integration as module
+    from app.schemas.integration import IntegrationEventIngest
+
+    org_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    db = _FakeExternalAdapterRunDb()
+
+    async def _fake_get_engagement(
+        _db,
+        *,
+        org_id: uuid.UUID,
+        engagement_id: uuid.UUID,
+    ):
+        return SimpleNamespace(id=engagement_id, org_id=org_id)
+
+    monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+
+    values = {
+        "engagement_id": str(engagement_id),
+        "marketing_run_id": str(run_id),
+        "event_type": "crm.lead_qualified",
+        "source": "hubspot",
+        "payload": {"lead_id": "lead-1", "score": 91},
+        "idempotency_key": "hubspot-event-1",
+    }
+    await module.ingest_event(
+        body=IntegrationEventIngest.model_validate(values),
+        response=Response(),
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await module.ingest_event(
+            body=IntegrationEventIngest.model_validate(
+                {
+                    **values,
+                    "payload": {"lead_id": "lead-1", "score": 73},
+                }
+            ),
+            response=Response(),
+            db=db,
+            current_user={"org_id": str(org_id)},
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["code"] == "integration_event_idempotency_conflict"
+    assert len(db.artifacts) == 1
+
+
+@pytest.mark.asyncio
+async def test_integration_webhook_ingest_is_idempotent_for_matching_payload(
+    monkeypatch,
+):
+    import app.api.integration as module
+    from app.schemas.integration import IntegrationWebhookIngest
+
+    org_id = uuid.uuid4()
+    engagement_id = uuid.uuid4()
+    db = _FakeExternalAdapterRunDb()
+
+    async def _fake_get_engagement(
+        _db,
+        *,
+        org_id: uuid.UUID,
+        engagement_id: uuid.UUID,
+    ):
+        return SimpleNamespace(id=engagement_id, org_id=org_id)
+
+    monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+
+    body = IntegrationWebhookIngest.model_validate(
+        {
+            "engagement_id": str(engagement_id),
+            "provider": "github",
+            "event_type": "push",
+            "payload": {"ref": "refs/heads/main"},
+            "headers": {"x-github-delivery": "delivery-1"},
+            "idempotency_key": "delivery-1",
+        }
+    )
+    first = await module.ingest_webhook(
+        body=body,
+        response=Response(),
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+    retry_response = Response()
+    second = await module.ingest_webhook(
+        body=body,
+        response=retry_response,
+        db=db,
+        current_user={"org_id": str(org_id)},
+    )
+
+    assert first.artifact_id == second.artifact_id
+    assert len(db.artifacts) == 1
+    assert db.commit_count == 1
+    assert retry_response.status_code == 200
+    assert db.artifacts[0].lineage["idempotency_key"] == (
+        "integration_webhook:github:delivery-1"
+    )
 
 
 @pytest.mark.asyncio

@@ -2526,25 +2526,78 @@ async def _persist_integration_artifact(
     payload: dict[str, Any],
     evidence_refs: list[Any],
     lineage: dict[str, Any],
+    idempotency_key: str | None = None,
+    response: Response | None = None,
 ) -> IntegrationAcceptedResponse:
     engagement = await _get_engagement(
         db,
         org_id=org_id,
         engagement_id=engagement_id,
     )
+    artifact_body = AgencyArtifactCreate(
+        marketing_run_id=marketing_run_id,
+        artifact_type=artifact_type,
+        title=title,
+        payload=payload,
+        evidence_refs=evidence_refs,
+        lineage=lineage,
+        author_role="external_integration",
+    )
+    normalized_evidence_refs = normalize_agency_artifact_evidence_refs(
+        artifact_body.evidence_refs
+    )
+    expected_payload_hash = compute_agency_artifact_payload_hash(
+        body=artifact_body,
+        evidence_refs=normalized_evidence_refs,
+        lineage=build_agency_artifact_lineage(
+            engagement=engagement,
+            body=artifact_body,
+        ),
+        payload=dict(artifact_body.payload),
+    )
+    existing = await _find_integration_artifact_by_idempotency_key(
+        db,
+        org_id=org_id,
+        engagement_id=engagement.id,
+        marketing_run_id=marketing_run_id,
+        artifact_type=artifact_type,
+        idempotency_key=idempotency_key,
+    )
+    if existing is not None:
+        if existing.payload_hash != expected_payload_hash:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": f"{artifact_type}_idempotency_conflict",
+                    "message": (
+                        "Integration artifact idempotency key was reused with "
+                        "a different payload."
+                    ),
+                    "artifact_type": artifact_type,
+                    "idempotency_key": idempotency_key,
+                    "existing_artifact_id": str(existing.id),
+                },
+            )
+        if response is not None:
+            response.status_code = status.HTTP_200_OK
+        return IntegrationAcceptedResponse(
+            ok=True,
+            status="accepted",
+            payload_hash=existing.payload_hash,
+            artifact_id=existing.id,
+            links=[
+                _link(
+                    "engagement",
+                    f"/api/integration/v1/engagements/{engagement.id}",
+                ),
+            ],
+        )
+
     artifact = await create_agency_artifact(
         db,
         org_id=org_id,
         engagement=engagement,
-        body=AgencyArtifactCreate(
-            marketing_run_id=marketing_run_id,
-            artifact_type=artifact_type,
-            title=title,
-            payload=payload,
-            evidence_refs=evidence_refs,
-            lineage=lineage,
-            author_role="external_integration",
-        ),
+        body=artifact_body,
     )
     await db.commit()
     await db.refresh(artifact)
@@ -2562,6 +2615,53 @@ async def _persist_integration_artifact(
     )
 
 
+def _integration_artifact_idempotency_key(
+    *,
+    artifact_type: str,
+    source: str,
+    idempotency_key: str | None,
+) -> str | None:
+    if not idempotency_key:
+        return None
+    return f"{artifact_type}:{source}:{idempotency_key}"
+
+
+async def _find_integration_artifact_by_idempotency_key(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    engagement_id: uuid.UUID,
+    marketing_run_id: uuid.UUID | None,
+    artifact_type: str,
+    idempotency_key: str | None,
+) -> AgencyArtifact | None:
+    if not idempotency_key:
+        return None
+    if hasattr(db, "artifacts"):
+        artifacts = [
+            item
+            for item in getattr(db, "artifacts")
+            if item.org_id == org_id
+            and item.engagement_id == engagement_id
+            and item.marketing_run_id == marketing_run_id
+            and item.artifact_type == artifact_type
+        ]
+    else:
+        query = select(AgencyArtifact).where(
+            AgencyArtifact.org_id == org_id,
+            AgencyArtifact.engagement_id == engagement_id,
+            AgencyArtifact.marketing_run_id == marketing_run_id,
+            AgencyArtifact.artifact_type == artifact_type,
+        )
+        result = await db.execute(query)
+        artifacts = list(result.scalars().all())
+
+    for artifact in artifacts:
+        if dict(artifact.lineage or {}).get("idempotency_key") == idempotency_key:
+            return artifact
+    return None
+
+
 @router.post(
     "/events",
     response_model=IntegrationAcceptedResponse,
@@ -2569,15 +2669,22 @@ async def _persist_integration_artifact(
 )
 async def ingest_event(
     body: IntegrationEventIngest,
+    response: Response,
     db: AsyncSession = Depends(get_db_with_rls_dep),
     current_user: dict = Depends(get_current_user),
 ):
     org_id = _org_id_from_user(current_user)
+    idempotency_key = _integration_artifact_idempotency_key(
+        artifact_type="integration_event",
+        source=body.source,
+        idempotency_key=body.idempotency_key,
+    )
     payload = {
         "event_type": body.event_type,
         "source": body.source,
         "payload": body.payload,
-        "idempotency_key": body.idempotency_key,
+        "idempotency_key": idempotency_key,
+        "client_idempotency_key": body.idempotency_key,
     }
     return await _persist_integration_artifact(
         db,
@@ -2592,7 +2699,11 @@ async def ingest_event(
             "source": body.source,
             "event_type": body.event_type,
             "payload_hash": compute_payload_hash(payload),
+            "idempotency_key": idempotency_key,
+            "client_idempotency_key": body.idempotency_key,
         },
+        idempotency_key=idempotency_key,
+        response=response,
     )
 
 
@@ -2603,15 +2714,23 @@ async def ingest_event(
 )
 async def ingest_webhook(
     body: IntegrationWebhookIngest,
+    response: Response,
     db: AsyncSession = Depends(get_db_with_rls_dep),
     current_user: dict = Depends(get_current_user),
 ):
     org_id = _org_id_from_user(current_user)
+    idempotency_key = _integration_artifact_idempotency_key(
+        artifact_type="integration_webhook",
+        source=body.provider,
+        idempotency_key=body.idempotency_key,
+    )
     payload = {
         "provider": body.provider,
         "event_type": body.event_type,
         "payload": body.payload,
         "headers": body.headers,
+        "idempotency_key": idempotency_key,
+        "client_idempotency_key": body.idempotency_key,
     }
     return await _persist_integration_artifact(
         db,
@@ -2626,5 +2745,9 @@ async def ingest_webhook(
             "provider": body.provider,
             "event_type": body.event_type,
             "payload_hash": compute_payload_hash(payload),
+            "idempotency_key": idempotency_key,
+            "client_idempotency_key": body.idempotency_key,
         },
+        idempotency_key=idempotency_key,
+        response=response,
     )
