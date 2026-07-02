@@ -36,6 +36,12 @@ export async function apiFetch<T = unknown>(
 
   if (accessToken) {
     headers["Authorization"] = `Bearer ${accessToken}`;
+  } else if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_LOCAL_API_BEARER_TOKEN
+  ) {
+    headers["Authorization"] =
+      `Bearer ${process.env.NEXT_PUBLIC_LOCAL_API_BEARER_TOKEN}`;
   }
 
   const res = await fetch(`${API_URL}${path}`, {

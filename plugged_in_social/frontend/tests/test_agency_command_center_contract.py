@@ -84,3 +84,19 @@ def test_admin_shell_auth_extras_are_guarded_for_local_operator_monitoring():
     assert "hasSupabaseBrowserConfig()" in presence
     assert "hasSupabaseBrowserConfig()" in realtime
     assert "hasSupabaseBrowserConfig()" in api
+    assert "NEXT_PUBLIC_LOCAL_API_BEARER_TOKEN" in api
+    assert 'process.env.NODE_ENV !== "production"' in api
+
+
+def test_agency_monitor_demo_bootstrap_uses_real_domain_services():
+    source = (
+        ROOT.parent / "backend/scripts/bootstrap_agency_monitor_demo.py"
+    ).read_text()
+
+    assert "create_client_engagement(" in source
+    assert "kickoff_marketing_run(" in source
+    assert "create_approval_request(" in source
+    assert "decide_access_request(" in source
+    assert "approve_and_dispatch_marketing_run(" in source
+    assert "ALLOW_QUEUE_DROP" in source
+    assert "create_access_token(" in source
