@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -39,6 +40,48 @@ def test_scheduled_sweep_item_carries_expected_content_hash():
     )
 
     assert item.expected_content_hash == HASH_A
+
+
+def test_scheduled_sweep_body_defaults_to_stale_publishing_retry_window():
+    body = internal_social.ScheduledSweepBody()
+
+    assert body.retry_stale_publishing_after_minutes == 30
+
+
+def test_publish_sweep_candidate_includes_due_and_stale_publishing_posts():
+    now = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
+    stale_before = now - timedelta(minutes=30)
+    due = SocialPost(
+        status="scheduled",
+        scheduled_at=now - timedelta(minutes=1),
+        updated_at=now,
+    )
+    stale_publishing = SocialPost(
+        status="publishing",
+        scheduled_at=now - timedelta(hours=1),
+        updated_at=stale_before - timedelta(seconds=1),
+    )
+    fresh_publishing = SocialPost(
+        status="publishing",
+        scheduled_at=now - timedelta(hours=1),
+        updated_at=stale_before + timedelta(seconds=1),
+    )
+
+    assert internal_social._is_publish_sweep_candidate(
+        due,
+        now=now,
+        stale_publishing_before=stale_before,
+    )
+    assert internal_social._is_publish_sweep_candidate(
+        stale_publishing,
+        now=now,
+        stale_publishing_before=stale_before,
+    )
+    assert not internal_social._is_publish_sweep_candidate(
+        fresh_publishing,
+        now=now,
+        stale_publishing_before=stale_before,
+    )
 
 
 @pytest.mark.asyncio

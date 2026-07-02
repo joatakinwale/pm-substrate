@@ -53,7 +53,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, select, text
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.api.internal.webhooks import verify_webhook_secret
@@ -126,7 +126,13 @@ class SocialPublishResponse(BaseModel):
 
 
 class ScheduledSweepBody(BaseModel):
-    """Empty body — the cron Worker carries no per-call parameters."""
+    """Cron sweep parameters."""
+
+    retry_stale_publishing_after_minutes: int = Field(
+        default=30,
+        ge=1,
+        le=1440,
+    )
 
 
 class ScheduledPostItem(BaseModel):
@@ -305,24 +311,39 @@ async def sweep_scheduled_posts(
     Status flip and the returned payload list happen in the same
     transaction: if the commit fails, the Worker sees an error and the
     next cron tick retries those posts naturally. If the commit succeeds
-    but the Worker crashes before enqueueing, those posts are stuck in
-    'publishing' until manually retried.
+    but the Worker crashes before enqueueing, stale 'publishing' rows are
+    returned again after ``retry_stale_publishing_after_minutes``.
     """
     now = datetime.now(timezone.utc)
+    stale_publishing_before = now - timedelta(
+        minutes=body.retry_stale_publishing_after_minutes
+    )
     posts: list[ScheduledPostItem] = []
 
     async for db in get_db():
         result = await db.execute(
             select(SocialPost).where(
-                and_(
-                    SocialPost.status == "scheduled",
-                    SocialPost.scheduled_at <= now,
+                or_(
+                    and_(
+                        SocialPost.status == "scheduled",
+                        SocialPost.scheduled_at <= now,
+                    ),
+                    and_(
+                        SocialPost.status == "publishing",
+                        SocialPost.updated_at <= stale_publishing_before,
+                    ),
                 )
             )
         )
         due = list(result.scalars().all())
 
         for post in due:
+            if not _is_publish_sweep_candidate(
+                post,
+                now=now,
+                stale_publishing_before=stale_publishing_before,
+            ):
+                continue
             expected_content_hash = post.scheduled_content_hash
             current_content_hash = social_post_content_hash(post)
             if (
@@ -357,6 +378,19 @@ async def sweep_scheduled_posts(
         now.isoformat(),
     )
     return ScheduledSweepResponse(posts=posts)
+
+
+def _is_publish_sweep_candidate(
+    post: SocialPost,
+    *,
+    now: datetime,
+    stale_publishing_before: datetime,
+) -> bool:
+    if post.status == "scheduled":
+        return post.scheduled_at is not None and post.scheduled_at <= now
+    if post.status == "publishing":
+        return post.updated_at <= stale_publishing_before
+    return False
 
 
 @router.post(
