@@ -38,6 +38,8 @@ from app.services.virtual_agency_orchestration import (
     validate_required_context,
 )
 
+AGENT_COS = "chief_of_staff"
+
 
 async def _load_task(
     db: AsyncSession,
@@ -169,7 +171,9 @@ async def route_virtual_agency_task(
         )
     )
 
-    if agent_role == "content_creative":
+    if agent_role == AGENT_COS:
+        mutations = []
+    elif agent_role == "content_creative":
         account = await first_social_account(db, task.org_id)
         mutations = create_content_mutations(
             task=task,
@@ -192,6 +196,16 @@ async def route_virtual_agency_task(
     link_artifact_lineage(task=task, artifacts=artifacts)
     mark_done(task)
     completion_payload = {"artifacts_created": len(artifacts)}
+    if task.task_type == "strategy_research":
+        completion_payload["strategy_research"] = {
+            "engagement_id": (task.lineage or {}).get("engagement_id"),
+            "marketing_run_id": (task.lineage or {}).get("marketing_run_id"),
+            "access_request_count": len(
+                (task.context or {}).get("access_request_ids", [])
+            )
+            if isinstance((task.context or {}).get("access_request_ids"), list)
+            else 0,
+        }
     if task.task_type == "next_action_proposal":
         completion_payload["next_action_proposal"] = (
             build_next_action_proposal_completion_payload(task)

@@ -100,8 +100,8 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           description: "Plans campaigns and dispatches department work.",
           writes: ["project.create", "virtual_agency_task.create"],
           emits: ["task_created", "handoff_dispatched"],
-          queue: null,
-          task_types: ["campaign_planning"],
+          queue: "stevie-virtual-agency",
+          task_types: ["campaign_planning", "strategy_research"],
         },
         {
           role: "content_creative",
@@ -576,9 +576,13 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         ...snapshot,
         platformManifest: {
           ...snapshot.platformManifest,
-          agents: snapshot.platformManifest.agents.filter(
-            (agent) => agent.role !== "analytics_reporting",
-          ),
+          agents: snapshot.platformManifest.agents
+            .filter((agent) => agent.role !== "analytics_reporting")
+            .map((agent) =>
+              agent.role === "chief_of_staff"
+                ? { ...agent, queue: null, task_types: ["campaign_planning"] }
+                : agent,
+            ),
           queues: [],
           governance_gates: snapshot.platformManifest.governance_gates.filter(
             (gate) => gate !== "content_hash_gate",
@@ -591,6 +595,8 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     expect(result.issues).toEqual(
       expect.arrayContaining([
         "missing platform agent role: analytics_reporting",
+        "chief_of_staff lacks strategy_research task type",
+        "chief_of_staff is not bound to stevie-virtual-agency",
         "platform manifest missing stevie-virtual-agency queue",
         "missing platform governance gate: content_hash_gate",
       ]),

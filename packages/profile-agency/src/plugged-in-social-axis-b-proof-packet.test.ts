@@ -95,8 +95,8 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           description: "Plans campaigns and dispatches department work.",
           writes: ["project.create", "virtual_agency_task.create"],
           emits: ["task_created", "handoff_dispatched"],
-          queue: null,
-          task_types: ["campaign_planning"],
+          queue: "stevie-virtual-agency",
+          task_types: ["campaign_planning", "strategy_research"],
         },
         {
           role: "content_creative",

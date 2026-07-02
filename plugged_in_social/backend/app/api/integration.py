@@ -490,7 +490,11 @@ def _agent_manifest() -> list[IntegrationAgentManifest]:
         "chief_of_staff": {
             "name": "Chief of Staff",
             "description": "Turns client intake into strategy, project scope, dependencies, and department handoffs.",
-            "task_types": ["campaign_planning", "department_handoff"],
+            "task_types": [
+                "campaign_planning",
+                "strategy_research",
+                "department_handoff",
+            ],
             "writes": ["project.create", "legacy_task.create", "virtual_agency_task.create"],
             "emits": ["task_created", "handoff_dispatched"],
         },
@@ -538,9 +542,7 @@ def _agent_manifest() -> list[IntegrationAgentManifest]:
                 emits=sorted(
                     set(info.get("emits", [])) | set(capabilities.get("emits", set()))
                 ),
-                queue=(
-                    "stevie-virtual-agency" if role != "chief_of_staff" else None
-                ),
+                queue="stevie-virtual-agency",
                 task_types=list(info["task_types"]),
             )
         )

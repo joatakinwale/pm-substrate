@@ -36,6 +36,7 @@ from app.services.agency_domain import (
     create_approval_request,
     create_client_engagement,
     decide_approval_request,
+    kickoff_marketing_run,
     start_marketing_run,
 )
 
@@ -176,6 +177,12 @@ async def create_marketing_run(
         engagement=engagement,
         objective=body.objective,
         project_id=body.project_id,
+    )
+    await kickoff_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id=str(current_user.get("id")) if current_user.get("id") else None,
     )
     await db.commit()
     await db.refresh(run)

@@ -52,6 +52,10 @@ class ConcurrentMutationError(VirtualAgencyInvariantError):
 
 
 AGENT_CAPABILITIES: dict[str, dict[str, set[str]]] = {
+    "chief_of_staff": {
+        "writes": set(),
+        "emits": {"strategy_research.completed"},
+    },
     "content_creative": {
         "writes": {"social_post.create"},
         "emits": {"social_post.draft_created"},

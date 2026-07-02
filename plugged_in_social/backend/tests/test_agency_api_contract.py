@@ -66,3 +66,13 @@ def test_agency_router_exposes_nested_read_routes_for_monitoring():
         "/agency/engagements/{engagement_id}/access-requests",
         frozenset({"GET"}),
     ) in route_methods
+
+
+def test_marketing_run_creation_kicks_off_autonomous_agency_work():
+    import app.api.agency as module
+
+    src = inspect.getsource(module.create_marketing_run)
+
+    assert "start_marketing_run(" in src
+    assert "kickoff_marketing_run(" in src
+    assert src.index("start_marketing_run(") < src.index("kickoff_marketing_run(")

@@ -642,6 +642,17 @@ function liveRunEvidenceIssues(
       issues.add(`missing platform agent role: ${role}`);
     }
   }
+  const chiefAgent = platformManifest.agents.find(
+    (agent) => agent.role === "chief_of_staff",
+  );
+  if (chiefAgent !== undefined) {
+    if (!chiefAgent.task_types.includes("strategy_research")) {
+      issues.add("chief_of_staff lacks strategy_research task type");
+    }
+    if (chiefAgent.queue !== "stevie-virtual-agency") {
+      issues.add("chief_of_staff is not bound to stevie-virtual-agency");
+    }
+  }
   const contentAgent = platformManifest.agents.find(
     (agent) => agent.role === "content_creative",
   );

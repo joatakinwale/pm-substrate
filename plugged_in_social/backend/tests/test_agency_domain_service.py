@@ -12,6 +12,8 @@ from app.models.agency import (
     ClientEngagement,
     MarketingRun,
 )
+from app.models.project import Project
+from app.models.virtual_agency import VirtualAgencyEvent, VirtualAgencyTask
 from app.schemas.agency import (
     AgencyAccessRequestCreate,
     AgencyApprovalCreate,
@@ -70,6 +72,114 @@ async def test_create_engagement_and_marketing_run():
     assert run.stage == "intake"
     assert run.objective == "Build a 30-day launch strategy"
     assert db.flush_count == 2
+
+
+@pytest.mark.asyncio
+async def test_kickoff_marketing_run_builds_autonomous_agency_workbreakdown():
+    from app.services.agency_domain import (
+        create_client_engagement,
+        kickoff_marketing_run,
+        start_marketing_run,
+    )
+    from app.services.virtual_agency import (
+        AGENT_ANALYTICS,
+        AGENT_COMMUNITY,
+        AGENT_CONTENT,
+        AGENT_COS,
+        AGENT_SCHEDULING,
+    )
+
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(
+            name="Acme Launch",
+            client_url="https://acme.example",
+            repo_url="https://github.com/acme/app",
+            client_name="Ada",
+            client_email="ada@example.com",
+            goals=["increase qualified demo bookings"],
+            constraints=["client approval required before publishing"],
+            intake_payload={
+                "copy_inputs": ["homepage", "sales deck"],
+                "offer": "AI implementation audit",
+            },
+            integration_state={
+                "preferred_social_channels": ["linkedin"],
+                "analytics_provider": "umami",
+            },
+        ),
+        created_by_agent="chief_of_staff",
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective="Build and launch an autonomous 30-day marketing campaign",
+    )
+
+    kickoff = await kickoff_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="agent:chief_of_staff",
+    )
+
+    assert kickoff.project.id == engagement.project_id == run.project_id
+    assert kickoff.artifact.artifact_type == "implementation_brief"
+    assert kickoff.artifact.payload_hash
+    assert kickoff.artifact.lineage["engagement_id"] == str(engagement.id)
+    assert kickoff.artifact.lineage["marketing_run_id"] == str(run.id)
+    assert run.stage == "strategy"
+    assert run.strategy_summary["kickoff"]["task_count"] == 5
+    assert run.strategy_summary["client_context"] == {
+        "client_url": "https://acme.example/",
+        "repo_url": "https://github.com/acme/app",
+        "goals": ["increase qualified demo bookings"],
+        "constraints": ["client approval required before publishing"],
+    }
+
+    access_requests = list(db._store.get(AgencyAccessRequest, {}).values())
+    assert {(item.request_type, item.provider) for item in access_requests} == {
+        ("client_platform", "website"),
+        ("repository", "github"),
+        ("analytics", "umami"),
+        ("social_account", "linkedin"),
+    }
+    assert all(item.marketing_run_id == run.id for item in access_requests)
+
+    tasks = list(db._store.get(VirtualAgencyTask, {}).values())
+    assert [task.agent_role for task in tasks] == [
+        AGENT_COS,
+        AGENT_CONTENT,
+        AGENT_SCHEDULING,
+        AGENT_COMMUNITY,
+        AGENT_ANALYTICS,
+    ]
+    assert [task.task_type for task in tasks] == [
+        "strategy_research",
+        "content_generation",
+        "content_scheduling",
+        "community_engagement",
+        "analytics_reporting",
+    ]
+    assert tasks[1].dependencies == [tasks[0]]
+    assert tasks[2].dependencies == [tasks[1]]
+    assert tasks[3].dependencies == [tasks[2]]
+    assert tasks[4].dependencies == [tasks[3]]
+    assert all(task.lineage["engagement_id"] == str(engagement.id) for task in tasks)
+    assert all(task.lineage["marketing_run_id"] == str(run.id) for task in tasks)
+    assert all(task.lineage["orchestration_task_id"] == str(task.id) for task in tasks)
+    assert all(task.context["client_url"] == "https://acme.example/" for task in tasks)
+    assert all(task.context["repo_url"] == "https://github.com/acme/app" for task in tasks)
+    assert "approval_payload_hash" in tasks[0].context["required_gates"]
+
+    events = list(db._store.get(VirtualAgencyEvent, {}).values())
+    assert len(events) == 5
+    assert all(event.event_type == "task_created" for event in events)
+    assert len(kickoff.tasks) == 5
 
 
 @pytest.mark.asyncio
