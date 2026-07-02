@@ -1,4 +1,4 @@
--- 0123_agent_state_authority_topology_checkpoint_admission_witness_authority_transition_admission_witness_authority_transitions.sql
+-- 0123_agent_state_auth_topo_checkpoint_aw_authority_transition_witness_authority_transitions.sql
 -- Durable authority transitions for authority-topology checkpoint transition-admission witness certificates.
 
 CREATE TABLE IF NOT EXISTS agent_state.authority_topology_trans_adm_wit_auth_transitions (

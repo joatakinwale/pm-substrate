@@ -1,4 +1,4 @@
--- 0122_agent_state_quorum_certificate_proof_record_admission_witness_authority_transition_admission_witness_authority_transitions.sql
+-- 0122_agent_state_qc_proof_aw_authority_transition_witness_authority_transitions.sql
 -- Durable authority transitions for proof-record transition-admission witness certificates.
 
 CREATE TABLE IF NOT EXISTS agent_state.proof_record_trans_adm_wit_auth_transitions (

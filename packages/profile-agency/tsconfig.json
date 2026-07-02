@@ -5,7 +5,8 @@
     "rootDir": "./src"
   },
   "references": [
-    { "path": "../agent-state" },
+    { "path": "../agent-state-core" },
+    { "path": "../evals" },
     { "path": "../types" }
   ],
   "include": ["src/**/*"],

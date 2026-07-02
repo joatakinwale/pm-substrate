@@ -128,6 +128,7 @@ export interface PortfolioDecision
     reasoning: string;
     accepted: boolean;
     rejectionReason: string | null;
+    allowedActions: Readonly<Record<string, number>> | null;
   }>;
 }
 

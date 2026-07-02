@@ -1,0 +1,159 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_agency_api_types_and_helpers_are_declared():
+    source = (ROOT / "src/lib/api.ts").read_text()
+
+    assert "export interface ClientEngagement" in source
+    assert "export interface MarketingRun" in source
+    assert "export interface AgencyArtifact" in source
+    assert "export interface AgencyApprovalRequest" in source
+    assert "export interface AgencyAccessRequest" in source
+    assert "export interface IntegrationTask" in source
+    assert "export interface IntegrationClientReport" in source
+    assert "export interface IntegrationRunEvidenceSnapshot" in source
+    assert "export interface IntegrationStrategyAdapterReadiness" in source
+    assert "adapter_readiness: IntegrationStrategyAdapterReadiness" in source
+    assert "export interface IntegrationExternalAdapter" in source
+    assert "source_url: string" in source
+    assert "source_commit: string" in source
+    assert "compatible_protocols: string[]" in source
+    assert "runner_commands: string[]" in source
+    assert "required_result_shape: Record<string, unknown> | null" in source
+    assert "export async function listClientEngagements" in source
+    assert "export async function createClientEngagement" in source
+    assert "export async function createMarketingRun" in source
+    assert "export async function createAgencyArtifact" in source
+    assert "export async function createAgencyApproval" in source
+    assert "export async function decideAgencyApproval" in source
+    assert "export async function createAgencyAccessRequest" in source
+    assert "export async function listIntegrationRunTasks" in source
+    assert "export async function getIntegrationRunEvidenceSnapshot" in source
+    assert "export async function listIntegrationExternalAdapters" in source
+    assert "/api/integration/v1/marketing-runs/" in source
+    assert "/api/integration/v1/external-adapters" in source
+    assert "/tasks" in source
+    assert "/evidence-snapshot" in source
+
+
+def test_agency_command_center_route_exposes_operator_workflow():
+    page = ROOT / "src/app/admin/agency/page.tsx"
+    source = page.read_text()
+
+    assert "Autonomous Agency" in source
+    assert "New Client Engagement" in source
+    assert "Strategy Run" in source
+    assert "Evidence Artifacts" in source
+    assert "Approvals" in source
+    assert "Access Requests" in source
+    assert "source_urls" in source
+    assert "competitor_urls" in source
+    assert "auto_start_run" in source
+    assert "Start strategy run after intake" in source
+    assert "Create + Start Strategy" in source
+    assert "strategy_session" in source
+    assert "createClientEngagement" in source
+    assert "createMarketingRun" in source
+    assert "createMarketingRun(engagement.id" in source
+    assert "createAgencyArtifact" in source
+    assert "createAgencyApproval" in source
+    assert "decideAgencyApproval" in source
+    assert "createAgencyAccessRequest" in source
+
+
+def test_agency_command_center_route_exposes_autonomous_run_monitor():
+    page = ROOT / "src/app/admin/agency/page.tsx"
+    source = page.read_text()
+
+    assert "Run Monitor" in source
+    assert "Closed-loop Progress" in source
+    assert "Governance Gates" in source
+    assert "Adapter Evidence" in source
+    assert "External Adapter Boundary" in source
+    assert "Strategy Research Evidence" in source
+    assert "adapter_readiness" in source
+    assert "missing_evidence_fields" in source
+    assert "Agent Task Queue" in source
+    assert "CLOSED_LOOP_STAGES" in source
+    assert "next_action" in source
+    assert "runTasks" in source
+    assert "externalAdapters" in source
+    assert "adapter.compatible_protocols" in source
+    assert "adapter.runner_commands" in source
+    assert "adapter.source_url" in source
+    assert "adapter.source_commit" in source
+    assert "externalAdapterRuns" in source
+    assert "Adapter Run Evidence" in source
+    assert "external_adapter_run" in source
+    assert "gate_results_hash" in source
+    assert "output_payload_hash" in source
+    assert "artifactIdempotencyValue" in source
+    assert "event.idempotency_key" in source
+    assert "listIntegrationExternalAdapters" in source
+    assert "getIntegrationRunEvidenceSnapshot" in source
+    assert "approval_payload_hash" in source
+    assert "latest_event_hash" in source
+    assert "social_post_content_hashes" in source
+    assert "published_social_post_content_hashes" in source
+    assert "social_post_metric_hashes" in source
+    assert "client_report_hashes" in source
+    assert "client_report_metrics_hashes" in source
+    assert "report_count" in source
+    assert "openGateCount" in source
+    assert "openAccessRequestCount > 0" in source
+    assert "Published social metric evidence recorded." in source
+    assert "Report metrics recorded; waiting for social metric hash." in source
+    assert "Published content hash recorded." in source
+    assert "Metric Hash" in source
+    assert "Report Status" in source
+    assert "IntegrationSocialPost" in source
+    assert "runSocialPosts" in source
+    assert "snapshot.social_posts" in source
+    assert "Scheduled & Published Posts" in source
+    assert "Client Reports" in source
+    assert "Next Action Proposals" in source
+    assert "nextActionProposalFromEvent" in source
+    assert "next_action_proposal" in source
+    assert "marketing.next_action.propose" in source
+
+
+def test_sidebar_links_to_agency_command_center():
+    source = (ROOT / "src/components/admin/AdminSidebar.tsx").read_text()
+
+    assert 'href: "/admin/agency"' in source
+    assert 'label: "Agency"' in source
+
+
+def test_admin_shell_auth_extras_are_guarded_for_local_operator_monitoring():
+    client = (ROOT / "src/lib/supabase/client.ts").read_text()
+    sidebar = (ROOT / "src/components/admin/AdminSidebar.tsx").read_text()
+    presence = (ROOT / "src/lib/use-online-presence.ts").read_text()
+    realtime = (ROOT / "src/lib/use-realtime.ts").read_text()
+    api = (ROOT / "src/lib/api.ts").read_text()
+
+    assert "export function hasSupabaseBrowserConfig" in client
+    assert "hasSupabaseBrowserConfig()" in sidebar
+    assert "hasSupabaseBrowserConfig()" in presence
+    assert "hasSupabaseBrowserConfig()" in realtime
+    assert "hasSupabaseBrowserConfig()" in api
+    assert "NEXT_PUBLIC_LOCAL_API_BEARER_TOKEN" in api
+    assert 'process.env.NODE_ENV !== "production"' in api
+
+
+def test_agency_monitor_demo_bootstrap_uses_real_domain_services():
+    source = (
+        ROOT.parent / "backend/scripts/bootstrap_agency_monitor_demo.py"
+    ).read_text()
+
+    assert "create_client_engagement(" in source
+    assert "kickoff_marketing_run(" in source
+    assert "create_approval_request(" in source
+    assert "decide_access_request(" in source
+    assert "approve_and_dispatch_marketing_run(" in source
+    assert "ALLOW_QUEUE_DROP" in source
+    assert "create_access_token(" in source

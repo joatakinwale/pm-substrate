@@ -19,9 +19,7 @@ def test_public_branding_fields_are_safelisted():
         "primary_color",
         "accent_color",
         "dashboard_intro",
-        "cal_url",
-        "cal_username",
-        "cal_event_slug",
+        "booking_profile_slug",
         "umami_website_id",
     }
     assert set(PublicBrandingResponse.model_fields.keys()) == expected

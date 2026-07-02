@@ -1,4 +1,4 @@
--- 0135_agent_state_authority_epoch_seal_finalizer_proof_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0135_agent_state_auth_epoch_seal_fin_aw_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for finalizer transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.finalizer_proof_adm_wit_auth_trans_adm_wit_auth_trans_adms (

@@ -1,4 +1,4 @@
--- 0117_agent_state_history_root_settlement_authority_transition_admission_witness_authority_transitions.sql
+-- 0117_agent_state_history_root_settle_authority_transition_witness_authority_transitions.sql
 -- Durable authority transitions for history-root settlement transition-admission witness certificates.
 
 CREATE TABLE IF NOT EXISTS agent_state.history_root_settle_trans_adm_witness_authority_transitions (

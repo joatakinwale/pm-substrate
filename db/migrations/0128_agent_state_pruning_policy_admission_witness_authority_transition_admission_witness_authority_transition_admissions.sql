@@ -1,4 +1,4 @@
--- 0128_agent_state_pruning_policy_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0128_agent_state_pruning_policy_aw_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for pruning-policy transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.pruning_policy_trans_adm_wit_auth_transition_admissions (

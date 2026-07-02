@@ -20,6 +20,7 @@ describe("FINANCE_RESEARCH_INGEST_CAPABILITY", () => {
       "portfolio.decision.proposed",
       "portfolio.decision.accepted",
       "workflow.blocked.stale_state",
+      "workflow.blocked.invalid_action",
     ]);
 
     const normalized = normalizeCapability(FINANCE_RESEARCH_INGEST_CAPABILITY);

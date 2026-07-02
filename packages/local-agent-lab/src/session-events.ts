@@ -7,6 +7,7 @@ export type LabSessionStatus = "running" | "completed" | "stopped" | "failed";
 export type LabSessionEventType =
   | "session_created"
   | "agent_started"
+  | "agent_completed"
   | "agent_stopped"
   | "arm_started"
   | "world_seeded"

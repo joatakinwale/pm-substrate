@@ -19,7 +19,7 @@ import {
   verifyActionOutcomeEnvelopeHash,
   verifyStateReviewArtifactHash,
   type ActionOutcomeEnvelope,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { tenantId, timestamp } from "@pm/types";
 
@@ -33,6 +33,8 @@ import {
   buildArrowHedgeCleanCurrentFixtureCase,
   buildArrowHedgeCanonicalStateReviewArtifactCorpus,
   buildArrowHedgeCurrentStateView,
+  expandArrowHedgeRunEnvelope,
+  reviewArrowHedgeRunEnvelopeOffline,
   buildArrowHedgeContinuityFixtureCases,
   buildArrowHedgeObservationReport,
   buildArrowHedgeProposalReview,
@@ -208,6 +210,356 @@ describe("ArrowHedge snapshot adapter", () => {
     ]);
   });
 
+  it("maps plural ArrowHedge analyst signals without dropping dissent", () => {
+    const multiSignalSnapshot = {
+      ...snapshot,
+      signals: [
+        {
+          id: "sig_aapl_ben_graham",
+          agentId: "ben_graham_agent",
+          signal: "bullish",
+          confidence: 0.71,
+          evidenceWindowStart: "2026-06-03T13:30:00.000Z",
+          evidenceWindowEnd: "2026-06-03T13:59:00.000Z",
+        },
+        {
+          id: "sig_aapl_technical",
+          agentId: "technical_analyst_agent",
+          signal: "bearish",
+          confidence: 0.62,
+          evidenceWindowStart: "2026-06-03T13:30:00.000Z",
+          evidenceWindowEnd: "2026-06-03T13:59:00.000Z",
+        },
+      ],
+    };
+
+    const plan = buildArrowHedgeIngestionPlan(multiSignalSnapshot, {
+      tenantId: tenantId("tnt_arrowhedge_plural_signals"),
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+
+    expect(plan.valid).toBe(true);
+    expect(
+      plan.mapping.items.filter((item) => item.sourceName === "AnalystSignalSource"),
+    ).toHaveLength(2);
+    expect(
+      plan.typedEvents.filter((event) => event.type === "analyst.signal.created"),
+    ).toHaveLength(2);
+  });
+
+  it("expands a full ArrowHedge run envelope into validated ticker snapshots with run-level evidence", () => {
+    const runEnvelope = {
+      schemaVersion: "arrowhedge.run-envelope.v1",
+      runId: "run_demo_001",
+      surface: "backtest",
+      substrateMode: "blocking",
+      observedAt: "2026-06-03T14:00:00.000Z",
+      scope: {
+        startDate: "2026-05-01",
+        endDate: "2026-06-03",
+        tickers: ["AAPL", "MSFT"],
+      },
+      graph: {
+        nodes: [{ id: "agent:ben_graham_agent", kind: "analyst" }],
+        edges: [
+          {
+            source: "agent:ben_graham_agent",
+            target: "ticker:AAPL",
+            type: "analyzes",
+          },
+        ],
+      },
+      modelConfig: { model: "gpt-4.1", temperature: 0.1 },
+      portfolio: {
+        cash: 250000,
+        equity: 1000000,
+        margin_requirement: 0.25,
+        margin_used: 0.11,
+      },
+      signals: [
+        {
+          id: "sig_ben_graham_AAPL",
+          ticker: "AAPL",
+          agentId: "ben_graham_agent",
+          signal: "bullish",
+          confidence: 0.74,
+        },
+        {
+          id: "sig_ben_graham_MSFT",
+          ticker: "MSFT",
+          agentId: "ben_graham_agent",
+          signal: "neutral",
+          confidence: 0.51,
+        },
+      ],
+      riskStates: [
+        {
+          ticker: "AAPL",
+          agentId: "risk_management_agent",
+          currentPrice: 189.25,
+          remainingPositionLimit: 50000,
+          maxShares: 120,
+          volatility: 0.21,
+          bindingConstraint: "position_limit",
+        },
+        {
+          ticker: "MSFT",
+          agentId: "risk_management_agent",
+          currentPrice: 415.5,
+          remainingPositionLimit: 40000,
+          maxShares: 96,
+          volatility: 0.18,
+          bindingConstraint: "position_limit",
+        },
+      ],
+      decisions: [
+        {
+          id: "dec_run_demo_001_AAPL",
+          ticker: "AAPL",
+          action: "buy",
+          quantity: 100,
+          confidence: 0.76,
+          reasoning: "AAPL passed the risk gate.",
+          allowedActions: { hold: 0, buy: 120 },
+        },
+        {
+          id: "dec_run_demo_001_MSFT",
+          ticker: "MSFT",
+          action: "hold",
+          quantity: 0,
+          confidence: 0.61,
+          reasoning: "MSFT signal is not decisive.",
+          allowedActions: { hold: 0, buy: 96 },
+        },
+      ],
+      evidence: [
+        {
+          id: "ev_aapl_raw",
+          ticker: "AAPL",
+          sha256: "c".repeat(64),
+          mimeType: "application/json",
+          filename: "aapl-raw.json",
+          sourceUri: "arrowhedge://signals/ben_graham_agent/AAPL",
+          retrievedAt: "2026-06-03T14:00:00.000Z",
+          freshnessExpiresAt: "2026-06-03T14:00:00.000Z",
+        },
+        {
+          id: "ev_run_seed",
+          sha256: "d".repeat(64),
+          mimeType: "application/json",
+          filename: "run-seed.json",
+          sourceUri: "arrowhedge://runs/run_demo_001/seed",
+          retrievedAt: "2026-06-03T14:00:00.000Z",
+          freshnessExpiresAt: "2026-06-03T14:00:00.000Z",
+        },
+      ],
+    };
+
+    const expanded = expandArrowHedgeRunEnvelope(runEnvelope);
+
+    expect(expanded.valid).toBe(true);
+    expect(expanded.issues).toEqual([]);
+    expect(expanded.snapshots).toHaveLength(2);
+
+    const aapl = expanded.snapshots.find(
+      (expandedSnapshot) => expandedSnapshot.ticker.symbol === "AAPL",
+    );
+    expect(aapl).toMatchObject({
+      snapshotId: "snap_run_demo_001_AAPL",
+      authority: "arrowhedge:backtest:run_demo_001",
+      backtestRun: {
+        id: "run_demo_001",
+        scopeStart: "2026-05-01",
+        scopeEnd: "2026-06-03",
+      },
+      researchRun: {
+        id: "rr_run_demo_001_AAPL",
+        modelLock: '{"model":"gpt-4.1","temperature":0.1}',
+      },
+      decision: {
+        action: "buy",
+        quantity: 100,
+        accepted: true,
+        allowedActions: { hold: 0, buy: 120 },
+      },
+      risk: {
+        id: "risk_run_demo_001_AAPL",
+        maxShares: 120,
+      },
+    });
+    expect(aapl?.signals).toHaveLength(1);
+    expect(aapl?.evidence.map((item) => item.id)).toEqual(
+      expect.arrayContaining([
+        "ev_aapl_raw",
+        "ev_run_seed",
+        "ev_run_graph_run_demo_001",
+        "ev_run_model_config_run_demo_001",
+      ]),
+    );
+
+    const plan = buildArrowHedgeIngestionPlan(aapl, {
+      tenantId: tenantId("tnt_arrowhedge_run_envelope"),
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+
+    expect(plan.valid).toBe(true);
+    expect(
+      plan.mapping.items.filter((item) => item.sourceName === "EvidenceDocumentSource"),
+    ).toHaveLength(4);
+    expect(plan.typedEvents.map((event) => event.type)).toContain(
+      "portfolio.decision.accepted",
+    );
+  });
+
+  it("blocks fresh decisions whose quantity exceeds deterministic allowed actions", () => {
+    const overLimitSnapshot = {
+      ...snapshot,
+      decision: {
+        ...snapshot.decision,
+        quantity: 121,
+        accepted: true,
+        allowedActions: { hold: 0, buy: 120 },
+      },
+    };
+
+    const plan = buildArrowHedgeIngestionPlan(overLimitSnapshot, {
+      tenantId: tenantId("tnt_arrowhedge_over_limit"),
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+
+    expect(plan.valid).toBe(true);
+    expect(plan.typedEvents.map((event) => event.type)).toContain(
+      "workflow.blocked.invalid_action",
+    );
+    expect(plan.typedEvents.map((event) => event.type)).not.toContain(
+      "portfolio.decision.accepted",
+    );
+  });
+
+  it("reviews a full run envelope offline with deterministic COP and replayable blocked event ids", async () => {
+    const review = await reviewArrowHedgeRunEnvelopeOffline(
+      {
+        schemaVersion: "arrowhedge.run-envelope.v1",
+        runId: "run_offline_review_001",
+        surface: "backtest",
+        substrateMode: "blocking",
+        observedAt: "2026-06-03T14:00:00.000Z",
+        scope: {
+          startDate: "2026-05-01",
+          endDate: "2026-06-03",
+          tickers: ["AAPL"],
+        },
+        graph: {
+          nodes: [{ id: "agent:ben_graham_agent", kind: "analyst" }],
+          edges: [],
+        },
+        modelConfig: { model: "gpt-4.1", temperature: 0.1 },
+        portfolio: {
+          cash: 250000,
+          equity: 1000000,
+          margin_requirement: 0.25,
+          margin_used: 0.11,
+        },
+        signals: [
+          {
+            id: "sig_ben_graham_AAPL",
+            ticker: "AAPL",
+            agentId: "ben_graham_agent",
+            signal: "bullish",
+            confidence: 0.74,
+          },
+        ],
+        riskStates: [
+          {
+            ticker: "AAPL",
+            currentPrice: 189.25,
+            remainingPositionLimit: 50000,
+            maxShares: 120,
+            volatility: 0.21,
+            bindingConstraint: "position_limit",
+            freshnessExpiresAt: "2026-06-03T14:10:00.000Z",
+          },
+        ],
+        decisions: [
+          {
+            id: "dec_run_offline_review_001_AAPL",
+            ticker: "AAPL",
+            action: "buy",
+            quantity: 121,
+            confidence: 0.76,
+            reasoning: "Over-limit test decision.",
+            allowedActions: { hold: 0, buy: 120 },
+          },
+        ],
+        evidence: [
+          {
+            id: "ev_aapl_raw",
+            ticker: "AAPL",
+            sha256: "e".repeat(64),
+            mimeType: "application/json",
+            filename: "aapl-raw.json",
+            sourceUri: "arrowhedge://signals/ben_graham_agent/AAPL",
+            retrievedAt: "2026-06-03T14:00:00.000Z",
+            freshnessExpiresAt: "2026-06-03T14:10:00.000Z",
+          },
+        ],
+      },
+      {
+        tenantId: tenantId("tnt_arrowhedge_offline_review"),
+        profile: FINANCE_RESEARCH_PROFILE,
+        adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+      },
+    );
+
+    expect(review.valid).toBe(true);
+    expect(review.expanded).toEqual({ snapshots: 1, tickers: ["AAPL"] });
+    expect(review.ingested.eventsPublished).toBeGreaterThan(0);
+    expect(review.ingested.blockedEventIds).toEqual([
+      "evt_run_offline_review_001_0_3_workflow_blocked_invalid_action",
+    ]);
+    expect(review.cop.tickers["AAPL"]).toMatchObject({
+      authorityGate: { passes: 0, failures: 1 },
+      invalidActionBlocks: 1,
+    });
+  });
+
+  it("projects invalid-action blocks as blocked current-state workflow", async () => {
+    const overLimitSnapshot = {
+      ...snapshot,
+      decision: {
+        ...snapshot.decision,
+        quantity: 121,
+        accepted: true,
+        allowedActions: { hold: 0, buy: 120 },
+      },
+    };
+    const tenant = tenantId("tnt_arrowhedge_over_limit_view");
+    const plan = buildArrowHedgeIngestionPlan(overLimitSnapshot, {
+      tenantId: tenant,
+      profile: FINANCE_RESEARCH_PROFILE,
+      adapterStartedAt: timestamp("2026-06-03T13:59:58.500Z"),
+    });
+    const projection = createArrowHedgeCommonOperatingPictureProjection(
+      "arrowhedge_cop_invalid_action",
+    );
+
+    const state = await foldPlanIntoCop(projection, plan);
+    const view = buildArrowHedgeCurrentStateView({
+      tenantId: tenant,
+      projectionName: projection.name,
+      projectionVersion: projection.version,
+      symbol: "AAPL",
+      state,
+    });
+
+    expect(state.tickers["AAPL"]?.authorityGate.failures).toBe(1);
+    expect(state.summary.authorityGatePassRate).toBe(0);
+    expect(view?.workflowPosition).toBe("blocked_invalid_action");
+  });
+
   it("rejects typed finance events that violate their payload schema", () => {
     const plan = buildArrowHedgeIngestionPlan(snapshot, {
       tenantId: tenantId("tnt_arrowhedge_contract"),
@@ -280,6 +632,7 @@ describe("ArrowHedge snapshot adapter", () => {
               id: input.id!,
               identity: input.identity,
               schemaVersion: input.schemaVersion,
+              revision: 1,
             },
           }),
           updateNode: async () => undefined,

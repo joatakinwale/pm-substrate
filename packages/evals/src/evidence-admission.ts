@@ -11,7 +11,7 @@ import {
   type ExternalStateEvidenceKind,
   type StateReviewArtifact,
   type StateReviewInvariantClass,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 
 /**
  * Deterministic external-evidence admission fixture corpus (research frontier

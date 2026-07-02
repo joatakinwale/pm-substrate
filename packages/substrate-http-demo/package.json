@@ -15,16 +15,17 @@
   },
   "dependencies": {
     "@pm/capability-finance-research-ingest": "workspace:*",
-    "@pm/profile-finance-research": "workspace:*",
     "@pm/events": "workspace:*",
     "@pm/graph": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
     "@pm/profile-registry": "workspace:*",
     "@pm/projections": "workspace:*",
     "@pm/registry": "workspace:*",
     "@pm/substrate-http": "workspace:*",
+    "@pm/tenants": "workspace:*",
     "@pm/types": "workspace:*",
-    "pg": "^8.13.0",
-    "@pm/tenants": "workspace:*"
+    "hono": "^4.12.16",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",

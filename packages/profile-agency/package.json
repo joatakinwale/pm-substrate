@@ -19,13 +19,13 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
-    "@pm/agent-state": "workspace:*",
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/evals": "workspace:*",
     "@pm/types": "workspace:*"
   },
   "devDependencies": {
     "@pm/capability-audit": "workspace:*",
     "@pm/entity-mapping": "workspace:*",
-    "@pm/evals": "workspace:*",
     "@pm/events": "workspace:*",
     "@pm/graph": "workspace:*",
     "@pm/profile-registry": "workspace:*",

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-07-01 - Substrate primitive back-map
+
+- Added `research/daily-arrowsmith-agent-state/v229-substrate-primitive-backmap-2026-07-01.md` as a consolidation checkpoint rather than a new recursive proof layer.
+- Back-mapped v62-v228 into eight substrate primitive families: state identity, admission calculus, recovery cut, policy compiler, authority topology, obstruction evidence, settlement/finality, and replay semantics.
+- Added a recursion stop rule requiring future Arrowsmith substrate work to declare the primitive family it strengthens, replaces, or falsifies before adding another proof/admission/witness layer.
+- Added `scripts/validate-arrowsmith-primitives.ts` and `pnpm validate:arrowsmith-primitives` to make the v229 primitive-family rule executable for future v230+ research slices.
+- Annotated SQ176-SQ185 by primitive family so the next implementation begins from generic settlement/finality, obstruction evidence, replay semantics, authority topology, or admission calculus instead of proof-layer recursion.
+- Claim boundary: v229 does not delete or refactor existing `@pm/agent-state` code, close SQ176-SQ185, implement generic admission calculus, or add the Pi Harness/procedure admission kernel. It establishes the compression map and governance rule that those future implementations must satisfy.
+
 ## 2026-06-27 - Operational state accountable finality evidence
 
 - Added `research/daily-arrowsmith-agent-state/v228-operational-state-authority-epoch-seal-accountable-finality-evidence-2026-06-27.md`, closing SQ175 and replacing it with SQ185 finality-evidence gossip/custody/currentness follow-up pressure.

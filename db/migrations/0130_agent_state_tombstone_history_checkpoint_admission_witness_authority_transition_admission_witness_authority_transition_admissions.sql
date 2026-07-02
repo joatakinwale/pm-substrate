@@ -1,4 +1,4 @@
--- 0130_agent_state_tombstone_history_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0130_agent_state_th_checkpoint_aw_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for tombstone-history checkpoint transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.tombstone_checkpoint_trans_adm_wit_auth_transition_admissions (

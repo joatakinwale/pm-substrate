@@ -1,0 +1,238 @@
+# ArrowHedgeLab Upstream Integration Review
+
+Date: 2026-07-01
+
+Scope: fresh upstream clone at `arrowhedgelab`, remote `https://github.com/virattt/ai-hedge-fund.git`, commit `65a0349`.
+
+This review reflects the current tree after the old local `arrowhedgelab` copy was archived to `trash/arrowhedgelab-archive-20260701-133154` and replaced with a fresh upstream clone. The previous local `src/substrate` bridge is not present in this upstream tree.
+
+## Evaluation
+
+ArrowHedgeLab is a good substrate validation target, but it is not currently integrated as an external, portable pm-substrate target. The project has real multi-agent orchestration, persisted flow/run state, model/API-key configuration, market data tools, in-memory cache state, web and CLI execution paths, and backtest loops. Those are exactly the surfaces pm-substrate needs to govern.
+
+The missing piece was a stable adapter boundary. The current slice now exists: ArrowHedgeLab exposes a neutral `/integration/v1/*` API for capabilities, agents, effective graph expansion, saved flows, saved flow runs, run events, source artifacts, run-specific source artifacts, backtest inventory, backtest details/days, model inventory, redacted API-key presence, and cache summaries. pm-substrate has a finance-ingest client that consumes and validates those endpoints as an external HTTP system. This is intentionally not a revived `src/substrate` bridge. ArrowHedgeLab stays usable on its own; pm-substrate attaches from the outside.
+
+## Current ArrowHedgeLab State
+
+Multi-agent orchestration:
+
+- CLI path `src/main.py` creates a static LangGraph: selected analysts -> risk manager -> portfolio manager -> END.
+- Web/backend path `app/backend/services/graph.py` builds a graph from React Flow nodes and edges, injects a synthetic risk manager for each portfolio manager, and rewires direct analyst -> portfolio-manager edges through that risk manager.
+- The effective runtime graph is now exposed through `POST /integration/v1/graphs/effective`, which accepts a React Flow graph and returns the risk-manager-rewired graph with validation issues.
+- Analyst inventory is centralized in `src/utils/analysts.py` with 19 analyst/persona/signal agents. The new `GET /integration/v1/agents` endpoint exposes those analysts plus operational `risk_management` and `portfolio_manager` roles with stable IDs and no callable objects.
+
+Runtime/API surface:
+
+- `/hedge-fund/run` streams progress and final decisions, analyst signals, and current prices.
+- `/hedge-fund/backtest` streams progress and day results inside progress-event `analysis`, then final metrics/final portfolio/total days.
+- `/hedge-fund/agents` returns analyst metadata only.
+- `/flows` and `/flows/{flow_id}/runs` persist React Flow graphs, run request data, results, status, timestamps, and errors.
+- `/language-models` and `/ollama` expose model/provider availability.
+- `/api-keys` includes summary routes, but `GET /api-keys/{provider}`, create, update, and bulk routes return `key_value`; substrate must never use those raw secret routes.
+- `/integration/v1/capabilities`, `/integration/v1/agents`, `/integration/v1/graphs/effective`, `/integration/v1/flows`, `/integration/v1/flows/{id}`, `/integration/v1/flows/{id}/runs`, `/integration/v1/runs/{id}`, `/integration/v1/runs/{id}/events`, `/integration/v1/runs/{id}/source-artifacts`, `/integration/v1/backtests`, `/integration/v1/backtests/{id}`, `/integration/v1/backtests/{id}/days`, `/integration/v1/config/models`, `/integration/v1/config/api-keys`, `/integration/v1/data/cache/summary`, and `/integration/v1/data/source-artifacts` now provide the current external adapter surface.
+
+Data/provenance:
+
+- Data tools in `src/tools/api.py` fetch prices, financial metrics, line items, insider trades, company news, market cap, and price DataFrames from Financial Datasets.
+- `src/data/cache.py` stores prices, metrics, line items, insider trades, and company news in process memory.
+- `GET /integration/v1/data/cache/summary` exposes cache kind, cache key, row count, observed date bounds when available, and SHA-256 hash without raw rows.
+- `GET /integration/v1/data/source-artifacts` exposes cache-derived provider/kind/ticker/request/observed-window/hash metadata without raw rows, including line-item request fields for cached `search_line_items()` calls.
+- `GET /integration/v1/runs/{id}/source-artifacts` filters source artifacts by a saved run's tickers/date request and records how each artifact matched the run request.
+- `search_line_items()` now writes request-specific results to the shared cache, so line-item consumers can be traced through source artifacts like prices, metrics, trades, and news.
+
+Backtesting:
+
+- Backend `BacktestService` returns day-level backtest results with decisions, executed trades, analyst signals, current prices, exposures, metrics, and generated `arrowhedgelab.runtime-provenance.v1` blocks. Saved flow-run updates also attach that provenance at persistence time. The adapter now exposes saved results through backtest inventory/detail/day endpoints with redaction and hashes, source-artifact endpoints expose cache-derived provider/window/hash metadata, and the pm-substrate connector can build a canonical `arrowhedge.run-envelope.v1` from those adapter responses. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records, preserve ArrowHedge runtime provenance on signal/decision records, and carry those IDs through expansion and analyst-signal typed events. The pm-substrate HTTP demo now exposes `POST /tenants/:tenantId/arrowhedge/experiments/paired-readiness` and `POST /tenants/:tenantId/arrowhedge/experiments/paired-bundles` to admit or reject comparable arms, preserve envelope/report hashes, separate market deltas from governance deltas, and deny market-win claims unless readiness and false-positive/false-negative evidence gates pass. The local `pnpm arrowhedge:paired-bundle` script writes and verifies replayable `baseline-envelope.json`, `substrate-envelope.json`, `paired-report.json`, `manifest.json`, and `paired-bundle.json` artifacts from saved envelopes plus explicit metrics. It can now also drive ArrowHedge externally: create labeled saved flow runs, stream `/hedge-fund/backtest`, persist collected backtest days/final metrics back into those runs, run scoped adapter discovery over the created run IDs, and review each admitted envelope through the pm-substrate offline finance-research path to attach event/block counts. The remaining gap is collecting enough real historical paired windows and explicit false-positive/false-negative substrate-governance evidence.
+- Newer `src/backtesting/*` components are cleaner and more testable, but are not exposed as an integration service.
+- `v2/*` provides an emerging protocol/data/backtesting research direction, but it is not wired into the app adapter surface.
+
+## Current pm-substrate State
+
+- `packages/capability-finance-research-ingest` already understands `arrowhedge.run-envelope.v1`, expands full run envelopes into per-ticker snapshots, emits typed finance-research events, builds COP state, and blocks stale or invalid actions.
+- `packages/capability-finance-research-ingest/src/arrowhedge-integration.ts` now fetches and validates ArrowHedgeLab `/integration/v1/*` capabilities, agents, effective graphs, saved flows, optional flow/run details, run events, source artifacts, run-specific source artifacts, backtest inventory, optional backtest details/days, model inventory, redacted API-key summaries, and cache summaries, producing evidence refs, canonical `arrowhedge.run-envelope.v1` payloads with per-record evidence IDs/runtime provenance, paired envelope readiness gates, and paired experiment bundles/reports without importing ArrowHedgeLab code.
+- `packages/substrate-http-demo` mounts ArrowHedge routes at `/tenants/:tenantId/arrowhedge` with `/snapshots`, `/run-envelopes`, `/experiments/paired-readiness`, and `/experiments/paired-bundles`.
+- `docs/validation.md` and `docs/arrowhedgelab-pm-substrate-integration-audit-2026-07-01.md` previously referenced the old local Python bridge (`arrowhedgelab/src/substrate/*` and `arrowhedgelab/examples/substrate/*`). Those paths no longer exist in the fresh upstream clone, so the docs now point to this current review instead.
+- The parent pm-substrate repo now represents `arrowhedgelab` as an external Git submodule-style reference at adapter commit `e6a5ba9`, rather than owning the upstream source files directly.
+
+## Required Adapter Contract
+
+ArrowHedgeLab should expose a neutral integration API, not a pm-substrate import. pm-substrate should consume this API through a connector and translate it into substrate events/envelopes.
+
+Implemented first adapter surface:
+
+- `GET /integration/v1/capabilities`: adapter version, app version/commit, supported surfaces, schema versions, auth mode, redaction policy.
+- `GET /integration/v1/agents`: all analyst agents plus operational risk/portfolio manager roles, model defaults, descriptions, tool dependencies, and stable IDs.
+- `POST /integration/v1/graphs/effective`: input React Flow graph -> effective execution graph with injected risk managers, rewired edges, skipped nodes, and validation issues.
+- `GET /integration/v1/data/cache/summary`: cache keys, source kind, row counts, min/max dates when available, and payload hashes.
+- `GET /integration/v1/data/source-artifacts`: source provider, kind, cache key, ticker, parsed request metadata, observed date windows, row counts, and hashes without raw rows.
+- `GET /integration/v1/flows` and `GET /integration/v1/flows/{id}`: saved graph/config state with graph/data/effective-graph hashes.
+- `GET /integration/v1/flows/{id}/runs` and `GET /integration/v1/runs/{id}`: saved run config, redacted request data, status, timestamps, result/portfolio hashes, and error state.
+- `GET /integration/v1/runs/{id}/events`: normalized run timeline events for creation, start, request capture, portfolio capture, result capture, final portfolio capture, completion, and errors.
+- `GET /integration/v1/runs/{id}/source-artifacts`: source artifacts filtered by saved run request tickers/date metadata, including match reasons for paired-run comparisons.
+- `GET /integration/v1/backtests`, `GET /integration/v1/backtests/{id}`, and `GET /integration/v1/backtests/{id}/days`: saved backtest summaries, performance/final-portfolio/portfolio-value hashes, and day-level decisions, executed trades, analyst signals, current prices, exposures, and metrics.
+- `GET /integration/v1/config/models` and `GET /integration/v1/config/api-keys`: model/provider inventory and redacted key presence only; no secret values.
+
+Remaining minimum experiment surface:
+
+- Historical corpus collection: use the external paired runner to execute baseline/substrate ArrowHedgeLab arms with explicit mode labels, use adapter discovery to assemble admitted pairs, call the pm-substrate bundle/report gate, and collect enough historical windows to evaluate the market hypothesis.
+
+pm-substrate connector requirements:
+
+- Treat ArrowHedgeLab as an external HTTP system.
+- Pull from `/integration/v1/*`, then build `arrowhedge.run-envelope.v1` or successor schemas. `buildArrowHedgeRunEnvelopeFromIntegrationSnapshot` now performs this connector-side translation for saved run/backtest adapter snapshots. `compareArrowHedgeIntegrationRunEnvelopePair` gates baseline/substrate envelope pairs, and `buildArrowHedgePairedExperimentBundle` writes the claim-gated bundle/report. The HTTP demo exposes those gates through `/arrowhedge/experiments/paired-readiness` and `/arrowhedge/experiments/paired-bundles`.
+- Preserve graph, model config, agent outputs, risk state, portfolio state, data hashes, freshness windows, runtime provenance, and evidence refs. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records before expansion.
+- Never read raw API key values.
+- Keep ArrowHedge-specific mapping in finance-research capability/profile packages or a dedicated connector package, not substrate core.
+
+Replayable bundle command:
+
+From saved envelope files:
+
+```bash
+pnpm arrowhedge:paired-bundle -- write \
+  --experiment-id exp_arrowhedge_axis_a_001 \
+  --baseline-envelope artifacts/arrowhedge/baseline-envelope.json \
+  --substrate-envelope artifacts/arrowhedge/substrate-envelope.json \
+  --baseline-metrics artifacts/arrowhedge/baseline-metrics.json \
+  --substrate-metrics artifacts/arrowhedge/substrate-metrics.json \
+  --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001
+
+pnpm arrowhedge:paired-bundle -- verify \
+  --bundle-dir artifacts/arrowhedge/exp_arrowhedge_axis_a_001
+```
+
+Directly from the external ArrowHedgeLab adapter:
+
+```bash
+pnpm arrowhedge:paired-bundle -- from-integration \
+  --experiment-id exp_arrowhedge_axis_a_001 \
+  --base-url http://127.0.0.1:8000 \
+  --baseline-run-id 101 \
+  --substrate-run-id 102 \
+  --baseline-metrics artifacts/arrowhedge/baseline-metrics.json \
+  --substrate-metrics artifacts/arrowhedge/substrate-metrics.json \
+  --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001
+```
+
+Run a fresh labeled baseline/substrate pair through ArrowHedgeLab's public APIs:
+
+```json
+{
+  "schemaVersion": "arrowhedge.paired-run-plan.v1",
+  "integrationBaseUrl": "http://127.0.0.1:8000",
+  "flowId": 7,
+  "experimentId": "exp_arrowhedge_axis_a_001",
+  "request": {
+    "tickers": ["AAPL"],
+    "start_date": "2026-05-01",
+    "end_date": "2026-06-03",
+    "initial_capital": 1000000,
+    "margin_requirement": 0.25,
+    "graph_nodes": [{ "id": "warren_buffett_ab12cd", "type": "agent" }],
+    "graph_edges": []
+  },
+  "baseline": { "mode": "off" },
+  "substrate": { "mode": "blocking" }
+}
+```
+
+```bash
+pnpm arrowhedge:paired-bundle -- run-paired-from-integration \
+  --plan artifacts/arrowhedge/paired-run-plan.json \
+  --out artifacts/arrowhedge/run_axis_a_001
+```
+
+The runner does not import ArrowHedge code. It uses `POST /flows/{id}/runs`,
+`PUT /flows/{id}/runs/{run_id}`, and `POST /hedge-fund/backtest`, then writes
+`paired-run-report.json` plus a scoped discovery directory containing
+`paired-batch-plan.json` and `plan-discovery-report.json`. It also writes
+`governance-evidence-template.json` with the new run IDs so a real governance
+review can attach expected/observed allow/block cases.
+
+Explicit governance evidence is supplied separately and keyed to saved run IDs:
+
+```json
+{
+  "schemaVersion": "arrowhedge.governance-evidence.v1",
+  "entries": [
+    {
+      "runId": 102,
+      "role": "substrate",
+      "mode": "blocking",
+      "cases": [
+        {
+          "caseId": "fresh_in_policy_allowed",
+          "expectedDisposition": "allow",
+          "observedDisposition": "allow",
+          "artifactSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        },
+        {
+          "caseId": "stale_state_blocked",
+          "expectedDisposition": "block",
+          "observedDisposition": "block",
+          "artifactSha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Discover a conservative batch plan from saved ArrowHedgeLab adapter runs:
+
+```bash
+pnpm arrowhedge:paired-bundle -- discover-plan-from-integration \
+  --base-url http://127.0.0.1:8000 \
+  --run-ids 101,102 \
+  --governance-evidence artifacts/arrowhedge/governance-evidence.json \
+  --out artifacts/arrowhedge/discovery_axis_a_001
+```
+
+The discovery command writes `paired-batch-plan.json` and
+`plan-discovery-report.json`. It only emits experiments for runs with explicit
+baseline/substrate mode labels, valid pm-substrate offline review, and
+readiness-equal envelopes; unlabeled, unsupported, invalid-review, or
+non-comparable runs stay in the discovery report as skipped runs or candidate
+issues. Review-derived event and block counts are included in arm metrics, but
+false-positive/false-negative counts are only merged from a governance evidence
+manifest whose run IDs match the discovery scope. Each manifest entry must
+include at least one expected-allow case and one expected-block case, so a
+market-win claim cannot be unlocked by testing only one side of the governance
+gate.
+
+Batch many historical pairs from one plan:
+
+```bash
+pnpm arrowhedge:paired-bundle -- batch-from-integration \
+  --plan artifacts/arrowhedge/discovery_axis_a_001/paired-batch-plan.json \
+  --out artifacts/arrowhedge/batch_axis_a_001
+```
+
+The batch plan is a JSON object with `integrationBaseUrl`, optional
+`bearerToken`/`generatedAt`, and an `experiments` array. Each experiment
+declares `experimentId`, `baseline.runId`, `substrate.runId`, optional flow or
+backtest IDs, optional modes, and explicit baseline/substrate governance metric
+controls. The command writes one verified bundle directory per experiment plus
+`batch-report.json`, which keeps market/PnL aggregates separate from governance
+gate aggregates and records denied claim issues per experiment.
+
+## False-Positive Controls
+
+The market-win hypothesis cannot be claimed from a single run or from governance-only tests. A valid paired experiment requires:
+
+- identical tickers, dates, graph, model config, starting portfolio, API-key presence, and source-data hashes across baseline and substrate arms;
+- raw pre-gate decisions preserved for both arms;
+- substrate blocks only stale, source-conflicted, unauthorized, or out-of-policy actions;
+- false-positive blocks equal zero on fresh in-policy decisions;
+- false-negative stale/invalid actions equal zero when the fixture intentionally contains stale/conflicted state;
+- a `blocking` or `substrate` label alone is not evidence of substrate governance;
+- replayable substrate event IDs and evidence hashes for every accepted or blocked terminal decision;
+- PnL/market delta reported separately from governance/protection delta.
+
+## Next Implementation Order
+
+1. Run the external paired runner against the fresh upstream clone with a small historical window and inspect `paired-run-report.json` plus `plan-discovery-report.json`.
+2. Run `batch-from-integration` against the scoped discovered plan, then run substrate-side TypeScript tests for envelope expansion, COP projection, stale-state blocking, invalid-action blocking, clean-current acceptance, bundle claim gating, and bundle directory verification.
+3. Collect enough saved historical windows to estimate market/PnL deltas separately from governance/protection deltas without claiming improvement from governance-only wins.
+
+The critical design rule: ArrowHedgeLab must remain usable without pm-substrate. pm-substrate must be able to attach from the outside, observe/govern the system through stable microservice surfaces, and be removed without breaking the hedge fund app.

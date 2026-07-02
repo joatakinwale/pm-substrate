@@ -12,7 +12,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import type { Hono } from "hono";
+import { Hono } from "hono";
 import { PostgresEventStore } from "@pm/events";
 import { PostgresGraph } from "@pm/graph";
 import { PostgresProfileRegistry } from "@pm/profile-registry";
@@ -108,6 +108,455 @@ const cleanSnapshot = {
     signalSourceSnapshotId: "snap_aapl_2026_06_03_1400",
   },
 };
+
+const runEnvelope = {
+  schemaVersion: "arrowhedge.run-envelope.v1",
+  runId: "run_http_demo_001",
+  surface: "backtest",
+  substrateMode: "shadow",
+  observedAt: "2026-06-03T14:00:00.000Z",
+  scope: {
+    startDate: "2026-05-01",
+    endDate: "2026-06-03",
+    tickers: ["AAPL", "MSFT"],
+  },
+  graph: {
+    nodes: [{ id: "agent:ben_graham_agent", kind: "analyst" }],
+    edges: [
+      {
+        source: "agent:ben_graham_agent",
+        target: "ticker:AAPL",
+        type: "analyzes",
+      },
+    ],
+  },
+  modelConfig: { model: "gpt-4.1", temperature: 0.1 },
+  portfolio: {
+    cash: 250000,
+    equity: 1000000,
+    margin_requirement: 0.25,
+    margin_used: 0.11,
+  },
+  signals: [
+    {
+      id: "sig_ben_graham_AAPL",
+      ticker: "AAPL",
+      agentId: "ben_graham_agent",
+      signal: "bullish",
+      confidence: 0.74,
+    },
+    {
+      id: "sig_ben_graham_MSFT",
+      ticker: "MSFT",
+      agentId: "ben_graham_agent",
+      signal: "neutral",
+      confidence: 0.51,
+    },
+  ],
+  riskStates: [
+    {
+      ticker: "AAPL",
+      currentPrice: 189.25,
+      remainingPositionLimit: 50000,
+      maxShares: 120,
+      volatility: 0.21,
+      bindingConstraint: "position_limit",
+    },
+    {
+      ticker: "MSFT",
+      currentPrice: 415.5,
+      remainingPositionLimit: 40000,
+      maxShares: 96,
+      volatility: 0.18,
+      bindingConstraint: "position_limit",
+    },
+  ],
+  decisions: [
+    {
+      id: "dec_run_http_demo_001_AAPL",
+      ticker: "AAPL",
+      action: "buy",
+      quantity: 100,
+      confidence: 0.76,
+      reasoning: "AAPL passed the risk gate.",
+      allowedActions: { hold: 0, buy: 120 },
+    },
+    {
+      id: "dec_run_http_demo_001_MSFT",
+      ticker: "MSFT",
+      action: "hold",
+      quantity: 0,
+      confidence: 0.61,
+      reasoning: "MSFT signal is not decisive.",
+      allowedActions: { hold: 0, buy: 96 },
+    },
+  ],
+  evidence: [
+    {
+      id: "ev_run_seed",
+      sha256: "d".repeat(64),
+      mimeType: "application/json",
+      filename: "run-seed.json",
+      sourceUri: "arrowhedge://runs/run_http_demo_001/seed",
+      retrievedAt: "2026-06-03T14:00:00.000Z",
+      freshnessExpiresAt: "2026-06-03T14:00:00.000Z",
+    },
+  ],
+};
+
+const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const pairedReadinessApp = (): Hono => {
+  const app = new Hono();
+  app.route(
+    "/tenants/:tenantId/arrowhedge",
+    arrowhedgeRoutes({
+      pool: {} as unknown as pg.Pool,
+      graph: {
+        createNode: async () => undefined,
+        updateNode: async () => undefined,
+        createEdge: async () => undefined,
+      },
+      events: {
+        publishWith: async (_tx: unknown, input: unknown) => input as PMEvent,
+      },
+      projections: {
+        register: async () => undefined,
+        catchUp: async () => undefined,
+        getState: async () => undefined,
+      } as unknown as ProjectionRunner,
+    }),
+  );
+  return app;
+};
+
+describe("ArrowHedge run-envelope HTTP route contract", () => {
+  it("POST /experiments/paired-readiness admits comparable baseline and substrate envelopes", async () => {
+    const app = pairedReadinessApp();
+    const baseline = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "observe",
+    };
+    const substrate = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "blocking",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-readiness", {
+        method: "POST",
+        body: JSON.stringify({ baseline, substrate }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      ready: boolean;
+      issues: readonly string[];
+      admitted: {
+        baselineRunId: string;
+        substrateRunId: string;
+        tickers: readonly string[];
+      };
+      fingerprints: {
+        scopeEqual: boolean;
+        graphEqual: boolean;
+        modelConfigEqual: boolean;
+        portfolioEqual: boolean;
+        sourceDataEqual: boolean;
+      };
+    };
+    expect(body.ready).toBe(true);
+    expect(body.issues).toEqual([]);
+    expect(body.admitted).toMatchObject({
+      baselineRunId: "run_http_demo_001",
+      substrateRunId: "run_http_demo_001",
+      tickers: ["AAPL", "MSFT"],
+    });
+    expect(body.fingerprints).toMatchObject({
+      scopeEqual: true,
+      graphEqual: true,
+      modelConfigEqual: true,
+      portfolioEqual: true,
+      sourceDataEqual: true,
+    });
+  });
+
+  it("POST /experiments/paired-bundles returns market and governance gates", async () => {
+    const app = pairedReadinessApp();
+    const baseline = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "observe",
+    };
+    const substrate = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "blocking",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-bundles", {
+        method: "POST",
+        body: JSON.stringify({
+          experimentId: "exp_http_arrowhedge_001",
+          generatedAt: "2026-06-03T14:05:00.000Z",
+          baseline,
+          substrate,
+          baselineMetrics: {
+            endingEquity: 1000000,
+            realizedPnl: 0,
+            returnPct: 0,
+            falsePositiveBlockCount: 0,
+            falseNegativeBlockCount: 0,
+          },
+          substrateMetrics: {
+            endingEquity: 1002500,
+            realizedPnl: 2500,
+            returnPct: 0.0025,
+            blockedDecisionCount: 1,
+            staleBlockCount: 1,
+            falsePositiveBlockCount: 0,
+            falseNegativeBlockCount: 0,
+            blockedEventIds: ["evt_block_stale_decision"],
+          },
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      schemaVersion: string;
+      manifest: {
+        ready: boolean;
+        marketWinClaimAllowed: boolean;
+        baselineEnvelopeSha256: string;
+        substrateEnvelopeSha256: string;
+        reportSha256: string;
+      };
+      report: {
+        marketWinClaimAllowed: boolean;
+        claimIssues: readonly string[];
+        market: {
+          deltas: {
+            endingEquity: number;
+            realizedPnl: number;
+            returnPct: number;
+          };
+        };
+        governance: {
+          gates: {
+            falsePositiveBlocksZero: boolean;
+            falseNegativeBlocksZero: boolean;
+          };
+        };
+      };
+    };
+    expect(body.schemaVersion).toBe("arrowhedge.paired-experiment-bundle.v1");
+    expect(body.manifest.ready).toBe(true);
+    expect(body.manifest.marketWinClaimAllowed).toBe(true);
+    expect(body.manifest.baselineEnvelopeSha256).toHaveLength(64);
+    expect(body.manifest.substrateEnvelopeSha256).toHaveLength(64);
+    expect(body.manifest.reportSha256).toHaveLength(64);
+    expect(body.report.marketWinClaimAllowed).toBe(true);
+    expect(body.report.claimIssues).toEqual([]);
+    expect(body.report.market.deltas).toEqual({
+      endingEquity: 2500,
+      realizedPnl: 2500,
+      returnPct: 0.0025,
+    });
+    expect(body.report.governance.gates).toMatchObject({
+      falsePositiveBlocksZero: true,
+      falseNegativeBlocksZero: true,
+    });
+  });
+
+  it("POST /experiments/paired-bundles rejects malformed metric evidence", async () => {
+    const app = pairedReadinessApp();
+    const baseline = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "observe",
+    };
+    const substrate = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "blocking",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-bundles", {
+        method: "POST",
+        body: JSON.stringify({
+          experimentId: "exp_http_arrowhedge_bad_metrics",
+          baseline,
+          substrate,
+          substrateMetrics: {
+            falsePositiveBlockCount: "0",
+          },
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    const body = await response.json() as {
+      error: string;
+      issues: readonly string[];
+    };
+    expect(body.error).toBe("invalid paired experiment bundle input");
+    expect(body.issues).toEqual([
+      "substrateMetrics.falsePositiveBlockCount must be a non-negative integer",
+    ]);
+  });
+
+  it("POST /experiments/paired-readiness refuses mismatched experiment arms", async () => {
+    const app = pairedReadinessApp();
+    const substrate = cloneJson(runEnvelope);
+    substrate.modelConfig = {
+      ...substrate.modelConfig,
+      model: "gpt-4o",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-readiness", {
+        method: "POST",
+        body: JSON.stringify({
+          baseline: runEnvelope,
+          substrate,
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.json() as {
+      ready: boolean;
+      issues: readonly string[];
+      admitted: null;
+      fingerprints: { modelConfigEqual: boolean };
+    };
+    expect(body.ready).toBe(false);
+    expect(body.admitted).toBeNull();
+    expect(body.issues).toEqual(["modelConfig hash mismatch"]);
+    expect(body.fingerprints.modelConfigEqual).toBe(false);
+  });
+
+  it("POST /experiments/paired-readiness rejects malformed envelopes before comparing", async () => {
+    const app = pairedReadinessApp();
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-readiness", {
+        method: "POST",
+        body: JSON.stringify({
+          baseline: { schemaVersion: "arrowhedge.run-envelope.v1" },
+          substrate: runEnvelope,
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    const body = await response.json() as {
+      ready: boolean;
+      error: string;
+      issues: readonly string[];
+    };
+    expect(body.ready).toBe(false);
+    expect(body.error).toBe("invalid paired run envelopes");
+    expect(body.issues).toEqual(
+      expect.arrayContaining([expect.stringContaining("baseline:")]),
+    );
+  });
+
+  it("POST /run-envelopes expands and ingests every ticker snapshot", async () => {
+    const app = new Hono();
+    let graphNodeWrites = 0;
+    let graphEdgeWrites = 0;
+    let eventWrites = 0;
+    let catchUpCalls = 0;
+    const projectionState: ArrowHedgeCommonOperatingPictureState = {
+      tickers: {},
+      summary: {
+        validEventCount: 0,
+        authorityGatePassRate: null,
+        stateDisagreementRate: null,
+      },
+    };
+
+    app.route(
+      "/tenants/:tenantId/arrowhedge",
+      arrowhedgeRoutes({
+        pool: {
+          connect: async () => ({
+            query: async () => undefined,
+            release: () => undefined,
+          }),
+        } as unknown as pg.Pool,
+        graph: {
+          createNode: async (input: unknown) => {
+            graphNodeWrites += 1;
+            const node = input as {
+              id: string;
+              identity: Readonly<Record<string, unknown>>;
+              schemaVersion: number;
+              revision?: number;
+            };
+            return {
+              created: true,
+              node: {
+                id: node.id,
+                identity: node.identity,
+                schemaVersion: node.schemaVersion,
+                revision: node.revision ?? 1,
+              },
+            };
+          },
+          updateNode: async () => undefined,
+          createEdge: async () => {
+            graphEdgeWrites += 1;
+            return undefined;
+          },
+        },
+        events: {
+          publishWith: async (_tx: unknown, input: unknown) => {
+            eventWrites += 1;
+            const event = input as PMEvent;
+            return { ...event, id: `evt_${eventWrites}` } as PMEvent;
+          },
+        },
+        projections: {
+          register: async () => undefined,
+          catchUp: async () => {
+            catchUpCalls += 1;
+          },
+          getState: async () => projectionState,
+        } as unknown as ProjectionRunner,
+      }),
+    );
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/run-envelopes", {
+        method: "POST",
+        body: JSON.stringify(runEnvelope),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    if (response.status !== 200) {
+      throw new Error(await response.text());
+    }
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      expanded: { snapshots: number; tickers: readonly string[] };
+      ingested: { nodesCreated: number; edgesCreated: number; eventsPublished: number };
+    };
+
+    expect(body.expanded).toEqual({ snapshots: 2, tickers: ["AAPL", "MSFT"] });
+    expect(body.ingested.nodesCreated).toBe(graphNodeWrites);
+    expect(body.ingested.edgesCreated).toBe(graphEdgeWrites);
+    expect(body.ingested.eventsPublished).toBe(eventWrites);
+    expect(catchUpCalls).toBe(1);
+  });
+});
 
 describeIfDb("ArrowHedge live-ingest HTTP route", () => {
   let pool: pg.Pool;

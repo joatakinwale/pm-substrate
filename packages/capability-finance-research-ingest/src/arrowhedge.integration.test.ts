@@ -3,10 +3,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
 import {
+  buildActionOutcomeEnvelope,
   buildObservationContractFromCurrentStateView,
   buildReadSetFromCurrentStateView,
+  stateRef,
   validateProposedActionReadSet,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import {
   analyzeAdapterOperationalMetrics,
   analyzeEvalEvents,
@@ -328,6 +330,26 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
       "stale_read_ref",
     );
 
+    const canonicalAuthorityEnvelope = buildActionOutcomeEnvelope({
+      tenantId,
+      actionId: "act_arrowhedge_terminal_outcome_partition",
+      subject: stateRef("event", result.eventsPublished[0]!.id),
+      proposalReviewId: "prop_arrowhedge_terminal_outcome_partition",
+      stateReviewArtifactHash: equivalence.projected.artifactHashes[0]!,
+      requestedTerminalOutcome: "blocked",
+      blockingCauses: [
+        {
+          source: "proposal_review",
+          code: "terminal_outcome_partition",
+          message:
+            "Conflicting accepted/blocked terminal claims reduced to one blocked ActionOutcomeEnvelope normal form.",
+          refs: [stateRef("event", result.eventsPublished[0]!.id)],
+        },
+      ],
+      decidedAt: timestamp("2026-06-03T16:29:00.000Z"),
+      decidedBy: "arrowhedge_axis_a_agent",
+      substrateRefs: [stateRef("event", result.eventsPublished[0]!.id)],
+    });
     const emittedEventIds = result.eventsPublished.map((event) => event.id);
     const evalSuite = buildArrowHedgeStateEvalSuite({
       tenantId,
@@ -345,6 +367,14 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
         issueCodes: readSetValidation.issues.map((issue) => issue.code),
       },
       operationalSamples: [plan.operationalSample],
+      actionOutcomeEnvelopes: [
+        {
+          scenarioId: "arrowhedge-terminal-outcome-partition",
+          envelopeId: canonicalAuthorityEnvelope.outcomeHash,
+          terminalOutcome: "blocked",
+          label: "ArrowHedge canonical authority packet (integration proof)",
+        },
+      ],
     });
     const metrics = analyzeEvalEvents(evalSuite.events);
     expect(metrics.byFailureClass["representation_loss"]).toMatchObject({
@@ -367,7 +397,7 @@ describeIfDb("ArrowHedge finance adapter DB proof", () => {
       mappingRejectionRate: 0,
       stateDisagreementRate: 0,
       authorityGatePassRate: 1,
-      authorityGatePasses: 5,
+      authorityGatePasses: 6,
       authorityGateFailures: 0,
     });
   });

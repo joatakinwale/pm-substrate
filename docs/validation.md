@@ -13,6 +13,54 @@ The agent-state work is not a pivot from the PM-layer thesis; it is the harder v
 
 ---
 
+## Axis B - PluggedInSocial marketing-engine validation
+
+PluggedInSocial is the marketing-operations validation lane. Its test is whether
+the substrate can observe and govern a complete agency loop without prompt-memory
+shortcuts:
+
+`intake/lead signal -> strategy -> content -> approval -> scheduling -> publishing -> metrics -> report -> next action`
+
+The executable integration surface is
+`buildPluggedInSocialIntegrationAudit` from `@pm/profile-agency`. It reads the
+live PluggedInSocial source tree, derives agents, queues, APIs, data models, and
+configuration, runs the Axis B next-action adapter, builds paired "without
+substrate" vs "with substrate" marketing scenarios, and emits a proof-packet
+summary. A ready audit means the marketing axis is verified; it does not imply
+the finance or local-lab axes are verified.
+
+To produce a durable JSON audit artifact from a saved PluggedInSocial
+`ClientReport` row snapshot:
+
+```bash
+pnpm audit:plugged-in-social \
+  --report artifacts/plugged-in-social/client-report.json \
+  --out artifacts/plugged-in-social/axis-b-audit.json \
+  --tenant tnt_plugged_in_social \
+  --observed-at 2026-07-01T19:15:00.000Z \
+  --state-review-artifact-hash <64-char-sha256>
+```
+
+The command writes the full manifest, next-action adapter result, Axis B eval
+events, proof packet, and "without substrate" vs "with substrate" summary. It
+exits nonzero when any required source, gate, stage, adapter admission, or
+marketing proof coverage is missing.
+
+Focused checks:
+
+```bash
+pnpm vitest run \
+  packages/profile-agency/src/plugged-in-social-audit-script.test.ts \
+  packages/profile-agency/src/plugged-in-social-integration-audit.test.ts \
+  packages/profile-agency/src/plugged-in-social-manifest.test.ts \
+  packages/profile-agency/src/plugged-in-social-axis-b-proof-packet.test.ts \
+  packages/profile-agency/src/plugged-in-social-axis-b-adapter.test.ts \
+  packages/profile-agency/src/next-action-proposal.test.ts \
+  packages/evals/src/marketing.test.ts
+```
+
+---
+
 ## Test plan T1–T8 (from the rewrite thesis)
 
 | Test | Pass condition | Status / executable proof |
@@ -31,6 +79,102 @@ The agent-state work is not a pivot from the PM-layer thesis; it is the harder v
 Time-to-plugin · substrate edit count (target: zero) · mapping coverage · validator rejection rate · evidence coverage · state disagreement rate · stale action rate · agent resume success · replay fidelity · unauthorized action block rate · cross-tool outcome success · mean time to reconcile.
 
 Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. The plug-in lane (time-to-plugin, substrate edit count, mapping coverage) is **not yet instrumented** — tracked in `research/index.md` → remaining frontier.
+
+Market-win claims require a saved paired run with:
+
+- identical tickers, dates, effective graph, model config, starting portfolio, and source data in off and blocking modes;
+- false-positive blocks = 0 on fresh in-limit actions;
+- false-negative stale actions = 0 on stale or source-conflicted actions;
+- replayable event ids for every substrate-blocked decision;
+- backtest/PnL deltas reported separately from governance deltas.
+
+Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
+
+- `arrowhedgelab` is now a submodule-style external repo reference to
+  `https://github.com/virattt/ai-hedge-fund.git` at commit `65a0349`.
+- The previous local Python bridge under `arrowhedgelab/src/substrate/*` and the
+  sample request under `arrowhedgelab/examples/substrate/*` are no longer
+  present in the fresh upstream tree.
+- ArrowHedgeLab now exposes the first neutral external adapter slice:
+  `/integration/v1/capabilities`, `/integration/v1/agents`,
+  `/integration/v1/graphs/effective`, and
+  `/integration/v1/data/cache/summary`.
+- The adapter now also exposes saved flow/run state and redacted config through
+  `/integration/v1/flows`, `/integration/v1/flows/{id}`,
+  `/integration/v1/flows/{id}/runs`, `/integration/v1/runs/{id}`,
+  `/integration/v1/config/models`, and `/integration/v1/config/api-keys`.
+- The adapter now exposes run-state and backtest evidence through
+  `/integration/v1/runs/{id}/events`, `/integration/v1/backtests`,
+  `/integration/v1/backtests/{id}`, and `/integration/v1/backtests/{id}/days`.
+- The adapter now exposes source-data evidence through
+  `/integration/v1/data/source-artifacts` and
+  `/integration/v1/runs/{id}/source-artifacts`, including provider, kind,
+  ticker, parsed request metadata, observed windows, row counts, and hashes
+  without raw rows.
+- pm-substrate now has a finance-ingest HTTP client,
+  `fetchArrowHedgeIntegrationSnapshot`, that validates those external surfaces,
+  optional flow/run details, run events, source artifacts, run-specific source
+  artifacts, backtest inventory/details/days, model inventory, redacted API-key
+  summaries, emits source-record refs, and builds canonical
+  `arrowhedge.run-envelope.v1` payloads without importing ArrowHedgeLab
+  internals. Connector-built envelopes attach source-artifact/backtest-day
+  evidence IDs to signal, risk, and decision records, and those IDs survive
+  expansion into analyst-signal typed events. The connector also exposes
+  `compareArrowHedgeIntegrationRunEnvelopePair`, which rejects paired
+  baseline/substrate envelopes when request scope, graph, model config,
+  portfolio, or source-data hashes differ.
+- ArrowHedgeLab saved results now carry generated
+  `arrowhedgelab.runtime-provenance.v1` blocks with source artifacts, tool
+  refs, agent-output refs, and decision refs. The connector preserves those
+  runtime provenance refs on canonical envelope signal/decision records, and
+  line-item searches now enter the shared cache with request-specific keys.
+- The TypeScript substrate side still supports `arrowhedge.run-envelope.v1`
+  through `packages/capability-finance-research-ingest` and
+  `packages/substrate-http-demo`, and the connector now builds canonical
+  envelopes from external adapter snapshots. The HTTP demo now exposes
+  `/tenants/:tenantId/arrowhedge/experiments/paired-readiness`, which validates
+  baseline/substrate run envelopes and returns `409` when request scope, graph,
+  model config, portfolio, or source-data hashes differ. It also exposes
+  `/tenants/:tenantId/arrowhedge/experiments/paired-bundles`, which returns a
+  replayable paired bundle with baseline/substrate envelope hashes, report hash,
+  market/PnL deltas, governance/protection deltas, and claim gates that deny
+  market-win claims unless readiness plus false-positive and false-negative
+  evidence gates pass. The `pnpm arrowhedge:paired-bundle` script now writes
+  and verifies replayable local bundle directories either from saved envelope
+  and metrics files or directly from ArrowHedgeLab `/integration/v1/*` run IDs.
+  It also supports conservative `discover-plan-from-integration` plan discovery
+  from saved adapter runs, which only admits explicit baseline/substrate mode
+  labels with readiness-equal envelopes and valid pm-substrate offline review,
+  and records unlabeled, invalid-review, or non-comparable runs in
+  `plan-discovery-report.json`. The same tool now supports
+  `run-paired-from-integration`, an external runner that creates labeled saved
+  ArrowHedge flow runs, streams `/hedge-fund/backtest`, persists collected
+  backtest days/final metrics into those runs, and emits scoped discovery for
+  the created run IDs without importing ArrowHedge code. It also writes a
+  `governance-evidence-template.json` keyed to the created run IDs. Discovery
+  carries review-derived event and block counts into arm metrics, but it does
+  not invent false-positive or false-negative counts from substrate labels.
+  Those counts are merged only from a `arrowhedge.governance-evidence.v1`
+  manifest whose run IDs match the discovery scope and whose cases include at
+  least one expected-allow and one expected-block review. `batch-from-integration`
+  then writes one verified bundle directory per admitted historical pair plus a
+  `batch-report.json` summarizing market aggregates, governance aggregates,
+  claim-denial issues, and verification issues. Historical corpus collection
+  plus explicit false-positive/false-negative governance evidence is still
+  required before live or backtest experiments can make strong market-win
+  claims.
+
+The next valid historical experiment path is:
+
+1. Run the external paired runner against ArrowHedgeLab with small historical
+   windows and inspect the scoped `paired-run-report.json` plus
+   `plan-discovery-report.json`.
+2. Collect enough saved historical windows to estimate market/PnL deltas
+   separately from governance/protection deltas without claiming improvement
+   from governance-only wins.
+
+See `docs/arrowhedgelab-upstream-integration-review-2026-07-01.md` for the
+current adapter contract and integration review.
 
 ---
 
@@ -71,3 +215,4 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).
+- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, ArrowHedge-generated runtime provenance, connector-side `arrowhedge.run-envelope.v1` generation, per-record evidence IDs/runtime provenance in expanded connector envelopes, paired baseline/substrate envelope readiness gates, paired experiment bundle/report claim gates, local replayable bundle writer/verifier, conservative plan discovery with offline substrate review counts, explicit governance-evidence manifests, external paired-run execution/persistence tooling, batch-from-integration collector reports, and pm-substrate finance-ingest client plus HTTP readiness/bundle endpoints landed.

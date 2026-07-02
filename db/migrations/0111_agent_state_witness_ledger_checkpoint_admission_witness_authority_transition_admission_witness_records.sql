@@ -1,7 +1,7 @@
--- 0111_agent_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records.sql
+-- 0111_agent_state_wl_checkpoint_aw_authority_transition_witness_records.sql
 -- Witness-certified accountability records for witness-ledger checkpoint admission witness authority-transition admission rows.
 
-CREATE TABLE IF NOT EXISTS agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records (
+CREATE TABLE IF NOT EXISTS agent_state.wl_checkpoint_aw_authority_transition_witness_records (
   tenant_id TEXT NOT NULL,
   transition_admission_witness_store_id TEXT NOT NULL,
   transition_admission_store_id TEXT NOT NULL,
@@ -37,8 +37,8 @@ CREATE TABLE IF NOT EXISTS agent_state.witness_ledger_checkpoint_admission_witne
   )
 );
 
-CREATE INDEX IF NOT EXISTS witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_scope_idx
-  ON agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records (
+CREATE INDEX IF NOT EXISTS wl_checkpoint_aw_authority_transition_witness_scope_idx
+  ON agent_state.wl_checkpoint_aw_authority_transition_witness_records (
     tenant_id,
     transition_admission_witness_store_id,
     transition_admission_store_id,
@@ -47,16 +47,16 @@ CREATE INDEX IF NOT EXISTS witness_ledger_checkpoint_admission_witness_authority
     witness_sequence
   );
 
-CREATE INDEX IF NOT EXISTS witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_admission_idx
-  ON agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records (
+CREATE INDEX IF NOT EXISTS wl_checkpoint_aw_authority_transition_witness_admission_idx
+  ON agent_state.wl_checkpoint_aw_authority_transition_witness_records (
     tenant_id,
     transition_admission_store_id,
     admission_sequence,
     admission_record_hash
   );
 
-CREATE INDEX IF NOT EXISTS witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_idx
-  ON agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records (
+CREATE INDEX IF NOT EXISTS wl_checkpoint_aw_authority_transition_witness_authority_idx
+  ON agent_state.wl_checkpoint_aw_authority_transition_witness_records (
     tenant_id,
     witness_ledger_checkpoint_admission_witness_authority_topology_id,
     authority_sequence,
@@ -64,7 +64,7 @@ CREATE INDEX IF NOT EXISTS witness_ledger_checkpoint_admission_witness_authority
     next_authority_topology_hash
   );
 
-CREATE OR REPLACE FUNCTION agent_state.prevent_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_record_rewrite()
+CREATE OR REPLACE FUNCTION agent_state.prevent_wl_checkpoint_aw_authority_transition_witness_record_rewrite()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -74,27 +74,27 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS prevent_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_record_rewrite
-  ON agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records;
+DROP TRIGGER IF EXISTS prevent_wl_checkpoint_aw_authority_transition_witness_record_rewrite
+  ON agent_state.wl_checkpoint_aw_authority_transition_witness_records;
 
-CREATE TRIGGER prevent_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_record_rewrite
-  BEFORE UPDATE OR DELETE ON agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records
+CREATE TRIGGER prevent_wl_checkpoint_aw_authority_transition_witness_record_rewrite
+  BEFORE UPDATE OR DELETE ON agent_state.wl_checkpoint_aw_authority_transition_witness_records
   FOR EACH ROW
-  EXECUTE FUNCTION agent_state.prevent_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_record_rewrite();
+  EXECUTE FUNCTION agent_state.prevent_wl_checkpoint_aw_authority_transition_witness_record_rewrite();
 
-REVOKE INSERT, UPDATE, DELETE ON agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records FROM PUBLIC;
+REVOKE INSERT, UPDATE, DELETE ON agent_state.wl_checkpoint_aw_authority_transition_witness_records FROM PUBLIC;
 
-COMMENT ON TABLE agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records IS
+COMMENT ON TABLE agent_state.wl_checkpoint_aw_authority_transition_witness_records IS
   'Append-only witness accountability records for witness-ledger checkpoint admission witness authority-transition admission rows. Strict compacted recovery can require this ledger so a transition-admission row is not sufficient unless a witness certificate accounts for the exact admission record hash.';
 
-COMMENT ON COLUMN agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records.admission_record_hash IS
+COMMENT ON COLUMN agent_state.wl_checkpoint_aw_authority_transition_witness_records.admission_record_hash IS
   'Deterministic hash of the witness-ledger checkpoint admission witness authority-transition admission record being witnessed. The witness certificate subject hash must match this value.';
 
-COMMENT ON COLUMN agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records.next_authority_topology_hash IS
+COMMENT ON COLUMN agent_state.wl_checkpoint_aw_authority_transition_witness_records.next_authority_topology_hash IS
   'Hash of the witness-ledger checkpoint admission witness authority topology derived by the transition-admission record being witnessed.';
 
-COMMENT ON COLUMN agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records.admission_certificate IS
+COMMENT ON COLUMN agent_state.wl_checkpoint_aw_authority_transition_witness_records.admission_certificate IS
   'Quorum certificate over the exact transition-admission store, topology id, admission sequence, and admission record hash.';
 
-COMMENT ON COLUMN agent_state.witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_records.witness_record_hash IS
+COMMENT ON COLUMN agent_state.wl_checkpoint_aw_authority_transition_witness_records.witness_record_hash IS
   'Deterministic hash of the transition-admission witness record, including the witness certificate and hash link to the prior witness record.';

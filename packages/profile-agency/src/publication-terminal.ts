@@ -8,7 +8,7 @@ import {
   type ActionOutcomeTerminalIndex,
   type ActionTerminalOutcome,
   type StateRef,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import type {
   TenantId,
   TerminalAdmissionProviderManifest,

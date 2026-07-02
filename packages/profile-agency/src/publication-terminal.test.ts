@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   stateRef,
   verifyActionOutcomeEnvelopeHash,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import { verifyTerminalAdmissionProviderRef } from "@pm/registry";
 import { tenantId, timestamp } from "@pm/types";
 

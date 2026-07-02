@@ -67,7 +67,7 @@ const ENTITY_TYPES: Readonly<Record<string, EntityTypeDef>> = {
       "reasoning",
       "accepted",
     ],
-    optionalFields: ["rejectionReason"],
+    optionalFields: ["rejectionReason", "allowedActions"],
     schemaVersion: 1,
   },
   EvidenceDocument: {

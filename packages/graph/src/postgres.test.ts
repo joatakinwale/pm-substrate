@@ -135,7 +135,7 @@ describeIfDb("PostgresGraph", () => {
     expect(r.rows[0]?.deleted_at).not.toBeNull();
   });
 
-  it("optimistic concurrency: rejects stale schemaVersion", async () => {
+  it("optimistic concurrency: rejects stale node revision", async () => {
     const { node } = await graph.createNode({
       tenantId, profile: RAW_ENGAGEMENT,
       identity: { name: "v1" }, schemaVersion: 1,
@@ -147,7 +147,8 @@ describeIfDb("PostgresGraph", () => {
       identity: { name: "v2" },
       expectedSchemaVersion: 1,
     });
-    expect(updated.schemaVersion).toBe(2);
+    expect(updated.schemaVersion).toBe(1);
+    expect(updated.revision).toBe(2);
 
     // Stale read → conflict
     await expect(

@@ -67,7 +67,11 @@ async function runOne(
   });
 
   if (!response.ok) {
-    if (response.status >= 500 || response.status === 429) {
+    if (
+      response.status >= 500 ||
+      response.status === 429 ||
+      response.status === 425
+    ) {
       throw new RetryableError(`backend failed: ${response.status}`);
     }
     throw new PermanentError(`backend failed permanently: ${response.status}`);

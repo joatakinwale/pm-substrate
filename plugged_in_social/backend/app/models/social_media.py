@@ -125,6 +125,8 @@ class SocialPost(Base, OrgMixin, TimestampMixin):
     # Virtual Agency
     created_by_agent: Mapped[str | None] = mapped_column(String(50))
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    scheduled_content_hash: Mapped[str | None] = mapped_column(String(64))
+    published_content_hash: Mapped[str | None] = mapped_column(String(64))
 
     # Engagement (updated by nightly aggregation)
     likes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

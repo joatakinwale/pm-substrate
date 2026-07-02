@@ -116,6 +116,7 @@ interface NodeRow {
   profile: string | null;
   concrete: string;
   schema_version: number;
+  revision: number;
   identity: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
@@ -142,6 +143,7 @@ const rowToNode = (r: NodeRow): NodeBase => ({
     concrete: r.concrete,
   } satisfies ProfileBinding,
   schemaVersion: r.schema_version,
+  revision: r.revision,
   identity: r.identity ?? {},
   createdAt: r.created_at.toISOString() as Timestamp,
   updatedAt: r.updated_at.toISOString() as Timestamp,
@@ -188,7 +190,7 @@ export class PostgresGraph implements Graph {
   ): Promise<NodeBase | null> {
     const q = this.#q(tx);
     const r = await q.query<NodeRow>(
-      `SELECT id, tenant_id, tier1, profile, concrete, schema_version,
+      `SELECT id, tenant_id, tier1, profile, concrete, schema_version, revision,
               identity, created_at, updated_at
          FROM graph.nodes
         WHERE tenant_id = $1 AND id = $2
@@ -293,7 +295,7 @@ export class PostgresGraph implements Graph {
         (id, tenant_id, tier1, profile, concrete, schema_version, identity)
        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)
        ON CONFLICT (id) DO NOTHING
-       RETURNING id, tenant_id, tier1, profile, concrete, schema_version,
+       RETURNING id, tenant_id, tier1, profile, concrete, schema_version, revision,
                  identity, created_at, updated_at`,
       [
         id,
@@ -358,8 +360,8 @@ export class PostgresGraph implements Graph {
     // Validate the proposed identity against the tenant's installed
     // profiles. We need the existing node to know the profile binding
     // (caller supplies only the tenantId+id+identity), so we read first.
+    const existing = await this.getNode(input.tenantId, input.id, tx);
     if (this.#validatorFactory) {
-      const existing = await this.getNode(input.tenantId, input.id, tx);
       if (existing) {
         const v = await this.#validatorFactory(input.tenantId);
         v.validateNode({
@@ -372,19 +374,20 @@ export class PostgresGraph implements Graph {
       // If existing is null, fall through — the UPDATE will return 0 rows
       // and we'll throw NotFoundError below, which is the right error.
     }
+    const expectedRevision = input.expectedRevision ?? input.expectedSchemaVersion;
     const q = this.#q(tx);
     const r = await q.query<NodeRow>(
       `UPDATE graph.nodes
           SET identity       = $4::jsonb,
-              schema_version = schema_version + 1,
+              revision       = revision + 1,
               updated_at     = now()
-        WHERE tenant_id = $1 AND id = $2 AND schema_version = $3
-        RETURNING id, tenant_id, tier1, profile, concrete, schema_version,
+        WHERE tenant_id = $1 AND id = $2 AND revision = $3
+        RETURNING id, tenant_id, tier1, profile, concrete, schema_version, revision,
                   identity, created_at, updated_at`,
       [
         input.tenantId,
         input.id,
-        input.expectedSchemaVersion,
+        expectedRevision,
         JSON.stringify(input.identity ?? {}),
       ],
     );
@@ -395,8 +398,8 @@ export class PostgresGraph implements Graph {
     if (!cur) throw new NotFoundError("node", input.id);
     throw new OptimisticConcurrencyError(
       input.id,
-      input.expectedSchemaVersion,
-      cur.schemaVersion,
+      expectedRevision,
+      cur.revision,
     );
   }
 

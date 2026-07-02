@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS agent_state.storage_mutation_guard_authorization_admi
   admission_sequence BIGINT NOT NULL CHECK (admission_sequence >= 1),
   authorization_hash TEXT NOT NULL,
   previous_admission_record_hash TEXT,
-  authorization JSONB NOT NULL,
+  "authorization" JSONB NOT NULL,
   admission_procedure_id TEXT NOT NULL,
   admission_role TEXT NOT NULL,
   admitted_at TIMESTAMPTZ NOT NULL,
@@ -151,7 +151,7 @@ REVOKE INSERT, UPDATE, DELETE ON agent_state.storage_mutation_guard_authorizatio
 COMMENT ON TABLE agent_state.storage_mutation_guard_authorization_admission_records IS
   'Append-only admission records for storage mutation guard authorizations. A row in storage_mutation_guard_authorizations is not sufficient authority by itself; protected UPDATE/DELETE checks require the authorization hash to be the latest admitted record for the tenant, guard, table, and operation.';
 
-COMMENT ON COLUMN agent_state.storage_mutation_guard_authorization_admission_records.authorization IS
+COMMENT ON COLUMN agent_state.storage_mutation_guard_authorization_admission_records."authorization" IS
   'Canonical storage mutation guard authorization payload admitted by the guard admission procedure. Replay must recompute the embedded authorization hash and the admission record hash.';
 
 COMMENT ON COLUMN agent_state.storage_mutation_guard_authorization_admission_records.admission_procedure_id IS

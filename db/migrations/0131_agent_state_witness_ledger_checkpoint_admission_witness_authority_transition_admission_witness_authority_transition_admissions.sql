@@ -1,4 +1,4 @@
--- 0131_agent_state_witness_ledger_checkpoint_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0131_agent_state_wl_checkpoint_aw_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for witness-ledger checkpoint transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.witness_ledger_cp_trans_adm_wit_auth_transition_admissions (

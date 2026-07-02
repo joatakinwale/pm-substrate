@@ -45,6 +45,7 @@ from app.db.database import get_db
 from app.db.session import sync_engine
 from app.models import ClientReport, ReportSchedule, SocialPost
 from app.models.report import ReportCadence, ReportStatus
+from app.services.report_next_actions import create_next_action_proposal_task_for_report
 
 logger = logging.getLogger(__name__)
 
@@ -522,6 +523,11 @@ def _render_report_sync(
         report.pdf_url = pdf_url
         report.pdf_generated_at = datetime.now(timezone.utc)
         report.status = ReportStatus.generated.value
+        create_next_action_proposal_task_for_report(
+            db,
+            report=report,
+            actor_id=f"system:{_SYSTEM_USER_ID}",
+        )
         db.commit()
 
         logger.info(

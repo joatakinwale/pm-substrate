@@ -59,7 +59,7 @@ export interface GraphWriter {
   createNode(input: CreateNodeInput): Promise<CreateNodeResult>;
 
   /**
-   * Optimistic concurrency: caller passes the schemaVersion they read.
+   * Optimistic concurrency: caller passes the revision they read.
    * Throws OptimisticConcurrencyError if it doesn't match the current row.
    */
   updateNode(input: UpdateNodeInput): Promise<NodeBase>;
@@ -94,6 +94,15 @@ export interface UpdateNodeInput {
   readonly tenantId: TenantId;
   readonly id: EntityId;
   readonly identity: Readonly<Record<string, unknown>>;
+  /**
+   * Preferred optimistic-concurrency token. Use the `revision` returned by
+   * createNode/getNode/updateNode.
+   */
+  readonly expectedRevision?: number;
+  /**
+   * Deprecated legacy name for the optimistic-concurrency token. Kept for
+   * older callers while the public API moves to expectedRevision.
+   */
   readonly expectedSchemaVersion: number;
   readonly writeAuthorityRef?: GraphWriteAuthorityRef;
   readonly writeAuthoritySubstrateRecord?: GraphWriteAuthoritySubstrateRecord;

@@ -4,7 +4,7 @@ import {
   buildActionOutcomeEnvelope,
   stateRef,
   type ActionOutcomeEnvelope,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 
 import { evalEvidenceRef, type EvalEvent } from "../schema.js";
 import { PostgresEvalEventStore } from "./postgres.js";

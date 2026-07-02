@@ -1,4 +1,4 @@
--- 0126_agent_state_recovery_cut_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0126_agent_state_recovery_cut_aw_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for recovery-cut transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.recovery_cut_trans_adm_wit_auth_transition_admissions (

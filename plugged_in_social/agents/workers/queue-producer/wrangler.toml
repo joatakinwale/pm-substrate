@@ -11,7 +11,7 @@
 
 name = "stevie-queue-producer"
 main = "src/index.ts"
-compatibility_date = "2026-04-01"
+compatibility_date = "2024-12-30"
 
 [vars]
 ENVIRONMENT = "development"
@@ -27,6 +27,10 @@ binding = "QUEUE_STRIPE_SYNC"
 [[queues.producers]]
 queue = "stevie-email-sender"
 binding = "QUEUE_EMAIL_SENDER"
+
+[[queues.producers]]
+queue = "stevie-mux-ingest"
+binding = "QUEUE_MUX_INGEST"
 
 [[queues.producers]]
 queue = "stevie-ai-content"

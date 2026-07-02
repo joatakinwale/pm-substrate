@@ -12,7 +12,7 @@ import {
   type StateReviewActionConsequence,
   type StateReviewInvariantClass,
   type StateReviewTemporalMisalignmentPhase,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import {
   listTerminalAdmissionProviderBindings,
   normalizeCapability,

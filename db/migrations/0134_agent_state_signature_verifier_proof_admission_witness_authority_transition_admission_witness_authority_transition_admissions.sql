@@ -1,4 +1,4 @@
--- 0134_agent_state_signature_verifier_proof_admission_witness_authority_transition_admission_witness_authority_transition_admissions.sql
+-- 0134_agent_state_sig_verifier_proof_aw_authority_transition_witness_authority_transition_admissions.sql
 -- Durable admission records for signature-verifier transition-admission witness authority transitions.
 
 CREATE TABLE IF NOT EXISTS agent_state.sig_verifier_proof_adm_wit_auth_trans_adm_wit_auth_trans_adms (

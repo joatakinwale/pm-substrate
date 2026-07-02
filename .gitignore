@@ -14,6 +14,7 @@ node_modules/
 .idea/
 *.tsbuildinfo
 pgdata/
+trash/
 
 # Joat workspace context (session continuity files for the AI dev — not project artifacts)
 .joat/

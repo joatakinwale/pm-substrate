@@ -5,7 +5,8 @@ Worker flows:
   - social-publisher (queue consumer):
       1. Worker pulls a SocialPublishMessage off the stevie-social-publisher queue.
       2. Worker POSTs ``/internal/social/posts/{post_id}/publish`` body
-         ``{org_id}``. We dispatch to the right platform publisher
+         ``{org_id, expected_content_hash}``. We verify the hash captured
+         at scheduling time, dispatch to the right platform publisher
          (Meta/LinkedIn/X/etc), refresh tokens if needed, persist the
          result on the SocialPost row, and log an Activity entry — all
          under RLS.
@@ -13,8 +14,8 @@ Worker flows:
       1. Hourly (0 * * * *): Worker POSTs ``/internal/social/scheduled/sweep``
          body ``{}``. We scan every org for SocialPost rows whose
          ``scheduled_at`` is past, flip them to ``publishing``, and return
-         the list of {post_id, org_id} pairs the Worker will fan out to
-         the social-publisher queue.
+         the list of {post_id, org_id, expected_content_hash} entries the
+         Worker will fan out to the social-publisher queue.
       2. Every 30 minutes (*/30 * * * *): Worker POSTs
          ``/internal/social/metrics/refresh`` body ``{}``. We refresh
          engagement metrics across all recently-published posts in-process
@@ -52,13 +53,18 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, select, text
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.api.internal.webhooks import verify_webhook_secret
 from app.db.database import get_db
 from app.db.session import sync_engine
 from app.models.social_media import SocialAccount, SocialPost
+from app.models.virtual_agency import (
+    VirtualAgencyEvent,
+    VirtualAgencyTask,
+    VirtualAgencyTaskStatus,
+)
 from app.services.social import (
     PublisherConfigError,
     PublisherError,
@@ -66,10 +72,23 @@ from app.services.social import (
     get_publisher,
 )
 from app.services.social.token_refresh import RefreshError, refresh_if_needed
+from app.services.virtual_agency import (
+    AGENT_ANALYTICS,
+    agent_task_handoff_idempotency_key,
+    build_agent_task_dispatch,
+)
+from app.services.virtual_agency_orchestration import (
+    DependencyNotSatisfiedError,
+    ensure_dependencies_completed,
+    post_has_metric_evidence,
+    social_post_content_hash,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/internal/social", tags=["internal"])
+
+_SHA256_PATTERN = r"^[0-9a-fA-F]{64}$"
 
 
 # ── Schemas ──────────────────────────────────────────────────────
@@ -84,6 +103,14 @@ class SocialPublishBody(BaseModel):
             "queue message; we use it to scope the lookup and to set RLS "
             "context on writes."
         )
+    )
+    expected_content_hash: str = Field(
+        pattern=_SHA256_PATTERN,
+        description=(
+            "SHA-256 digest of the content-bearing SocialPost fields captured "
+            "when the post was scheduled. The backend refuses to publish if "
+            "the row has changed since that point."
+        ),
     )
 
 
@@ -103,7 +130,13 @@ class SocialPublishResponse(BaseModel):
 
 
 class ScheduledSweepBody(BaseModel):
-    """Empty body — the cron Worker carries no per-call parameters."""
+    """Cron sweep parameters."""
+
+    retry_stale_publishing_after_minutes: int = Field(
+        default=30,
+        ge=1,
+        le=1440,
+    )
 
 
 class ScheduledPostItem(BaseModel):
@@ -111,6 +144,7 @@ class ScheduledPostItem(BaseModel):
 
     post_id: uuid.UUID
     org_id: uuid.UUID
+    expected_content_hash: str = Field(pattern=_SHA256_PATTERN)
 
 
 class ScheduledSweepResponse(BaseModel):
@@ -132,6 +166,7 @@ class MetricsRefreshResponse(BaseModel):
     checked: int = Field(ge=0)
     updated: int = Field(ge=0)
     errored: int = Field(ge=0)
+    virtual_agency_tasks: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ── RLS helper ───────────────────────────────────────────────────
@@ -191,6 +226,7 @@ async def publish_post_from_worker(
         _publish_post_sync,
         post_id=post_id,
         org_id=body.org_id,
+        expected_content_hash=body.expected_content_hash,
     )
 
     error = result.get("error")
@@ -229,6 +265,14 @@ async def publish_post_from_worker(
         raise HTTPException(
             status_code=422,
             detail=result.get("detail", "OAuth token refresh failed"),
+        )
+    if error == "content_hash_mismatch":
+        # 409 — the queued publish request no longer matches the
+        # scheduled/approved content identity. Permanent; the row has
+        # already been marked failed for operator review.
+        raise HTTPException(
+            status_code=409,
+            detail=result.get("detail", "Social post content hash mismatch"),
         )
     if error == "publish_failed":
         # 5xx — transient platform failure. The post error_message has
@@ -271,29 +315,58 @@ async def sweep_scheduled_posts(
     Status flip and the returned payload list happen in the same
     transaction: if the commit fails, the Worker sees an error and the
     next cron tick retries those posts naturally. If the commit succeeds
-    but the Worker crashes before enqueueing, those posts are stuck in
-    'publishing' until manually retried.
+    but the Worker crashes before enqueueing, stale 'publishing' rows are
+    returned again after ``retry_stale_publishing_after_minutes``.
     """
     now = datetime.now(timezone.utc)
+    stale_publishing_before = now - timedelta(
+        minutes=body.retry_stale_publishing_after_minutes
+    )
     posts: list[ScheduledPostItem] = []
 
     async for db in get_db():
         result = await db.execute(
             select(SocialPost).where(
-                and_(
-                    SocialPost.status == "scheduled",
-                    SocialPost.scheduled_at <= now,
+                or_(
+                    and_(
+                        SocialPost.status == "scheduled",
+                        SocialPost.scheduled_at <= now,
+                    ),
+                    and_(
+                        SocialPost.status == "publishing",
+                        SocialPost.updated_at <= stale_publishing_before,
+                    ),
                 )
             )
         )
         due = list(result.scalars().all())
 
         for post in due:
+            if not _is_publish_sweep_candidate(
+                post,
+                now=now,
+                stale_publishing_before=stale_publishing_before,
+            ):
+                continue
+            expected_content_hash = post.scheduled_content_hash
+            current_content_hash = social_post_content_hash(post)
+            if (
+                not expected_content_hash
+                or current_content_hash != expected_content_hash
+            ):
+                post.status = "failed"
+                post.error_message = "Social post content hash mismatch before publish sweep"
+                logger.error(
+                    "SocialPost %s content hash mismatch before publish sweep",
+                    post.id,
+                )
+                continue
             post.status = "publishing"
             posts.append(
                 ScheduledPostItem(
                     post_id=post.id,
                     org_id=post.org_id,
+                    expected_content_hash=expected_content_hash,
                 )
             )
 
@@ -309,6 +382,19 @@ async def sweep_scheduled_posts(
         now.isoformat(),
     )
     return ScheduledSweepResponse(posts=posts)
+
+
+def _is_publish_sweep_candidate(
+    post: SocialPost,
+    *,
+    now: datetime,
+    stale_publishing_before: datetime,
+) -> bool:
+    if post.status == "scheduled":
+        return post.scheduled_at is not None and post.scheduled_at <= now
+    if post.status == "publishing":
+        return post.updated_at <= stale_publishing_before
+    return False
 
 
 @router.post(
@@ -342,6 +428,7 @@ def _publish_post_sync(
     *,
     post_id: uuid.UUID,
     org_id: uuid.UUID,
+    expected_content_hash: str,
 ) -> dict[str, Any]:
     """Run a single-post publish under a sync DB session.
 
@@ -349,7 +436,8 @@ def _publish_post_sync(
         {status: "published", platform_post_id: str | None}
         {status: "failed", platform_post_id: None}
         {error: "not_found" | "account_not_found" | "unknown_platform" |
-                "config" | "auth_refresh" | "publish_failed", detail?: str}
+                "config" | "auth_refresh" | "content_hash_mismatch" |
+                "publish_failed", detail?: str}
 
     Errors are surfaced with descriptive ``detail`` strings; the FastAPI
     handler turns these into the right HTTP status code.
@@ -373,6 +461,24 @@ def _publish_post_sync(
                 post_id, post.org_id, org_id,
             )
             return {"error": "not_found"}
+
+        if (
+            post.scheduled_content_hash != expected_content_hash
+            or social_post_content_hash(post) != expected_content_hash
+        ):
+            logger.error(
+                "SocialPost %s content hash mismatch — expected=%s scheduled=%s",
+                post_id,
+                expected_content_hash,
+                post.scheduled_content_hash,
+            )
+            post.status = "failed"
+            post.error_message = "Social post content hash mismatch before publish"
+            db.commit()
+            return {
+                "error": "content_hash_mismatch",
+                "detail": "Social post content hash mismatch before publish",
+            }
 
         account = db.get(SocialAccount, str(post.social_account_id))
         if not account:
@@ -451,6 +557,7 @@ def _publish_post_sync(
             post.published_at = datetime.now(timezone.utc)
             post.platform_post_id = result.platform_post_id
             post.platform_url = result.platform_url
+            post.published_content_hash = expected_content_hash
             post.error_message = None
             logger.info(
                 "Published post %s to %s: platform_id=%s url=%s",
@@ -532,7 +639,7 @@ def _log_publish_activity(
     db.commit()
 
 
-def _refresh_metrics_sync() -> dict[str, int]:
+def _refresh_metrics_sync() -> dict[str, Any]:
     """Refresh engagement metrics across all recently-published posts.
 
     Cross-org sweep — no per-org RLS context. Mutations are limited to
@@ -555,6 +662,7 @@ def _refresh_metrics_sync() -> dict[str, int]:
 
         updated = 0
         errored = 0
+        updated_project_ids: set[uuid.UUID] = set()
         for post in recent:
             account = db.get(SocialAccount, str(post.social_account_id))
             if not account:
@@ -596,11 +704,74 @@ def _refresh_metrics_sync() -> dict[str, int]:
                 if rate is not None:
                     post.engagement_rate = rate
                 updated += 1
+                if post.project_id is not None:
+                    updated_project_ids.add(post.project_id)
 
+        virtual_agency_tasks = _dispatch_ready_analytics_tasks_sync(
+            db,
+            project_ids=updated_project_ids,
+        )
         db.commit()
 
     return {
         "checked": len(recent),
         "updated": updated,
         "errored": errored,
+        "virtual_agency_tasks": virtual_agency_tasks,
     }
+
+
+def _dispatch_ready_analytics_tasks_sync(
+    db: Session,
+    *,
+    project_ids: set[uuid.UUID],
+) -> list[dict[str, Any]]:
+    if not project_ids:
+        return []
+    result = db.execute(
+        select(VirtualAgencyTask).where(
+            VirtualAgencyTask.project_id.in_(project_ids),
+            VirtualAgencyTask.agent_role == AGENT_ANALYTICS,
+            VirtualAgencyTask.task_type == "analytics_reporting",
+            VirtualAgencyTask.status == VirtualAgencyTaskStatus.todo.value,
+            VirtualAgencyTask.approval_active.is_(True),
+        )
+    )
+    messages: list[dict[str, Any]] = []
+    for task in result.scalars().all():
+        try:
+            ensure_dependencies_completed(task.dependencies or [])
+            if not _project_has_metric_evidence_sync(db, task.project_id):
+                raise DependencyNotSatisfiedError(
+                    "Analytics task requires published social metrics evidence"
+                )
+        except DependencyNotSatisfiedError:
+            continue
+        message_idempotency_key = agent_task_handoff_idempotency_key(task)
+        existing_event = db.execute(
+            select(VirtualAgencyEvent).where(
+                VirtualAgencyEvent.idempotency_key
+                == f"handoff:{message_idempotency_key}"
+            )
+        ).scalar_one_or_none()
+        if existing_event is not None:
+            continue
+        dispatch = build_agent_task_dispatch(
+            task=task,
+            actor_id="system:metrics-refresh",
+            idempotency_key=message_idempotency_key,
+        )
+        db.add(dispatch["event"])
+        messages.append(dispatch["message"])
+    return messages
+
+
+def _project_has_metric_evidence_sync(db: Session, project_id: uuid.UUID) -> bool:
+    result = db.execute(
+        select(SocialPost).where(
+            SocialPost.project_id == project_id,
+            SocialPost.status == "published",
+            SocialPost.published_at.isnot(None),
+        )
+    )
+    return any(post_has_metric_evidence(post) for post in result.scalars().all())

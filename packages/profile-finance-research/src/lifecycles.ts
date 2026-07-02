@@ -25,6 +25,11 @@ export const RESEARCH_RUN_LIFECYCLE: LifecycleDef = {
       trigger: "workflow.blocked.stale_state",
     },
     {
+      from: ["collecting", "analyzing", "risk_validating", "deciding"],
+      to: "blocked",
+      trigger: "workflow.blocked.invalid_action",
+    },
+    {
       from: ["planned", "collecting", "analyzing", "risk_validating", "deciding"],
       to: "cancelled",
       trigger: "research_run.cancelled",

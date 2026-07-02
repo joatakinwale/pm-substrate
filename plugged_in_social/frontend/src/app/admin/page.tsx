@@ -57,7 +57,8 @@ const STATUS_COLORS: Record<string, string> = {
 interface InboxItem {
   id: string;
   project_id: string | null;
-  type: "task" | "post" | "report";
+  type: "task" | "post" | "report" | "orchestration_task";
+  task_type?: string;
   title: string;
   agent: string;
   status: string;

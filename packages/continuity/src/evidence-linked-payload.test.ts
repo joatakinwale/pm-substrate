@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   stateRef,
   type EvidenceLinkedContinuityPayload,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import { eventId, tenantId, timestamp } from "@pm/types";
 
 import type { RecordCheckpointInput } from "./interfaces.js";

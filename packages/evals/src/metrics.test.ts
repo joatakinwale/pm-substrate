@@ -5,7 +5,7 @@ import {
   reviewProposedActionAgainstCurrentState,
   stateRef,
   type CurrentStateView,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import type { TenantId, Timestamp } from "@pm/types";
 
 import { evalEvidenceRef, type EvalEvent } from "./schema.js";

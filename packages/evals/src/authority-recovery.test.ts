@@ -3,7 +3,7 @@ import {
   buildActionOutcomeEnvelope,
   stateRef,
   type ActionOutcomeEnvelope,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import {
   graphWriteAuthorityResolverFromWorkflowEnvelopeStore,
 } from "@pm/capability-kit";

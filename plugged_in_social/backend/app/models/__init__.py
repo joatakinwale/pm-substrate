@@ -97,6 +97,19 @@ from app.models.virtual_agency import (
     VirtualAgencyEventType,
     virtual_agency_task_dependencies,
 )
+from app.models.agency import (
+    AgencyAccessRequest,
+    AgencyAccessRequestStatus,
+    AgencyApprovalRequest,
+    AgencyApprovalStatus,
+    AgencyArtifact,
+    AgencyArtifactType,
+    ClientEngagement,
+    ClientEngagementStatus,
+    MarketingRun,
+    MarketingRunStage,
+    MarketingRunStatus,
+)
 
 # Client Portal
 from app.models.portal import PortalToken, PortalSession
@@ -199,6 +212,17 @@ __all__ = [
     "VirtualAgencyEvent",
     "VirtualAgencyEventType",
     "virtual_agency_task_dependencies",
+    "AgencyAccessRequest",
+    "AgencyAccessRequestStatus",
+    "AgencyApprovalRequest",
+    "AgencyApprovalStatus",
+    "AgencyArtifact",
+    "AgencyArtifactType",
+    "ClientEngagement",
+    "ClientEngagementStatus",
+    "MarketingRun",
+    "MarketingRunStage",
+    "MarketingRunStatus",
     # Client Portal
     "PortalToken",
     "PortalSession",

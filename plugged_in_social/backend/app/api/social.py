@@ -17,6 +17,7 @@ from app.schemas.social_media import (
     SocialPostResponse,
     SocialPostUpdate,
 )
+from app.services.virtual_agency_orchestration import social_post_content_hash
 
 router = APIRouter(prefix="/social", tags=["social"])
 
@@ -179,6 +180,7 @@ async def schedule_post(
     if not post.scheduled_at:
         raise HTTPException(status_code=400, detail="Set scheduled_at before scheduling")
     post.status = "scheduled"
+    post.scheduled_content_hash = social_post_content_hash(post)
     await db.flush()
     await db.refresh(post)
     return SocialPostResponse.model_validate(post)
@@ -198,6 +200,8 @@ async def publish_post(
     if post.status not in ("draft", "scheduled"):
         raise HTTPException(status_code=400, detail="Post cannot be published in current status")
 
+    expected_content_hash = social_post_content_hash(post)
+    post.scheduled_content_hash = expected_content_hash
     post.status = "publishing"
     await db.flush()
     await db.refresh(post)
@@ -207,6 +211,7 @@ async def publish_post(
     await publish_social_post_publish(
         org_id=post.org_id,
         post_id=post.id,
+        expected_content_hash=expected_content_hash,
     )
 
     return SocialPostResponse.model_validate(post)

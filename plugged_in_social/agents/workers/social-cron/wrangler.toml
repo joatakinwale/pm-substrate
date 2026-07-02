@@ -11,10 +11,10 @@
 # which schedule fired.
 #
 # Flow:
-#   - Hourly (0 * * * *):
+#   - Every 5 minutes (*/5 * * * *):
 #       1. POST /internal/social/scheduled/sweep on FastAPI. Backend flips
 #          due posts from 'scheduled' → 'publishing' and returns the list
-#          of {post_id, org_id} pairs.
+#          of {post_id, org_id, expected_content_hash} entries.
 #       2. For each entry, POST a social.post.publish message to the
 #          queue-producer Worker's /enqueue/stevie-social-publisher route.
 #          The social-publisher Worker does the actual platform call.
@@ -35,7 +35,7 @@
 
 name = "stevie-social-cron"
 main = "src/index.ts"
-compatibility_date = "2026-04-01"
+compatibility_date = "2024-12-30"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]

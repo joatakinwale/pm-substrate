@@ -1,7 +1,7 @@
--- 0104_agent_state_signature_verifier_proof_admission_witness_authority_transition_admissions.sql
+-- 0104_agent_state_sig_verifier_proof_aw_authority_transition_admissions.sql
 -- Durable admission records for signature-verifier proof admission witness authority transitions.
 
-CREATE TABLE IF NOT EXISTS agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions (
+CREATE TABLE IF NOT EXISTS agent_state.sig_verifier_proof_aw_authority_transition_admissions (
   tenant_id TEXT NOT NULL,
   transition_admission_store_id TEXT NOT NULL,
   proof_admission_witness_authority_topology_id TEXT NOT NULL,
@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS agent_state.signature_verifier_proof_admission_witnes
   )
 );
 
-CREATE INDEX IF NOT EXISTS signature_verifier_proof_admission_witness_authority_transition_admission_scope_idx
-  ON agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions (
+CREATE INDEX IF NOT EXISTS sig_verifier_proof_aw_authority_transition_scope_idx
+  ON agent_state.sig_verifier_proof_aw_authority_transition_admissions (
     tenant_id,
     transition_admission_store_id,
     proof_admission_witness_authority_topology_id,
@@ -50,23 +50,23 @@ CREATE INDEX IF NOT EXISTS signature_verifier_proof_admission_witness_authority_
     admission_sequence
   );
 
-CREATE INDEX IF NOT EXISTS signature_verifier_proof_admission_witness_authority_transition_admission_authority_idx
-  ON agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions (
+CREATE INDEX IF NOT EXISTS sig_verifier_proof_aw_authority_transition_authority_idx
+  ON agent_state.sig_verifier_proof_aw_authority_transition_admissions (
     tenant_id,
     proof_admission_witness_authority_topology_id,
     authority_sequence,
     authority_record_hash
   );
 
-CREATE INDEX IF NOT EXISTS signature_verifier_proof_admission_witness_authority_transition_admission_topology_idx
-  ON agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions (
+CREATE INDEX IF NOT EXISTS sig_verifier_proof_aw_authority_transition_topology_idx
+  ON agent_state.sig_verifier_proof_aw_authority_transition_admissions (
     tenant_id,
     authority_scope,
     next_authority_topology_hash,
     admission_sequence
   );
 
-CREATE OR REPLACE FUNCTION agent_state.prevent_signature_verifier_proof_admission_witness_authority_transition_admission_rewrite()
+CREATE OR REPLACE FUNCTION agent_state.prevent_sig_verifier_proof_aw_authority_transition_rewrite()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
@@ -76,27 +76,27 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS prevent_signature_verifier_proof_admission_witness_authority_transition_admission_rewrite
-  ON agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions;
+DROP TRIGGER IF EXISTS prevent_sig_verifier_proof_aw_authority_transition_rewrite
+  ON agent_state.sig_verifier_proof_aw_authority_transition_admissions;
 
-CREATE TRIGGER prevent_signature_verifier_proof_admission_witness_authority_transition_admission_rewrite
-  BEFORE UPDATE OR DELETE ON agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions
+CREATE TRIGGER prevent_sig_verifier_proof_aw_authority_transition_rewrite
+  BEFORE UPDATE OR DELETE ON agent_state.sig_verifier_proof_aw_authority_transition_admissions
   FOR EACH ROW
-  EXECUTE FUNCTION agent_state.prevent_signature_verifier_proof_admission_witness_authority_transition_admission_rewrite();
+  EXECUTE FUNCTION agent_state.prevent_sig_verifier_proof_aw_authority_transition_rewrite();
 
-REVOKE INSERT, UPDATE, DELETE ON agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions FROM PUBLIC;
+REVOKE INSERT, UPDATE, DELETE ON agent_state.sig_verifier_proof_aw_authority_transition_admissions FROM PUBLIC;
 
-COMMENT ON TABLE agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions IS
+COMMENT ON TABLE agent_state.sig_verifier_proof_aw_authority_transition_admissions IS
   'Append-only admission records for signature-verifier proof admission witness authority transitions. Replaying this ledger proves which verifier proof-admission witness authority topology rows were admitted instead of supplied from memory, adapters, or connector caches.';
 
-COMMENT ON COLUMN agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions.authority_record_hash IS
+COMMENT ON COLUMN agent_state.sig_verifier_proof_aw_authority_transition_admissions.authority_record_hash IS
   'Deterministic hash of the admitted signature-verifier proof admission witness authority transition.';
 
-COMMENT ON COLUMN agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions.previous_authority_topology_hash IS
+COMMENT ON COLUMN agent_state.sig_verifier_proof_aw_authority_transition_admissions.previous_authority_topology_hash IS
   'Hash of the previous replayed authority topology whose active principals certified this authority transition, except for the bootstrap transition.';
 
-COMMENT ON COLUMN agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions.next_authority_topology_hash IS
+COMMENT ON COLUMN agent_state.sig_verifier_proof_aw_authority_transition_admissions.next_authority_topology_hash IS
   'Hash of the authority topology derived after applying the admitted authority transition.';
 
-COMMENT ON COLUMN agent_state.signature_verifier_proof_admission_witness_authority_transition_admissions.admission_certificate IS
+COMMENT ON COLUMN agent_state.sig_verifier_proof_aw_authority_transition_admissions.admission_certificate IS
   'Quorum certificate over the exact authority transition hash and authority boundary.';
