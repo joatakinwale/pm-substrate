@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { tenantId, timestamp } from "@pm/types";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, resolve } from "node:path";
 
 import { FAILURE_CLASSES, validateEvalEvent } from "./schema.js";
 import {
@@ -43,6 +46,7 @@ describe("marketing Axis B blocker eval", () => {
       "plugged_in_social.queue_producer_config",
       "plugged_in_social.deploy_script",
       "plugged_in_social.agent_inbox_ui",
+      "plugged_in_social.operator_run_monitor_ui",
       "plugged_in_social.virtual_agency_ledger_migration",
       "pm_substrate.profile_agency",
       "pm_substrate.publication_terminal",
@@ -50,6 +54,29 @@ describe("marketing Axis B blocker eval", () => {
       "pm_substrate.plugged_in_social_axis_b_adapter",
       "pm_substrate.marketing_eval",
     ]);
+  });
+
+  it("does not treat placeholder files as live Axis B integration anchors", () => {
+    const workspaceRoot = mkdtempSync(resolve(tmpdir(), "axis-b-empty-anchors-"));
+    for (const anchor of MARKETING_AXIS_B_REQUIRED_ANCHORS) {
+      const target = resolve(
+        workspaceRoot,
+        anchor.base === "plugged_in_social" ? "plugged_in_social" : ".",
+        anchor.path,
+      );
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, "", "utf8");
+    }
+
+    const availability = readMarketingAxisBAnchorAvailability({
+      workspaceRoot,
+      sourcePath: "./plugged_in_social",
+    });
+
+    expect(availability.present).toEqual([]);
+    expect(availability.missing.map((anchor) => anchor.id)).toEqual(
+      MARKETING_AXIS_B_REQUIRED_ANCHORS.map((anchor) => anchor.id),
+    );
   });
 
   it("passes readiness when the real PluggedInSocial anchors are present", () => {
