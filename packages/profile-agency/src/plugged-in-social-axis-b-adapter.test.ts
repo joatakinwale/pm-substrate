@@ -54,6 +54,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "next_action",
       ],
       capabilities: [
+        "platform_manifest.read",
         "marketing_run.read",
         "task.read",
         "artifact.read",
@@ -66,6 +67,200 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         methods: ["GET"],
         resources: ["marketing_run"],
       })),
+    },
+    platformManifest: {
+      resource_type: "plugged_in_social_platform_manifest",
+      version: "v1",
+      service: "plugged_in_social",
+      closed_loop_stages: [
+        "intake",
+        "strategy",
+        "content",
+        "approval",
+        "scheduling",
+        "publishing",
+        "metrics",
+        "report",
+        "next_action",
+      ],
+      governance_gates: [
+        "tenant_rls",
+        "internal_system_rls",
+        "handoff_scope_guard",
+        "approval_payload_hash",
+        "content_hash_gate",
+        "publish_content_hash_gate",
+        "capability_gate",
+        "durable_event_hash",
+      ],
+      agents: [
+        {
+          role: "chief_of_staff",
+          name: "Chief of Staff",
+          description: "Plans campaigns and dispatches department work.",
+          writes: ["project.create", "virtual_agency_task.create"],
+          emits: ["task_created", "handoff_dispatched"],
+          queue: null,
+          task_types: ["campaign_planning"],
+        },
+        {
+          role: "content_creative",
+          name: "Content Creative",
+          description: "Creates campaign content drafts.",
+          writes: ["social_post.create"],
+          emits: ["social_post.draft_created"],
+          queue: "stevie-virtual-agency",
+          task_types: ["content_generation"],
+        },
+        {
+          role: "scheduling_distribution",
+          name: "Scheduling Distribution",
+          description: "Schedules approved content.",
+          writes: ["social_post.schedule"],
+          emits: ["social_post.scheduled"],
+          queue: "stevie-virtual-agency",
+          task_types: ["content_scheduling"],
+        },
+        {
+          role: "community_engagement",
+          name: "Community Engagement",
+          description: "Handles engagement follow-up.",
+          writes: [],
+          emits: ["community_engagement.completed"],
+          queue: "stevie-virtual-agency",
+          task_types: ["community_engagement"],
+        },
+        {
+          role: "analytics_reporting",
+          name: "Analytics Reporting",
+          description: "Builds reports and next actions.",
+          writes: ["client_report.create"],
+          emits: [
+            "client_report.draft_created",
+            "marketing.next_action.proposed",
+          ],
+          queue: "stevie-virtual-agency",
+          task_types: ["analytics_reporting", "next_action_proposal"],
+        },
+      ],
+      queues: [
+        {
+          queue: "stevie-virtual-agency",
+          worker: "virtual-agency",
+          dead_letter_queue: "stevie-virtual-agency-dlq",
+          producer_binding: "QUEUE_VIRTUAL_AGENCY",
+        },
+      ],
+      api_endpoints: [
+        {
+          method: "GET",
+          path: "/api/integration/v1/platform-manifest",
+          boundary: "public_rls",
+          capability_ids: ["platform_manifest.read"],
+        },
+        {
+          method: "POST",
+          path: "/api/internal/virtual-agency/task",
+          boundary: "internal_system_rls",
+          capability_ids: ["task.execute"],
+        },
+      ],
+      data_resources: [
+        {
+          id: "client_engagement",
+          table: "client_engagements",
+          resource_type: "client_engagement",
+          org_scoped: true,
+          durable_evidence_fields: ["intake_payload"],
+          read_capability_ids: ["engagement.read"],
+          write_capability_ids: [],
+        },
+        {
+          id: "marketing_run",
+          table: "marketing_runs",
+          resource_type: "marketing_run",
+          org_scoped: true,
+          durable_evidence_fields: ["strategy_summary"],
+          read_capability_ids: ["marketing_run.read"],
+          write_capability_ids: [],
+        },
+        {
+          id: "virtual_agency_task",
+          table: "virtual_agency_tasks",
+          resource_type: "virtual_agency_task",
+          org_scoped: true,
+          durable_evidence_fields: ["latest_event_hash"],
+          read_capability_ids: ["task.read"],
+          write_capability_ids: ["task.execute"],
+        },
+        {
+          id: "virtual_agency_event",
+          table: "virtual_agency_events",
+          resource_type: "virtual_agency_event",
+          org_scoped: true,
+          durable_evidence_fields: ["event_hash", "payload_hash"],
+          read_capability_ids: ["event_timeline.read"],
+          write_capability_ids: [],
+        },
+        {
+          id: "agency_artifact",
+          table: "agency_artifacts",
+          resource_type: "agency_artifact",
+          org_scoped: true,
+          durable_evidence_fields: ["payload_hash"],
+          read_capability_ids: ["artifact.read"],
+          write_capability_ids: ["event.ingest"],
+        },
+        {
+          id: "agency_approval_request",
+          table: "agency_approval_requests",
+          resource_type: "agency_approval_request",
+          org_scoped: true,
+          durable_evidence_fields: ["approval_payload_hash"],
+          read_capability_ids: ["approval.read"],
+          write_capability_ids: ["approval.decide"],
+        },
+        {
+          id: "social_post",
+          table: "social_posts",
+          resource_type: "social_post",
+          org_scoped: true,
+          durable_evidence_fields: ["scheduled_content_hash"],
+          read_capability_ids: ["social_post.read"],
+          write_capability_ids: ["social_post.publish"],
+        },
+        {
+          id: "client_report",
+          table: "client_reports",
+          resource_type: "client_report",
+          org_scoped: true,
+          durable_evidence_fields: ["metrics_snapshot"],
+          read_capability_ids: ["report.read"],
+          write_capability_ids: [],
+        },
+      ],
+      configuration_requirements: [
+        {
+          key: "WEBHOOK_SECRET",
+          kind: "secret",
+          required_for: ["internal webhooks"],
+        },
+        {
+          key: "BACKEND_BASE_URL",
+          kind: "secret",
+          required_for: ["virtual-agency worker"],
+        },
+        {
+          key: "QUEUE_PRODUCER_URL",
+          kind: "environment",
+          required_for: ["FastAPI queue publisher"],
+        },
+        {
+          key: "QUEUE_VIRTUAL_AGENCY",
+          kind: "queue_binding",
+          required_for: ["queue-producer"],
+        },
+      ],
     },
     run: {
       resource_type: "marketing_run",
@@ -280,6 +475,10 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     const responses = new Map<string, unknown>([
       ["https://api.example/api/integration/v1/capabilities", snapshot.capabilities],
       [
+        "https://api.example/api/integration/v1/platform-manifest",
+        snapshot.platformManifest,
+      ],
+      [
         `https://api.example/api/integration/v1/marketing-runs/${liveRunId}`,
         snapshot.run,
       ],
@@ -326,6 +525,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
 
     expect(calls.map((call) => call.url)).toEqual([
       "https://api.example/api/integration/v1/capabilities",
+      "https://api.example/api/integration/v1/platform-manifest",
       `https://api.example/api/integration/v1/marketing-runs/${liveRunId}`,
       `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-summary`,
       `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/events?limit=1000`,
@@ -346,6 +546,10 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
           id: `plugged_in_social:marketing_runs:${liveRunId}`,
         }),
         expect.objectContaining({
+          kind: "source_record",
+          id: "plugged_in_social:integration_api:platform_manifest",
+        }),
+        expect.objectContaining({
           kind: "event",
           id: "plugged_in_social:virtual_agency_events:88888888-8888-4888-8888-888888888888",
         }),
@@ -361,6 +565,34 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
           kind: "state_review_artifact",
           id: `plugged_in_social:marketing_runs:${liveRunId}:live-axis-b-review`,
         }),
+      ]),
+    );
+  });
+
+  it("blocks live run evidence when the remote platform manifest omits required wiring", () => {
+    const snapshot = liveSnapshotFixture();
+    const result = buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult({
+      snapshot: {
+        ...snapshot,
+        platformManifest: {
+          ...snapshot.platformManifest,
+          agents: snapshot.platformManifest.agents.filter(
+            (agent) => agent.role !== "analytics_reporting",
+          ),
+          queues: [],
+          governance_gates: snapshot.platformManifest.governance_gates.filter(
+            (gate) => gate !== "content_hash_gate",
+          ),
+        },
+      },
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        "missing platform agent role: analytics_reporting",
+        "platform manifest missing stevie-virtual-agency queue",
+        "missing platform governance gate: content_hash_gate",
       ]),
     );
   });

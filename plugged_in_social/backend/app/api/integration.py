@@ -25,11 +25,17 @@ from app.schemas.integration import (
     IntegrationArtifactEnvelope,
     IntegrationCapability,
     IntegrationCapabilityResponse,
+    IntegrationAgentManifest,
+    IntegrationConfigurationRequirement,
+    IntegrationDataResourceManifest,
+    IntegrationEndpointManifest,
     IntegrationEngagementEnvelope,
     IntegrationEvidenceSummaryEnvelope,
     IntegrationEventIngest,
     IntegrationLink,
     IntegrationMarketingRunEnvelope,
+    IntegrationPlatformManifestEnvelope,
+    IntegrationQueueManifest,
     IntegrationRunEventEnvelope,
     IntegrationTaskEnvelope,
     IntegrationWebhookIngest,
@@ -39,6 +45,7 @@ from app.services.agency_domain import (
     create_agency_artifact,
     decide_approval_request,
 )
+from app.services.virtual_agency_orchestration import AGENT_CAPABILITIES
 
 router = APIRouter(prefix="/integration/v1", tags=["integration"])
 
@@ -372,6 +379,13 @@ def _count_by(items: list[Any], attr: str) -> dict[str, int]:
 def _capabilities() -> list[IntegrationCapability]:
     return [
         IntegrationCapability(
+            id="platform_manifest.read",
+            name="Read platform integration manifest",
+            description="Inspect agent, queue, endpoint, data, and configuration metadata for external orchestration.",
+            methods=["GET"],
+            resources=["platform_manifest"],
+        ),
+        IntegrationCapability(
             id="engagement.read",
             name="Read client engagements",
             description="Inspect tenant-scoped client engagement state.",
@@ -407,11 +421,32 @@ def _capabilities() -> list[IntegrationCapability]:
             resources=["virtual_agency_event"],
         ),
         IntegrationCapability(
+            id="approval.read",
+            name="Read approval gates",
+            description="Inspect approval requests and current decision state.",
+            methods=["GET"],
+            resources=["agency_approval_request"],
+        ),
+        IntegrationCapability(
             id="evidence_summary.read",
             name="Read marketing run evidence summary",
             description="Inspect run-level artifact, task, event, approval, and hash counts.",
             methods=["GET"],
             resources=["marketing_run"],
+        ),
+        IntegrationCapability(
+            id="social_post.read",
+            name="Read social post state",
+            description="Inspect social post lifecycle, content hashes, and platform publication state.",
+            methods=["GET"],
+            resources=["social_post"],
+        ),
+        IntegrationCapability(
+            id="report.read",
+            name="Read client reports",
+            description="Inspect report metrics, generated artifacts, and next-action source state.",
+            methods=["GET"],
+            resources=["client_report"],
         ),
         IntegrationCapability(
             id="approval.decide",
@@ -430,7 +465,333 @@ def _capabilities() -> list[IntegrationCapability]:
             resources=["agency_artifact"],
             events=["integration.event_ingested", "integration.webhook_ingested"],
         ),
+        IntegrationCapability(
+            id="task.execute",
+            name="Execute virtual-agency task",
+            description="Internal worker execution callback for approved virtual-agency tasks.",
+            methods=["POST"],
+            resources=["virtual_agency_task"],
+            events=["execution_claimed", "execution_completed"],
+        ),
+        IntegrationCapability(
+            id="social_post.publish",
+            name="Publish social post",
+            description="Internal publisher callback guarded by scheduled content hash.",
+            methods=["POST"],
+            resources=["social_post"],
+            events=["social_post.published"],
+            writes_external_systems=True,
+        ),
     ]
+
+
+def _agent_manifest() -> list[IntegrationAgentManifest]:
+    agent_info = {
+        "chief_of_staff": {
+            "name": "Chief of Staff",
+            "description": "Turns client intake into strategy, project scope, dependencies, and department handoffs.",
+            "task_types": ["campaign_planning", "department_handoff"],
+            "writes": ["project.create", "legacy_task.create", "virtual_agency_task.create"],
+            "emits": ["task_created", "handoff_dispatched"],
+        },
+        "content_creative": {
+            "name": "Content Creative",
+            "description": "Produces draft content artifacts under campaign and approval lineage.",
+            "task_types": ["content_generation"],
+        },
+        "scheduling_distribution": {
+            "name": "Scheduling Distribution",
+            "description": "Schedules approved content and binds scheduled content hashes for publish-time verification.",
+            "task_types": ["content_scheduling"],
+        },
+        "community_engagement": {
+            "name": "Community Engagement",
+            "description": "Handles follow-up engagement tasks without publishing mutations.",
+            "task_types": ["community_engagement"],
+        },
+        "analytics_reporting": {
+            "name": "Analytics Reporting",
+            "description": "Builds reports and governed next-action proposals from metrics evidence.",
+            "task_types": ["analytics_reporting", "next_action_proposal"],
+        },
+    }
+    roles = [
+        "chief_of_staff",
+        "content_creative",
+        "scheduling_distribution",
+        "community_engagement",
+        "analytics_reporting",
+    ]
+
+    agents: list[IntegrationAgentManifest] = []
+    for role in roles:
+        info = agent_info[role]
+        capabilities = AGENT_CAPABILITIES.get(role, {})
+        agents.append(
+            IntegrationAgentManifest(
+                role=role,
+                name=str(info["name"]),
+                description=str(info["description"]),
+                writes=sorted(
+                    set(info.get("writes", [])) | set(capabilities.get("writes", set()))
+                ),
+                emits=sorted(
+                    set(info.get("emits", [])) | set(capabilities.get("emits", set()))
+                ),
+                queue=(
+                    "stevie-virtual-agency" if role != "chief_of_staff" else None
+                ),
+                task_types=list(info["task_types"]),
+            )
+        )
+    return agents
+
+
+def _queue_manifest() -> list[IntegrationQueueManifest]:
+    return [
+        IntegrationQueueManifest(
+            queue="stevie-virtual-agency",
+            worker="virtual-agency",
+            dead_letter_queue="stevie-virtual-agency-dlq",
+            producer_binding="QUEUE_VIRTUAL_AGENCY",
+        ),
+        IntegrationQueueManifest(
+            queue="stevie-social-publisher",
+            worker="social-publisher",
+            dead_letter_queue="stevie-social-publisher-dlq",
+            producer_binding="QUEUE_SOCIAL_PUBLISHER",
+        ),
+        IntegrationQueueManifest(
+            queue="stevie-ai-content",
+            worker="ai-content",
+            dead_letter_queue="stevie-ai-content-dlq",
+            producer_binding="QUEUE_AI_CONTENT",
+        ),
+        IntegrationQueueManifest(
+            queue="stevie-report-builder",
+            worker="report-builder",
+            dead_letter_queue="stevie-report-builder-dlq",
+            producer_binding="QUEUE_REPORT_BUILDER",
+        ),
+    ]
+
+
+def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
+    return [
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/capabilities",
+            boundary="public_rls",
+            capability_ids=["marketing_run.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/platform-manifest",
+            boundary="public_rls",
+            capability_ids=["platform_manifest.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/engagements",
+            boundary="public_rls",
+            capability_ids=["engagement.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}",
+            boundary="public_rls",
+            capability_ids=["marketing_run.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/events",
+            boundary="public_rls",
+            capability_ids=["event_timeline.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/evidence-summary",
+            boundary="public_rls",
+            capability_ids=["evidence_summary.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/internal/virtual-agency/task",
+            boundary="internal_system_rls",
+            capability_ids=["task.execute"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/internal/social/posts/{post_id}/publish",
+            boundary="internal_system_rls",
+            capability_ids=["social_post.publish"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/approvals/{approval_id}/decision",
+            boundary="public_rls",
+            capability_ids=["approval.decide"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/events",
+            boundary="public_rls",
+            capability_ids=["event.ingest"],
+        ),
+    ]
+
+
+def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
+    return [
+        IntegrationDataResourceManifest(
+            id="client_engagement",
+            table="client_engagements",
+            resource_type="client_engagement",
+            durable_evidence_fields=["intake_payload", "integration_state"],
+            read_capability_ids=["engagement.read"],
+        ),
+        IntegrationDataResourceManifest(
+            id="marketing_run",
+            table="marketing_runs",
+            resource_type="marketing_run",
+            durable_evidence_fields=["strategy_summary", "current_blocker", "stage"],
+            read_capability_ids=["marketing_run.read", "evidence_summary.read"],
+        ),
+        IntegrationDataResourceManifest(
+            id="virtual_agency_task",
+            table="virtual_agency_tasks",
+            resource_type="virtual_agency_task",
+            durable_evidence_fields=[
+                "task_version",
+                "approval_payload_hash",
+                "latest_event_hash",
+                "context",
+                "lineage",
+            ],
+            read_capability_ids=["task.read"],
+            write_capability_ids=["task.execute"],
+        ),
+        IntegrationDataResourceManifest(
+            id="virtual_agency_event",
+            table="virtual_agency_events",
+            resource_type="virtual_agency_event",
+            durable_evidence_fields=[
+                "previous_event_hash",
+                "payload_hash",
+                "event_hash",
+                "lineage",
+            ],
+            read_capability_ids=["event_timeline.read"],
+        ),
+        IntegrationDataResourceManifest(
+            id="agency_artifact",
+            table="agency_artifacts",
+            resource_type="agency_artifact",
+            durable_evidence_fields=[
+                "payload_hash",
+                "version",
+                "evidence_refs",
+                "lineage",
+            ],
+            read_capability_ids=["artifact.read"],
+            write_capability_ids=["event.ingest"],
+        ),
+        IntegrationDataResourceManifest(
+            id="agency_approval_request",
+            table="agency_approval_requests",
+            resource_type="agency_approval_request",
+            durable_evidence_fields=[
+                "approval_version",
+                "approval_payload_hash",
+                "decision_note",
+                "decided_at",
+            ],
+            read_capability_ids=["approval.read"],
+            write_capability_ids=["approval.decide"],
+        ),
+        IntegrationDataResourceManifest(
+            id="social_post",
+            table="social_posts",
+            resource_type="social_post",
+            durable_evidence_fields=[
+                "scheduled_content_hash",
+                "published_content_hash",
+                "platform_post_id",
+                "platform_url",
+            ],
+            read_capability_ids=["social_post.read"],
+            write_capability_ids=["social_post.publish"],
+        ),
+        IntegrationDataResourceManifest(
+            id="client_report",
+            table="client_reports",
+            resource_type="client_report",
+            durable_evidence_fields=[
+                "metrics_snapshot",
+                "pdf_url",
+                "pdf_generated_at",
+                "sent_at",
+            ],
+            read_capability_ids=["report.read"],
+        ),
+    ]
+
+
+def _configuration_manifest() -> list[IntegrationConfigurationRequirement]:
+    return [
+        IntegrationConfigurationRequirement(
+            key="WEBHOOK_SECRET",
+            kind="secret",
+            required_for=["internal webhooks", "worker callbacks"],
+        ),
+        IntegrationConfigurationRequirement(
+            key="BACKEND_BASE_URL",
+            kind="secret",
+            required_for=["virtual-agency worker", "social publisher", "cron workers"],
+        ),
+        IntegrationConfigurationRequirement(
+            key="QUEUE_PRODUCER_URL",
+            kind="environment",
+            required_for=["FastAPI queue publisher", "cron workers"],
+        ),
+        IntegrationConfigurationRequirement(
+            key="QUEUE_VIRTUAL_AGENCY",
+            kind="queue_binding",
+            required_for=["queue-producer"],
+        ),
+        IntegrationConfigurationRequirement(
+            key="DATABASE_URL",
+            kind="secret",
+            required_for=["FastAPI backend"],
+        ),
+    ]
+
+
+def _platform_manifest() -> IntegrationPlatformManifestEnvelope:
+    return IntegrationPlatformManifestEnvelope(
+        closed_loop_stages=_CLOSED_LOOP_STAGES,
+        governance_gates=[
+            "tenant_rls",
+            "internal_system_rls",
+            "handoff_scope_guard",
+            "approval_payload_hash",
+            "content_hash_gate",
+            "publish_content_hash_gate",
+            "capability_gate",
+            "idempotency_key",
+            "durable_event_hash",
+            "next_action_approval",
+        ],
+        agents=_agent_manifest(),
+        queues=_queue_manifest(),
+        api_endpoints=_endpoint_manifest(),
+        data_resources=_data_resource_manifest(),
+        configuration_requirements=_configuration_manifest(),
+        links=[
+            _link("capabilities", "/api/integration/v1/capabilities"),
+            _link("engagements", "/api/integration/v1/engagements"),
+        ],
+    )
 
 
 @router.get("/capabilities", response_model=IntegrationCapabilityResponse)
@@ -444,6 +805,16 @@ async def get_capabilities(
         capabilities=_capabilities(),
         closed_loop_stages=_CLOSED_LOOP_STAGES,
     )
+
+
+@router.get("/platform-manifest", response_model=IntegrationPlatformManifestEnvelope)
+async def get_platform_manifest(
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    _ = db
+    _org_id_from_user(current_user)
+    return _platform_manifest()
 
 
 @router.get("/engagements", response_model=list[IntegrationEngagementEnvelope])

@@ -87,6 +87,59 @@ export interface PluggedInSocialIntegrationCapabilityResponse {
   readonly closed_loop_stages: readonly string[];
 }
 
+export interface PluggedInSocialIntegrationAgentManifest {
+  readonly role: string;
+  readonly name: string;
+  readonly description: string;
+  readonly writes: readonly string[];
+  readonly emits: readonly string[];
+  readonly queue: string | null;
+  readonly task_types: readonly string[];
+}
+
+export interface PluggedInSocialIntegrationQueueManifest {
+  readonly queue: string;
+  readonly worker: string;
+  readonly dead_letter_queue: string | null;
+  readonly producer_binding: string | null;
+}
+
+export interface PluggedInSocialIntegrationEndpointManifest {
+  readonly method: string;
+  readonly path: string;
+  readonly boundary: "public_rls" | "internal_system_rls" | "internal_secret";
+  readonly capability_ids: readonly string[];
+}
+
+export interface PluggedInSocialIntegrationDataResourceManifest {
+  readonly id: string;
+  readonly table: string;
+  readonly resource_type: string;
+  readonly org_scoped: boolean;
+  readonly durable_evidence_fields: readonly string[];
+  readonly read_capability_ids: readonly string[];
+  readonly write_capability_ids: readonly string[];
+}
+
+export interface PluggedInSocialIntegrationConfigurationRequirement {
+  readonly key: string;
+  readonly kind: "environment" | "secret" | "queue_binding";
+  readonly required_for: readonly string[];
+}
+
+export interface PluggedInSocialIntegrationPlatformManifestEnvelope {
+  readonly resource_type: "plugged_in_social_platform_manifest";
+  readonly version: "v1";
+  readonly service: "plugged_in_social";
+  readonly closed_loop_stages: readonly string[];
+  readonly governance_gates: readonly string[];
+  readonly agents: readonly PluggedInSocialIntegrationAgentManifest[];
+  readonly queues: readonly PluggedInSocialIntegrationQueueManifest[];
+  readonly api_endpoints: readonly PluggedInSocialIntegrationEndpointManifest[];
+  readonly data_resources: readonly PluggedInSocialIntegrationDataResourceManifest[];
+  readonly configuration_requirements: readonly PluggedInSocialIntegrationConfigurationRequirement[];
+}
+
 export interface PluggedInSocialIntegrationMarketingRunEnvelope {
   readonly resource_type: "marketing_run";
   readonly id: string;
@@ -194,6 +247,7 @@ export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
 
 export interface PluggedInSocialLiveRunEvidenceSnapshot {
   readonly capabilities: PluggedInSocialIntegrationCapabilityResponse;
+  readonly platformManifest: PluggedInSocialIntegrationPlatformManifestEnvelope;
   readonly run: PluggedInSocialIntegrationMarketingRunEnvelope;
   readonly summary: PluggedInSocialIntegrationEvidenceSummaryEnvelope;
   readonly events: readonly PluggedInSocialIntegrationRunEventEnvelope[];
@@ -212,6 +266,7 @@ export interface PluggedInSocialAxisBLiveRunEvidenceAdapterInput {
   readonly workspaceRoot?: string;
   readonly sourcePath?: string;
   readonly manifest?: PluggedInSocialSourceManifest;
+  readonly requireLocalSourceManifest?: boolean;
 }
 
 export interface PluggedInSocialAxisBLiveRunEvidenceAdapterResult {
@@ -256,6 +311,7 @@ const REQUIRED_LIVE_CLOSED_LOOP_STAGES = [
 ] as const;
 
 const REQUIRED_LIVE_CAPABILITIES = [
+  "platform_manifest.read",
   "marketing_run.read",
   "task.read",
   "artifact.read",
@@ -263,6 +319,43 @@ const REQUIRED_LIVE_CAPABILITIES = [
   "evidence_summary.read",
   "approval.decide",
   "event.ingest",
+] as const;
+
+const REQUIRED_LIVE_AGENT_ROLES = [
+  "chief_of_staff",
+  "content_creative",
+  "scheduling_distribution",
+  "community_engagement",
+  "analytics_reporting",
+] as const;
+
+const REQUIRED_LIVE_GOVERNANCE_GATES = [
+  "tenant_rls",
+  "internal_system_rls",
+  "handoff_scope_guard",
+  "approval_payload_hash",
+  "content_hash_gate",
+  "publish_content_hash_gate",
+  "capability_gate",
+  "durable_event_hash",
+] as const;
+
+const REQUIRED_LIVE_DATA_TABLES = [
+  "client_engagements",
+  "marketing_runs",
+  "virtual_agency_tasks",
+  "virtual_agency_events",
+  "agency_artifacts",
+  "agency_approval_requests",
+  "social_posts",
+  "client_reports",
+] as const;
+
+const REQUIRED_LIVE_CONFIG_KEYS = [
+  "WEBHOOK_SECRET",
+  "BACKEND_BASE_URL",
+  "QUEUE_PRODUCER_URL",
+  "QUEUE_VIRTUAL_AGENCY",
 ] as const;
 
 export function buildPluggedInSocialAxisBNextActionAdapterResult(
@@ -358,6 +451,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
   const runPath = `/marketing-runs/${encodeURIComponent(input.runId)}`;
   const [
     capabilities,
+    platformManifest,
     run,
     summary,
     events,
@@ -368,6 +462,10 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
     fetchIntegrationJson<PluggedInSocialIntegrationCapabilityResponse>(
       client,
       "/capabilities",
+    ),
+    fetchIntegrationJson<PluggedInSocialIntegrationPlatformManifestEnvelope>(
+      client,
+      "/platform-manifest",
     ),
     fetchIntegrationJson<PluggedInSocialIntegrationMarketingRunEnvelope>(
       client,
@@ -397,6 +495,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
 
   return {
     capabilities,
+    platformManifest,
     run,
     summary,
     events,
@@ -417,7 +516,12 @@ export function buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult(
         : {}),
       ...(input.sourcePath !== undefined ? { sourcePath: input.sourcePath } : {}),
     });
-  const issues = liveRunEvidenceIssues(manifest, input.snapshot);
+  const issues = new Set<string>(liveRunEvidenceIssues(input.snapshot));
+  if (input.manifest !== undefined || input.requireLocalSourceManifest === true) {
+    for (const issue of manifestReadinessIssues(manifest)) {
+      issues.add(issue);
+    }
+  }
   const evidenceRefs = liveRunEvidenceRefs(input.snapshot, manifest);
   const substrateRefs = uniqueStateRefs([
     ...manifest.substrateRefs.map(manifestRefToStateRef),
@@ -435,11 +539,11 @@ export function buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult(
 
   return {
     sourcePath: manifest.sourcePath,
-    ready: issues.length === 0,
-    terminalOutcome: issues.length === 0 ? "accepted" : "blocked",
+    ready: issues.size === 0,
+    terminalOutcome: issues.size === 0 ? "accepted" : "blocked",
     actionId: `plugged_in_social:${input.snapshot.run.id}:live-axis-b-evidence`,
     runId: input.snapshot.run.id,
-    issues,
+    issues: [...issues].sort(),
     manifest,
     snapshot: input.snapshot,
     evidenceRefs,
@@ -491,12 +595,19 @@ function manifestReadinessIssues(
 }
 
 function liveRunEvidenceIssues(
-  manifest: PluggedInSocialSourceManifest,
   snapshot: PluggedInSocialLiveRunEvidenceSnapshot,
 ): readonly string[] {
-  const issues = new Set<string>(manifestReadinessIssues(manifest));
-  const { capabilities, run, summary, events, tasks, artifacts, approvals } =
-    snapshot;
+  const issues = new Set<string>();
+  const {
+    capabilities,
+    platformManifest,
+    run,
+    summary,
+    events,
+    tasks,
+    artifacts,
+    approvals,
+  } = snapshot;
 
   if (summary.run_id !== run.id) {
     issues.add("evidence summary run_id does not match marketing run");
@@ -519,6 +630,96 @@ function liveRunEvidenceIssues(
   for (const stage of REQUIRED_LIVE_CLOSED_LOOP_STAGES) {
     if (!capabilities.closed_loop_stages.includes(stage)) {
       issues.add(`missing integration closed-loop stage: ${stage}`);
+    }
+    if (!platformManifest.closed_loop_stages.includes(stage)) {
+      issues.add(`missing platform closed-loop stage: ${stage}`);
+    }
+  }
+
+  const agentRoles = new Set(platformManifest.agents.map((agent) => agent.role));
+  for (const role of REQUIRED_LIVE_AGENT_ROLES) {
+    if (!agentRoles.has(role)) {
+      issues.add(`missing platform agent role: ${role}`);
+    }
+  }
+  const contentAgent = platformManifest.agents.find(
+    (agent) => agent.role === "content_creative",
+  );
+  if (contentAgent !== undefined) {
+    if (!contentAgent.writes.includes("social_post.create")) {
+      issues.add("content_creative lacks social_post.create capability");
+    }
+    if (contentAgent.queue !== "stevie-virtual-agency") {
+      issues.add("content_creative is not bound to stevie-virtual-agency");
+    }
+  }
+  const analyticsAgent = platformManifest.agents.find(
+    (agent) => agent.role === "analytics_reporting",
+  );
+  if (
+    analyticsAgent !== undefined &&
+    !analyticsAgent.emits.includes("marketing.next_action.proposed")
+  ) {
+    issues.add("analytics_reporting lacks marketing.next_action.proposed event");
+  }
+
+  const queueNames = new Set(platformManifest.queues.map((queue) => queue.queue));
+  if (!queueNames.has("stevie-virtual-agency")) {
+    issues.add("platform manifest missing stevie-virtual-agency queue");
+  }
+  const virtualAgencyQueue = platformManifest.queues.find(
+    (queue) => queue.queue === "stevie-virtual-agency",
+  );
+  if (
+    virtualAgencyQueue !== undefined &&
+    virtualAgencyQueue.producer_binding !== "QUEUE_VIRTUAL_AGENCY"
+  ) {
+    issues.add("stevie-virtual-agency queue is missing QUEUE_VIRTUAL_AGENCY binding");
+  }
+
+  const endpointKey = (endpoint: PluggedInSocialIntegrationEndpointManifest) =>
+    `${endpoint.method} ${endpoint.path}`;
+  const endpoints = new Map(
+    platformManifest.api_endpoints.map((endpoint) => [endpointKey(endpoint), endpoint]),
+  );
+  const internalTaskEndpoint = endpoints.get("POST /api/internal/virtual-agency/task");
+  if (internalTaskEndpoint?.boundary !== "internal_system_rls") {
+    issues.add("internal virtual-agency task endpoint is not system-RLS scoped");
+  }
+  const manifestEndpoint = endpoints.get("GET /api/integration/v1/platform-manifest");
+  if (manifestEndpoint?.boundary !== "public_rls") {
+    issues.add("platform manifest endpoint is not public-RLS scoped");
+  }
+
+  const dataTables = new Set(
+    platformManifest.data_resources.map((resource) => resource.table),
+  );
+  for (const table of REQUIRED_LIVE_DATA_TABLES) {
+    if (!dataTables.has(table)) {
+      issues.add(`missing platform data table: ${table}`);
+    }
+  }
+  const eventResource = platformManifest.data_resources.find(
+    (resource) => resource.table === "virtual_agency_events",
+  );
+  if (
+    eventResource !== undefined &&
+    !eventResource.durable_evidence_fields.includes("event_hash")
+  ) {
+    issues.add("virtual_agency_events resource lacks event_hash evidence field");
+  }
+
+  const configKeys = new Set(
+    platformManifest.configuration_requirements.map((config) => config.key),
+  );
+  for (const key of REQUIRED_LIVE_CONFIG_KEYS) {
+    if (!configKeys.has(key)) {
+      issues.add(`missing platform configuration key: ${key}`);
+    }
+  }
+  for (const gate of REQUIRED_LIVE_GOVERNANCE_GATES) {
+    if (!platformManifest.governance_gates.includes(gate)) {
+      issues.add(`missing platform governance gate: ${gate}`);
     }
   }
 
@@ -792,6 +993,11 @@ function liveRunEvidenceRefs(
       "source_record",
       "plugged_in_social:integration_api:capabilities",
       "PluggedInSocial integration API capabilities",
+    ),
+    stateRef(
+      "source_record",
+      "plugged_in_social:integration_api:platform_manifest",
+      "PluggedInSocial integration API platform manifest",
     ),
     ...snapshot.tasks.map((task) =>
       stateRef(

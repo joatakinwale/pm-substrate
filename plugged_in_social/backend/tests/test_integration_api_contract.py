@@ -13,6 +13,7 @@ def test_integration_router_imports_with_neutral_v1_prefix():
     }
 
     assert ("/integration/v1/capabilities", frozenset({"GET"})) in route_methods
+    assert ("/integration/v1/platform-manifest", frozenset({"GET"})) in route_methods
     assert ("/integration/v1/events", frozenset({"POST"})) in route_methods
     assert ("/integration/v1/engagements", frozenset({"GET"})) in route_methods
     assert (
@@ -58,6 +59,7 @@ def test_integration_router_uses_rls_and_has_no_substrate_imports():
     assert "get_db_with_rls_dep" in src
     assert "get_current_user" in src
     assert "async def get_capabilities(" in src
+    assert "async def get_platform_manifest(" in src
     assert "_org_id_from_user(current_user)" in src
     assert "pm_substrate" not in src
     assert "packages.profile" not in src
@@ -78,6 +80,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationAcceptedResponse,
         IntegrationArtifactEnvelope,
         IntegrationCapabilityResponse,
+        IntegrationPlatformManifestEnvelope,
         IntegrationEvidenceSummaryEnvelope,
         IntegrationEventIngest,
         IntegrationRunEventEnvelope,
@@ -86,6 +89,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
     )
 
     capability_fields = set(IntegrationCapabilityResponse.model_fields)
+    platform_manifest_fields = set(IntegrationPlatformManifestEnvelope.model_fields)
     run_fields = set(IntegrationMarketingRunEnvelope.model_fields)
     artifact_fields = set(IntegrationArtifactEnvelope.model_fields)
     task_fields = set(IntegrationTaskEnvelope.model_fields)
@@ -97,6 +101,19 @@ def test_integration_schemas_expose_stable_external_envelopes():
     assert {"version", "service", "capabilities", "closed_loop_stages"}.issubset(
         capability_fields
     )
+    assert {
+        "resource_type",
+        "version",
+        "service",
+        "closed_loop_stages",
+        "governance_gates",
+        "agents",
+        "queues",
+        "api_endpoints",
+        "data_resources",
+        "configuration_requirements",
+        "links",
+    }.issubset(platform_manifest_fields)
     assert {
         "id",
         "org_id",
@@ -154,3 +171,52 @@ def test_integration_schemas_expose_stable_external_envelopes():
     assert {"ok", "status", "payload_hash", "artifact_id"}.issubset(
         accepted_fields
     )
+
+
+def test_platform_manifest_exposes_agents_config_data_and_gates():
+    import app.api.integration as module
+
+    manifest = module._platform_manifest()
+
+    assert manifest.resource_type == "plugged_in_social_platform_manifest"
+    assert manifest.closed_loop_stages == [
+        "intake",
+        "strategy",
+        "content",
+        "approval",
+        "scheduling",
+        "publishing",
+        "metrics",
+        "report",
+        "next_action",
+    ]
+    assert {agent.role for agent in manifest.agents} == {
+        "chief_of_staff",
+        "content_creative",
+        "scheduling_distribution",
+        "community_engagement",
+        "analytics_reporting",
+    }
+    content_agent = next(
+        agent for agent in manifest.agents if agent.role == "content_creative"
+    )
+    assert content_agent.queue == "stevie-virtual-agency"
+    assert "social_post.create" in content_agent.writes
+    assert "social_post.draft_created" in content_agent.emits
+    assert any(queue.queue == "stevie-virtual-agency" for queue in manifest.queues)
+    assert any(
+        endpoint.path == "/api/internal/virtual-agency/task"
+        and endpoint.boundary == "internal_system_rls"
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        resource.table == "virtual_agency_events"
+        and "event_hash" in resource.durable_evidence_fields
+        for resource in manifest.data_resources
+    )
+    assert any(
+        config.key == "BACKEND_BASE_URL" and config.kind == "secret"
+        for config in manifest.configuration_requirements
+    )
+    assert "tenant_rls" in manifest.governance_gates
+    assert "content_hash_gate" in manifest.governance_gates

@@ -37,6 +37,62 @@ class IntegrationCapabilityResponse(BaseModel):
     closed_loop_stages: list[str]
 
 
+class IntegrationAgentManifest(BaseModel):
+    role: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    description: str
+    writes: list[str]
+    emits: list[str]
+    queue: str | None = None
+    task_types: list[str] = Field(default_factory=list)
+
+
+class IntegrationQueueManifest(BaseModel):
+    queue: str = Field(min_length=1)
+    worker: str = Field(min_length=1)
+    dead_letter_queue: str | None = None
+    producer_binding: str | None = None
+
+
+class IntegrationEndpointManifest(BaseModel):
+    method: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    boundary: Literal["public_rls", "internal_system_rls", "internal_secret"]
+    capability_ids: list[str] = Field(default_factory=list)
+
+
+class IntegrationDataResourceManifest(BaseModel):
+    id: str = Field(min_length=1)
+    table: str = Field(min_length=1)
+    resource_type: str = Field(min_length=1)
+    org_scoped: bool = True
+    durable_evidence_fields: list[str] = Field(default_factory=list)
+    read_capability_ids: list[str] = Field(default_factory=list)
+    write_capability_ids: list[str] = Field(default_factory=list)
+
+
+class IntegrationConfigurationRequirement(BaseModel):
+    key: str = Field(min_length=1)
+    kind: Literal["environment", "secret", "queue_binding"]
+    required_for: list[str] = Field(default_factory=list)
+
+
+class IntegrationPlatformManifestEnvelope(BaseModel):
+    resource_type: Literal["plugged_in_social_platform_manifest"] = (
+        "plugged_in_social_platform_manifest"
+    )
+    version: Literal["v1"] = "v1"
+    service: Literal["plugged_in_social"] = "plugged_in_social"
+    closed_loop_stages: list[str]
+    governance_gates: list[str]
+    agents: list[IntegrationAgentManifest]
+    queues: list[IntegrationQueueManifest]
+    api_endpoints: list[IntegrationEndpointManifest]
+    data_resources: list[IntegrationDataResourceManifest]
+    configuration_requirements: list[IntegrationConfigurationRequirement]
+    links: list[IntegrationLink]
+
+
 class IntegrationEngagementEnvelope(BaseModel):
     resource_type: Literal["client_engagement"] = "client_engagement"
     id: uuid.UUID

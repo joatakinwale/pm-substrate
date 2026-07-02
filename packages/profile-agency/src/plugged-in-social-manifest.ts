@@ -737,6 +737,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes("get_db_with_rls_dep") &&
       integrationApi.includes("get_current_user") &&
       integrationApi.includes('"/capabilities"') &&
+      integrationApi.includes('"/platform-manifest"') &&
       integrationApi.includes('"/engagements"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/artifacts"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/tasks"') &&
@@ -746,6 +747,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes('"/events"') &&
       integrationApi.includes('"/webhooks"') &&
       integrationSchemas.includes("IntegrationCapabilityResponse") &&
+      integrationSchemas.includes("IntegrationPlatformManifestEnvelope") &&
+      integrationSchemas.includes("IntegrationAgentManifest") &&
+      integrationSchemas.includes("IntegrationConfigurationRequirement") &&
+      integrationSchemas.includes("IntegrationDataResourceManifest") &&
       integrationSchemas.includes("IntegrationMarketingRunEnvelope") &&
       integrationSchemas.includes("IntegrationArtifactEnvelope") &&
       integrationSchemas.includes("IntegrationTaskEnvelope") &&
