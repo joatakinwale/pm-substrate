@@ -302,6 +302,10 @@ export default function AgencyCommandCenterPage() {
     const hasScheduledPost = Number(socialStatusCounts.scheduled || 0) > 0;
     const hasPublishedPost = Number(socialStatusCounts.published || 0) > 0;
     const reportCount = evidenceSummary?.report_count ?? clientReports.length;
+    const reportEvidenceCount = reportCount || 1;
+    const hasReportMetricsEvidence =
+      (evidenceSummary?.evidence_hashes?.client_report_metrics_hashes || [])
+        .length > 0 || reportCount > 0;
     const hasReportArtifact = artifacts.some(
       (artifact) =>
         artifact.artifact_type === "client_report" ||
@@ -340,13 +344,15 @@ export default function AgencyCommandCenterPage() {
         : hasScheduledPost
           ? "Scheduled post awaiting publish evidence."
           : "Waiting for publish evidence.",
-      metrics: taskTypeSet.has("analytics_reporting")
-        ? completedTaskTypeSet.has("analytics_reporting")
-          ? "Metrics/reporting task completed."
-          : "Analytics task queued."
-        : "Waiting for metrics task.",
+      metrics: hasReportMetricsEvidence
+        ? "Report metrics evidence recorded."
+        : taskTypeSet.has("analytics_reporting")
+          ? completedTaskTypeSet.has("analytics_reporting")
+            ? "Metrics/reporting task completed."
+            : "Analytics task queued."
+          : "Waiting for metrics task.",
       report: hasReportEvidence
-        ? `${reportCount || 1} report evidence record${(reportCount || 1) === 1 ? "" : "s"} present.`
+        ? `${reportEvidenceCount} report evidence record${reportEvidenceCount === 1 ? "" : "s"} present.`
         : "Waiting for report evidence.",
       next_action: hasNextAction
         ? "Next action proposal recorded."
@@ -378,7 +384,12 @@ export default function AgencyCommandCenterPage() {
       } else if (stage === "publishing" && hasScheduledPost) {
         status = "active";
       }
-      if (stage === "metrics" && completedTaskTypeSet.has("analytics_reporting")) {
+      if (stage === "metrics" && hasReportMetricsEvidence) {
+        status = "complete";
+      } else if (
+        stage === "metrics" &&
+        completedTaskTypeSet.has("analytics_reporting")
+      ) {
         status = "complete";
       } else if (stage === "metrics" && taskTypeSet.has("analytics_reporting")) {
         status = "active";

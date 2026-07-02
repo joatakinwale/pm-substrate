@@ -71,7 +71,9 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "latest_event_hash" in source
     assert "social_post_content_hashes" in source
     assert "client_report_hashes" in source
+    assert "client_report_metrics_hashes" in source
     assert "report_count" in source
+    assert "Report metrics evidence recorded." in source
     assert "Report Status" in source
 
 
