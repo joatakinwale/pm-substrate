@@ -37,6 +37,7 @@ from app.schemas.integration import (
     IntegrationEngagementEnvelope,
     IntegrationEvidenceSummaryEnvelope,
     IntegrationEventIngest,
+    IntegrationExternalAdapterManifest,
     IntegrationLink,
     IntegrationMarketingRunEnvelope,
     IntegrationPlatformManifestEnvelope,
@@ -643,9 +644,22 @@ def _capabilities() -> list[IntegrationCapability]:
         IntegrationCapability(
             id="platform_manifest.read",
             name="Read platform integration manifest",
-            description="Inspect agent, queue, endpoint, data, and configuration metadata for external orchestration.",
+            description=(
+                "Inspect agent, queue, endpoint, data, configuration, and external "
+                "adapter metadata for external orchestration."
+            ),
             methods=["GET"],
             resources=["platform_manifest"],
+        ),
+        IntegrationCapability(
+            id="external_adapter_manifest.read",
+            name="Read external adapter manifest",
+            description=(
+                "Inspect neutral adapter contracts for browser QA harnesses and "
+                "external agent harnesses without coupling to a specific runtime."
+            ),
+            methods=["GET"],
+            resources=["external_adapter"],
         ),
         IntegrationCapability(
             id="engagement.read",
@@ -896,6 +910,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
         ),
         IntegrationEndpointManifest(
             method="GET",
+            path="/api/integration/v1/external-adapters",
+            boundary="public_rls",
+            capability_ids=["external_adapter_manifest.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
             path="/api/integration/v1/engagements",
             boundary="public_rls",
             capability_ids=["engagement.read"],
@@ -1117,6 +1137,122 @@ def _configuration_manifest() -> list[IntegrationConfigurationRequirement]:
     ]
 
 
+def _external_adapter_manifest() -> list[IntegrationExternalAdapterManifest]:
+    return [
+        IntegrationExternalAdapterManifest(
+            id="browser_qa_harness",
+            name="Browser QA harness",
+            adapter_type="browser_qa_harness",
+            boundary="sandboxed_process",
+            description=(
+                "Runs external browser verification flows and returns reproducible "
+                "evidence artifacts without direct PluggedInSocial state mutation."
+            ),
+            capabilities=[
+                "affected_flow_detection",
+                "browser_replay",
+                "playwright_script_capture",
+                "trace_capture",
+                "network_har_capture",
+                "console_log_capture",
+                "self_contained_report",
+            ],
+            input_contracts=[
+                "git_diff",
+                "operator_flow_prompt",
+                "target_url",
+                "auth_context_ref",
+            ],
+            output_artifacts=[
+                "report_html",
+                "playwright_script",
+                "trace_zip",
+                "network_har",
+                "console_log",
+                "screen_recording",
+                "step_screenshots",
+            ],
+            required_gates=[
+                "tenant_rls",
+                "approval_payload_hash",
+                "evidence_hash_gate",
+                "no_secret_exfiltration",
+            ],
+            evidence_fields=[
+                "artifact_payload_hash",
+                "report_uri",
+                "trace_uri",
+                "har_uri",
+                "script_hash",
+                "console_error_count",
+            ],
+            notes={
+                "inspired_by": "canary",
+                "coupling": "adapter_contract_only",
+                "source": "https://github.com/LopeWale/canary",
+            },
+        ),
+        IntegrationExternalAdapterManifest(
+            id="agent_harness",
+            name="External agent harness",
+            adapter_type="agent_harness",
+            boundary="containerized_process",
+            description=(
+                "Executes external agent loops against approved task contracts while "
+                "PluggedInSocial retains tenant, capability, approval, and evidence gates."
+            ),
+            capabilities=[
+                "multi_provider_llm",
+                "tool_calling",
+                "agent_loop_state",
+                "session_tree",
+                "json_mode",
+                "rpc_mode",
+                "sdk_embedding",
+                "extension_packages",
+            ],
+            input_contracts=[
+                "virtual_agency_task",
+                "approval_payload_hash",
+                "capability_grant",
+                "tenant_context",
+                "evidence_snapshot",
+            ],
+            output_artifacts=[
+                "agent_session_tree",
+                "tool_call_log",
+                "proposed_mutations",
+                "artifact_payload",
+                "next_action_proposal",
+            ],
+            required_gates=[
+                "tenant_rls",
+                "capability_gate",
+                "approval_payload_hash",
+                "content_hash_gate",
+                "sandbox_boundary",
+                "durable_event_hash",
+            ],
+            evidence_fields=[
+                "session_id",
+                "tool_call_hash",
+                "state_ref",
+                "approval_payload_hash",
+                "output_payload_hash",
+            ],
+            notes={
+                "inspired_by": "pi",
+                "coupling": "adapter_contract_only",
+                "source": "https://github.com/earendil-works/pi",
+                "security": (
+                    "External harnesses without built-in permission systems must run "
+                    "behind PluggedInSocial gates and a containerized boundary."
+                ),
+            },
+        ),
+    ]
+
+
 def _platform_manifest() -> IntegrationPlatformManifestEnvelope:
     return IntegrationPlatformManifestEnvelope(
         closed_loop_stages=_CLOSED_LOOP_STAGES,
@@ -1131,14 +1267,20 @@ def _platform_manifest() -> IntegrationPlatformManifestEnvelope:
             "idempotency_key",
             "durable_event_hash",
             "next_action_approval",
+            "external_adapter_boundary",
+            "sandbox_boundary",
+            "evidence_hash_gate",
+            "no_secret_exfiltration",
         ],
         agents=_agent_manifest(),
         queues=_queue_manifest(),
         api_endpoints=_endpoint_manifest(),
         data_resources=_data_resource_manifest(),
         configuration_requirements=_configuration_manifest(),
+        external_adapters=_external_adapter_manifest(),
         links=[
             _link("capabilities", "/api/integration/v1/capabilities"),
+            _link("external_adapters", "/api/integration/v1/external-adapters"),
             _link("engagements", "/api/integration/v1/engagements"),
         ],
     )
@@ -1165,6 +1307,19 @@ async def get_platform_manifest(
     _ = db
     _org_id_from_user(current_user)
     return _platform_manifest()
+
+
+@router.get(
+    "/external-adapters",
+    response_model=list[IntegrationExternalAdapterManifest],
+)
+async def get_external_adapters(
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    _ = db
+    _org_id_from_user(current_user)
+    return _external_adapter_manifest()
 
 
 @router.get("/engagements", response_model=list[IntegrationEngagementEnvelope])

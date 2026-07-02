@@ -81,6 +81,25 @@ class IntegrationConfigurationRequirement(BaseModel):
     required_for: list[str] = Field(default_factory=list)
 
 
+class IntegrationExternalAdapterManifest(BaseModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    adapter_type: Literal["browser_qa_harness", "agent_harness"]
+    boundary: Literal[
+        "external_process",
+        "sandboxed_process",
+        "containerized_process",
+        "hosted_service",
+    ]
+    description: str
+    capabilities: list[str] = Field(default_factory=list)
+    input_contracts: list[str] = Field(default_factory=list)
+    output_artifacts: list[str] = Field(default_factory=list)
+    required_gates: list[str] = Field(default_factory=list)
+    evidence_fields: list[str] = Field(default_factory=list)
+    notes: dict[str, Any] = Field(default_factory=dict)
+
+
 class IntegrationPlatformManifestEnvelope(BaseModel):
     resource_type: Literal["plugged_in_social_platform_manifest"] = (
         "plugged_in_social_platform_manifest"
@@ -94,6 +113,7 @@ class IntegrationPlatformManifestEnvelope(BaseModel):
     api_endpoints: list[IntegrationEndpointManifest]
     data_resources: list[IntegrationDataResourceManifest]
     configuration_requirements: list[IntegrationConfigurationRequirement]
+    external_adapters: list[IntegrationExternalAdapterManifest]
     links: list[IntegrationLink]
 
 

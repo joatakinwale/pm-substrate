@@ -35,6 +35,7 @@ export const PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES = [
   "metricsReadyAnalyticsDispatch",
   "closedLoopRuntimeFixture",
   "externalIntegrationBoundary",
+  "externalAdapterBoundary",
   "operatorRunMonitorSurface",
 ] as const;
 
@@ -92,6 +93,28 @@ export interface PluggedInSocialConfigurationManifest {
   readonly compatibilityDate?: string;
 }
 
+export type PluggedInSocialExternalAdapterType =
+  | "browser_qa_harness"
+  | "agent_harness";
+
+export type PluggedInSocialExternalAdapterBoundary =
+  | "external_process"
+  | "sandboxed_process"
+  | "containerized_process"
+  | "hosted_service";
+
+export interface PluggedInSocialExternalAdapterManifest {
+  readonly id: string;
+  readonly adapterType: PluggedInSocialExternalAdapterType;
+  readonly sourcePath: string;
+  readonly boundary: PluggedInSocialExternalAdapterBoundary;
+  readonly capabilities: readonly string[];
+  readonly inputContracts: readonly string[];
+  readonly outputArtifacts: readonly string[];
+  readonly requiredGates: readonly string[];
+  readonly evidenceFields: readonly string[];
+}
+
 export interface PluggedInSocialDataModelManifest {
   readonly table: string;
   readonly model: string;
@@ -122,6 +145,7 @@ export interface PluggedInSocialSourceManifest {
   readonly dataTables: readonly string[];
   readonly dataModels: readonly PluggedInSocialDataModelManifest[];
   readonly configurations: readonly PluggedInSocialConfigurationManifest[];
+  readonly externalAdapters: readonly PluggedInSocialExternalAdapterManifest[];
   readonly governance: PluggedInSocialGovernance;
   readonly closedLoopStages: readonly PluggedInSocialClosedLoopStage[];
   readonly evidenceRefs: readonly PluggedInSocialManifestRef[];
@@ -183,6 +207,11 @@ const REQUIRED_CONFIGURATION_NAMES = [
   "stevie-queue-producer",
   "stevie-virtual-agency",
   "stevie-social-cron",
+] as const;
+
+const REQUIRED_EXTERNAL_ADAPTER_IDS = [
+  "browser_qa_harness",
+  "agent_harness",
 ] as const;
 
 const DURABLE_EVIDENCE_FIELD_NAMES = [
@@ -368,6 +397,155 @@ function extractApiEndpoints(
       return endpoint !== undefined;
     });
   });
+}
+
+function sourceIncludesAll(source: string, values: readonly string[]): boolean {
+  return values.every((value) => source.includes(value));
+}
+
+function buildExternalAdapters(
+  sourceRoot: string,
+): readonly PluggedInSocialExternalAdapterManifest[] {
+  const sourcePath = "backend/app/api/integration.py";
+  const apiSource = readSource(sourceRoot, sourcePath);
+  const schemaSource = readSource(sourceRoot, "backend/app/schemas/integration.py");
+  const hasAdapterContract =
+    schemaSource.includes("IntegrationExternalAdapterManifest") &&
+    schemaSource.includes("external_adapters") &&
+    apiSource.includes("_external_adapter_manifest") &&
+    apiSource.includes('"/external-adapters"') &&
+    apiSource.includes("external_adapter_manifest.read");
+
+  if (!hasAdapterContract) {
+    return [];
+  }
+
+  const adapters: PluggedInSocialExternalAdapterManifest[] = [];
+
+  if (
+    sourceIncludesAll(apiSource, [
+      "browser_qa_harness",
+      "sandboxed_process",
+      "affected_flow_detection",
+      "playwright_script_capture",
+      "network_har",
+      "trace_zip",
+      "evidence_hash_gate",
+      "no_secret_exfiltration",
+      "script_hash",
+      "console_error_count",
+    ])
+  ) {
+    adapters.push({
+      id: "browser_qa_harness",
+      adapterType: "browser_qa_harness",
+      sourcePath,
+      boundary: "sandboxed_process",
+      capabilities: [
+        "affected_flow_detection",
+        "browser_replay",
+        "playwright_script_capture",
+        "trace_capture",
+        "network_har_capture",
+        "console_log_capture",
+        "self_contained_report",
+      ],
+      inputContracts: [
+        "git_diff",
+        "operator_flow_prompt",
+        "target_url",
+        "auth_context_ref",
+      ],
+      outputArtifacts: [
+        "report_html",
+        "playwright_script",
+        "trace_zip",
+        "network_har",
+        "console_log",
+        "screen_recording",
+        "step_screenshots",
+      ],
+      requiredGates: [
+        "tenant_rls",
+        "approval_payload_hash",
+        "evidence_hash_gate",
+        "no_secret_exfiltration",
+      ],
+      evidenceFields: [
+        "artifact_payload_hash",
+        "report_uri",
+        "trace_uri",
+        "har_uri",
+        "script_hash",
+        "console_error_count",
+      ],
+    });
+  }
+
+  if (
+    sourceIncludesAll(apiSource, [
+      "agent_harness",
+      "containerized_process",
+      "multi_provider_llm",
+      "tool_calling",
+      "session_tree",
+      "virtual_agency_task",
+      "capability_grant",
+      "tool_call_log",
+      "sandbox_boundary",
+      "durable_event_hash",
+      "tool_call_hash",
+      "output_payload_hash",
+    ])
+  ) {
+    adapters.push({
+      id: "agent_harness",
+      adapterType: "agent_harness",
+      sourcePath,
+      boundary: "containerized_process",
+      capabilities: [
+        "multi_provider_llm",
+        "tool_calling",
+        "agent_loop_state",
+        "session_tree",
+        "json_mode",
+        "rpc_mode",
+        "sdk_embedding",
+        "extension_packages",
+      ],
+      inputContracts: [
+        "virtual_agency_task",
+        "approval_payload_hash",
+        "capability_grant",
+        "tenant_context",
+        "evidence_snapshot",
+      ],
+      outputArtifacts: [
+        "agent_session_tree",
+        "tool_call_log",
+        "proposed_mutations",
+        "artifact_payload",
+        "next_action_proposal",
+      ],
+      requiredGates: [
+        "tenant_rls",
+        "capability_gate",
+        "approval_payload_hash",
+        "content_hash_gate",
+        "sandbox_boundary",
+        "durable_event_hash",
+      ],
+      evidenceFields: [
+        "session_id",
+        "tool_call_hash",
+        "state_ref",
+        "approval_payload_hash",
+        "output_payload_hash",
+      ],
+    });
+  }
+
+  return adapters.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function extractTables(sourceRoot: string): readonly string[] {
@@ -769,6 +947,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes("get_current_user") &&
       integrationApi.includes('"/capabilities"') &&
       integrationApi.includes('"/platform-manifest"') &&
+      integrationApi.includes('"/external-adapters"') &&
       integrationApi.includes('"/engagements"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/artifacts"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/tasks"') &&
@@ -783,6 +962,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationSchemas.includes("IntegrationAgentManifest") &&
       integrationSchemas.includes("IntegrationConfigurationRequirement") &&
       integrationSchemas.includes("IntegrationDataResourceManifest") &&
+      integrationSchemas.includes("IntegrationExternalAdapterManifest") &&
       integrationSchemas.includes("IntegrationMarketingRunEnvelope") &&
       integrationSchemas.includes("IntegrationArtifactEnvelope") &&
       integrationSchemas.includes("IntegrationTaskEnvelope") &&
@@ -793,6 +973,24 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       !integrationApi.includes("pm_substrate") &&
       !integrationApi.includes("packages.profile") &&
       !integrationApi.includes("packages/evals"),
+    externalAdapterBoundary:
+      integrationApi.includes("_external_adapter_manifest") &&
+      integrationApi.includes("get_external_adapters") &&
+      integrationApi.includes("external_adapter_manifest.read") &&
+      integrationApi.includes("browser_qa_harness") &&
+      integrationApi.includes("agent_harness") &&
+      integrationApi.includes("sandboxed_process") &&
+      integrationApi.includes("containerized_process") &&
+      integrationApi.includes("evidence_hash_gate") &&
+      integrationApi.includes("sandbox_boundary") &&
+      integrationApi.includes("no_secret_exfiltration") &&
+      integrationApi.includes("tool_call_hash") &&
+      integrationApi.includes("network_har") &&
+      integrationSchemas.includes("IntegrationExternalAdapterManifest") &&
+      integrationSchemas.includes("external_adapters") &&
+      integrationTests.includes("external_adapter_manifest.read") &&
+      integrationTests.includes("browser_qa_harness") &&
+      integrationTests.includes("sandbox_boundary"),
     operatorRunMonitorSurface:
       frontendApi.includes("export interface IntegrationTask") &&
       frontendApi.includes("export interface IntegrationRunEvidenceSnapshot") &&
@@ -1019,6 +1217,12 @@ function buildEvidenceRefs(): readonly PluggedInSocialManifestRef[] {
     },
     {
       kind: "source_record",
+      id: "plugged_in_social:api:external-adapter-manifest",
+      label: "External QA and agent harness adapter manifest",
+      path: "backend/app/api/integration.py",
+    },
+    {
+      kind: "source_record",
       id: "plugged_in_social:ledger:virtual-agency",
       label: "Virtual agency orchestration ledger",
       path: "backend/app/models/virtual_agency.py",
@@ -1111,6 +1315,22 @@ function missingReadinessItems(
       missing.add(`missing configuration: ${configuration}`);
     }
   }
+  for (const adapterId of REQUIRED_EXTERNAL_ADAPTER_IDS) {
+    const adapter = manifest.externalAdapters.find((item) => item.id === adapterId);
+    if (adapter === undefined) {
+      missing.add(`missing external adapter: ${adapterId}`);
+      continue;
+    }
+    if (adapter.requiredGates.length === 0) {
+      missing.add(`missing external adapter gates: ${adapterId}`);
+    }
+    if (adapter.outputArtifacts.length === 0) {
+      missing.add(`missing external adapter artifacts: ${adapterId}`);
+    }
+    if (adapter.evidenceFields.length === 0) {
+      missing.add(`missing external adapter evidence fields: ${adapterId}`);
+    }
+  }
   for (const gate of PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES) {
     if (!manifest.governance[gate]) {
       missing.add(`missing governance gate: ${gate}`);
@@ -1155,6 +1375,7 @@ export function readPluggedInSocialSourceManifest(
     dataTables: extractTables(sourceRoot),
     dataModels: extractDataModels(sourceRoot),
     configurations: buildConfigurations(sourceRoot),
+    externalAdapters: buildExternalAdapters(sourceRoot),
     governance: buildGovernance(sourceRoot),
     closedLoopStages: buildClosedLoopStages(sourceRoot),
     evidenceRefs: buildEvidenceRefs(),

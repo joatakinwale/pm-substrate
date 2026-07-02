@@ -76,6 +76,11 @@ describe("PluggedInSocial source manifest", () => {
         }),
         expect.objectContaining({
           method: "GET",
+          path: "/integration/v1/external-adapters",
+          boundary: "public_rls",
+        }),
+        expect.objectContaining({
+          method: "GET",
           path: "/integration/v1/marketing-runs/{run_id}/artifacts",
           boundary: "public_rls",
         }),
@@ -233,6 +238,57 @@ describe("PluggedInSocial source manifest", () => {
         .filter((config) => config.kind === "worker_wrangler")
         .every((config) => /^\d{4}-\d{2}-\d{2}$/.test(config.compatibilityDate ?? "")),
     ).toBe(true);
+    expect(manifest.externalAdapters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "agent_harness",
+          adapterType: "agent_harness",
+          boundary: "containerized_process",
+          sourcePath: "backend/app/api/integration.py",
+          inputContracts: expect.arrayContaining([
+            "virtual_agency_task",
+            "approval_payload_hash",
+            "capability_grant",
+          ]),
+          outputArtifacts: expect.arrayContaining([
+            "agent_session_tree",
+            "tool_call_log",
+            "next_action_proposal",
+          ]),
+          requiredGates: expect.arrayContaining([
+            "tenant_rls",
+            "capability_gate",
+            "sandbox_boundary",
+            "durable_event_hash",
+          ]),
+          evidenceFields: expect.arrayContaining([
+            "tool_call_hash",
+            "output_payload_hash",
+          ]),
+        }),
+        expect.objectContaining({
+          id: "browser_qa_harness",
+          adapterType: "browser_qa_harness",
+          boundary: "sandboxed_process",
+          sourcePath: "backend/app/api/integration.py",
+          outputArtifacts: expect.arrayContaining([
+            "report_html",
+            "playwright_script",
+            "network_har",
+            "trace_zip",
+          ]),
+          requiredGates: expect.arrayContaining([
+            "tenant_rls",
+            "evidence_hash_gate",
+            "no_secret_exfiltration",
+          ]),
+          evidenceFields: expect.arrayContaining([
+            "script_hash",
+            "console_error_count",
+          ]),
+        }),
+      ]),
+    );
 
     for (const gate of PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES) {
       expect(manifest.governance[gate]).toBe(true);
@@ -243,6 +299,7 @@ describe("PluggedInSocial source manifest", () => {
     expect(manifest.governance.metricsReadyAnalyticsDispatch).toBe(true);
     expect(manifest.governance.closedLoopRuntimeFixture).toBe(true);
     expect(manifest.governance.externalIntegrationBoundary).toBe(true);
+    expect(manifest.governance.externalAdapterBoundary).toBe(true);
     expect(manifest.governance.sharedPayloadContract).toBe(true);
     expect(manifest.governance.operatorRunMonitorSurface).toBe(true);
     expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
@@ -253,6 +310,9 @@ describe("PluggedInSocial source manifest", () => {
     );
     expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
       "operatorRunMonitorSurface",
+    );
+    expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
+      "externalAdapterBoundary",
     );
     expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
       "publishContentHashGate",
@@ -309,6 +369,12 @@ describe("PluggedInSocial source manifest", () => {
     expect(manifest.evidenceRefs).toContainEqual(
       expect.objectContaining({
         id: "plugged_in_social:api:integration-v1",
+        path: "backend/app/api/integration.py",
+      }),
+    );
+    expect(manifest.evidenceRefs).toContainEqual(
+      expect.objectContaining({
+        id: "plugged_in_social:api:external-adapter-manifest",
         path: "backend/app/api/integration.py",
       }),
     );

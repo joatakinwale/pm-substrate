@@ -16,6 +16,7 @@ def test_integration_router_imports_with_neutral_v1_prefix():
 
     assert ("/integration/v1/capabilities", frozenset({"GET"})) in route_methods
     assert ("/integration/v1/platform-manifest", frozenset({"GET"})) in route_methods
+    assert ("/integration/v1/external-adapters", frozenset({"GET"})) in route_methods
     assert ("/integration/v1/events", frozenset({"POST"})) in route_methods
     assert ("/integration/v1/engagements", frozenset({"GET"})) in route_methods
     assert (
@@ -106,6 +107,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationPlatformManifestEnvelope,
         IntegrationEvidenceSummaryEnvelope,
         IntegrationEventIngest,
+        IntegrationExternalAdapterManifest,
         IntegrationRunDispatchEnvelope,
         IntegrationRunEventEnvelope,
         IntegrationRunEvidenceSnapshotEnvelope,
@@ -128,6 +130,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationRunEvidenceSnapshotEnvelope.model_fields
     )
     event_fields = set(IntegrationEventIngest.model_fields)
+    external_adapter_fields = set(IntegrationExternalAdapterManifest.model_fields)
     accepted_fields = set(IntegrationAcceptedResponse.model_fields)
 
     assert {"version", "service", "capabilities", "closed_loop_stages"}.issubset(
@@ -144,8 +147,21 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "api_endpoints",
         "data_resources",
         "configuration_requirements",
+        "external_adapters",
         "links",
     }.issubset(platform_manifest_fields)
+    assert {
+        "id",
+        "name",
+        "adapter_type",
+        "boundary",
+        "capabilities",
+        "input_contracts",
+        "output_artifacts",
+        "required_gates",
+        "evidence_fields",
+        "notes",
+    }.issubset(external_adapter_fields)
     assert {
         "id",
         "org_id",
@@ -299,6 +315,12 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for endpoint in manifest.api_endpoints
     )
     assert any(
+        endpoint.path == "/api/integration/v1/external-adapters"
+        and endpoint.boundary == "public_rls"
+        and "external_adapter_manifest.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
         resource.table == "marketing_runs"
         and "marketing_run.dispatch" in resource.write_capability_ids
         for resource in manifest.data_resources
@@ -337,6 +359,29 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for capability in module._capabilities()
     )
     assert any(
+        capability.id == "external_adapter_manifest.read"
+        and "external_adapter" in capability.resources
+        for capability in module._capabilities()
+    )
+    assert {adapter.id for adapter in manifest.external_adapters} == {
+        "agent_harness",
+        "browser_qa_harness",
+    }
+    agent_adapter = next(
+        adapter for adapter in manifest.external_adapters if adapter.id == "agent_harness"
+    )
+    browser_adapter = next(
+        adapter
+        for adapter in manifest.external_adapters
+        if adapter.id == "browser_qa_harness"
+    )
+    assert agent_adapter.boundary == "containerized_process"
+    assert "sandbox_boundary" in agent_adapter.required_gates
+    assert "tool_call_hash" in agent_adapter.evidence_fields
+    assert browser_adapter.boundary == "sandboxed_process"
+    assert "network_har" in browser_adapter.output_artifacts
+    assert "evidence_hash_gate" in browser_adapter.required_gates
+    assert any(
         resource.table == "social_posts"
         and "current_content_hash" in resource.durable_evidence_fields
         and "lineage" in resource.durable_evidence_fields
@@ -348,6 +393,8 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     )
     assert "tenant_rls" in manifest.governance_gates
     assert "content_hash_gate" in manifest.governance_gates
+    assert "external_adapter_boundary" in manifest.governance_gates
+    assert "sandbox_boundary" in manifest.governance_gates
 
 
 def test_social_post_integration_envelope_derives_hash_and_lineage():
