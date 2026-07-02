@@ -113,18 +113,6 @@ export class PostgresProcedureAdmissionStore {
     readonly record: ProcedureAdmissionRecord;
     readonly evaluatedAt: string;
   }): Promise<void> {
-    const evaluation = evaluateProcedureAdmission({
-      definition: input.definition,
-      record: input.record,
-      evaluatedAt: input.evaluatedAt,
-    });
-    if (!evaluation.admissible) {
-      throw new ProcedureAdmissionStoreError(
-        `procedure admission ${input.record.admissionId} failed evaluation`,
-        evaluation.issues,
-      );
-    }
-
     const client = await this.#pool.connect();
     try {
       await client.query("BEGIN");
@@ -169,6 +157,17 @@ export class PostgresProcedureAdmissionStore {
                 "Procedure admission definition must match the stored definition hash.",
             },
           ],
+        );
+      }
+      const evaluation = evaluateProcedureAdmission({
+        definition: input.definition,
+        record: input.record,
+        evaluatedAt: input.evaluatedAt,
+      });
+      if (!evaluation.admissible) {
+        throw new ProcedureAdmissionStoreError(
+          `procedure admission ${input.record.admissionId} failed evaluation`,
+          evaluation.issues,
         );
       }
       const latest = await client.query<{
