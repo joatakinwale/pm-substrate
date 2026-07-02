@@ -100,6 +100,22 @@ def _link(rel: str, href: str) -> IntegrationLink:
 def _engagement_links(engagement_id: uuid.UUID) -> list[IntegrationLink]:
     return [
         _link("self", f"/api/integration/v1/engagements/{engagement_id}"),
+        _link(
+            "marketing_runs",
+            f"/api/integration/v1/engagements/{engagement_id}/marketing-runs",
+        ),
+        _link(
+            "artifacts",
+            f"/api/integration/v1/engagements/{engagement_id}/artifacts",
+        ),
+        _link(
+            "approvals",
+            f"/api/integration/v1/engagements/{engagement_id}/approvals",
+        ),
+        _link(
+            "access_requests",
+            f"/api/integration/v1/engagements/{engagement_id}/access-requests",
+        ),
     ]
 
 
@@ -1020,6 +1036,30 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             path="/api/integration/v1/engagements",
             boundary="public_rls",
             capability_ids=["engagement.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/engagements/{engagement_id}/marketing-runs",
+            boundary="public_rls",
+            capability_ids=["marketing_run.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/engagements/{engagement_id}/artifacts",
+            boundary="public_rls",
+            capability_ids=["artifact.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/engagements/{engagement_id}/approvals",
+            boundary="public_rls",
+            capability_ids=["approval.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/engagements/{engagement_id}/access-requests",
+            boundary="public_rls",
+            capability_ids=["access_request.read"],
         ),
         IntegrationEndpointManifest(
             method="GET",

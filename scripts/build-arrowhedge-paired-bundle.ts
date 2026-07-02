@@ -236,16 +236,14 @@ export async function writeArrowHedgePairedBundleBatchFromIntegration(
   const bundleDirs: string[] = [];
   for (const experiment of plan.experiments) {
     const outputDir = join(input.outputDir, sanitizePathSegment(experiment.experimentId));
+    const bearerToken = input.bearerToken ?? plan.bearerToken;
+    const generatedAt = experiment.generatedAt ?? plan.generatedAt;
     const result = await buildArrowHedgePairedExperimentBundleFromIntegrationRuns({
       experimentId: experiment.experimentId,
       integrationBaseUrl: plan.integrationBaseUrl,
-      ...(input.bearerToken ?? plan.bearerToken === undefined
-        ? {}
-        : { bearerToken: input.bearerToken ?? plan.bearerToken }),
+      ...(bearerToken === undefined ? {} : { bearerToken }),
       ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
-      ...(experiment.generatedAt ?? plan.generatedAt === undefined
-        ? {}
-        : { generatedAt: experiment.generatedAt ?? plan.generatedAt }),
+      ...(generatedAt === undefined ? {} : { generatedAt }),
       baseline: {
         runId: experiment.baseline.runId,
         ...(experiment.baseline.flowId === undefined
@@ -393,6 +391,105 @@ function readMetricsFile(
 ): ArrowHedgePairedExperimentArmMetrics | undefined {
   if (path === undefined) return undefined;
   return readPairedMetrics(readJsonFile<unknown>(path), label);
+}
+
+function readBatchPlan(path: string): ArrowHedgePairedBundleBatchPlan {
+  const value = readJsonFile<unknown>(path);
+  if (!isRecord(value)) {
+    throw new Error("batch plan must be an object");
+  }
+  const integrationBaseUrl = value["integrationBaseUrl"];
+  if (typeof integrationBaseUrl !== "string" || integrationBaseUrl.trim() === "") {
+    throw new Error("batch plan integrationBaseUrl must be a non-empty string");
+  }
+  const experimentsValue = value["experiments"];
+  if (!Array.isArray(experimentsValue) || experimentsValue.length === 0) {
+    throw new Error("batch plan experiments must be a non-empty array");
+  }
+  return {
+    ...(value["schemaVersion"] === undefined
+      ? {}
+      : { schemaVersion: "arrowhedge.paired-bundle-batch-plan.v1" as const }),
+    integrationBaseUrl,
+    ...(typeof value["bearerToken"] === "string"
+      ? { bearerToken: value["bearerToken"] }
+      : {}),
+    ...(typeof value["generatedAt"] === "string"
+      ? { generatedAt: value["generatedAt"] }
+      : {}),
+    experiments: experimentsValue.map((item, index) =>
+      readBatchPlanExperiment(item, index),
+    ),
+  };
+}
+
+function readBatchPlanExperiment(
+  value: unknown,
+  index: number,
+): ArrowHedgePairedBundleBatchPlan["experiments"][number] {
+  if (!isRecord(value)) {
+    throw new Error(`batch plan experiments[${index}] must be an object`);
+  }
+  const experimentId = value["experimentId"];
+  if (typeof experimentId !== "string" || experimentId.trim() === "") {
+    throw new Error(`batch plan experiments[${index}].experimentId must be a non-empty string`);
+  }
+  return {
+    experimentId,
+    ...(typeof value["generatedAt"] === "string"
+      ? { generatedAt: value["generatedAt"] }
+      : {}),
+    baseline: readBatchPlanArm(value["baseline"], `experiments[${index}].baseline`),
+    substrate: readBatchPlanArm(value["substrate"], `experiments[${index}].substrate`),
+  };
+}
+
+function readBatchPlanArm(
+  value: unknown,
+  path: string,
+): ArrowHedgePairedBundleBatchPlan["experiments"][number]["baseline"] {
+  if (!isRecord(value)) {
+    throw new Error(`batch plan ${path} must be an object`);
+  }
+  const runId = integerField(value, "runId", `batch plan ${path}.runId`);
+  return {
+    runId,
+    ...optionalIntegerField(value, "flowId"),
+    ...optionalIntegerField(value, "backtestRunId"),
+    ...(typeof value["mode"] === "string" ? { mode: value["mode"] } : {}),
+    ...(value["metrics"] === undefined
+      ? {}
+      : {
+          metrics: readPairedMetrics(
+            value["metrics"],
+            path.endsWith(".baseline") ? "baselineMetrics" : "substrateMetrics",
+          ),
+        }),
+  };
+}
+
+function integerField(
+  record: Record<string, unknown>,
+  field: string,
+  path: string,
+): number {
+  const value = record[field];
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${path} must be an integer`);
+  }
+  return value;
+}
+
+function optionalIntegerField<TField extends string>(
+  record: Record<string, unknown>,
+  field: TField,
+): Record<TField, number> | Record<string, never> {
+  const value = record[field];
+  if (value === undefined) return {};
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${field} must be an integer`);
+  }
+  return { [field]: value } as Record<TField, number>;
 }
 
 function readPairedMetrics(
