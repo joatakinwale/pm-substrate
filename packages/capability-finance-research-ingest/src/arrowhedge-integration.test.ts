@@ -248,7 +248,57 @@ describe("ArrowHedge integration API client", () => {
             end_date: "2024-01-02",
             api_keys: { OPENAI_API_KEY: { present: true } },
           },
-          results: { decisions: { AAPL: { action: "buy" } } },
+          results: {
+            decisions: { AAPL: { action: "buy" } },
+            provenance: {
+              schemaVersion: "arrowhedgelab.runtime-provenance.v1",
+              sourceArtifacts: [
+                {
+                  id: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  kind: "prices",
+                  ticker: "AAPL",
+                  sha256: "c1".repeat(32),
+                },
+              ],
+              toolRefs: [
+                {
+                  tool: "prices",
+                  ticker: "AAPL",
+                  sourceArtifactId: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  sha256: "c1".repeat(32),
+                },
+              ],
+              agentOutputs: [
+                {
+                  agent_id: "warren_buffett",
+                  base_agent_key: "warren_buffett",
+                  ticker: "AAPL",
+                  outputPath: "results[0].analyst_signals.warren_buffett.AAPL",
+                  outputSha256: "ab".repeat(32),
+                  sourceArtifactIds: [
+                    `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  ],
+                },
+              ],
+              decisions: [
+                {
+                  ticker: "AAPL",
+                  outputPath: "results[0].decisions.AAPL",
+                  outputSha256: "cd".repeat(32),
+                  inputAgentIds: ["warren_buffett"],
+                  sourceArtifactIds: [
+                    `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  ],
+                },
+              ],
+              hashes: {
+                sourceArtifactsSha256: "aa".repeat(32),
+                toolRefsSha256: "bb".repeat(32),
+                agentOutputsSha256: "cc".repeat(32),
+                decisionsSha256: "dd".repeat(32),
+              },
+            },
+          },
           hashes: {
             requestDataSha256: "e".repeat(64),
             resultsSha256: "f".repeat(64),
@@ -555,6 +605,7 @@ describe("ArrowHedge integration API client", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: expect.stringContaining("AAPL_2024-01-01_2024-01-02"),
+          sourceArtifactId: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
           ticker: "AAPL",
           sha256: "c1".repeat(32),
         }),
@@ -578,6 +629,20 @@ describe("ArrowHedge integration API client", () => {
     expect(envelopeResult.envelope?.decisions[0]?.evidenceDocumentIds).toEqual(
       expect.arrayContaining(evidenceIds),
     );
+    expect(envelopeResult.envelope?.signals[0]?.runtimeProvenance).toMatchObject({
+      outputPath: "results[0].analyst_signals.warren_buffett.AAPL",
+      outputSha256: "ab".repeat(32),
+      sourceArtifactIds: [
+        `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+      ],
+      evidenceDocumentIds: ["ev_source_prices_AAPL_2024-01-01_2024-01-02"],
+    });
+    expect(envelopeResult.envelope?.decisions[0]?.runtimeProvenance).toMatchObject({
+      outputPath: "results[0].decisions.AAPL",
+      outputSha256: "cd".repeat(32),
+      inputAgentIds: ["warren_buffett"],
+      evidenceDocumentIds: ["ev_source_prices_AAPL_2024-01-01_2024-01-02"],
+    });
     const expandedEnvelope = expandArrowHedgeRunEnvelope(envelopeResult.envelope);
     expect(expandedEnvelope).toMatchObject({
       valid: true,

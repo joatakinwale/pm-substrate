@@ -123,20 +123,21 @@ Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
   `compareArrowHedgeIntegrationRunEnvelopePair`, which rejects paired
   baseline/substrate envelopes when request scope, graph, model config,
   portfolio, or source-data hashes differ.
+- ArrowHedgeLab saved results now carry generated
+  `arrowhedgelab.runtime-provenance.v1` blocks with source artifacts, tool
+  refs, agent-output refs, and decision refs. The connector preserves those
+  runtime provenance refs on canonical envelope signal/decision records, and
+  line-item searches now enter the shared cache with request-specific keys.
 - The TypeScript substrate side still supports `arrowhedge.run-envelope.v1`
   through `packages/capability-finance-research-ingest` and
   `packages/substrate-http-demo`, and the connector now builds canonical
-  envelopes from external adapter snapshots. ArrowHedgeLab should still add
-  deeper per-agent/per-tool provenance at generation time, and paired experiment
-  automation is still required before live/backtest experiments can make strong
-  market-win claims.
+  envelopes from external adapter snapshots. Paired experiment automation is
+  still required before live/backtest experiments can make strong market-win
+  claims.
 
 The next valid historical experiment path is:
 
-1. Add deeper per-agent/per-tool provenance in ArrowHedge saved results at
-   generation time so the connector does not have to infer source refs from
-   ticker/date/source-artifact windows.
-2. Wire the paired envelope readiness gate into experiment commands so baseline
+1. Wire the paired envelope readiness gate into experiment commands so baseline
    and substrate arms are selected only when request, graph, model, portfolio,
    and source-data hashes match.
 
@@ -182,4 +183,4 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).
-- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, connector-side `arrowhedge.run-envelope.v1` generation, per-record evidence IDs in expanded connector envelopes, and paired baseline/substrate envelope readiness gates plus pm-substrate finance-ingest client landed.
+- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, ArrowHedge-generated runtime provenance, connector-side `arrowhedge.run-envelope.v1` generation, per-record evidence IDs/runtime provenance in expanded connector envelopes, and paired baseline/substrate envelope readiness gates plus pm-substrate finance-ingest client landed.

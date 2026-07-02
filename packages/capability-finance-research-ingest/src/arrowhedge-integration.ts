@@ -595,7 +595,13 @@ export function buildArrowHedgeRunEnvelopeFromIntegrationSnapshot(
   );
   const selectedDay = selectBacktestDay(backtestDays, input.backtestDaySequence);
   const runResult = recordOrUndefined(run.results);
-  const resultRecord = selectedDay ?? runResult;
+  const runProvenance = recordOrUndefined(runResult?.["provenance"]);
+  const resultRecord = selectedDay === undefined
+    ? runResult
+    : {
+        ...selectedDay,
+        ...(runProvenance === undefined ? {} : { provenance: runProvenance }),
+      };
 
   if (resultRecord === undefined) {
     issues.push(`run ${input.runId} has no backtest day or result payload to envelope`);
@@ -1248,6 +1254,14 @@ function arrayOfStrings(value: unknown): readonly string[] {
   );
 }
 
+function arrayOfRecords(value: unknown): readonly Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const record = recordOrUndefined(item);
+    return record === undefined ? [] : [record];
+  });
+}
+
 function uniqueStrings(values: readonly string[]): readonly string[] {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
@@ -1262,6 +1276,7 @@ function sourceArtifactToEnvelopeEvidence(
   ]);
   return {
     id: `ev_source_${sanitizeToken(artifact.kind)}_${sanitizeToken(artifact.cache_key)}`,
+    sourceArtifactId: artifact.id,
     sha256: artifact.sha256,
     mimeType: "application/json",
     filename: `${sanitizeToken(artifact.cache_key)}.json`,
@@ -1319,6 +1334,13 @@ function buildEnvelopeSignals(
         ...(occurredAt !== undefined
           ? { evidenceWindowStart: occurredAt, evidenceWindowEnd: occurredAt }
           : {}),
+        ...runtimeProvenanceField({
+          resultRecord,
+          evidence,
+          collection: "agentOutputs",
+          ticker,
+          agentId,
+        }),
         evidenceDocumentIds: evidenceIdsForTicker(evidence, ticker),
       });
       tickerSignalCount += 1;
@@ -1401,6 +1423,12 @@ function buildEnvelopeDecisions(
         reasoning: stringField(decision, "reasoning") ?? `ArrowHedge ${ticker} ${action} decision`,
         accepted: action !== "hold" && quantity > 0,
         allowedActions: allowedActionsForDecision(action, quantity),
+        ...runtimeProvenanceField({
+          resultRecord,
+          evidence,
+          collection: "decisions",
+          ticker,
+        }),
         evidenceDocumentIds: evidenceIdsForTicker(evidence, ticker),
       },
     ];
@@ -1444,6 +1472,70 @@ function evidenceIdsForTicker(
     const itemTicker = item["ticker"];
     if (typeof itemTicker === "string" && itemTicker !== ticker) return [];
     return [id];
+  });
+}
+
+function runtimeProvenanceField(input: {
+  readonly resultRecord: Record<string, unknown>;
+  readonly evidence: readonly Record<string, unknown>[];
+  readonly collection: "agentOutputs" | "decisions";
+  readonly ticker: string;
+  readonly agentId?: string;
+}): Record<string, unknown> {
+  const provenance = runtimeProvenanceRecord(input);
+  if (provenance === undefined) return {};
+  const sourceArtifactIds = arrayOfStrings(provenance["sourceArtifactIds"]);
+  return {
+    runtimeProvenance: {
+      ...(stringField(provenance, "outputPath") === undefined
+        ? {}
+        : { outputPath: stringField(provenance, "outputPath") }),
+      ...(stringField(provenance, "outputSha256") === undefined
+        ? {}
+        : { outputSha256: stringField(provenance, "outputSha256") }),
+      ...(arrayOfStrings(provenance["inputAgentIds"]).length === 0
+        ? {}
+        : { inputAgentIds: arrayOfStrings(provenance["inputAgentIds"]) }),
+      sourceArtifactIds,
+      evidenceDocumentIds: evidenceIdsForSourceArtifactIds(
+        input.evidence,
+        sourceArtifactIds,
+      ),
+    },
+  };
+}
+
+function runtimeProvenanceRecord(input: {
+  readonly resultRecord: Record<string, unknown>;
+  readonly collection: "agentOutputs" | "decisions";
+  readonly ticker: string;
+  readonly agentId?: string;
+}): Record<string, unknown> | undefined {
+  const provenance = recordOrUndefined(input.resultRecord["provenance"]);
+  const records = arrayOfRecords(provenance?.[input.collection]);
+  return records.find((record) => {
+    if (stringField(record, "ticker") !== input.ticker) return false;
+    if (input.agentId === undefined) return true;
+    return stringField(record, "agent_id") === input.agentId;
+  });
+}
+
+function evidenceIdsForSourceArtifactIds(
+  evidence: readonly Record<string, unknown>[],
+  sourceArtifactIds: readonly string[],
+): readonly string[] {
+  const evidenceBySourceArtifactId = new Map(
+    evidence.flatMap((item) => {
+      const sourceArtifactId = stringField(item, "sourceArtifactId");
+      const evidenceId = stringField(item, "id");
+      return sourceArtifactId === undefined || evidenceId === undefined
+        ? []
+        : [[sourceArtifactId, evidenceId] as const];
+    }),
+  );
+  return sourceArtifactIds.flatMap((sourceArtifactId) => {
+    const evidenceId = evidenceBySourceArtifactId.get(sourceArtifactId);
+    return evidenceId === undefined ? [] : [evidenceId];
   });
 }
 
