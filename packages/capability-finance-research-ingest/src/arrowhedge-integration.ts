@@ -493,6 +493,59 @@ export interface ArrowHedgePairedExperimentBundleVerification {
   };
 }
 
+export interface ArrowHedgePairedExperimentBatchReport {
+  readonly schemaVersion: "arrowhedge.paired-experiment-batch-report.v1";
+  readonly generatedAt: string;
+  readonly experimentCount: number;
+  readonly validBundleCount: number;
+  readonly readyCount: number;
+  readonly marketWinClaimAllowedCount: number;
+  readonly claimDeniedCount: number;
+  readonly issueCount: number;
+  readonly market: {
+    readonly metricsAvailableCount: number;
+    readonly substrateOutperformedCount: number;
+    readonly deltaSums: {
+      readonly endingEquity: number;
+      readonly realizedPnl: number;
+      readonly returnPct: number;
+    };
+    readonly deltaAverages: {
+      readonly endingEquity: number | null;
+      readonly realizedPnl: number | null;
+      readonly returnPct: number | null;
+    };
+  };
+  readonly governance: {
+    readonly deltaSums: {
+      readonly acceptedDecisionCount: number;
+      readonly blockedDecisionCount: number;
+      readonly staleBlockCount: number;
+      readonly invalidActionBlockCount: number;
+    };
+    readonly gates: {
+      readonly falsePositiveBlocksZeroCount: number;
+      readonly falseNegativeBlocksZeroCount: number;
+      readonly falsePositiveEvidencePresentCount: number;
+      readonly falseNegativeEvidencePresentCount: number;
+    };
+  };
+  readonly bundles: readonly {
+    readonly experimentId: string;
+    readonly ready: boolean;
+    readonly marketWinClaimAllowed: boolean;
+    readonly baselineRunId: string;
+    readonly substrateRunId: string;
+    readonly reportSha256: string;
+    readonly claimIssues: readonly string[];
+    readonly verificationIssues: readonly string[];
+  }[];
+  readonly issues: readonly {
+    readonly experimentId: string;
+    readonly issue: string;
+  }[];
+}
+
 export interface ArrowHedgePairedIntegrationExperimentArmInput {
   readonly runId: number;
   readonly flowId?: number;
@@ -1241,6 +1294,119 @@ export function deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapsho
     ...optionalNumberMetric("realizedPnl", realizedPnl),
     ...optionalNumberMetric("returnPct", returnPct),
     ...(eventIds === undefined || eventIds.length === 0 ? {} : { eventIds }),
+  };
+}
+
+export function buildArrowHedgePairedExperimentBatchReport(input: {
+  readonly bundles: readonly ArrowHedgePairedExperimentBundle[];
+  readonly generatedAt?: string;
+}): ArrowHedgePairedExperimentBatchReport {
+  const verified = input.bundles.map((bundle) => ({
+    bundle,
+    verification: verifyArrowHedgePairedExperimentBundle(bundle),
+  }));
+  const marketEndingEquityValues = verified.flatMap(({ bundle }) =>
+    finiteMetric(bundle.report.market.deltas.endingEquity),
+  );
+  const marketRealizedPnlValues = verified.flatMap(({ bundle }) =>
+    finiteMetric(bundle.report.market.deltas.realizedPnl),
+  );
+  const marketReturnPctValues = verified.flatMap(({ bundle }) =>
+    finiteMetric(bundle.report.market.deltas.returnPct),
+  );
+  const issues = verified.flatMap(({ bundle, verification }) => [
+    ...bundle.report.claimIssues.map((issue) => ({
+      experimentId: bundle.manifest.experimentId,
+      issue,
+    })),
+    ...verification.issues.map((issue) => ({
+      experimentId: bundle.manifest.experimentId,
+      issue: `verification: ${issue}`,
+    })),
+  ]);
+
+  return {
+    schemaVersion: "arrowhedge.paired-experiment-batch-report.v1",
+    generatedAt: input.generatedAt ?? new Date().toISOString(),
+    experimentCount: input.bundles.length,
+    validBundleCount: verified.filter(({ verification }) => verification.valid).length,
+    readyCount: input.bundles.filter((bundle) => bundle.report.ready).length,
+    marketWinClaimAllowedCount: input.bundles.filter(
+      (bundle) => bundle.report.marketWinClaimAllowed,
+    ).length,
+    claimDeniedCount: input.bundles.filter(
+      (bundle) => !bundle.report.marketWinClaimAllowed,
+    ).length,
+    issueCount: issues.length,
+    market: {
+      metricsAvailableCount: input.bundles.filter(
+        (bundle) => bundle.report.market.metricsAvailable,
+      ).length,
+      substrateOutperformedCount: input.bundles.filter(
+        (bundle) => bundle.report.market.substrateOutperformed,
+      ).length,
+      deltaSums: {
+        endingEquity: sumNumbers(marketEndingEquityValues),
+        realizedPnl: sumNumbers(marketRealizedPnlValues),
+        returnPct: sumNumbers(marketReturnPctValues),
+      },
+      deltaAverages: {
+        endingEquity: averageNumber(marketEndingEquityValues),
+        realizedPnl: averageNumber(marketRealizedPnlValues),
+        returnPct: averageNumber(marketReturnPctValues),
+      },
+    },
+    governance: {
+      deltaSums: {
+        acceptedDecisionCount: sumNumbers(
+          input.bundles.map(
+            (bundle) => bundle.report.governance.deltas.acceptedDecisionCount,
+          ),
+        ),
+        blockedDecisionCount: sumNumbers(
+          input.bundles.map(
+            (bundle) => bundle.report.governance.deltas.blockedDecisionCount,
+          ),
+        ),
+        staleBlockCount: sumNumbers(
+          input.bundles.map(
+            (bundle) => bundle.report.governance.deltas.staleBlockCount,
+          ),
+        ),
+        invalidActionBlockCount: sumNumbers(
+          input.bundles.map(
+            (bundle) => bundle.report.governance.deltas.invalidActionBlockCount,
+          ),
+        ),
+      },
+      gates: {
+        falsePositiveBlocksZeroCount: input.bundles.filter(
+          (bundle) => bundle.report.governance.gates.falsePositiveBlocksZero,
+        ).length,
+        falseNegativeBlocksZeroCount: input.bundles.filter(
+          (bundle) => bundle.report.governance.gates.falseNegativeBlocksZero,
+        ).length,
+        falsePositiveEvidencePresentCount: input.bundles.filter(
+          (bundle) =>
+            bundle.report.governance.gates.falsePositiveEvidencePresent,
+        ).length,
+        falseNegativeEvidencePresentCount: input.bundles.filter(
+          (bundle) =>
+            bundle.report.governance.gates.falseNegativeEvidencePresent,
+        ).length,
+      },
+    },
+    bundles: verified.map(({ bundle, verification }) => ({
+      experimentId: bundle.manifest.experimentId,
+      ready: bundle.report.ready,
+      marketWinClaimAllowed: bundle.report.marketWinClaimAllowed,
+      baselineRunId: bundle.manifest.baselineRunId,
+      substrateRunId: bundle.manifest.substrateRunId,
+      reportSha256: bundle.manifest.reportSha256,
+      claimIssues: bundle.report.claimIssues,
+      verificationIssues: verification.issues,
+    })),
+    issues,
   };
 }
 
@@ -2115,6 +2281,20 @@ function mergePairedExperimentArmMetrics(
     ...derived,
     ...(overrides ?? {}),
   };
+}
+
+function finiteMetric(value: number | undefined): readonly number[] {
+  return typeof value === "number" && Number.isFinite(value) ? [value] : [];
+}
+
+function sumNumbers(values: readonly number[]): number {
+  return Number(values.reduce((sum, value) => sum + value, 0).toFixed(12));
+}
+
+function averageNumber(values: readonly number[]): number | null {
+  return values.length === 0
+    ? null
+    : Number((sumNumbers(values) / values.length).toFixed(12));
 }
 
 function summarizePairedExperimentArm(

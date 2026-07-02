@@ -7,10 +7,12 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  buildArrowHedgePairedExperimentBatchReport,
   buildArrowHedgePairedExperimentBundleFromIntegrationRuns,
   buildArrowHedgePairedExperimentBundle,
   verifyArrowHedgePairedExperimentBundle,
   type ArrowHedgeIntegrationFetch,
+  type ArrowHedgePairedExperimentBatchReport,
   type ArrowHedgeIntegrationRunEnvelope,
   type ArrowHedgePairedExperimentArmMetrics,
   type ArrowHedgePairedExperimentBundle,
@@ -56,6 +58,47 @@ export interface WriteArrowHedgePairedBundleFromIntegrationInput {
   readonly baselineMetricsPath?: string;
   readonly substrateMetricsPath?: string;
   readonly fetchFn?: ArrowHedgeIntegrationFetch;
+}
+
+export interface ArrowHedgePairedBundleBatchPlan {
+  readonly schemaVersion?: "arrowhedge.paired-bundle-batch-plan.v1";
+  readonly integrationBaseUrl: string;
+  readonly bearerToken?: string;
+  readonly generatedAt?: string;
+  readonly experiments: readonly {
+    readonly experimentId: string;
+    readonly generatedAt?: string;
+    readonly baseline: {
+      readonly runId: number;
+      readonly flowId?: number;
+      readonly backtestRunId?: number;
+      readonly mode?: string;
+      readonly metrics?: ArrowHedgePairedExperimentArmMetrics;
+    };
+    readonly substrate: {
+      readonly runId: number;
+      readonly flowId?: number;
+      readonly backtestRunId?: number;
+      readonly mode?: string;
+      readonly metrics?: ArrowHedgePairedExperimentArmMetrics;
+    };
+  }[];
+}
+
+export interface WriteArrowHedgePairedBundleBatchFromIntegrationInput {
+  readonly planPath: string;
+  readonly outputDir: string;
+  readonly bearerToken?: string;
+  readonly fetchFn?: ArrowHedgeIntegrationFetch;
+}
+
+export interface WriteArrowHedgePairedBundleBatchFromIntegrationResult {
+  readonly report: ArrowHedgePairedExperimentBatchReport;
+  readonly bundles: readonly ArrowHedgePairedExperimentBundle[];
+  readonly outputPaths: {
+    readonly batchReport: string;
+    readonly bundleDirs: readonly string[];
+  };
 }
 
 export interface VerifyArrowHedgePairedBundleDirectoryResult {
