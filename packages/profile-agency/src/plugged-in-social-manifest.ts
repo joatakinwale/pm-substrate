@@ -1043,6 +1043,11 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       agencyCommandCenter.includes("openAccessRequestCount > 0") &&
       agencyCommandCenter.includes("CLOSED_LOOP_STAGES") &&
       agencyCommandCenter.includes("externalAdapters") &&
+      agencyCommandCenter.includes("externalAdapterRuns") &&
+      agencyCommandCenter.includes("Adapter Run Evidence") &&
+      agencyCommandCenter.includes("external_adapter_run") &&
+      agencyCommandCenter.includes("gate_results_hash") &&
+      agencyCommandCenter.includes("output_payload_hash") &&
       agencyCommandCenter.includes("getIntegrationRunEvidenceSnapshot") &&
       agencyCommandCenter.includes("listIntegrationExternalAdapters") &&
       agencyCommandCenter.includes("clientReports") &&

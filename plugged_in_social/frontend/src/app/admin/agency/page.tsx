@@ -53,6 +53,9 @@ const STATUS_COLORS: Record<string, string> = {
   revoked: "bg-gray-100 text-gray-600",
   requested: "bg-yellow-50 text-yellow-700",
   granted: "bg-stevie-green/10 text-stevie-green",
+  succeeded: "bg-stevie-green/10 text-stevie-green",
+  failed: "bg-red-50 text-red-700",
+  partial: "bg-yellow-50 text-yellow-700",
 };
 
 const CLOSED_LOOP_STAGES = [
@@ -123,6 +126,10 @@ function objectValue(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : null;
 }
 
 function stringArrayValue(value: unknown): string[] {
@@ -281,6 +288,10 @@ export default function AgencyCommandCenterPage() {
     evidenceSummary?.open_access_request_count ?? 0
   );
   const openGateCount = pendingApprovalCount + openAccessRequestCount;
+  const externalAdapterRuns = useMemo(
+    () => artifacts.filter((item) => item.artifact_type === "external_adapter_run"),
+    [artifacts]
+  );
   const recentRunEvents = useMemo(
     () => runEvents.slice(-8).reverse(),
     [runEvents]
@@ -1346,6 +1357,68 @@ export default function AgencyCommandCenterPage() {
                       ))}
                     </div>
                   )}
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
+                      Adapter Run Evidence
+                    </p>
+                    {externalAdapterRuns.length === 0 ? (
+                      <EmptyState>No adapter run evidence.</EmptyState>
+                    ) : (
+                      <div className="space-y-2">
+                        {externalAdapterRuns.map((artifact) => {
+                          const lineage = objectValue(artifact.lineage) || {};
+                          const payload = objectValue(artifact.payload) || {};
+                          const adapterId =
+                            stringValue(lineage.adapter_id) ||
+                            stringValue(payload.adapter_id) ||
+                            "external_adapter";
+                          const status =
+                            stringValue(lineage.status) ||
+                            stringValue(payload.status) ||
+                            "recorded";
+                          const boundary =
+                            stringValue(lineage.boundary) ||
+                            stringValue(
+                              objectValue(payload.adapter_contract)?.boundary
+                            ) ||
+                            "boundary recorded";
+
+                          return (
+                            <div
+                              key={artifact.id}
+                              className="rounded-lg border border-border px-3 py-3"
+                            >
+                              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {adapterId.replaceAll("_", " ")}
+                                  </p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {boundary.replaceAll("_", " ")}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(status)}`}
+                                >
+                                  {status}
+                                </span>
+                              </div>
+                              <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                                <span>payload {shortHash(artifact.payload_hash)}</span>
+                                <span>
+                                  gates {shortHash(stringValue(lineage.gate_results_hash))}
+                                </span>
+                                <span>
+                                  output {shortHash(stringValue(lineage.output_payload_hash))}
+                                </span>
+                                <span>run {compactDateTime(artifact.created_at)}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {kickoffSummary && (
