@@ -63,6 +63,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "artifact.read",
         "event_timeline.read",
         "evidence_summary.read",
+        "run_evidence_snapshot.read",
         "access_request.read",
         "social_post.read",
         "approval.decide",
@@ -175,6 +176,12 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           path: "/api/internal/virtual-agency/task",
           boundary: "internal_system_rls",
           capability_ids: ["task.execute"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+          boundary: "public_rls",
+          capability_ids: ["run_evidence_snapshot.read"],
         },
         {
           method: "GET",
@@ -580,36 +587,18 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         snapshot.platformManifest,
       ],
       [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}`,
-        snapshot.run,
-      ],
-      [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-summary`,
-        snapshot.summary,
-      ],
-      [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/events?limit=1000`,
-        snapshot.events,
-      ],
-      [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/tasks`,
-        snapshot.tasks,
-      ],
-      [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/artifacts`,
-        snapshot.artifacts,
-      ],
-      [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/approvals`,
-        snapshot.approvals,
-      ],
-      [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/access-requests`,
-        snapshot.accessRequests,
-      ],
-      [
-        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/social-posts`,
-        snapshot.socialPosts,
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-snapshot`,
+        {
+          resource_type: "marketing_run_evidence_snapshot",
+          run: snapshot.run,
+          summary: snapshot.summary,
+          events: snapshot.events,
+          tasks: snapshot.tasks,
+          artifacts: snapshot.artifacts,
+          approvals: snapshot.approvals,
+          access_requests: snapshot.accessRequests,
+          social_posts: snapshot.socialPosts,
+        },
       ],
     ]);
     const calls: Array<{ url: string; authorization: string | undefined }> = [];
@@ -635,14 +624,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     expect(calls.map((call) => call.url)).toEqual([
       "https://api.example/api/integration/v1/capabilities",
       "https://api.example/api/integration/v1/platform-manifest",
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}`,
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-summary`,
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/events?limit=1000`,
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/tasks`,
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/artifacts`,
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/approvals`,
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/access-requests`,
-      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/social-posts`,
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-snapshot`,
     ]);
     expect(new Set(calls.map((call) => call.authorization))).toEqual(
       new Set(["Bearer jwt-token"]),

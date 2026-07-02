@@ -31,13 +31,11 @@ import {
   decideAgencyAccessRequest,
   decideAgencyApproval,
   dispatchMarketingRun,
-  getIntegrationEvidenceSummary,
+  getIntegrationRunEvidenceSnapshot,
   listAgencyAccessRequests,
   listAgencyApprovals,
   listAgencyArtifacts,
   listClientEngagements,
-  listIntegrationRunTasks,
-  listIntegrationRunEvents,
   listMarketingRuns,
 } from "@/lib/api";
 
@@ -493,17 +491,22 @@ export default function AgencyCommandCenterPage() {
       let eventData: IntegrationRunEvent[] = [];
       let taskData: IntegrationTask[] = [];
       let summaryData: IntegrationEvidenceSummary | null = null;
+      let artifactsForDisplay = artifactData;
+      let approvalsForDisplay = approvalData;
+      let accessRequestsForDisplay = accessData;
       if (latestRun) {
-        [eventData, taskData, summaryData] = await Promise.all([
-          listIntegrationRunEvents(latestRun.id),
-          listIntegrationRunTasks(latestRun.id),
-          getIntegrationEvidenceSummary(latestRun.id),
-        ]);
+        const snapshot = await getIntegrationRunEvidenceSnapshot(latestRun.id);
+        eventData = snapshot.events;
+        taskData = snapshot.tasks;
+        summaryData = snapshot.summary;
+        artifactsForDisplay = snapshot.artifacts;
+        approvalsForDisplay = snapshot.approvals;
+        accessRequestsForDisplay = snapshot.access_requests;
       }
       setRuns(runData);
-      setArtifacts(artifactData);
-      setApprovals(approvalData);
-      setAccessRequests(accessData);
+      setArtifacts(artifactsForDisplay);
+      setApprovals(approvalsForDisplay);
+      setAccessRequests(accessRequestsForDisplay);
       setRunTasks(taskData);
       setRunEvents(eventData);
       setEvidenceSummary(summaryData);
@@ -511,9 +514,9 @@ export default function AgencyCommandCenterPage() {
         ...current,
         subject_id:
           current.subject_id ||
-          artifactData[0]?.id ||
+          artifactsForDisplay[0]?.id ||
           engagementId,
-        subject_type: artifactData[0] ? "agency_artifact" : "client_engagement",
+        subject_type: artifactsForDisplay[0] ? "agency_artifact" : "client_engagement",
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load agency state.");

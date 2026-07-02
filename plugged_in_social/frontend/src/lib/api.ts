@@ -942,6 +942,53 @@ export interface IntegrationEvidenceSummary {
   links: Array<{ rel: string; href: string }>;
 }
 
+export interface IntegrationSocialPost {
+  resource_type: "social_post";
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  social_account_id: string;
+  platform: string;
+  status: string;
+  caption: string | null;
+  hashtags: unknown[] | null;
+  media_urls: unknown[] | null;
+  media_type: string | null;
+  scheduled_at: string | null;
+  published_at: string | null;
+  platform_post_id: string | null;
+  platform_url: string | null;
+  compound_phase: string | null;
+  created_by_agent: string | null;
+  version: number;
+  current_content_hash: string;
+  scheduled_content_hash: string | null;
+  published_content_hash: string | null;
+  likes: number;
+  comments: number;
+  shares: number;
+  impressions: number;
+  reach: number;
+  engagement_rate: number | null;
+  lineage: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  links: Array<{ rel: string; href: string }>;
+}
+
+export interface IntegrationRunEvidenceSnapshot {
+  resource_type: "marketing_run_evidence_snapshot";
+  run: MarketingRun;
+  summary: IntegrationEvidenceSummary;
+  tasks: IntegrationTask[];
+  events: IntegrationRunEvent[];
+  artifacts: AgencyArtifact[];
+  approvals: AgencyApprovalRequest[];
+  access_requests: AgencyAccessRequest[];
+  social_posts: IntegrationSocialPost[];
+  links: Array<{ rel: string; href: string }>;
+}
+
 export interface ClientEngagementCreatePayload {
   name?: string;
   client_url?: string;
@@ -1134,6 +1181,12 @@ export async function listIntegrationRunEvents(runId: string) {
 export async function listIntegrationRunTasks(runId: string) {
   return apiFetch<IntegrationTask[]>(
     `/api/integration/v1/marketing-runs/${encodeURIComponent(runId)}/tasks`
+  );
+}
+
+export async function getIntegrationRunEvidenceSnapshot(runId: string) {
+  return apiFetch<IntegrationRunEvidenceSnapshot>(
+    `/api/integration/v1/marketing-runs/${encodeURIComponent(runId)}/evidence-snapshot`
   );
 }
 

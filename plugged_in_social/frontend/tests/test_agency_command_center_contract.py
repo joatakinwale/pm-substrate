@@ -15,6 +15,7 @@ def test_agency_api_types_and_helpers_are_declared():
     assert "export interface AgencyApprovalRequest" in source
     assert "export interface AgencyAccessRequest" in source
     assert "export interface IntegrationTask" in source
+    assert "export interface IntegrationRunEvidenceSnapshot" in source
     assert "export async function listClientEngagements" in source
     assert "export async function createClientEngagement" in source
     assert "export async function createMarketingRun" in source
@@ -23,8 +24,10 @@ def test_agency_api_types_and_helpers_are_declared():
     assert "export async function decideAgencyApproval" in source
     assert "export async function createAgencyAccessRequest" in source
     assert "export async function listIntegrationRunTasks" in source
+    assert "export async function getIntegrationRunEvidenceSnapshot" in source
     assert "/api/integration/v1/marketing-runs/" in source
     assert "/tasks" in source
+    assert "/evidence-snapshot" in source
 
 
 def test_agency_command_center_route_exposes_operator_workflow():
@@ -56,7 +59,7 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "CLOSED_LOOP_STAGES" in source
     assert "next_action" in source
     assert "runTasks" in source
-    assert "listIntegrationRunTasks" in source
+    assert "getIntegrationRunEvidenceSnapshot" in source
     assert "approval_payload_hash" in source
     assert "latest_event_hash" in source
     assert "social_post_content_hashes" in source

@@ -296,6 +296,18 @@ export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly evidence_hashes: Record<string, readonly string[]>;
 }
 
+export interface PluggedInSocialIntegrationRunEvidenceSnapshotEnvelope {
+  readonly resource_type: "marketing_run_evidence_snapshot";
+  readonly run: PluggedInSocialIntegrationMarketingRunEnvelope;
+  readonly summary: PluggedInSocialIntegrationEvidenceSummaryEnvelope;
+  readonly tasks: readonly PluggedInSocialIntegrationTaskEnvelope[];
+  readonly events: readonly PluggedInSocialIntegrationRunEventEnvelope[];
+  readonly artifacts: readonly PluggedInSocialIntegrationArtifactEnvelope[];
+  readonly approvals: readonly PluggedInSocialIntegrationApprovalEnvelope[];
+  readonly access_requests: readonly PluggedInSocialIntegrationAccessRequestEnvelope[];
+  readonly social_posts: readonly PluggedInSocialIntegrationSocialPostEnvelope[];
+}
+
 export interface PluggedInSocialLiveRunEvidenceSnapshot {
   readonly capabilities: PluggedInSocialIntegrationCapabilityResponse;
   readonly platformManifest: PluggedInSocialIntegrationPlatformManifestEnvelope;
@@ -371,6 +383,7 @@ const REQUIRED_LIVE_CAPABILITIES = [
   "artifact.read",
   "event_timeline.read",
   "evidence_summary.read",
+  "run_evidence_snapshot.read",
   "access_request.read",
   "social_post.read",
   "approval.decide",
@@ -510,14 +523,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
   const [
     capabilities,
     platformManifest,
-    run,
-    summary,
-    events,
-    tasks,
-    artifacts,
-    approvals,
-    accessRequests,
-    socialPosts,
+    runSnapshot,
   ] = await Promise.all([
     fetchIntegrationJson<PluggedInSocialIntegrationCapabilityResponse>(
       client,
@@ -527,51 +533,23 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
       client,
       "/platform-manifest",
     ),
-    fetchIntegrationJson<PluggedInSocialIntegrationMarketingRunEnvelope>(
+    fetchIntegrationJson<PluggedInSocialIntegrationRunEvidenceSnapshotEnvelope>(
       client,
-      runPath,
-    ),
-    fetchIntegrationJson<PluggedInSocialIntegrationEvidenceSummaryEnvelope>(
-      client,
-      `${runPath}/evidence-summary`,
-    ),
-    fetchIntegrationJson<PluggedInSocialIntegrationRunEventEnvelope[]>(
-      client,
-      `${runPath}/events?limit=1000`,
-    ),
-    fetchIntegrationJson<PluggedInSocialIntegrationTaskEnvelope[]>(
-      client,
-      `${runPath}/tasks`,
-    ),
-    fetchIntegrationJson<PluggedInSocialIntegrationArtifactEnvelope[]>(
-      client,
-      `${runPath}/artifacts`,
-    ),
-    fetchIntegrationJson<PluggedInSocialIntegrationApprovalEnvelope[]>(
-      client,
-      `${runPath}/approvals`,
-    ),
-    fetchIntegrationJson<PluggedInSocialIntegrationAccessRequestEnvelope[]>(
-      client,
-      `${runPath}/access-requests`,
-    ),
-    fetchIntegrationJson<PluggedInSocialIntegrationSocialPostEnvelope[]>(
-      client,
-      `${runPath}/social-posts`,
+      `${runPath}/evidence-snapshot`,
     ),
   ]);
 
   return {
     capabilities,
     platformManifest,
-    run,
-    summary,
-    events,
-    tasks,
-    artifacts,
-    approvals,
-    accessRequests,
-    socialPosts,
+    run: runSnapshot.run,
+    summary: runSnapshot.summary,
+    events: runSnapshot.events,
+    tasks: runSnapshot.tasks,
+    artifacts: runSnapshot.artifacts,
+    approvals: runSnapshot.approvals,
+    accessRequests: runSnapshot.access_requests,
+    socialPosts: runSnapshot.social_posts,
   };
 }
 
@@ -791,6 +769,12 @@ function liveRunEvidenceIssues(
   );
   if (socialPostsEndpoint?.boundary !== "public_rls") {
     issues.add("marketing run social-posts endpoint is not public-RLS scoped");
+  }
+  const evidenceSnapshotEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+  );
+  if (evidenceSnapshotEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run evidence-snapshot endpoint is not public-RLS scoped");
   }
 
   const dataTables = new Set(
@@ -1167,6 +1151,11 @@ function liveRunEvidenceRefs(
       "source_record",
       `plugged_in_social:marketing_runs:${run.id}:evidence_summary`,
       "PluggedInSocial marketing run evidence summary",
+    ),
+    stateRef(
+      "source_record",
+      `plugged_in_social:marketing_runs:${run.id}:evidence_snapshot`,
+      "PluggedInSocial marketing run evidence snapshot",
     ),
     stateRef(
       "source_record",

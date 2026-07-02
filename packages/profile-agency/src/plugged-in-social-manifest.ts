@@ -774,6 +774,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes('"/marketing-runs/{run_id}/tasks"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/events"') &&
       integrationApi.includes('"/marketing-runs/{run_id}/evidence-summary"') &&
+      integrationApi.includes('"/marketing-runs/{run_id}/evidence-snapshot"') &&
       integrationApi.includes('"/approvals/{approval_id}/decision"') &&
       integrationApi.includes('"/events"') &&
       integrationApi.includes('"/webhooks"') &&
@@ -787,20 +788,24 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationSchemas.includes("IntegrationTaskEnvelope") &&
       integrationSchemas.includes("IntegrationRunEventEnvelope") &&
       integrationSchemas.includes("IntegrationEvidenceSummaryEnvelope") &&
+      integrationSchemas.includes("IntegrationRunEvidenceSnapshotEnvelope") &&
       integrationTests.includes("test_integration_router_uses_rls_and_has_no_substrate_imports") &&
       !integrationApi.includes("pm_substrate") &&
       !integrationApi.includes("packages.profile") &&
       !integrationApi.includes("packages/evals"),
     operatorRunMonitorSurface:
       frontendApi.includes("export interface IntegrationTask") &&
+      frontendApi.includes("export interface IntegrationRunEvidenceSnapshot") &&
       frontendApi.includes("listIntegrationRunTasks") &&
+      frontendApi.includes("getIntegrationRunEvidenceSnapshot") &&
       frontendApi.includes("/api/integration/v1/marketing-runs/") &&
       frontendApi.includes("/tasks") &&
+      frontendApi.includes("/evidence-snapshot") &&
       agencyCommandCenter.includes("Closed-loop Progress") &&
       agencyCommandCenter.includes("Governance Gates") &&
       agencyCommandCenter.includes("Agent Task Queue") &&
       agencyCommandCenter.includes("CLOSED_LOOP_STAGES") &&
-      agencyCommandCenter.includes("listIntegrationRunTasks") &&
+      agencyCommandCenter.includes("getIntegrationRunEvidenceSnapshot") &&
       agencyCommandCenter.includes("approval_payload_hash") &&
       agencyCommandCenter.includes("latest_event_hash") &&
       agencyCommandCenter.includes("social_post_content_hashes") &&

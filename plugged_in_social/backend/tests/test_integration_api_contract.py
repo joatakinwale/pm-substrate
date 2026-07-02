@@ -59,6 +59,10 @@ def test_integration_router_imports_with_neutral_v1_prefix():
         frozenset({"GET"}),
     ) in route_methods
     assert (
+        "/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
         "/integration/v1/approvals/{approval_id}/decision",
         frozenset({"POST"}),
     ) in route_methods
@@ -104,6 +108,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationEventIngest,
         IntegrationRunDispatchEnvelope,
         IntegrationRunEventEnvelope,
+        IntegrationRunEvidenceSnapshotEnvelope,
         IntegrationMarketingRunEnvelope,
         IntegrationSocialPostEnvelope,
         IntegrationTaskEnvelope,
@@ -119,6 +124,9 @@ def test_integration_schemas_expose_stable_external_envelopes():
     access_request_fields = set(IntegrationAccessRequestEnvelope.model_fields)
     run_event_fields = set(IntegrationRunEventEnvelope.model_fields)
     evidence_summary_fields = set(IntegrationEvidenceSummaryEnvelope.model_fields)
+    evidence_snapshot_fields = set(
+        IntegrationRunEvidenceSnapshotEnvelope.model_fields
+    )
     event_fields = set(IntegrationEventIngest.model_fields)
     accepted_fields = set(IntegrationAcceptedResponse.model_fields)
 
@@ -229,6 +237,18 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "social_post_status_counts",
         "evidence_hashes",
     }.issubset(evidence_summary_fields)
+    assert {
+        "resource_type",
+        "run",
+        "summary",
+        "tasks",
+        "events",
+        "artifacts",
+        "approvals",
+        "access_requests",
+        "social_posts",
+        "links",
+    }.issubset(evidence_snapshot_fields)
     assert {"engagement_id", "event_type", "source", "payload"}.issubset(
         event_fields
     )
@@ -303,6 +323,18 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         and endpoint.boundary == "public_rls"
         and "social_post.read" in endpoint.capability_ids
         for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot"
+        and endpoint.boundary == "public_rls"
+        and "run_evidence_snapshot.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        capability.id == "run_evidence_snapshot.read"
+        and "virtual_agency_task" in capability.resources
+        and "social_post" in capability.resources
+        for capability in module._capabilities()
     )
     assert any(
         resource.table == "social_posts"

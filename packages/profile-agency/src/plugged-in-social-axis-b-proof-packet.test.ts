@@ -68,6 +68,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "artifact.read",
         "event_timeline.read",
         "evidence_summary.read",
+        "run_evidence_snapshot.read",
         "access_request.read",
         "social_post.read",
         "approval.decide",
@@ -170,6 +171,12 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           path: "/api/internal/virtual-agency/task",
           boundary: "internal_system_rls",
           capability_ids: ["task.execute"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+          boundary: "public_rls",
+          capability_ids: ["run_evidence_snapshot.read"],
         },
         {
           method: "GET",

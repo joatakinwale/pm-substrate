@@ -314,6 +314,21 @@ class IntegrationEvidenceSummaryEnvelope(BaseModel):
     links: list[IntegrationLink]
 
 
+class IntegrationRunEvidenceSnapshotEnvelope(BaseModel):
+    resource_type: Literal["marketing_run_evidence_snapshot"] = (
+        "marketing_run_evidence_snapshot"
+    )
+    run: IntegrationMarketingRunEnvelope
+    summary: IntegrationEvidenceSummaryEnvelope
+    tasks: list[IntegrationTaskEnvelope]
+    events: list[IntegrationRunEventEnvelope]
+    artifacts: list[IntegrationArtifactEnvelope]
+    approvals: list[IntegrationApprovalEnvelope]
+    access_requests: list[IntegrationAccessRequestEnvelope]
+    social_posts: list[IntegrationSocialPostEnvelope]
+    links: list[IntegrationLink]
+
+
 class IntegrationEventIngest(BaseModel):
     engagement_id: uuid.UUID
     marketing_run_id: uuid.UUID | None = None

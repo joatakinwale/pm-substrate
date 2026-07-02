@@ -43,6 +43,7 @@ from app.schemas.integration import (
     IntegrationQueueManifest,
     IntegrationRunDispatchEnvelope,
     IntegrationRunEventEnvelope,
+    IntegrationRunEvidenceSnapshotEnvelope,
     IntegrationSocialPostEnvelope,
     IntegrationTaskEnvelope,
     IntegrationWebhookIngest,
@@ -108,6 +109,15 @@ def _run_links(run_id: uuid.UUID) -> list[IntegrationLink]:
             f"/api/integration/v1/marketing-runs/{run_id}/social-posts",
         ),
         _link("tasks", f"/api/integration/v1/marketing-runs/{run_id}/tasks"),
+        _link(
+            "evidence_snapshot",
+            f"/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+        ),
+        _link(
+            "evidence_summary",
+            f"/api/integration/v1/marketing-runs/{run_id}/evidence-summary",
+        ),
+        _link("events", f"/api/integration/v1/marketing-runs/{run_id}/events"),
         _link("approvals", f"/api/integration/v1/marketing-runs/{run_id}/approvals"),
         _link(
             "access_requests",
@@ -515,6 +525,115 @@ async def _list_run_social_posts(
     ]
 
 
+async def _build_run_evidence_snapshot_rows(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run: MarketingRun,
+) -> dict[str, Any]:
+    artifact_result = await db.execute(
+        select(AgencyArtifact).where(
+            AgencyArtifact.org_id == org_id,
+            AgencyArtifact.marketing_run_id == run.id,
+        )
+    )
+    artifacts = list(artifact_result.scalars().all())
+
+    approval_result = await db.execute(
+        select(AgencyApprovalRequest).where(
+            AgencyApprovalRequest.org_id == org_id,
+            AgencyApprovalRequest.marketing_run_id == run.id,
+        )
+    )
+    approvals = list(approval_result.scalars().all())
+
+    access_result = await db.execute(
+        select(AgencyAccessRequest).where(
+            AgencyAccessRequest.org_id == org_id,
+            AgencyAccessRequest.marketing_run_id == run.id,
+        )
+    )
+    access_requests = list(access_result.scalars().all())
+
+    tasks = await _list_run_tasks(db, org_id=org_id, run=run)
+    events = await _list_run_events(db, org_id=org_id, run=run)
+    event_items = [event for event, _task in events]
+    social_posts = await _list_run_social_posts(db, org_id=org_id, run=run)
+
+    summary = IntegrationEvidenceSummaryEnvelope(
+        run_id=run.id,
+        org_id=run.org_id,
+        status=run.status,
+        stage=run.stage,
+        artifact_count=len(artifacts),
+        artifact_type_counts=_count_by(artifacts, "artifact_type"),
+        task_count=len(tasks),
+        task_status_counts=_count_by(tasks, "status"),
+        event_count=len(event_items),
+        event_type_counts=_count_by(event_items, "event_type"),
+        approval_count=len(approvals),
+        pending_approval_count=sum(1 for item in approvals if item.status == "pending"),
+        access_request_count=len(access_requests),
+        open_access_request_count=sum(
+            1 for item in access_requests if item.status in {"requested", "blocked"}
+        ),
+        social_post_count=len(social_posts),
+        social_post_status_counts=_count_by(social_posts, "status"),
+        evidence_hashes={
+            "artifact_payload_hashes": sorted(
+                {item.payload_hash for item in artifacts if item.payload_hash}
+            ),
+            "approval_payload_hashes": sorted(
+                {
+                    item.approval_payload_hash
+                    for item in approvals
+                    if item.approval_payload_hash
+                }
+            ),
+            "access_request_hashes": sorted(
+                {
+                    compute_payload_hash(
+                        {
+                            "id": str(item.id),
+                            "request_type": item.request_type,
+                            "provider": item.provider,
+                            "status": item.status,
+                            "scope": dict(item.scope or {}),
+                            "instructions": dict(item.instructions or {}),
+                            "resolved_at": item.resolved_at,
+                        }
+                    )
+                    for item in access_requests
+                }
+            ),
+            "event_hashes": sorted(
+                {item.event_hash for item in event_items if item.event_hash}
+            ),
+            "task_latest_event_hashes": sorted(
+                {item.latest_event_hash for item in tasks if item.latest_event_hash}
+            ),
+            "social_post_content_hashes": sorted(
+                {
+                    social_post_content_hash(item)
+                    for item in social_posts
+                    if item.scheduled_content_hash or item.published_content_hash
+                }
+            ),
+        },
+        links=_run_links(run.id),
+    )
+
+    return {
+        "summary": summary,
+        "tasks": tasks,
+        "events": events,
+        "artifacts": artifacts,
+        "approvals": approvals,
+        "access_requests": access_requests,
+        "social_posts": social_posts,
+    }
+
+
 def _count_by(items: list[Any], attr: str) -> dict[str, int]:
     return dict(Counter(str(getattr(item, attr)) for item in items))
 
@@ -592,6 +711,21 @@ def _capabilities() -> list[IntegrationCapability]:
             description="Inspect run-level artifact, task, event, approval, access-gate, and hash counts.",
             methods=["GET"],
             resources=["marketing_run"],
+        ),
+        IntegrationCapability(
+            id="run_evidence_snapshot.read",
+            name="Read marketing run evidence snapshot",
+            description="Inspect the complete run monitor packet: run, summary, tasks, events, artifacts, approvals, access gates, and social posts.",
+            methods=["GET"],
+            resources=[
+                "marketing_run",
+                "virtual_agency_task",
+                "virtual_agency_event",
+                "agency_artifact",
+                "agency_approval_request",
+                "agency_access_request",
+                "social_post",
+            ],
         ),
         IntegrationCapability(
             id="social_post.read",
@@ -789,6 +923,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             path="/api/integration/v1/marketing-runs/{run_id}/evidence-summary",
             boundary="public_rls",
             capability_ids=["evidence_summary.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+            boundary="public_rls",
+            capability_ids=["run_evidence_snapshot.read"],
         ),
         IntegrationEndpointManifest(
             method="GET",
@@ -1248,96 +1388,47 @@ async def get_run_evidence_summary(
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
-
-    artifact_result = await db.execute(
-        select(AgencyArtifact).where(
-            AgencyArtifact.org_id == org_id,
-            AgencyArtifact.marketing_run_id == run_id,
-        )
+    snapshot_rows = await _build_run_evidence_snapshot_rows(
+        db,
+        org_id=org_id,
+        run=run,
     )
-    artifacts = list(artifact_result.scalars().all())
+    return snapshot_rows["summary"]
 
-    approval_result = await db.execute(
-        select(AgencyApprovalRequest).where(
-            AgencyApprovalRequest.org_id == org_id,
-            AgencyApprovalRequest.marketing_run_id == run_id,
-        )
+
+@router.get(
+    "/marketing-runs/{run_id}/evidence-snapshot",
+    response_model=IntegrationRunEvidenceSnapshotEnvelope,
+)
+async def get_run_evidence_snapshot(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    run = await _get_run(db, org_id=org_id, run_id=run_id)
+    snapshot_rows = await _build_run_evidence_snapshot_rows(
+        db,
+        org_id=org_id,
+        run=run,
     )
-    approvals = list(approval_result.scalars().all())
 
-    access_result = await db.execute(
-        select(AgencyAccessRequest).where(
-            AgencyAccessRequest.org_id == org_id,
-            AgencyAccessRequest.marketing_run_id == run_id,
-        )
-    )
-    access_requests = list(access_result.scalars().all())
-
-    tasks = await _list_run_tasks(db, org_id=org_id, run=run)
-    events = await _list_run_events(db, org_id=org_id, run=run)
-    event_items = [event for event, _task in events]
-    social_posts = await _list_run_social_posts(db, org_id=org_id, run=run)
-
-    return IntegrationEvidenceSummaryEnvelope(
-        run_id=run.id,
-        org_id=run.org_id,
-        status=run.status,
-        stage=run.stage,
-        artifact_count=len(artifacts),
-        artifact_type_counts=_count_by(artifacts, "artifact_type"),
-        task_count=len(tasks),
-        task_status_counts=_count_by(tasks, "status"),
-        event_count=len(event_items),
-        event_type_counts=_count_by(event_items, "event_type"),
-        approval_count=len(approvals),
-        pending_approval_count=sum(1 for item in approvals if item.status == "pending"),
-        access_request_count=len(access_requests),
-        open_access_request_count=sum(
-            1 for item in access_requests if item.status in {"requested", "blocked"}
-        ),
-        social_post_count=len(social_posts),
-        social_post_status_counts=_count_by(social_posts, "status"),
-        evidence_hashes={
-            "artifact_payload_hashes": sorted(
-                {item.payload_hash for item in artifacts if item.payload_hash}
-            ),
-            "approval_payload_hashes": sorted(
-                {
-                    item.approval_payload_hash
-                    for item in approvals
-                    if item.approval_payload_hash
-                }
-            ),
-            "access_request_hashes": sorted(
-                {
-                    compute_payload_hash(
-                        {
-                            "id": str(item.id),
-                            "request_type": item.request_type,
-                            "provider": item.provider,
-                            "status": item.status,
-                            "scope": dict(item.scope or {}),
-                            "instructions": dict(item.instructions or {}),
-                            "resolved_at": item.resolved_at,
-                        }
-                    )
-                    for item in access_requests
-                }
-            ),
-            "event_hashes": sorted(
-                {item.event_hash for item in event_items if item.event_hash}
-            ),
-            "task_latest_event_hashes": sorted(
-                {item.latest_event_hash for item in tasks if item.latest_event_hash}
-            ),
-            "social_post_content_hashes": sorted(
-                {
-                    social_post_content_hash(item)
-                    for item in social_posts
-                    if item.scheduled_content_hash or item.published_content_hash
-                }
-            ),
-        },
+    return IntegrationRunEvidenceSnapshotEnvelope(
+        run=_to_run(run),
+        summary=snapshot_rows["summary"],
+        tasks=[_to_task(item) for item in snapshot_rows["tasks"]],
+        events=[
+            _to_event(event, run=run, task=task)
+            for event, task in snapshot_rows["events"]
+        ],
+        artifacts=[_to_artifact(item) for item in snapshot_rows["artifacts"]],
+        approvals=[_to_approval(item) for item in snapshot_rows["approvals"]],
+        access_requests=[
+            _to_access_request(item) for item in snapshot_rows["access_requests"]
+        ],
+        social_posts=[
+            _to_social_post(item) for item in snapshot_rows["social_posts"]
+        ],
         links=_run_links(run.id),
     )
 
