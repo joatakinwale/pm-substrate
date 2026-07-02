@@ -99,12 +99,17 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "approval_payload_hash" in source
     assert "latest_event_hash" in source
     assert "social_post_content_hashes" in source
+    assert "published_social_post_content_hashes" in source
+    assert "social_post_metric_hashes" in source
     assert "client_report_hashes" in source
     assert "client_report_metrics_hashes" in source
     assert "report_count" in source
     assert "openGateCount" in source
     assert "openAccessRequestCount > 0" in source
-    assert "Report metrics evidence recorded." in source
+    assert "Published social metric evidence recorded." in source
+    assert "Report metrics recorded; waiting for social metric hash." in source
+    assert "Published content hash recorded." in source
+    assert "Metric Hash" in source
     assert "Report Status" in source
     assert "IntegrationSocialPost" in source
     assert "runSocialPosts" in source

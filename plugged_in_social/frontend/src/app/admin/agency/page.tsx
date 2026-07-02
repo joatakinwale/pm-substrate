@@ -163,6 +163,17 @@ function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function socialPostHasMetricEvidence(post: IntegrationSocialPost) {
+  return (
+    post.likes > 0 ||
+    post.comments > 0 ||
+    post.shares > 0 ||
+    post.impressions > 0 ||
+    post.reach > 0 ||
+    post.engagement_rate !== null
+  );
+}
+
 function artifactAdapterIdValue(artifact: AgencyArtifact) {
   const lineage = objectValue(artifact.lineage) || {};
   const payload = objectValue(artifact.payload) || {};
@@ -468,6 +479,20 @@ export default function AgencyCommandCenterPage() {
     const hasPublishedPost =
       Number(socialStatusCounts.published || 0) > 0 ||
       runSocialPosts.some((post) => post.status === "published");
+    const publishedPostHashes =
+      evidenceSummary?.evidence_hashes?.published_social_post_content_hashes || [];
+    const socialMetricHashes =
+      evidenceSummary?.evidence_hashes?.social_post_metric_hashes || [];
+    const hasPublishedHashEvidence =
+      publishedPostHashes.length > 0 ||
+      runSocialPosts.some(
+        (post) => post.status === "published" && Boolean(post.published_content_hash)
+      );
+    const hasPublishedMetricEvidence =
+      socialMetricHashes.length > 0 ||
+      runSocialPosts.some(
+        (post) => post.status === "published" && socialPostHasMetricEvidence(post)
+      );
     const reportCount = evidenceSummary?.report_count ?? clientReports.length;
     const reportEvidenceCount = reportCount || 1;
     const hasReportMetricsEvidence =
@@ -519,12 +544,16 @@ export default function AgencyCommandCenterPage() {
           : "Scheduling task queued."
         : "Waiting for scheduling task.",
       publishing: hasPublishedPost
-        ? "Published post evidence recorded."
+        ? hasPublishedHashEvidence
+          ? "Published content hash recorded."
+          : "Published post missing content hash evidence."
         : hasScheduledPost
           ? "Scheduled post awaiting publish evidence."
           : "Waiting for publish evidence.",
-      metrics: hasReportMetricsEvidence
-        ? "Report metrics evidence recorded."
+      metrics: hasPublishedMetricEvidence
+        ? "Published social metric evidence recorded."
+        : hasReportMetricsEvidence
+          ? "Report metrics recorded; waiting for social metric hash."
         : taskTypeSet.has("analytics_reporting")
           ? completedTaskTypeSet.has("analytics_reporting")
             ? "Metrics/reporting task completed."
@@ -573,13 +602,17 @@ export default function AgencyCommandCenterPage() {
       } else if (stage === "scheduling" && taskTypeSet.has("content_scheduling")) {
         status = "active";
       }
-      if (stage === "publishing" && hasPublishedPost) {
+      if (stage === "publishing" && hasPublishedHashEvidence) {
         status = "complete";
+      } else if (stage === "publishing" && hasPublishedPost) {
+        status = "blocked";
       } else if (stage === "publishing" && hasScheduledPost) {
         status = "active";
       }
-      if (stage === "metrics" && hasReportMetricsEvidence) {
+      if (stage === "metrics" && hasPublishedMetricEvidence) {
         status = "complete";
+      } else if (stage === "metrics" && hasReportMetricsEvidence) {
+        status = "active";
       } else if (
         stage === "metrics" &&
         completedTaskTypeSet.has("analytics_reporting")
@@ -621,6 +654,10 @@ export default function AgencyCommandCenterPage() {
       evidenceSummary?.evidence_hashes?.task_latest_event_hashes || [];
     const socialPostHashes =
       evidenceSummary?.evidence_hashes?.social_post_content_hashes || [];
+    const publishedPostHashes =
+      evidenceSummary?.evidence_hashes?.published_social_post_content_hashes || [];
+    const socialMetricHashes =
+      evidenceSummary?.evidence_hashes?.social_post_metric_hashes || [];
     const reportHashes =
       evidenceSummary?.evidence_hashes?.client_report_hashes || [];
     const approvalHashes =
@@ -690,9 +727,15 @@ export default function AgencyCommandCenterPage() {
       },
       {
         label: "Publish Hash",
-        status: socialPostHashes.length > 0 ? "recorded" : "not reached",
-        detail: socialPostHashes[0] || null,
-        tone: socialPostHashes.length > 0 ? "complete" : "waiting",
+        status: publishedPostHashes.length > 0 ? "recorded" : "not reached",
+        detail: publishedPostHashes[0] || socialPostHashes[0] || null,
+        tone: publishedPostHashes.length > 0 ? "complete" : "waiting",
+      },
+      {
+        label: "Metric Hash",
+        status: socialMetricHashes.length > 0 ? "recorded" : "not reached",
+        detail: socialMetricHashes[0] || null,
+        tone: socialMetricHashes.length > 0 ? "complete" : "waiting",
       },
       {
         label: "Report Hash",
