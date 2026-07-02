@@ -13,6 +13,7 @@
     "dev": "echo 'Run pnpm dev inside a specific worker dir, e.g. cd workers/stripe-sync && pnpm dev'",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
+    "validate:deploy": "node scripts/validate-deploy-contract.mjs",
     "test": "pnpm -r test"
   },
   "devDependencies": {

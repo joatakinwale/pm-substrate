@@ -173,6 +173,7 @@ const REQUIRED_SOURCE_FILES = [
   "backend/alembic/versions/022_virtual_agency_orchestration_ledger.py",
   "agents/packages/shared/src/messages.ts",
   "agents/scripts/deploy.sh",
+  "agents/scripts/validate-deploy-contract.mjs",
   "agents/workers/queue-producer/wrangler.toml",
   "agents/workers/virtual-agency/src/index.ts",
   "agents/workers/virtual-agency/wrangler.toml",
@@ -806,6 +807,14 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
   );
   const messages = readSource(sourceRoot, "agents/packages/shared/src/messages.ts");
   const deploy = readSource(sourceRoot, "agents/scripts/deploy.sh");
+  const deployValidator = readSource(
+    sourceRoot,
+    "agents/scripts/validate-deploy-contract.mjs",
+  );
+  const queueProducer = readSource(
+    sourceRoot,
+    "agents/workers/queue-producer/src/index.ts",
+  );
   const publicationTerminal = readSource(
     resolve(sourceRoot, ".."),
     "packages/profile-agency/src/publication-terminal.ts",
@@ -913,7 +922,11 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     deployBinding:
       deploy.includes("stevie-virtual-agency") &&
       deploy.includes("virtual-agency") &&
-      deploy.includes("BACKEND_BASE_URL"),
+      deploy.includes("BACKEND_BASE_URL") &&
+      queueProducer.includes('"stevie-virtual-agency": "QUEUE_VIRTUAL_AGENCY"') &&
+      queueProducer.includes('"stevie-mux-ingest": "QUEUE_MUX_INGEST"') &&
+      deployValidator.includes("Deploy contract validation passed.") &&
+      deployValidator.includes("stevie-virtual-agency must map to QUEUE_VIRTUAL_AGENCY"),
     publicationTerminal: publicationTerminal.includes(
       "buildAgencyPublicationActionOutcomeEnvelope",
     ),
