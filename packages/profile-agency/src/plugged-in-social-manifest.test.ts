@@ -239,11 +239,15 @@ describe("PluggedInSocial source manifest", () => {
     expect(manifest.governance.closedLoopRuntimeFixture).toBe(true);
     expect(manifest.governance.externalIntegrationBoundary).toBe(true);
     expect(manifest.governance.sharedPayloadContract).toBe(true);
+    expect(manifest.governance.operatorRunMonitorSurface).toBe(true);
     expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
       "contentHashMutationGate",
     );
     expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
       "sharedPayloadContract",
+    );
+    expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
+      "operatorRunMonitorSurface",
     );
     expect(PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES).toContain(
       "publishContentHashGate",

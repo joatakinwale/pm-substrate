@@ -35,6 +35,7 @@ export const PLUGGED_IN_SOCIAL_REQUIRED_GOVERNANCE_GATES = [
   "metricsReadyAnalyticsDispatch",
   "closedLoopRuntimeFixture",
   "externalIntegrationBoundary",
+  "operatorRunMonitorSurface",
 ] as const;
 
 export type PluggedInSocialGovernanceGate =
@@ -153,6 +154,8 @@ const REQUIRED_SOURCE_FILES = [
   "agents/workers/virtual-agency/wrangler.toml",
   "backend/app/services/report_next_actions.py",
   "backend/tests/test_integration_api_contract.py",
+  "frontend/src/app/admin/agency/page.tsx",
+  "frontend/tests/test_agency_command_center_contract.py",
   "frontend/src/app/admin/page.tsx",
 ] as const;
 
@@ -650,6 +653,15 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     sourceRoot,
     "agents/workers/virtual-agency/src/index.test.ts",
   );
+  const frontendApi = readSource(sourceRoot, "frontend/src/lib/api.ts");
+  const agencyCommandCenter = readSource(
+    sourceRoot,
+    "frontend/src/app/admin/agency/page.tsx",
+  );
+  const agencyCommandCenterTests = readSource(
+    sourceRoot,
+    "frontend/tests/test_agency_command_center_contract.py",
+  );
 
   return {
     publicRlsBoundary:
@@ -779,6 +791,22 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       !integrationApi.includes("pm_substrate") &&
       !integrationApi.includes("packages.profile") &&
       !integrationApi.includes("packages/evals"),
+    operatorRunMonitorSurface:
+      frontendApi.includes("export interface IntegrationTask") &&
+      frontendApi.includes("listIntegrationRunTasks") &&
+      frontendApi.includes("/api/integration/v1/marketing-runs/") &&
+      frontendApi.includes("/tasks") &&
+      agencyCommandCenter.includes("Closed-loop Progress") &&
+      agencyCommandCenter.includes("Governance Gates") &&
+      agencyCommandCenter.includes("Agent Task Queue") &&
+      agencyCommandCenter.includes("CLOSED_LOOP_STAGES") &&
+      agencyCommandCenter.includes("listIntegrationRunTasks") &&
+      agencyCommandCenter.includes("approval_payload_hash") &&
+      agencyCommandCenter.includes("latest_event_hash") &&
+      agencyCommandCenter.includes("social_post_content_hashes") &&
+      agencyCommandCenterTests.includes(
+        "test_agency_command_center_route_exposes_autonomous_run_monitor",
+      ),
   };
 }
 

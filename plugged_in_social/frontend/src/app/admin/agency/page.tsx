@@ -21,6 +21,7 @@ import {
   type ClientEngagement,
   type IntegrationEvidenceSummary,
   type IntegrationRunEvent,
+  type IntegrationTask,
   type MarketingRun,
   createAgencyAccessRequest,
   createAgencyApproval,
@@ -35,6 +36,7 @@ import {
   listAgencyApprovals,
   listAgencyArtifacts,
   listClientEngagements,
+  listIntegrationRunTasks,
   listIntegrationRunEvents,
   listMarketingRuns,
 } from "@/lib/api";
@@ -50,6 +52,37 @@ const STATUS_COLORS: Record<string, string> = {
   revoked: "bg-gray-100 text-gray-600",
   requested: "bg-yellow-50 text-yellow-700",
   granted: "bg-stevie-green/10 text-stevie-green",
+};
+
+const CLOSED_LOOP_STAGES = [
+  "intake",
+  "strategy",
+  "content",
+  "approval",
+  "scheduling",
+  "publishing",
+  "metrics",
+  "report",
+  "next_action",
+] as const;
+
+const STAGE_LABELS: Record<(typeof CLOSED_LOOP_STAGES)[number], string> = {
+  intake: "Intake",
+  strategy: "Strategy",
+  content: "Content",
+  approval: "Approval",
+  scheduling: "Scheduling",
+  publishing: "Publishing",
+  metrics: "Metrics",
+  report: "Report",
+  next_action: "Next Action",
+};
+
+const MONITOR_STATUS_CLASSES: Record<string, string> = {
+  complete: "border-stevie-green bg-stevie-green/5 text-stevie-green",
+  active: "border-stevie-sky bg-stevie-sky/10 text-sky-700",
+  blocked: "border-stevie-orange bg-stevie-orange/10 text-stevie-orange",
+  waiting: "border-border bg-gray-50 text-muted-foreground",
 };
 
 function compactDate(value: string | null) {
@@ -72,6 +105,11 @@ function compactDateTime(value: string | null) {
 
 function shortHash(value: string | null | undefined) {
   return value ? value.slice(0, 8) : "-";
+}
+
+function compactEvidenceValue(value: string | null | undefined) {
+  if (!value) return "-";
+  return value.length > 16 ? shortHash(value) : value;
 }
 
 function countEntries(value: Record<string, number> | undefined) {
@@ -112,6 +150,10 @@ function parseObjectJson(value: string, label: string) {
 
 function statusClass(status: string) {
   return STATUS_COLORS[status] || "bg-gray-100 text-gray-600";
+}
+
+function monitorStatusClass(status: string) {
+  return MONITOR_STATUS_CLASSES[status] || MONITOR_STATUS_CLASSES.waiting;
 }
 
 function EmptyState({ children }: { children: ReactNode }) {
@@ -155,6 +197,7 @@ export default function AgencyCommandCenterPage() {
   const [artifacts, setArtifacts] = useState<AgencyArtifact[]>([]);
   const [approvals, setApprovals] = useState<AgencyApprovalRequest[]>([]);
   const [accessRequests, setAccessRequests] = useState<AgencyAccessRequest[]>([]);
+  const [runTasks, setRunTasks] = useState<IntegrationTask[]>([]);
   const [runEvents, setRunEvents] = useState<IntegrationRunEvent[]>([]);
   const [evidenceSummary, setEvidenceSummary] =
     useState<IntegrationEvidenceSummary | null>(null);
@@ -232,6 +275,195 @@ export default function AgencyCommandCenterPage() {
       ),
     [evidenceSummary]
   );
+  const taskTypeSet = useMemo(
+    () => new Set(runTasks.map((task) => task.task_type)),
+    [runTasks]
+  );
+  const completedTaskTypeSet = useMemo(
+    () =>
+      new Set(
+        runTasks
+          .filter((task) => task.status === "done")
+          .map((task) => task.task_type)
+      ),
+    [runTasks]
+  );
+  const eventTypeSet = useMemo(
+    () => new Set(runEvents.map((event) => event.event_type)),
+    [runEvents]
+  );
+  const closedLoopMonitor = useMemo(() => {
+    const socialStatusCounts = evidenceSummary?.social_post_status_counts || {};
+    const hasScheduledPost = Number(socialStatusCounts.scheduled || 0) > 0;
+    const hasPublishedPost = Number(socialStatusCounts.published || 0) > 0;
+    const hasReportArtifact = artifacts.some(
+      (artifact) =>
+        artifact.artifact_type === "client_report" ||
+        artifact.artifact_type === "report"
+    );
+    const hasNextAction =
+      taskTypeSet.has("next_action_proposal") ||
+      eventTypeSet.has("marketing.next_action.proposed");
+
+    const details: Record<(typeof CLOSED_LOOP_STAGES)[number], string> = {
+      intake: selectedEngagement
+        ? "Client URL, repository, goals, and constraints captured."
+        : "Waiting for client intake.",
+      strategy: activeRun
+        ? `${activeRun.stage} run created.`
+        : "Waiting for a strategy run.",
+      content: taskTypeSet.has("content_generation")
+        ? completedTaskTypeSet.has("content_generation")
+          ? "Content task completed."
+          : "Content task queued."
+        : "Waiting for content task.",
+      approval:
+        pendingApprovals.length > 0
+          ? `${pendingApprovals.length} approval gate pending.`
+          : approvals.length > 0
+            ? "Approval gates resolved or recorded."
+            : "Waiting for approval evidence.",
+      scheduling: taskTypeSet.has("content_scheduling")
+        ? completedTaskTypeSet.has("content_scheduling")
+          ? "Scheduling task completed."
+          : "Scheduling task queued."
+        : "Waiting for scheduling task.",
+      publishing: hasPublishedPost
+        ? "Published post evidence recorded."
+        : hasScheduledPost
+          ? "Scheduled post awaiting publish evidence."
+          : "Waiting for publish evidence.",
+      metrics: taskTypeSet.has("analytics_reporting")
+        ? completedTaskTypeSet.has("analytics_reporting")
+          ? "Metrics/reporting task completed."
+          : "Analytics task queued."
+        : "Waiting for metrics task.",
+      report: hasReportArtifact
+        ? "Report artifact recorded."
+        : "Waiting for report artifact.",
+      next_action: hasNextAction
+        ? "Next action proposal recorded."
+        : "Waiting for next action proposal.",
+    };
+
+    return CLOSED_LOOP_STAGES.map((stage) => {
+      let status: "complete" | "active" | "blocked" | "waiting" = "waiting";
+
+      if (stage === "intake" && selectedEngagement) status = "complete";
+      if (stage === "strategy" && activeRun) status = "complete";
+      if (stage === "content" && completedTaskTypeSet.has("content_generation")) {
+        status = "complete";
+      } else if (stage === "content" && taskTypeSet.has("content_generation")) {
+        status = "active";
+      }
+      if (stage === "approval" && pendingApprovals.length > 0) {
+        status = "blocked";
+      } else if (stage === "approval" && approvals.length > 0) {
+        status = "complete";
+      }
+      if (stage === "scheduling" && completedTaskTypeSet.has("content_scheduling")) {
+        status = "complete";
+      } else if (stage === "scheduling" && taskTypeSet.has("content_scheduling")) {
+        status = "active";
+      }
+      if (stage === "publishing" && hasPublishedPost) {
+        status = "complete";
+      } else if (stage === "publishing" && hasScheduledPost) {
+        status = "active";
+      }
+      if (stage === "metrics" && completedTaskTypeSet.has("analytics_reporting")) {
+        status = "complete";
+      } else if (stage === "metrics" && taskTypeSet.has("analytics_reporting")) {
+        status = "active";
+      }
+      if (stage === "report" && hasReportArtifact) status = "complete";
+      if (stage === "next_action" && hasNextAction) status = "complete";
+
+      return {
+        stage,
+        label: STAGE_LABELS[stage],
+        status,
+        detail: details[stage],
+      };
+    });
+  }, [
+    activeRun,
+    approvals.length,
+    artifacts,
+    completedTaskTypeSet,
+    evidenceSummary,
+    eventTypeSet,
+    pendingApprovals.length,
+    selectedEngagement,
+    taskTypeSet,
+  ]);
+  const governanceGates = useMemo(() => {
+    const eventHashes =
+      evidenceSummary?.evidence_hashes?.event_hashes || [];
+    const taskHashes =
+      evidenceSummary?.evidence_hashes?.task_latest_event_hashes || [];
+    const socialPostHashes =
+      evidenceSummary?.evidence_hashes?.social_post_content_hashes || [];
+    const approvalHashes =
+      evidenceSummary?.evidence_hashes?.approval_payload_hashes || [];
+
+    return [
+      {
+        label: "Tenant RLS",
+        status: "enforced",
+        detail: selectedEngagement?.org_id ? selectedEngagement.org_id.slice(0, 8) : "-",
+        tone: "complete",
+      },
+      {
+        label: "Access Gate",
+        status: openAccessRequests.length > 0 ? "blocked" : "clear",
+        detail:
+          openAccessRequests.length > 0
+            ? `${openAccessRequests.length} open`
+            : `${accessRequests.length} recorded`,
+        tone: openAccessRequests.length > 0 ? "blocked" : "complete",
+      },
+      {
+        label: "Approval Hash",
+        status:
+          approvalHashes.length > 0 || runTasks.some((task) => task.approval_payload_hash)
+            ? "recorded"
+            : "pending",
+        detail:
+          approvalHashes[0] ||
+          runTasks.find((task) => task.approval_payload_hash)?.approval_payload_hash ||
+          null,
+        tone:
+          approvalHashes.length > 0 || runTasks.some((task) => task.approval_payload_hash)
+            ? "complete"
+            : "waiting",
+      },
+      {
+        label: "Task Event Hash",
+        status: taskHashes.length > 0 ? "recorded" : "waiting",
+        detail: taskHashes[0] || null,
+        tone: taskHashes.length > 0 ? "complete" : "waiting",
+      },
+      {
+        label: "Event Chain",
+        status: eventHashes.length > 0 ? "chained" : "waiting",
+        detail: eventHashes[0] || null,
+        tone: eventHashes.length > 0 ? "complete" : "waiting",
+      },
+      {
+        label: "Publish Hash",
+        status: socialPostHashes.length > 0 ? "recorded" : "not reached",
+        detail: socialPostHashes[0] || null,
+        tone: socialPostHashes.length > 0 ? "complete" : "waiting",
+      },
+    ];
+  }, [
+    accessRequests.length,
+    evidenceSummary,
+    openAccessRequests.length,
+    runTasks,
+    selectedEngagement,
+  ]);
 
   const loadEngagements = useCallback(async () => {
     setLoading(true);
@@ -259,10 +491,12 @@ export default function AgencyCommandCenterPage() {
       ]);
       const latestRun = runData[0] || null;
       let eventData: IntegrationRunEvent[] = [];
+      let taskData: IntegrationTask[] = [];
       let summaryData: IntegrationEvidenceSummary | null = null;
       if (latestRun) {
-        [eventData, summaryData] = await Promise.all([
+        [eventData, taskData, summaryData] = await Promise.all([
           listIntegrationRunEvents(latestRun.id),
+          listIntegrationRunTasks(latestRun.id),
           getIntegrationEvidenceSummary(latestRun.id),
         ]);
       }
@@ -270,6 +504,7 @@ export default function AgencyCommandCenterPage() {
       setArtifacts(artifactData);
       setApprovals(approvalData);
       setAccessRequests(accessData);
+      setRunTasks(taskData);
       setRunEvents(eventData);
       setEvidenceSummary(summaryData);
       setApprovalForm((current) => ({
@@ -301,6 +536,7 @@ export default function AgencyCommandCenterPage() {
         setArtifacts([]);
         setApprovals([]);
         setAccessRequests([]);
+        setRunTasks([]);
         setRunEvents([]);
         setEvidenceSummary(null);
         return;
@@ -829,9 +1065,7 @@ export default function AgencyCommandCenterPage() {
               )}
             </div>
 
-            {!activeRun ? (
-              <EmptyState>No active run.</EmptyState>
-            ) : detailLoading ? (
+            {detailLoading ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                 {[0, 1, 2, 3].map((item) => (
                   <div
@@ -842,11 +1076,13 @@ export default function AgencyCommandCenterPage() {
               </div>
             ) : (
               <div className="space-y-5">
+                {!activeRun && <EmptyState>No active run.</EmptyState>}
+
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                   {[
                     {
                       label: "Tasks",
-                      value: evidenceSummary?.task_count ?? 0,
+                      value: evidenceSummary?.task_count ?? runTasks.length,
                       icon: Activity,
                     },
                     {
@@ -884,6 +1120,56 @@ export default function AgencyCommandCenterPage() {
                   ))}
                 </div>
 
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <Clock3 className="h-4 w-4 text-muted-foreground" />
+                    Closed-loop Progress
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    {closedLoopMonitor.map((stage) => (
+                      <div
+                        key={stage.stage}
+                        className={`rounded-lg border px-3 py-3 ${monitorStatusClass(stage.status)}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{stage.label}</p>
+                          <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-medium uppercase">
+                            {stage.status}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          {stage.detail}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                    Governance Gates
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    {governanceGates.map((gate) => (
+                      <div
+                        key={gate.label}
+                        className={`rounded-lg border px-3 py-3 ${monitorStatusClass(gate.tone)}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium">{gate.label}</p>
+                          <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-medium uppercase">
+                            {gate.status}
+                          </span>
+                        </div>
+                        <p className="mt-2 break-all font-mono text-[11px] text-muted-foreground">
+                          {compactEvidenceValue(gate.detail)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {kickoffSummary && (
                   <div className="rounded-lg border border-border px-4 py-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -915,6 +1201,54 @@ export default function AgencyCommandCenterPage() {
 
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                   <div className="space-y-4">
+                    <div>
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                        Agent Task Queue
+                      </div>
+                      {runTasks.length === 0 ? (
+                        <EmptyState>No agent tasks recorded.</EmptyState>
+                      ) : (
+                        <div className="space-y-2">
+                          {runTasks.map((task) => (
+                            <div
+                              key={task.id}
+                              className="rounded-lg border border-border px-3 py-3"
+                            >
+                              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                  <p className="text-sm font-medium">{task.title}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {task.agent_role.replaceAll("_", " ")} -{" "}
+                                    {task.task_type.replaceAll("_", " ")}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(task.status)}`}
+                                >
+                                  {task.status}
+                                </span>
+                              </div>
+                              <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground md:grid-cols-4">
+                                <span>v{task.task_version}</span>
+                                <span>
+                                  approval{" "}
+                                  {task.approval_active ? "active" : "pending"}
+                                </span>
+                                <span>
+                                  approval hash{" "}
+                                  {shortHash(task.approval_payload_hash)}
+                                </span>
+                                <span>
+                                  event hash {shortHash(task.latest_event_hash)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <div className="mb-2 flex items-center gap-2 text-sm font-medium">
                         <Hash className="h-4 w-4 text-muted-foreground" />

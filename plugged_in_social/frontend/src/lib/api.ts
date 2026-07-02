@@ -893,6 +893,33 @@ export interface IntegrationRunEvent {
   links: Array<{ rel: string; href: string }>;
 }
 
+export interface IntegrationTask {
+  resource_type: "virtual_agency_task";
+  id: string;
+  org_id: string;
+  project_id: string;
+  source_task_id: string | null;
+  parent_task_id: string | null;
+  title: string;
+  description: string | null;
+  reason: string;
+  agent_role: string;
+  task_type: string;
+  status: string;
+  task_version: number;
+  approved_version: number | null;
+  approval_active: boolean;
+  approval_payload_hash: string | null;
+  latest_event_hash: string | null;
+  context: Record<string, unknown>;
+  lineage: Record<string, unknown>;
+  claimed_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  links: Array<{ rel: string; href: string }>;
+}
+
 export interface IntegrationEvidenceSummary {
   resource_type: "marketing_run_evidence_summary";
   run_id: string;
@@ -1101,6 +1128,12 @@ export async function decideAgencyAccessRequest(
 export async function listIntegrationRunEvents(runId: string) {
   return apiFetch<IntegrationRunEvent[]>(
     `/api/integration/v1/marketing-runs/${encodeURIComponent(runId)}/events`
+  );
+}
+
+export async function listIntegrationRunTasks(runId: string) {
+  return apiFetch<IntegrationTask[]>(
+    `/api/integration/v1/marketing-runs/${encodeURIComponent(runId)}/tasks`
   );
 }
 
