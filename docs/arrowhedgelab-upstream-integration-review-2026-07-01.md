@@ -42,7 +42,7 @@ Data/provenance:
 
 Backtesting:
 
-- Backend `BacktestService` returns day-level backtest results with decisions, executed trades, analyst signals, current prices, exposures, metrics, and generated `arrowhedgelab.runtime-provenance.v1` blocks. Saved flow-run updates also attach that provenance at persistence time. The adapter now exposes saved results through backtest inventory/detail/day endpoints with redaction and hashes, source-artifact endpoints expose cache-derived provider/window/hash metadata, and the pm-substrate connector can build a canonical `arrowhedge.run-envelope.v1` from those adapter responses. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records, preserve ArrowHedge runtime provenance on signal/decision records, and carry those IDs through expansion and analyst-signal typed events. The pm-substrate HTTP demo now exposes `POST /tenants/:tenantId/arrowhedge/experiments/paired-readiness` and `POST /tenants/:tenantId/arrowhedge/experiments/paired-bundles` to admit or reject comparable arms, preserve envelope/report hashes, separate market deltas from governance deltas, and deny market-win claims unless readiness and false-positive/false-negative evidence gates pass. The remaining gap is automated paired experiment execution and durable artifact persistence over real historical windows.
+- Backend `BacktestService` returns day-level backtest results with decisions, executed trades, analyst signals, current prices, exposures, metrics, and generated `arrowhedgelab.runtime-provenance.v1` blocks. Saved flow-run updates also attach that provenance at persistence time. The adapter now exposes saved results through backtest inventory/detail/day endpoints with redaction and hashes, source-artifact endpoints expose cache-derived provider/window/hash metadata, and the pm-substrate connector can build a canonical `arrowhedge.run-envelope.v1` from those adapter responses. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records, preserve ArrowHedge runtime provenance on signal/decision records, and carry those IDs through expansion and analyst-signal typed events. The pm-substrate HTTP demo now exposes `POST /tenants/:tenantId/arrowhedge/experiments/paired-readiness` and `POST /tenants/:tenantId/arrowhedge/experiments/paired-bundles` to admit or reject comparable arms, preserve envelope/report hashes, separate market deltas from governance deltas, and deny market-win claims unless readiness and false-positive/false-negative evidence gates pass. The local `pnpm arrowhedge:paired-bundle` script writes and verifies replayable `baseline-envelope.json`, `substrate-envelope.json`, `paired-report.json`, `manifest.json`, and `paired-bundle.json` artifacts from saved envelopes plus explicit metrics. The remaining gap is automated paired experiment execution over real historical windows.
 - Newer `src/backtesting/*` components are cleaner and more testable, but are not exposed as an integration service.
 - `v2/*` provides an emerging protocol/data/backtesting research direction, but it is not wired into the app adapter surface.
 
@@ -74,7 +74,7 @@ Implemented first adapter surface:
 
 Remaining minimum experiment surface:
 
-- Automated paired experiment execution: run or assemble admitted baseline/substrate arms from ArrowHedgeLab runs, call the pm-substrate bundle/report gate, persist replayable artifacts durably, and collect enough historical windows to evaluate the market hypothesis.
+- Automated paired experiment execution: run or assemble admitted baseline/substrate arms from ArrowHedgeLab runs, call the pm-substrate bundle/report gate, and collect enough historical windows to evaluate the market hypothesis.
 
 pm-substrate connector requirements:
 
@@ -83,6 +83,21 @@ pm-substrate connector requirements:
 - Preserve graph, model config, agent outputs, risk state, portfolio state, data hashes, freshness windows, runtime provenance, and evidence refs. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records before expansion.
 - Never read raw API key values.
 - Keep ArrowHedge-specific mapping in finance-research capability/profile packages or a dedicated connector package, not substrate core.
+
+Replayable bundle command:
+
+```bash
+pnpm arrowhedge:paired-bundle -- write \
+  --experiment-id exp_arrowhedge_axis_a_001 \
+  --baseline-envelope artifacts/arrowhedge/baseline-envelope.json \
+  --substrate-envelope artifacts/arrowhedge/substrate-envelope.json \
+  --baseline-metrics artifacts/arrowhedge/baseline-metrics.json \
+  --substrate-metrics artifacts/arrowhedge/substrate-metrics.json \
+  --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001
+
+pnpm arrowhedge:paired-bundle -- verify \
+  --bundle-dir artifacts/arrowhedge/exp_arrowhedge_axis_a_001
+```
 
 ## False-Positive Controls
 
@@ -98,8 +113,8 @@ The market-win hypothesis cannot be claimed from a single run or from governance
 
 ## Next Implementation Order
 
-1. Add an automated paired experiment runner that calls the readiness and bundle endpoints, runs or ingests admitted baseline/substrate arms, and persists replayable artifacts for independent verification.
-2. Run paired contract tests against the fresh upstream clone, then run substrate-side TypeScript tests for envelope expansion, COP projection, stale-state blocking, invalid-action blocking, clean-current acceptance, and bundle claim gating.
+1. Add an automated paired experiment runner that calls the readiness and bundle endpoints, runs or ingests admitted baseline/substrate arms, and invokes the replayable bundle writer for independent verification.
+2. Run paired contract tests against the fresh upstream clone, then run substrate-side TypeScript tests for envelope expansion, COP projection, stale-state blocking, invalid-action blocking, clean-current acceptance, bundle claim gating, and bundle directory verification.
 3. Collect enough saved historical windows to estimate market/PnL deltas separately from governance/protection deltas without claiming improvement from governance-only wins.
 
 The critical design rule: ArrowHedgeLab must remain usable without pm-substrate. pm-substrate must be able to attach from the outside, observe/govern the system through stable microservice surfaces, and be removed without breaking the hedge fund app.

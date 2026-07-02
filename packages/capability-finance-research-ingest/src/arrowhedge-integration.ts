@@ -481,6 +481,18 @@ export interface ArrowHedgePairedExperimentBundle {
   readonly report: ArrowHedgePairedExperimentReport;
 }
 
+export interface ArrowHedgePairedExperimentBundleVerification {
+  readonly valid: boolean;
+  readonly issues: readonly string[];
+  readonly expected: {
+    readonly baselineEnvelopeSha256: string;
+    readonly substrateEnvelopeSha256: string;
+    readonly reportSha256: string;
+    readonly ready: boolean;
+    readonly marketWinClaimAllowed: boolean;
+  };
+}
+
 export interface ArrowHedgeIntegrationValidationResult {
   readonly ready: boolean;
   readonly issues: readonly string[];
@@ -961,6 +973,88 @@ export function buildArrowHedgePairedExperimentBundle(
     baselineEnvelope: input.baseline.envelope,
     substrateEnvelope: input.substrate.envelope,
     report,
+  };
+}
+
+export function verifyArrowHedgePairedExperimentBundle(
+  bundle: ArrowHedgePairedExperimentBundle,
+): ArrowHedgePairedExperimentBundleVerification {
+  const baselineArtifactName =
+    bundle.manifest.artifacts[0]?.name ?? "baseline-envelope.json";
+  const substrateArtifactName =
+    bundle.manifest.artifacts[1]?.name ?? "substrate-envelope.json";
+  const expectedBundle = buildArrowHedgePairedExperimentBundle({
+    experimentId: bundle.manifest.experimentId,
+    generatedAt: bundle.manifest.generatedAt,
+    baseline: {
+      envelope: bundle.baselineEnvelope,
+      metrics: bundle.report.market.baseline,
+      artifactLabel: baselineArtifactName,
+    },
+    substrate: {
+      envelope: bundle.substrateEnvelope,
+      metrics: bundle.report.market.substrate,
+      artifactLabel: substrateArtifactName,
+    },
+  });
+  const expected = {
+    baselineEnvelopeSha256: expectedBundle.manifest.baselineEnvelopeSha256,
+    substrateEnvelopeSha256: expectedBundle.manifest.substrateEnvelopeSha256,
+    reportSha256: expectedBundle.manifest.reportSha256,
+    ready: expectedBundle.report.ready,
+    marketWinClaimAllowed: expectedBundle.report.marketWinClaimAllowed,
+  };
+  const reportSha256 = sha256StableJson(bundle.report);
+  const issues = [
+    ...(bundle.schemaVersion === "arrowhedge.paired-experiment-bundle.v1"
+      ? []
+      : ["bundle schemaVersion must be arrowhedge.paired-experiment-bundle.v1"]),
+    ...(bundle.manifest.schemaVersion === "arrowhedge.paired-experiment-manifest.v1"
+      ? []
+      : ["manifest schemaVersion must be arrowhedge.paired-experiment-manifest.v1"]),
+    ...(bundle.report.schemaVersion === "arrowhedge.paired-experiment-report.v1"
+      ? []
+      : ["report schemaVersion must be arrowhedge.paired-experiment-report.v1"]),
+    ...(bundle.manifest.experimentId === bundle.report.experimentId
+      ? []
+      : ["manifest experimentId must match report experimentId"]),
+    ...(bundle.manifest.baselineRunId === bundle.baselineEnvelope.runId
+      ? []
+      : ["manifest baselineRunId must match baseline envelope runId"]),
+    ...(bundle.manifest.substrateRunId === bundle.substrateEnvelope.runId
+      ? []
+      : ["manifest substrateRunId must match substrate envelope runId"]),
+    ...(bundle.manifest.baselineEnvelopeSha256 === expected.baselineEnvelopeSha256
+      ? []
+      : ["manifest baselineEnvelopeSha256 does not match baseline envelope"]),
+    ...(bundle.manifest.substrateEnvelopeSha256 === expected.substrateEnvelopeSha256
+      ? []
+      : ["manifest substrateEnvelopeSha256 does not match substrate envelope"]),
+    ...(bundle.manifest.reportSha256 === reportSha256
+      ? []
+      : ["manifest reportSha256 does not match report"]),
+    ...(reportSha256 === expected.reportSha256
+      ? []
+      : ["report content does not match recomputed paired experiment report"]),
+    ...(bundle.manifest.ready === bundle.report.ready
+      ? []
+      : ["manifest ready must match report ready"]),
+    ...(bundle.manifest.marketWinClaimAllowed === bundle.report.marketWinClaimAllowed
+      ? []
+      : ["manifest marketWinClaimAllowed must match report marketWinClaimAllowed"]),
+    ...(bundle.report.ready === expected.ready
+      ? []
+      : ["report ready does not match recomputed readiness"]),
+    ...(bundle.report.marketWinClaimAllowed === expected.marketWinClaimAllowed
+      ? []
+      : ["report marketWinClaimAllowed does not match recomputed claim gate"]),
+    ...verifyPairedExperimentArtifacts(bundle),
+  ];
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    expected,
   };
 }
 
@@ -1861,6 +1955,55 @@ function booleanField(
 ): boolean | undefined {
   const value = record?.[field];
   return typeof value === "boolean" ? value : undefined;
+}
+
+function verifyPairedExperimentArtifacts(
+  bundle: ArrowHedgePairedExperimentBundle,
+): readonly string[] {
+  const artifacts = bundle.manifest.artifacts;
+  const issues: string[] = [];
+  if (artifacts.length !== 3) {
+    issues.push("manifest artifacts must include baseline, substrate, and report artifacts");
+  }
+  const expectedArtifacts = [
+    {
+      index: 0,
+      sha256: bundle.manifest.baselineEnvelopeSha256,
+      mediaType: "application/json",
+      description: "baseline envelope",
+    },
+    {
+      index: 1,
+      sha256: bundle.manifest.substrateEnvelopeSha256,
+      mediaType: "application/json",
+      description: "substrate envelope",
+    },
+    {
+      index: 2,
+      sha256: bundle.manifest.reportSha256,
+      mediaType: "application/json",
+      description: "paired report",
+    },
+  ] as const;
+
+  for (const expected of expectedArtifacts) {
+    const artifact = artifacts[expected.index];
+    if (artifact === undefined) {
+      issues.push(`manifest is missing ${expected.description} artifact`);
+      continue;
+    }
+    if (artifact.name.trim() === "") {
+      issues.push(`manifest ${expected.description} artifact name is required`);
+    }
+    if (artifact.sha256 !== expected.sha256) {
+      issues.push(`manifest ${expected.description} artifact sha256 is incorrect`);
+    }
+    if (artifact.mediaType !== expected.mediaType) {
+      issues.push(`manifest ${expected.description} artifact mediaType must be application/json`);
+    }
+  }
+
+  return issues;
 }
 
 function integrationEnvelopeFingerprints(
