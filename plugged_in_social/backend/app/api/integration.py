@@ -1669,6 +1669,8 @@ def _platform_manifest() -> IntegrationPlatformManifestEnvelope:
             "handoff_scope_guard",
             "approval_payload_hash",
             "content_hash_gate",
+            "strategy_research_artifact_gate",
+            "external_adapter_run_evidence_gate",
             "publish_content_hash_gate",
             "capability_gate",
             "idempotency_key",

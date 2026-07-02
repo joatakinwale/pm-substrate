@@ -873,6 +873,8 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     )
     assert "tenant_rls" in manifest.governance_gates
     assert "content_hash_gate" in manifest.governance_gates
+    assert "strategy_research_artifact_gate" in manifest.governance_gates
+    assert "external_adapter_run_evidence_gate" in manifest.governance_gates
     assert "external_adapter_boundary" in manifest.governance_gates
     assert "sandbox_boundary" in manifest.governance_gates
 

@@ -66,7 +66,9 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "Run Monitor" in source
     assert "Closed-loop Progress" in source
     assert "Governance Gates" in source
+    assert "Adapter Evidence" in source
     assert "External Adapter Boundary" in source
+    assert "Strategy Research Evidence" in source
     assert "Agent Task Queue" in source
     assert "CLOSED_LOOP_STAGES" in source
     assert "next_action" in source
