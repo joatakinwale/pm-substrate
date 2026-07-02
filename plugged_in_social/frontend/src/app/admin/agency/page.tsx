@@ -151,6 +151,18 @@ function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function artifactAdapterIdValue(artifact: AgencyArtifact) {
+  const lineage = objectValue(artifact.lineage) || {};
+  const payload = objectValue(artifact.payload) || {};
+  return stringValue(lineage.adapter_id) || stringValue(payload.adapter_id);
+}
+
+function artifactStatusValue(artifact: AgencyArtifact) {
+  const lineage = objectValue(artifact.lineage) || {};
+  const payload = objectValue(artifact.payload) || {};
+  return stringValue(lineage.status) || stringValue(payload.status);
+}
+
 function splitLines(value: string) {
   return value
     .split("\n")
@@ -347,6 +359,24 @@ export default function AgencyCommandCenterPage() {
       ),
     };
   }, [artifacts]);
+  const strategyAdapterGate = useMemo(() => {
+    const requiredIds = Array.from(
+      new Set(
+        strategyResearchEvidence.adapterRequirements
+          .map((requirement) => stringValue(requirement.adapter_id))
+          .filter((item): item is string => Boolean(item))
+      )
+    ).sort();
+    const succeededIds = new Set(
+      externalAdapterRuns
+        .filter((artifact) => artifactStatusValue(artifact) === "succeeded")
+        .map(artifactAdapterIdValue)
+        .filter((item): item is string => Boolean(item))
+    );
+    const missingIds = requiredIds.filter((adapterId) => !succeededIds.has(adapterId));
+
+    return { requiredIds, succeededIds, missingIds };
+  }, [externalAdapterRuns, strategyResearchEvidence.adapterRequirements]);
   const recentRunEvents = useMemo(
     () => runEvents.slice(-8).reverse(),
     [runEvents]
@@ -409,22 +439,28 @@ export default function AgencyCommandCenterPage() {
       eventTypeSet.has("marketing.next_action.proposed") ||
       nextActionProposals.length > 0;
     const hasStrategyResearchArtifact = Boolean(strategyResearchEvidence.artifact);
+    const hasRequiredAdapterEvidence =
+      strategyAdapterGate.missingIds.length === 0;
+    const strategyReady =
+      hasStrategyResearchArtifact && hasRequiredAdapterEvidence;
 
     const details: Record<(typeof CLOSED_LOOP_STAGES)[number], string> = {
       intake: selectedEngagement
         ? "Client URL, repository, goals, and constraints captured."
         : "Waiting for client intake.",
-      strategy: hasStrategyResearchArtifact
+      strategy: strategyReady
         ? `Strategy brief ${shortHash(strategyResearchEvidence.artifact?.payload_hash)} with ${strategyResearchEvidence.adapterRequirements.length} adapter requirement${strategyResearchEvidence.adapterRequirements.length === 1 ? "" : "s"}.`
+        : hasStrategyResearchArtifact
+          ? `Waiting for adapter evidence: ${strategyAdapterGate.missingIds.join(", ")}.`
         : activeRun
           ? "Strategy run waiting for research artifact evidence."
           : "Waiting for a strategy run.",
       content: taskTypeSet.has("content_generation")
         ? completedTaskTypeSet.has("content_generation")
           ? "Content task completed."
-          : hasStrategyResearchArtifact
+          : strategyReady
             ? "Content task queued."
-            : "Waiting for strategy artifact gate."
+            : "Waiting for strategy and adapter evidence gates."
         : "Waiting for content task.",
       approval:
         pendingApprovals.length > 0
@@ -461,8 +497,10 @@ export default function AgencyCommandCenterPage() {
       let status: "complete" | "active" | "blocked" | "waiting" = "waiting";
 
       if (stage === "intake" && selectedEngagement) status = "complete";
-      if (stage === "strategy" && hasStrategyResearchArtifact) {
+      if (stage === "strategy" && strategyReady) {
         status = "complete";
+      } else if (stage === "strategy" && hasStrategyResearchArtifact) {
+        status = "blocked";
       } else if (
         stage === "strategy" &&
         (activeRun || taskTypeSet.has("strategy_research"))
@@ -474,7 +512,7 @@ export default function AgencyCommandCenterPage() {
       } else if (
         stage === "content" &&
         taskTypeSet.has("content_generation") &&
-        !hasStrategyResearchArtifact
+        !strategyReady
       ) {
         status = "blocked";
       } else if (stage === "content" && taskTypeSet.has("content_generation")) {
@@ -527,6 +565,7 @@ export default function AgencyCommandCenterPage() {
     pendingApprovals.length,
     runSocialPosts,
     selectedEngagement,
+    strategyAdapterGate,
     strategyResearchEvidence,
     taskTypeSet,
   ]);
@@ -557,6 +596,25 @@ export default function AgencyCommandCenterPage() {
             ? `${openAccessRequestCount} open`
             : `${accessRequests.length} recorded`,
         tone: openAccessRequestCount > 0 ? "blocked" : "complete",
+      },
+      {
+        label: "Adapter Evidence",
+        status:
+          strategyAdapterGate.requiredIds.length === 0
+            ? "not required"
+            : strategyAdapterGate.missingIds.length === 0
+              ? "succeeded"
+              : "missing",
+        detail:
+          strategyAdapterGate.missingIds.length > 0
+            ? strategyAdapterGate.missingIds.join(", ")
+            : `${strategyAdapterGate.requiredIds.length} required`,
+        tone:
+          strategyAdapterGate.requiredIds.length === 0
+            ? "waiting"
+            : strategyAdapterGate.missingIds.length === 0
+              ? "complete"
+              : "blocked",
       },
       {
         label: "Approval Hash",
@@ -604,6 +662,7 @@ export default function AgencyCommandCenterPage() {
     openAccessRequestCount,
     runTasks,
     selectedEngagement,
+    strategyAdapterGate,
   ]);
 
   const loadEngagements = useCallback(async () => {
@@ -1537,6 +1596,10 @@ export default function AgencyCommandCenterPage() {
                                 const outputArtifacts = stringArrayValue(
                                   requirement.expected_output_artifacts
                                 );
+                                const adapterStatus =
+                                  strategyAdapterGate.succeededIds.has(adapterId)
+                                    ? "succeeded"
+                                    : "missing";
 
                                 return (
                                   <div
@@ -1553,9 +1616,16 @@ export default function AgencyCommandCenterPage() {
                                             "adapter requirement"}
                                         </p>
                                       </div>
-                                      <span className="text-[11px] text-muted-foreground">
-                                        {outputArtifacts.length} outputs
-                                      </span>
+                                      <div className="flex flex-col items-end gap-1">
+                                        <span
+                                          className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-medium ${statusClass(adapterStatus)}`}
+                                        >
+                                          {adapterStatus}
+                                        </span>
+                                        <span className="text-[11px] text-muted-foreground">
+                                          {outputArtifacts.length} outputs
+                                        </span>
+                                      </div>
                                     </div>
                                     <div className="mt-2 flex flex-wrap gap-1.5">
                                       {evidenceFields.slice(0, 5).map((field) => (
