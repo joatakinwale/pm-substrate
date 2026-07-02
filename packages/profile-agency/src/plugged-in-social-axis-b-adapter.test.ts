@@ -36,6 +36,7 @@ const liveTaskId = "55555555-5555-4555-8555-555555555555";
 const liveEventHashA = "a".repeat(64);
 const liveEventHashB = "b".repeat(64);
 const liveArtifactHash = "c".repeat(64);
+const liveAccessRequestHash = "d".repeat(64);
 
 function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
   return {
@@ -60,7 +61,9 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "artifact.read",
         "event_timeline.read",
         "evidence_summary.read",
+        "access_request.read",
         "approval.decide",
+        "access_request.decide",
         "event.ingest",
       ].map((id) => ({
         id,
@@ -164,6 +167,18 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           boundary: "internal_system_rls",
           capability_ids: ["task.execute"],
         },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/access-requests",
+          boundary: "public_rls",
+          capability_ids: ["access_request.read"],
+        },
+        {
+          method: "POST",
+          path: "/api/integration/v1/access-requests/{access_request_id}/decision",
+          boundary: "public_rls",
+          capability_ids: ["access_request.decide"],
+        },
       ],
       data_resources: [
         {
@@ -219,6 +234,15 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           durable_evidence_fields: ["approval_payload_hash"],
           read_capability_ids: ["approval.read"],
           write_capability_ids: ["approval.decide"],
+        },
+        {
+          id: "agency_access_request",
+          table: "agency_access_requests",
+          resource_type: "agency_access_request",
+          org_scoped: true,
+          durable_evidence_fields: ["scope", "instructions", "resolved_at"],
+          read_capability_ids: ["access_request.read"],
+          write_capability_ids: ["access_request.decide"],
         },
         {
           id: "social_post",
@@ -292,8 +316,11 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       event_type_counts: { task_created: 1, execution_completed: 1 },
       approval_count: 0,
       pending_approval_count: 0,
+      access_request_count: 1,
+      open_access_request_count: 0,
       evidence_hashes: {
         artifact_payload_hashes: [liveArtifactHash],
+        access_request_hashes: [liveAccessRequestHash],
         event_hashes: [liveEventHashA, liveEventHashB],
         task_latest_event_hashes: [liveEventHashB],
       },
@@ -379,6 +406,26 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       },
     ],
     approvals: [],
+    accessRequests: [
+      {
+        resource_type: "agency_access_request",
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        org_id: liveOrgId,
+        engagement_id: "66666666-6666-4666-8666-666666666666",
+        marketing_run_id: liveRunId,
+        request_type: "analytics",
+        provider: "umami",
+        status: "granted",
+        scope: { website_id: "acme" },
+        reason: "Metrics reporting needs analytics access",
+        instructions: {
+          action: "connect_analytics",
+          resolution: { decision: "granted" },
+        },
+        resolved_at: "2026-07-01T16:30:00.000Z",
+        resolved_by_user_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   };
 }
 
@@ -502,6 +549,10 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/approvals`,
         snapshot.approvals,
       ],
+      [
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/access-requests`,
+        snapshot.accessRequests,
+      ],
     ]);
     const calls: Array<{ url: string; authorization: string | undefined }> = [];
     const fetchFn: PluggedInSocialIntegrationFetch = async (url, init) => {
@@ -532,6 +583,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
       `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/tasks`,
       `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/artifacts`,
       `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/approvals`,
+      `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/access-requests`,
     ]);
     expect(new Set(calls.map((call) => call.authorization))).toEqual(
       new Set(["Bearer jwt-token"]),
@@ -552,6 +604,10 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         expect.objectContaining({
           kind: "event",
           id: "plugged_in_social:virtual_agency_events:88888888-8888-4888-8888-888888888888",
+        }),
+        expect.objectContaining({
+          kind: "source_record",
+          id: "plugged_in_social:agency_access_requests:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         }),
       ]),
     );
@@ -613,6 +669,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
           ...snapshot.summary,
           evidence_hashes: {
             artifact_payload_hashes: [],
+            access_request_hashes: [],
             event_hashes: [],
             task_latest_event_hashes: [],
           },
@@ -625,6 +682,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     expect(result.issues).toEqual(
       expect.arrayContaining([
         "missing evidence hashes: artifact_payload_hashes",
+        "missing evidence hashes: access_request_hashes",
         "missing evidence hashes: event_hashes",
         "missing evidence hashes: task_latest_event_hashes",
       ]),

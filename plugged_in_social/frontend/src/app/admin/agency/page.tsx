@@ -27,6 +27,7 @@ import {
   createAgencyArtifact,
   createClientEngagement,
   createMarketingRun,
+  decideAgencyAccessRequest,
   decideAgencyApproval,
   getIntegrationEvidenceSummary,
   listAgencyAccessRequests,
@@ -479,6 +480,32 @@ export default function AgencyCommandCenterPage() {
       await loadEngagementDetail(selectedId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create access request.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleAccessDecision(
+    request: AgencyAccessRequest,
+    decision: "granted" | "blocked" | "revoked"
+  ) {
+    if (!selectedId) return;
+    setActionLoading(`${decision}:access:${request.id}`);
+    setError(null);
+    try {
+      await decideAgencyAccessRequest(request.id, {
+        decision,
+        decision_note:
+          decision === "granted"
+            ? "Access granted from agency command center"
+            : decision === "blocked"
+              ? "Access blocked from agency command center"
+              : "Access revoked from agency command center",
+        resolution_payload: { source: "agency_command_center" },
+      });
+      await loadEngagementDetail(selectedId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not resolve access request.");
     } finally {
       setActionLoading(null);
     }
@@ -1233,21 +1260,70 @@ export default function AgencyCommandCenterPage() {
                 {accessRequests.length === 0 ? (
                   <EmptyState>No access requests.</EmptyState>
                 ) : (
-                  accessRequests.map((request) => (
-                    <div key={request.id} className="rounded-lg border border-border p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium">{request.reason}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {request.request_type} - {request.provider || "internal"}
-                          </p>
+                  accessRequests.map((request) => {
+                    const canGrant =
+                      request.status === "requested" || request.status === "blocked";
+                    const canBlock =
+                      request.status === "requested" || request.status === "granted";
+                    const canRevoke =
+                      request.status === "granted" || request.status === "blocked";
+
+                    return (
+                      <div key={request.id} className="rounded-lg border border-border p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{request.reason}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {request.request_type} - {request.provider || "internal"}
+                            </p>
+                          </div>
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(request.status)}`}>
+                            {request.status}
+                          </span>
                         </div>
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(request.status)}`}>
-                          {request.status}
-                        </span>
+                        {(canGrant || canBlock || canRevoke) && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {canGrant && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleAccessDecision(request, "granted")
+                                }
+                                disabled={actionLoading === `granted:access:${request.id}`}
+                                className="rounded-full bg-stevie-green px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                              >
+                                Grant
+                              </button>
+                            )}
+                            {canBlock && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleAccessDecision(request, "blocked")
+                                }
+                                disabled={actionLoading === `blocked:access:${request.id}`}
+                                className="rounded-full border border-stevie-orange px-3 py-1.5 text-xs font-medium text-stevie-orange disabled:opacity-60"
+                              >
+                                Block
+                              </button>
+                            )}
+                            {canRevoke && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleAccessDecision(request, "revoked")
+                                }
+                                disabled={actionLoading === `revoked:access:${request.id}`}
+                                className="rounded-full border border-border px-3 py-1.5 text-xs font-medium disabled:opacity-60"
+                              >
+                                Revoke
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>

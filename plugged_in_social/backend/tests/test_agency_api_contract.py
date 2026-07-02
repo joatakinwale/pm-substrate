@@ -14,6 +14,7 @@ def test_agency_router_imports_with_expected_prefix():
     assert "/agency/engagements/{engagement_id}/artifacts" in route_paths
     assert "/agency/engagements/{engagement_id}/approvals" in route_paths
     assert "/agency/engagements/{engagement_id}/access-requests" in route_paths
+    assert "/agency/access-requests/{access_request_id}/decision" in route_paths
 
 
 def test_agency_router_uses_rls_and_current_user_dependencies():
@@ -43,6 +44,16 @@ def test_agency_router_exposes_approval_decision_endpoint():
     assert '"/approvals/{approval_id}/decision"' in src
     assert "AgencyApprovalDecision" in src
     assert "decide_approval_request(" in src
+
+
+def test_agency_router_exposes_access_request_decision_endpoint():
+    import app.api.agency as module
+
+    src = inspect.getsource(module)
+
+    assert '"/access-requests/{access_request_id}/decision"' in src
+    assert "AgencyAccessRequestDecision" in src
+    assert "decide_access_request(" in src
 
 
 def test_agency_router_exposes_nested_read_routes_for_monitoring():

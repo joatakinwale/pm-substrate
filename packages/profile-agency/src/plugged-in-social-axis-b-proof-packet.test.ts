@@ -39,6 +39,7 @@ const liveTaskId = "55555555-5555-4555-8555-555555555555";
 const liveEventHashA = "a".repeat(64);
 const liveEventHashB = "b".repeat(64);
 const liveArtifactHash = "c".repeat(64);
+const liveAccessRequestHash = "d".repeat(64);
 
 const closedLoopStages = [
   "intake",
@@ -65,7 +66,9 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "artifact.read",
         "event_timeline.read",
         "evidence_summary.read",
+        "access_request.read",
         "approval.decide",
+        "access_request.decide",
         "event.ingest",
       ].map((id) => ({
         id,
@@ -159,6 +162,18 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           boundary: "internal_system_rls",
           capability_ids: ["task.execute"],
         },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/access-requests",
+          boundary: "public_rls",
+          capability_ids: ["access_request.read"],
+        },
+        {
+          method: "POST",
+          path: "/api/integration/v1/access-requests/{access_request_id}/decision",
+          boundary: "public_rls",
+          capability_ids: ["access_request.decide"],
+        },
       ],
       data_resources: [
         {
@@ -214,6 +229,15 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           durable_evidence_fields: ["approval_payload_hash"],
           read_capability_ids: ["approval.read"],
           write_capability_ids: ["approval.decide"],
+        },
+        {
+          id: "agency_access_request",
+          table: "agency_access_requests",
+          resource_type: "agency_access_request",
+          org_scoped: true,
+          durable_evidence_fields: ["scope", "instructions", "resolved_at"],
+          read_capability_ids: ["access_request.read"],
+          write_capability_ids: ["access_request.decide"],
         },
         {
           id: "social_post",
@@ -287,8 +311,11 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       event_type_counts: { task_created: 1, execution_completed: 1 },
       approval_count: 0,
       pending_approval_count: 0,
+      access_request_count: 1,
+      open_access_request_count: 0,
       evidence_hashes: {
         artifact_payload_hashes: [liveArtifactHash],
+        access_request_hashes: [liveAccessRequestHash],
         event_hashes: [liveEventHashA, liveEventHashB],
         task_latest_event_hashes: [liveEventHashB],
       },
@@ -374,6 +401,26 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       },
     ],
     approvals: [],
+    accessRequests: [
+      {
+        resource_type: "agency_access_request",
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        org_id: liveOrgId,
+        engagement_id: "66666666-6666-4666-8666-666666666666",
+        marketing_run_id: liveRunId,
+        request_type: "analytics",
+        provider: "umami",
+        status: "granted",
+        scope: { website_id: "acme" },
+        reason: "Metrics reporting needs analytics access",
+        instructions: {
+          action: "connect_analytics",
+          resolution: { decision: "granted" },
+        },
+        resolved_at: "2026-07-01T16:30:00.000Z",
+        resolved_by_user_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
   };
 }
 

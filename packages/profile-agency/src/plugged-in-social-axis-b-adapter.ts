@@ -228,6 +228,22 @@ export interface PluggedInSocialIntegrationApprovalEnvelope {
   readonly approval_payload_hash: string;
 }
 
+export interface PluggedInSocialIntegrationAccessRequestEnvelope {
+  readonly resource_type: "agency_access_request";
+  readonly id: string;
+  readonly org_id: string;
+  readonly engagement_id: string;
+  readonly marketing_run_id: string | null;
+  readonly request_type: string;
+  readonly provider: string | null;
+  readonly status: string;
+  readonly scope: Record<string, unknown>;
+  readonly reason: string;
+  readonly instructions: Record<string, unknown>;
+  readonly resolved_at: string | null;
+  readonly resolved_by_user_id: string | null;
+}
+
 export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly resource_type: "marketing_run_evidence_summary";
   readonly run_id: string;
@@ -242,6 +258,8 @@ export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly event_type_counts: Record<string, number>;
   readonly approval_count: number;
   readonly pending_approval_count: number;
+  readonly access_request_count: number;
+  readonly open_access_request_count: number;
   readonly evidence_hashes: Record<string, readonly string[]>;
 }
 
@@ -254,6 +272,7 @@ export interface PluggedInSocialLiveRunEvidenceSnapshot {
   readonly tasks: readonly PluggedInSocialIntegrationTaskEnvelope[];
   readonly artifacts: readonly PluggedInSocialIntegrationArtifactEnvelope[];
   readonly approvals: readonly PluggedInSocialIntegrationApprovalEnvelope[];
+  readonly accessRequests: readonly PluggedInSocialIntegrationAccessRequestEnvelope[];
 }
 
 export interface PluggedInSocialLiveRunEvidenceFetchInput
@@ -317,7 +336,9 @@ const REQUIRED_LIVE_CAPABILITIES = [
   "artifact.read",
   "event_timeline.read",
   "evidence_summary.read",
+  "access_request.read",
   "approval.decide",
+  "access_request.decide",
   "event.ingest",
 ] as const;
 
@@ -347,6 +368,7 @@ const REQUIRED_LIVE_DATA_TABLES = [
   "virtual_agency_events",
   "agency_artifacts",
   "agency_approval_requests",
+  "agency_access_requests",
   "social_posts",
   "client_reports",
 ] as const;
@@ -458,6 +480,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
     tasks,
     artifacts,
     approvals,
+    accessRequests,
   ] = await Promise.all([
     fetchIntegrationJson<PluggedInSocialIntegrationCapabilityResponse>(
       client,
@@ -491,6 +514,10 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
       client,
       `${runPath}/approvals`,
     ),
+    fetchIntegrationJson<PluggedInSocialIntegrationAccessRequestEnvelope[]>(
+      client,
+      `${runPath}/access-requests`,
+    ),
   ]);
 
   return {
@@ -502,6 +529,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
     tasks,
     artifacts,
     approvals,
+    accessRequests,
   };
 }
 
@@ -607,6 +635,7 @@ function liveRunEvidenceIssues(
     tasks,
     artifacts,
     approvals,
+    accessRequests,
   } = snapshot;
 
   if (summary.run_id !== run.id) {
@@ -615,7 +644,13 @@ function liveRunEvidenceIssues(
   if (summary.org_id !== run.org_id) {
     issues.add("evidence summary org_id does not match marketing run");
   }
-  for (const item of [...events, ...tasks, ...artifacts, ...approvals]) {
+  for (const item of [
+    ...events,
+    ...tasks,
+    ...artifacts,
+    ...approvals,
+    ...accessRequests,
+  ]) {
     if (item.org_id !== run.org_id) {
       issues.add(`cross-org integration envelope detected: ${item.resource_type}`);
     }
@@ -746,6 +781,11 @@ function liveRunEvidenceIssues(
   if (summary.pending_approval_count > 0) {
     issues.add(`marketing run has pending approvals: ${summary.pending_approval_count}`);
   }
+  if (summary.open_access_request_count > 0) {
+    issues.add(
+      `marketing run has open access requests: ${summary.open_access_request_count}`,
+    );
+  }
   if (events.length < Math.min(summary.event_count, 1000)) {
     issues.add("event timeline response is shorter than evidence summary count");
   }
@@ -757,6 +797,9 @@ function liveRunEvidenceIssues(
   }
   if (approvals.length !== summary.approval_count) {
     issues.add("approval response count does not match evidence summary count");
+  }
+  if (accessRequests.length !== summary.access_request_count) {
+    issues.add("access request response count does not match evidence summary count");
   }
 
   for (const [group, hashes] of Object.entries(summary.evidence_hashes)) {
@@ -772,6 +815,12 @@ function liveRunEvidenceIssues(
     if ((summary.evidence_hashes[group] ?? []).length === 0) {
       issues.add(`missing evidence hashes: ${group}`);
     }
+  }
+  if (
+    summary.access_request_count > 0 &&
+    (summary.evidence_hashes.access_request_hashes ?? []).length === 0
+  ) {
+    issues.add("missing evidence hashes: access_request_hashes");
   }
 
   const seenEventHashes = new Set<string>();
@@ -1036,6 +1085,13 @@ function liveRunEvidenceRefs(
         "source_record",
         `plugged_in_social:agency_approval_requests:${approval.id}`,
         `PluggedInSocial approval gate: ${approval.approval_type}`,
+      ),
+    ),
+    ...snapshot.accessRequests.map((request) =>
+      stateRef(
+        "source_record",
+        `plugged_in_social:agency_access_requests:${request.id}`,
+        `PluggedInSocial access gate: ${request.request_type}`,
       ),
     ),
     ...manifest.evidenceRefs.map(manifestRefToStateRef),

@@ -311,6 +311,91 @@ async def test_create_access_request_records_visible_blocker():
 
 
 @pytest.mark.asyncio
+async def test_decide_access_request_records_resolution_and_run_blocker():
+    from app.services.agency_domain import (
+        create_access_request,
+        create_client_engagement,
+        decide_access_request,
+        start_marketing_run,
+    )
+
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(name="Acme"),
+        created_by_agent="chief_of_staff",
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective="Build campaign",
+    )
+    request = await create_access_request(
+        db,
+        org_id=org_id,
+        engagement=engagement,
+        body=AgencyAccessRequestCreate(
+            marketing_run_id=run.id,
+            request_type="analytics",
+            provider="umami",
+            scope={"website_id": "required"},
+            reason="Metrics reporting needs analytics access",
+            instructions={"action": "connect_umami"},
+        ),
+    )
+
+    blocked = await decide_access_request(
+        db,
+        access_request=request,
+        decision="blocked",
+        resolved_by_user_id=user_id,
+        decision_note="Client has not granted analytics yet",
+        resolution_payload={"provider": "umami"},
+    )
+
+    assert blocked is request
+    assert request.status == "blocked"
+    assert request.resolved_by_user_id == user_id
+    assert request.resolved_at is not None
+    assert request.instructions["resolution"] == {
+        "decision": "blocked",
+        "decision_note": "Client has not granted analytics yet",
+        "resolution_payload": {"provider": "umami"},
+        "resolved_at": request.resolved_at.isoformat(),
+    }
+    assert run.status == "blocked"
+    assert run.current_blocker == {
+        "type": "access_request",
+        "access_request_id": str(request.id),
+        "request_type": "analytics",
+        "provider": "umami",
+        "status": "blocked",
+        "reason": "Metrics reporting needs analytics access",
+        "decision_note": "Client has not granted analytics yet",
+        "resolved_at": request.resolved_at.isoformat(),
+    }
+
+    granted = await decide_access_request(
+        db,
+        access_request=request,
+        decision="granted",
+        resolved_by_user_id=user_id,
+        decision_note="Analytics connected",
+        resolution_payload={"connection_ref": "umami:workspace"},
+    )
+
+    assert granted is request
+    assert request.status == "granted"
+    assert request.instructions["resolution"]["decision"] == "granted"
+    assert request.instructions["resolution"]["decision_note"] == "Analytics connected"
+    assert run.status == "active"
+    assert run.current_blocker is None
+
+
+@pytest.mark.asyncio
 async def test_decide_approval_request_records_decision_actor_and_note():
     from app.services.agency_domain import (
         create_approval_request,

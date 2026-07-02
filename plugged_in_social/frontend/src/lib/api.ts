@@ -907,6 +907,8 @@ export interface IntegrationEvidenceSummary {
   event_type_counts: Record<string, number>;
   approval_count: number;
   pending_approval_count: number;
+  access_request_count: number;
+  open_access_request_count: number;
   evidence_hashes: Record<string, string[]>;
   links: Array<{ rel: string; href: string }>;
 }
@@ -950,6 +952,12 @@ export interface AgencyAccessRequestCreatePayload {
   scope?: Record<string, unknown>;
   reason: string;
   instructions?: Record<string, unknown>;
+}
+
+export interface AgencyAccessRequestDecisionPayload {
+  decision: "granted" | "blocked" | "revoked";
+  decision_note?: string;
+  resolution_payload?: Record<string, unknown>;
 }
 
 export async function listClientEngagements() {
@@ -1049,6 +1057,19 @@ export async function createAgencyAccessRequest(
 ) {
   return apiFetch<AgencyAccessRequest>(
     `/api/agency/engagements/${encodeURIComponent(engagementId)}/access-requests`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+export async function decideAgencyAccessRequest(
+  accessRequestId: string,
+  payload: AgencyAccessRequestDecisionPayload
+) {
+  return apiFetch<AgencyAccessRequest>(
+    `/api/agency/access-requests/${encodeURIComponent(accessRequestId)}/decision`,
     {
       method: "POST",
       body: JSON.stringify(payload),

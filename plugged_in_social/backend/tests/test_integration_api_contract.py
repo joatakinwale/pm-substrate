@@ -37,6 +37,10 @@ def test_integration_router_imports_with_neutral_v1_prefix():
         frozenset({"GET"}),
     ) in route_methods
     assert (
+        "/integration/v1/marketing-runs/{run_id}/access-requests",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
         "/integration/v1/marketing-runs/{run_id}/events",
         frozenset({"GET"}),
     ) in route_methods
@@ -46,6 +50,10 @@ def test_integration_router_imports_with_neutral_v1_prefix():
     ) in route_methods
     assert (
         "/integration/v1/approvals/{approval_id}/decision",
+        frozenset({"POST"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/access-requests/{access_request_id}/decision",
         frozenset({"POST"}),
     ) in route_methods
     assert ("/integration/v1/webhooks", frozenset({"POST"})) in route_methods
@@ -78,6 +86,7 @@ def test_main_registers_neutral_integration_router():
 def test_integration_schemas_expose_stable_external_envelopes():
     from app.schemas.integration import (
         IntegrationAcceptedResponse,
+        IntegrationAccessRequestEnvelope,
         IntegrationArtifactEnvelope,
         IntegrationCapabilityResponse,
         IntegrationPlatformManifestEnvelope,
@@ -93,6 +102,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
     run_fields = set(IntegrationMarketingRunEnvelope.model_fields)
     artifact_fields = set(IntegrationArtifactEnvelope.model_fields)
     task_fields = set(IntegrationTaskEnvelope.model_fields)
+    access_request_fields = set(IntegrationAccessRequestEnvelope.model_fields)
     run_event_fields = set(IntegrationRunEventEnvelope.model_fields)
     evidence_summary_fields = set(IntegrationEvidenceSummaryEnvelope.model_fields)
     event_fields = set(IntegrationEventIngest.model_fields)
@@ -146,6 +156,19 @@ def test_integration_schemas_expose_stable_external_envelopes():
     }.issubset(task_fields)
     assert {
         "id",
+        "engagement_id",
+        "marketing_run_id",
+        "request_type",
+        "provider",
+        "status",
+        "scope",
+        "instructions",
+        "resolved_at",
+        "resolved_by_user_id",
+        "links",
+    }.issubset(access_request_fields)
+    assert {
+        "id",
         "task_id",
         "event_type",
         "payload_hash",
@@ -162,7 +185,10 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "task_status_counts",
         "event_count",
         "event_type_counts",
+        "approval_count",
         "pending_approval_count",
+        "access_request_count",
+        "open_access_request_count",
         "evidence_hashes",
     }.issubset(evidence_summary_fields)
     assert {"engagement_id", "event_type", "source", "payload"}.issubset(
@@ -213,6 +239,16 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         resource.table == "virtual_agency_events"
         and "event_hash" in resource.durable_evidence_fields
         for resource in manifest.data_resources
+    )
+    assert any(
+        resource.table == "agency_access_requests"
+        and "access_request.decide" in resource.write_capability_ids
+        for resource in manifest.data_resources
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/access-requests/{access_request_id}/decision"
+        and endpoint.boundary == "public_rls"
+        for endpoint in manifest.api_endpoints
     )
     assert any(
         config.key == "BACKEND_BASE_URL" and config.kind == "secret"
