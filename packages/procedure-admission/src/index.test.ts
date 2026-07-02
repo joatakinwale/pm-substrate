@@ -8,8 +8,13 @@ import {
   buildProcedureDefinition,
   buildProcedureRun,
   evaluateProcedureAdmission,
+  ProcedureAdmissionRuntime,
   replayProcedureAdmissionHistory,
+  type ProcedureAdmissionReplay,
   type ProcedureAdmissionRecord,
+  type ProcedureAdmissionStore,
+  type ProcedureDefinition,
+  type ProcedureRunnerPort,
 } from "./index.js";
 
 const tenantId = "tenant_proc" as TenantId;
@@ -85,6 +90,78 @@ const makeRecord = (
     run: makeRun(),
     ...overrides,
   });
+
+class InMemoryProcedureAdmissionStore implements ProcedureAdmissionStore {
+  readonly definitions = new Map<string, ProcedureDefinition>();
+  readonly records: ProcedureAdmissionRecord[] = [];
+
+  async putDefinition(definition: ProcedureDefinition): Promise<void> {
+    this.definitions.set(this.key(definition), definition);
+  }
+
+  async getDefinition(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+  }): Promise<ProcedureDefinition | null> {
+    return this.definitions.get(this.key(input)) ?? null;
+  }
+
+  async admit(input: {
+    readonly definition: ProcedureDefinition;
+    readonly record: ProcedureAdmissionRecord;
+    readonly evaluatedAt: string;
+  }): Promise<void> {
+    const evaluation = evaluateProcedureAdmission(input);
+    if (!evaluation.admissible) {
+      throw new Error(
+        `procedure admission failed: ${evaluation.issues.map((issue) => issue.code).join(",")}`,
+      );
+    }
+    const replay = await this.replay({
+      tenantId: input.record.tenantId,
+      procedureId: input.definition.procedureId,
+      version: input.definition.version,
+      evaluatedAt: input.evaluatedAt,
+    });
+    if (
+      input.record.sequence !== replay.replayedToSequence + 1 ||
+      input.record.previousAdmissionHash !== replay.currentHeadHash
+    ) {
+      throw new Error("procedure admission record does not extend head");
+    }
+    this.records.push(input.record);
+  }
+
+  async replay(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+    readonly evaluatedAt: string;
+  }): Promise<ProcedureAdmissionReplay> {
+    const definition = await this.getDefinition(input);
+    if (definition === null) throw new Error("definition not found");
+    return replayProcedureAdmissionHistory({
+      definition,
+      records: this.records.filter(
+        (record) =>
+          record.tenantId === input.tenantId &&
+          record.authorityScope === definition.authorityScope,
+      ),
+      evaluatedAt: input.evaluatedAt,
+      tenantId: input.tenantId,
+      authorityScope: definition.authorityScope,
+    });
+  }
+
+  private key(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+  }): string {
+    return `${input.tenantId}/${input.procedureId}/${input.version}`;
+  }
+}
 
 describe("@pm/procedure-admission", () => {
   it("replays an admitted Pi Harness run into operational procedure state", () => {
@@ -243,5 +320,97 @@ describe("@pm/procedure-admission", () => {
     expect(replay.valid).toBe(true);
     expect(replay.admittedRuns).toHaveLength(0);
     expect(replay.rejectedRuns).toHaveLength(1);
+  });
+
+  it("executes a Pi Harness runner through runtime admission and replays the admitted projection", async () => {
+    const store = new InMemoryProcedureAdmissionStore();
+    const runner: ProcedureRunnerPort = {
+      runnerKind: "pi_harness",
+      async run(invocation) {
+        expect(invocation.definition.definitionHash).toBe(
+          definition.definitionHash,
+        );
+        return {
+          status: "succeeded",
+          completedAt: "2026-07-02T17:56:00.000Z",
+          outputHash: "sha256:runtime-output",
+          outputEvidence: [
+            {
+              ref: stateRef("document", "doc_runtime_output"),
+              evidenceHash: "sha256:runtime-output-evidence",
+              observedAt: "2026-07-02T17:56:00.000Z",
+              validUntil: "2026-07-02T19:00:00.000Z",
+            },
+          ],
+          runnerEvidence: [runnerEvidence],
+        };
+      },
+    };
+    const runtime = new ProcedureAdmissionRuntime({
+      store,
+      runners: [runner],
+      admittedBy: "procedure-admission.runtime-test",
+    });
+
+    await runtime.registerDefinition(definition);
+    const result = await runtime.execute({
+      tenantId,
+      procedureId: definition.procedureId,
+      version: definition.version,
+      runId: "run_pi_harness_runtime_001",
+      requestedBy: "agent:planner",
+      inputHash: "sha256:runtime-input",
+      inputEvidence: [evidence],
+      startedAt: "2026-07-02T17:55:00.000Z",
+      evaluatedAt: now,
+    });
+
+    expect(result.record.sequence).toBe(1);
+    expect(result.replay.valid).toBe(true);
+    expect(result.replay.admittedRuns.map((run) => run.runId)).toEqual([
+      "run_pi_harness_runtime_001",
+    ]);
+    expect(store.records).toHaveLength(1);
+  });
+
+  it("keeps stale runner output from a runtime port out of operational state", async () => {
+    const store = new InMemoryProcedureAdmissionStore();
+    const runtime = new ProcedureAdmissionRuntime({
+      store,
+      runners: [
+        {
+          runnerKind: "pi_harness",
+          async run() {
+            return {
+              status: "succeeded",
+              completedAt: "2026-07-02T17:56:00.000Z",
+              outputHash: "sha256:runtime-output",
+              runnerEvidence: [
+                {
+                  ...runnerEvidence,
+                  validUntil: "2026-07-02T17:59:00.000Z",
+                },
+              ],
+            };
+          },
+        },
+      ],
+    });
+
+    await runtime.registerDefinition(definition);
+    await expect(
+      runtime.execute({
+        tenantId,
+        procedureId: definition.procedureId,
+        version: definition.version,
+        runId: "run_pi_harness_runtime_stale",
+        requestedBy: "agent:planner",
+        inputHash: "sha256:runtime-input",
+        inputEvidence: [evidence],
+        startedAt: "2026-07-02T17:55:00.000Z",
+        evaluatedAt: now,
+      }),
+    ).rejects.toThrow(/stale_runner_evidence/);
+    expect(store.records).toHaveLength(0);
   });
 });

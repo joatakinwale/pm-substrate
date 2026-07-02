@@ -100,7 +100,9 @@ export type ProcedureAdmissionIssueCode =
   | "run_not_successful"
   | "sequence_gap"
   | "previous_hash_mismatch"
-  | "duplicate_run";
+  | "duplicate_run"
+  | "runner_not_registered"
+  | "invalid_replay_history";
 
 export interface ProcedureAdmissionIssue {
   readonly code: ProcedureAdmissionIssueCode;
@@ -120,6 +122,81 @@ export interface ProcedureAdmissionReplay {
   readonly rejectedRuns: readonly ProcedureRun[];
   readonly currentHeadHash?: string;
   readonly replayedToSequence: number;
+}
+
+export class ProcedureAdmissionRuntimeError extends Error {
+  readonly issues: readonly ProcedureAdmissionIssue[];
+
+  constructor(message: string, issues: readonly ProcedureAdmissionIssue[]) {
+    super(message);
+    this.name = "ProcedureAdmissionRuntimeError";
+    this.issues = issues;
+  }
+}
+
+export interface ProcedureAdmissionStore {
+  putDefinition(definition: ProcedureDefinition): Promise<void>;
+  getDefinition(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+  }): Promise<ProcedureDefinition | null>;
+  admit(input: {
+    readonly definition: ProcedureDefinition;
+    readonly record: ProcedureAdmissionRecord;
+    readonly evaluatedAt: Timestamp | string;
+  }): Promise<void>;
+  replay(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+    readonly evaluatedAt: Timestamp | string;
+  }): Promise<ProcedureAdmissionReplay>;
+}
+
+export interface ProcedureRunnerInvocation {
+  readonly definition: ProcedureDefinition;
+  readonly tenantId: TenantId;
+  readonly runId: string;
+  readonly requestedBy: string;
+  readonly inputHash: string;
+  readonly inputEvidence: readonly ProcedureEvidenceBinding[];
+  readonly startedAt: Timestamp | string;
+  readonly input?: unknown;
+}
+
+export interface ProcedureRunnerResult {
+  readonly status: ProcedureRunStatus;
+  readonly completedAt: Timestamp | string;
+  readonly outputHash?: string;
+  readonly outputEvidence?: readonly ProcedureEvidenceBinding[];
+  readonly runnerEvidence: readonly ProcedureEvidenceBinding[];
+}
+
+export interface ProcedureRunnerPort {
+  readonly runnerKind: ProcedureRunnerKind;
+  run(invocation: ProcedureRunnerInvocation): Promise<ProcedureRunnerResult>;
+}
+
+export interface ProcedureAdmissionRuntimeInput {
+  readonly tenantId: TenantId;
+  readonly procedureId: string;
+  readonly version: number;
+  readonly runId: string;
+  readonly requestedBy: string;
+  readonly inputHash: string;
+  readonly inputEvidence: readonly ProcedureEvidenceBinding[];
+  readonly input?: unknown;
+  readonly startedAt?: Timestamp | string;
+  readonly admittedBy?: string;
+  readonly evaluatedAt?: Timestamp | string;
+}
+
+export interface ProcedureAdmissionRuntimeResult {
+  readonly definition: ProcedureDefinition;
+  readonly run: ProcedureRun;
+  readonly record: ProcedureAdmissionRecord;
+  readonly replay: ProcedureAdmissionReplay;
 }
 
 export interface ProcedureDefinitionInput
@@ -417,6 +494,188 @@ export function replayProcedureAdmissionHistory(input: {
     replayedToSequence: expectedSequence - 1,
   };
 }
+
+export class ProcedureAdmissionRuntime {
+  readonly #store: ProcedureAdmissionStore;
+  readonly #runners: ReadonlyMap<ProcedureRunnerKind, ProcedureRunnerPort>;
+  readonly #clock: () => Timestamp | string;
+  readonly #admittedBy: string;
+
+  constructor(input: {
+    readonly store: ProcedureAdmissionStore;
+    readonly runners: readonly ProcedureRunnerPort[];
+    readonly clock?: () => Timestamp | string;
+    readonly admittedBy?: string;
+  }) {
+    this.#store = input.store;
+    this.#runners = new Map(
+      input.runners.map((runner) => [runner.runnerKind, runner]),
+    );
+    this.#clock = input.clock ?? (() => new Date().toISOString());
+    this.#admittedBy = input.admittedBy ?? "procedure-admission.runtime";
+  }
+
+  async registerDefinition(
+    input: ProcedureDefinitionInput | ProcedureDefinition,
+  ): Promise<ProcedureDefinition> {
+    const definition =
+      "schemaVersion" in input && "definitionHash" in input
+        ? input
+        : buildProcedureDefinition(input);
+    await this.#store.putDefinition(definition);
+    return definition;
+  }
+
+  async getDefinition(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+  }): Promise<ProcedureDefinition | null> {
+    return this.#store.getDefinition(input);
+  }
+
+  async replay(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+    readonly evaluatedAt: Timestamp | string;
+  }): Promise<ProcedureAdmissionReplay> {
+    return this.#store.replay(input);
+  }
+
+  async execute(
+    input: ProcedureAdmissionRuntimeInput,
+  ): Promise<ProcedureAdmissionRuntimeResult> {
+    const definition = await this.#store.getDefinition({
+      tenantId: input.tenantId,
+      procedureId: input.procedureId,
+      version: input.version,
+    });
+    if (definition === null) {
+      throw new ProcedureAdmissionRuntimeError(
+        `procedure definition not registered for ${input.procedureId}@${input.version}`,
+        [
+          {
+            code: "definition_not_registered",
+            path: "definition",
+            message:
+              "Procedure execution requires a stored procedure definition.",
+          },
+        ],
+      );
+    }
+
+    const runner = this.#runners.get(definition.runnerKind);
+    if (runner === undefined) {
+      throw new ProcedureAdmissionRuntimeError(
+        `procedure runner not registered for kind ${definition.runnerKind}`,
+        [
+          {
+            code: "runner_not_registered",
+            path: "definition.runnerKind",
+            message:
+              "Procedure execution requires a registered runner for the definition runner kind.",
+          },
+        ],
+      );
+    }
+
+    const startedAt = input.startedAt ?? this.#clock();
+    const result = await runner.run({
+      definition,
+      tenantId: input.tenantId,
+      runId: input.runId,
+      requestedBy: input.requestedBy,
+      inputHash: input.inputHash,
+      inputEvidence: input.inputEvidence,
+      startedAt,
+      input: input.input,
+    });
+    const evaluatedAt = input.evaluatedAt ?? result.completedAt;
+    const previousReplay = await this.#store.replay({
+      tenantId: input.tenantId,
+      procedureId: definition.procedureId,
+      version: definition.version,
+      evaluatedAt,
+    });
+    if (!previousReplay.valid) {
+      throw new ProcedureAdmissionRuntimeError(
+        `procedure admission history is not replay-valid for ${definition.procedureId}@${definition.version}`,
+        [
+          {
+            code: "invalid_replay_history",
+            path: "replay",
+            message:
+              "Procedure runtime refuses to append onto an invalid admission history.",
+          },
+          ...previousReplay.issues,
+        ],
+      );
+    }
+
+    const run = buildProcedureRun({
+      runId: input.runId,
+      tenantId: input.tenantId,
+      procedureId: definition.procedureId,
+      procedureVersion: definition.version,
+      procedureDefinitionHash: definition.definitionHash,
+      authorityScope: definition.authorityScope,
+      runnerKind: definition.runnerKind,
+      requestedBy: input.requestedBy,
+      startedAt,
+      completedAt: result.completedAt,
+      status: result.status,
+      inputHash: input.inputHash,
+      ...(result.outputHash !== undefined
+        ? { outputHash: result.outputHash }
+        : {}),
+      inputEvidence: input.inputEvidence,
+      outputEvidence: result.outputEvidence ?? [],
+      runnerEvidence: result.runnerEvidence,
+    });
+    const sequence = previousReplay.replayedToSequence + 1;
+    const decision: ProcedureAdmissionDecision =
+      result.status === "succeeded" ? "admitted" : "rejected";
+    const record = buildProcedureAdmissionRecord({
+      admissionId: buildProcedureAdmissionId({
+        tenantId: input.tenantId,
+        authorityScope: definition.authorityScope,
+        runId: input.runId,
+        procedureDefinitionHash: definition.definitionHash,
+      }),
+      tenantId: input.tenantId,
+      authorityScope: definition.authorityScope,
+      sequence,
+      ...(previousReplay.currentHeadHash !== undefined
+        ? { previousAdmissionHash: previousReplay.currentHeadHash }
+        : {}),
+      admittedAt: evaluatedAt,
+      admittedBy: input.admittedBy ?? this.#admittedBy,
+      decision,
+      run,
+    });
+
+    await this.#store.admit({
+      definition,
+      record,
+      evaluatedAt,
+    });
+    const replay = await this.#store.replay({
+      tenantId: input.tenantId,
+      procedureId: definition.procedureId,
+      version: definition.version,
+      evaluatedAt,
+    });
+    return { definition, run, record, replay };
+  }
+}
+
+export const buildProcedureAdmissionId = (input: {
+  readonly tenantId: TenantId;
+  readonly authorityScope: string;
+  readonly runId: string;
+  readonly procedureDefinitionHash: string;
+}): string => `adm_${procedureSha256(input).slice(0, 32)}`;
 
 const pushUnless = (
   issues: ProcedureAdmissionIssue[],
