@@ -119,6 +119,15 @@ describe("validateMessage(virtual_agency.task)", () => {
     ).toThrow(InvalidMessageError);
   });
 
+  it("rejects unparseable emitted_at", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        { ...VALID_MSG, emitted_at: "not-a-date" },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
   it("rejects missing orchestration task id", () => {
     const { orchestration_task_id: _omit, ...rest } = VALID_MSG;
     expect(() =>
@@ -142,6 +151,15 @@ describe("validateMessage(virtual_agency.task)", () => {
     ).toThrow(InvalidMessageError);
   });
 
+  it("rejects invalid approval payload hash", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        { ...VALID_MSG, approval_payload_hash: "not-a-sha256" },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
   it("rejects missing required lineage fields", () => {
     expect(() =>
       validateMessage<VirtualAgencyMessage>(
@@ -150,6 +168,34 @@ describe("validateMessage(virtual_agency.task)", () => {
           lineage: {
             client_request: "Launch a June campaign",
             project_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+          },
+        },
+        "virtual_agency.task"
+      )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("validates optional marketing-run lineage ids", () => {
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        {
+          ...VALID_MSG,
+          lineage: {
+            ...VALID_MSG.lineage,
+            engagement_id: "dddddddd-eeee-ffff-0000-111111111111",
+            marketing_run_id: "eeeeeeee-ffff-0000-1111-222222222222",
+          },
+        },
+        "virtual_agency.task"
+      )
+    ).not.toThrow();
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(
+        {
+          ...VALID_MSG,
+          lineage: {
+            ...VALID_MSG.lineage,
+            marketing_run_id: "not-a-uuid",
           },
         },
         "virtual_agency.task"

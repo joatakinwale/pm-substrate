@@ -99,6 +99,8 @@ export interface VirtualAgencyLineage {
   legacy_task_id: string;
   orchestration_task_id?: string;
   artifact_id?: string;
+  engagement_id?: string;
+  marketing_run_id?: string;
 }
 
 export interface VirtualAgencyMessage extends BaseMessage {
@@ -158,6 +160,9 @@ export function validateMessage<T extends QueueMessage>(
   }
   if (typeof msg["emitted_at"] !== "string") {
     throw new InvalidMessageError("missing emitted_at");
+  }
+  if (Number.isNaN(Date.parse(msg["emitted_at"] as string))) {
+    throw new InvalidMessageError("emitted_at must be a parseable timestamp");
   }
   if (expectedType === "virtual_agency.task") {
     validateVirtualAgencyMessage(msg);
@@ -256,10 +261,10 @@ function validateVirtualAgencyMessage(msg: Record<string, unknown>): void {
   const approvalPayloadHash = msg["approval_payload_hash"];
   if (
     approvalPayloadHash != null &&
-    (typeof approvalPayloadHash !== "string" || approvalPayloadHash.length === 0)
+    (typeof approvalPayloadHash !== "string" || !SHA256_RE.test(approvalPayloadHash))
   ) {
     throw new InvalidMessageError(
-      "approval_payload_hash must be a non-empty string when provided"
+      "approval_payload_hash must be a SHA-256 hex digest when provided"
     );
   }
 
@@ -278,6 +283,17 @@ function validateVirtualAgencyMessage(msg: Record<string, unknown>): void {
   }
   if (!UUID_RE.test(lineage["legacy_task_id"] as string)) {
     throw new InvalidMessageError("lineage.legacy_task_id must be a UUID");
+  }
+  for (const field of [
+    "orchestration_task_id",
+    "artifact_id",
+    "engagement_id",
+    "marketing_run_id",
+  ]) {
+    const value = lineage[field];
+    if (value != null && (typeof value !== "string" || !UUID_RE.test(value))) {
+      throw new InvalidMessageError(`lineage.${field} must be a UUID when provided`);
+    }
   }
 
   const context = msg["context"];

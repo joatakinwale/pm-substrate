@@ -642,6 +642,14 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     sourceRoot,
     "backend/tests/test_internal_social_hash_gate.py",
   );
+  const internalVirtualAgencyTests = readSource(
+    sourceRoot,
+    "backend/tests/test_virtual_agency_api_contract.py",
+  );
+  const virtualAgencyWorkerTests = readSource(
+    sourceRoot,
+    "agents/workers/virtual-agency/src/index.test.ts",
+  );
 
   return {
     publicRlsBoundary:
@@ -680,10 +688,21 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       orchestration.includes("AGENT_CAPABILITIES") &&
       orchestration.includes("ensure_capability"),
     sharedPayloadContract:
+      internalApi.includes('type: Literal["virtual_agency.task"]') &&
+      internalApi.includes("emitted_at: datetime") &&
+      internalApi.includes("dependency_ids: list[uuid.UUID]") &&
+      internalApi.includes("approval_payload_hash: str | None") &&
+      internalApi.includes("VirtualAgencyTaskRequest") &&
       messages.includes("VirtualAgencyAgentRole") &&
       messages.includes("orchestration_task_id") &&
       messages.includes("task_version") &&
-      messages.includes("approval_payload_hash"),
+      messages.includes("approval_payload_hash") &&
+      messages.includes("approval_payload_hash must be a SHA-256 hex digest") &&
+      messages.includes("emitted_at must be a parseable timestamp") &&
+      internalVirtualAgencyTests.includes(
+        "test_internal_virtual_agency_payload_matches_worker_contract",
+      ) &&
+      virtualAgencyWorkerTests.includes("rejects invalid approval payload hash"),
     deployBinding:
       deploy.includes("stevie-virtual-agency") &&
       deploy.includes("virtual-agency") &&
