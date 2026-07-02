@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import inspect
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -131,6 +132,23 @@ async def _capture_publish(monkeypatch):
 
     monkeypatch.setattr("app.services.virtual_agency._publish", _fake_publish)
     return sent
+
+
+def test_task_dependencies_are_initialized_before_handoff_payloads() -> None:
+    import app.services.agency_domain as agency_domain
+    import app.services.virtual_agency as virtual_agency
+
+    agency_source = inspect.getsource(agency_domain._create_kickoff_virtual_tasks)
+    virtual_source = inspect.getsource(virtual_agency.start_campaign_planning)
+
+    assert "task.dependencies = []" in agency_source
+    assert agency_source.index("task.dependencies = []") < agency_source.index(
+        "build_handoff_payload(task)"
+    )
+    assert "task.dependencies = []" in virtual_source
+    assert virtual_source.index("task.dependencies = []") < virtual_source.index(
+        "build_handoff_payload(task)"
+    )
 
 
 @pytest.mark.asyncio

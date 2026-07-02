@@ -195,6 +195,8 @@ async def start_campaign_planning(
             ),
         ),
     ]
+    for task in orchestration_tasks:
+        task.dependencies = []
     orchestration_tasks[1].dependencies.append(orchestration_tasks[0])
     orchestration_tasks[2].dependencies.append(orchestration_tasks[1])
     db.add_all(orchestration_tasks)

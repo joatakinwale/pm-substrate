@@ -483,6 +483,7 @@ async def _create_kickoff_virtual_tasks(
                 marketing_run_id=run.id,
             ),
         )
+        task.dependencies = []
         db.add(task)
         tasks.append(task)
     for index, task in enumerate(tasks):

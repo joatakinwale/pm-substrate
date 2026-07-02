@@ -1,4 +1,4 @@
-"""018 — Enable RLS on public tables flagged by Supabase advisor.
+"""025 — Enable RLS on public tables flagged by Supabase advisor.
 
 Supabase exposes the ``public`` schema through the Data API by default on
 older projects, so every public table needs RLS even when application access
@@ -11,14 +11,14 @@ only by app-level parent lookups or internal-only routing:
 - sprints
 - task_dependencies
 
-Revision ID: 018
-Revises: 017
+Revision ID: 025
+Revises: 024
 """
 from alembic import op
 
 
-revision = "018"
-down_revision = "017"
+revision = "025"
+down_revision = "024"
 branch_labels = None
 depends_on = None
 
