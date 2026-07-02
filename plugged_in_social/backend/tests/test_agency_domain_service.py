@@ -151,22 +151,25 @@ async def _capture_publish(monkeypatch):
 
 
 def _default_adapter_evidence(adapter_id: str) -> dict[str, object]:
-    if adapter_id == "browser_qa_harness":
-        return {
-            "session_id": "browser-session-1",
-            "report_html_hash": "b" * 64,
-            "network_har_hash": "c" * 64,
-            "screenshot_hashes": ["d" * 64],
-        }
-    if adapter_id == "agent_harness":
-        return {
-            "instance_id": "agent-instance-1",
-            "session_id": "agent-session-1",
-            "agent_event_hash": "e" * 64,
-            "tool_call_hash": "f" * 64,
-            "output_payload_hash": "a" * 64,
-        }
+    from app.services.external_adapter_contracts import get_external_adapter_contract
+
+    contract = get_external_adapter_contract(adapter_id)
+    if contract is not None:
+        evidence = {field: f"{adapter_id}:{field}" for field in contract.evidence_fields}
+        evidence["run_count"] = 1
+        evidence["console_error_count"] = 0
+        evidence["screenshot_hashes"] = ["d" * 64]
+        return evidence
     return {"session_id": f"{adapter_id}-session"}
+
+
+def _default_adapter_gate_results(adapter_id: str) -> dict[str, bool]:
+    from app.services.external_adapter_contracts import get_external_adapter_contract
+
+    contract = get_external_adapter_contract(adapter_id)
+    if contract is None:
+        return {}
+    return {gate: True for gate in contract.required_gates}
 
 
 def _add_external_adapter_run_artifact(
@@ -178,6 +181,7 @@ def _add_external_adapter_run_artifact(
     adapter_id: str,
     status: str = "succeeded",
     evidence: dict[str, object] | None = None,
+    gate_results: dict[str, bool] | None = None,
 ) -> AgencyArtifact:
     artifact = AgencyArtifact(
         id=uuid.uuid4(),
@@ -189,6 +193,9 @@ def _add_external_adapter_run_artifact(
         payload={
             "adapter_id": adapter_id,
             "status": status,
+            "gate_results": gate_results
+            if gate_results is not None
+            else _default_adapter_gate_results(adapter_id),
             "evidence": evidence
             if evidence is not None
             else _default_adapter_evidence(adapter_id),
@@ -653,6 +660,22 @@ async def test_content_generation_waits_for_declared_external_adapter_runs(
         engagement_id=engagement.id,
         run_id=run.id,
         adapter_id="agent_harness",
+        gate_results={"tenant_rls": True},
+    )
+    missing_agent_gate = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+    assert missing_agent_gate.dispatched_messages == []
+
+    _add_external_adapter_run_artifact(
+        db,
+        org_id=org_id,
+        engagement_id=engagement.id,
+        run_id=run.id,
+        adapter_id="agent_harness",
     )
     resumed = await approve_and_dispatch_marketing_run(
         db,
@@ -791,6 +814,19 @@ async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_act
         item["adapter_id"]
         for item in strategy_artifacts[0].payload["external_adapter_requirements"]
     } == {"browser_qa_harness", "agent_harness"}
+    from app.services.external_adapter_contracts import get_external_adapter_contract
+
+    requirements_by_id = {
+        item["adapter_id"]: item
+        for item in strategy_artifacts[0].payload["external_adapter_requirements"]
+    }
+    for adapter_id, requirement in requirements_by_id.items():
+        contract = get_external_adapter_contract(adapter_id)
+        assert contract is not None
+        assert set(requirement["required_gates"]) == set(contract.required_gates)
+        assert set(requirement["required_evidence_fields"]) == set(
+            contract.evidence_fields
+        )
     assert strategy_artifacts[0].payload_hash
 
     posts = list(db._store.get(SocialPost, {}).values())

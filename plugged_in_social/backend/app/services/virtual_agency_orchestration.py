@@ -22,6 +22,7 @@ from app.models.virtual_agency import (
     VirtualAgencyTaskStatus,
     virtual_agency_task_dependencies,
 )
+from app.services.external_adapter_contracts import get_external_adapter_contract
 
 
 class VirtualAgencyInvariantError(ValueError):
@@ -231,22 +232,33 @@ async def ensure_strategy_research_artifact_ready(
             + ", ".join(missing)
         )
 
-    required_adapter_evidence_fields: dict[str, list[str]] = {}
+    required_adapter_requirements: dict[str, dict[str, list[str]]] = {}
     for artifacts in strategy_artifacts_by_task.values():
-        for adapter_id, fields in strategy_artifact_required_adapter_evidence_fields(
+        for adapter_id, requirement in strategy_artifact_required_adapter_requirements(
             artifacts
         ).items():
-            required_adapter_evidence_fields.setdefault(adapter_id, [])
-            required_adapter_evidence_fields[adapter_id].extend(fields)
-    required_adapter_evidence_fields = {
-        adapter_id: sorted(set(fields))
-        for adapter_id, fields in sorted(required_adapter_evidence_fields.items())
+            current = required_adapter_requirements.setdefault(
+                adapter_id,
+                {"required_evidence_fields": [], "required_gates": []},
+            )
+            current["required_evidence_fields"].extend(
+                requirement["required_evidence_fields"]
+            )
+            current["required_gates"].extend(requirement["required_gates"])
+    required_adapter_requirements = {
+        adapter_id: {
+            "required_evidence_fields": sorted(
+                set(requirement["required_evidence_fields"])
+            ),
+            "required_gates": sorted(set(requirement["required_gates"])),
+        }
+        for adapter_id, requirement in sorted(required_adapter_requirements.items())
     }
-    if required_adapter_evidence_fields:
+    if required_adapter_requirements:
         await ensure_external_adapter_run_evidence_ready(
             db,
             task=task,
-            adapter_evidence_fields=required_adapter_evidence_fields,
+            adapter_requirements=required_adapter_requirements,
         )
 
 
@@ -254,10 +266,10 @@ async def ensure_external_adapter_run_evidence_ready(
     db: AsyncSession,
     *,
     task: VirtualAgencyTask,
-    adapter_evidence_fields: dict[str, list[str]],
+    adapter_requirements: dict[str, dict[str, list[str]]],
 ) -> None:
     missing = []
-    for adapter_id, required_evidence_fields in adapter_evidence_fields.items():
+    for adapter_id, requirement in adapter_requirements.items():
         artifacts = await list_external_adapter_run_artifacts(
             db,
             task=task,
@@ -266,7 +278,8 @@ async def ensure_external_adapter_run_evidence_ready(
         if not any(
             external_adapter_run_satisfies_requirement(
                 artifact,
-                required_evidence_fields=required_evidence_fields,
+                required_evidence_fields=requirement["required_evidence_fields"],
+                required_gates=requirement["required_gates"],
             )
             for artifact in artifacts
         ):
@@ -583,14 +596,37 @@ async def list_external_adapter_run_artifacts(
 def strategy_artifact_required_adapter_ids(
     artifacts: Iterable[AgencyArtifact],
 ) -> list[str]:
-    return sorted(strategy_artifact_required_adapter_evidence_fields(artifacts))
+    return sorted(strategy_artifact_required_adapter_requirements(artifacts))
 
 
 def strategy_artifact_required_adapter_evidence_fields(
     artifacts: Iterable[AgencyArtifact],
 ) -> dict[str, list[str]]:
+    return {
+        adapter_id: requirement["required_evidence_fields"]
+        for adapter_id, requirement in strategy_artifact_required_adapter_requirements(
+            artifacts
+        ).items()
+    }
+
+
+def strategy_artifact_required_adapter_gates(
+    artifacts: Iterable[AgencyArtifact],
+) -> dict[str, list[str]]:
+    return {
+        adapter_id: requirement["required_gates"]
+        for adapter_id, requirement in strategy_artifact_required_adapter_requirements(
+            artifacts
+        ).items()
+    }
+
+
+def strategy_artifact_required_adapter_requirements(
+    artifacts: Iterable[AgencyArtifact],
+) -> dict[str, dict[str, list[str]]]:
     adapter_ids: set[str] = set()
     evidence_fields: dict[str, set[str]] = {}
+    gates: dict[str, set[str]] = {}
     for artifact in artifacts:
         payload = artifact.payload if isinstance(artifact.payload, dict) else {}
         requirements = payload.get("external_adapter_requirements")
@@ -602,6 +638,12 @@ def strategy_artifact_required_adapter_evidence_fields(
             adapter_id = requirement.get("adapter_id")
             if isinstance(adapter_id, str) and adapter_id.strip():
                 adapter_ids.add(adapter_id)
+                contract = get_external_adapter_contract(adapter_id)
+                if contract is not None:
+                    evidence_fields.setdefault(adapter_id, set()).update(
+                        contract.evidence_fields
+                    )
+                    gates.setdefault(adapter_id, set()).update(contract.required_gates)
                 required_fields = requirement.get("required_evidence_fields")
                 if not isinstance(required_fields, list):
                     required_fields = []
@@ -610,8 +652,21 @@ def strategy_artifact_required_adapter_evidence_fields(
                     for item in required_fields
                     if isinstance(item, str) and item.strip()
                 )
+                required_gates = requirement.get("required_gates")
+                if not isinstance(required_gates, list):
+                    required_gates = []
+                gates.setdefault(adapter_id, set()).update(
+                    item
+                    for item in required_gates
+                    if isinstance(item, str) and item.strip()
+                )
     return {
-        adapter_id: sorted(evidence_fields.get(adapter_id, set()))
+        adapter_id: {
+            "required_evidence_fields": sorted(
+                evidence_fields.get(adapter_id, set())
+            ),
+            "required_gates": sorted(gates.get(adapter_id, set())),
+        }
         for adapter_id in sorted(adapter_ids)
     }
 
@@ -634,12 +689,16 @@ def external_adapter_run_satisfies_requirement(
     artifact: AgencyArtifact,
     *,
     required_evidence_fields: list[str],
+    required_gates: list[str],
 ) -> bool:
     if not external_adapter_run_succeeded(artifact):
         return False
     return not missing_external_adapter_run_evidence_fields(
         artifact,
         required_evidence_fields=required_evidence_fields,
+    ) and not missing_external_adapter_run_gates(
+        artifact,
+        required_gates=required_gates,
     )
 
 
@@ -656,6 +715,17 @@ def missing_external_adapter_run_evidence_fields(
         for field in required_evidence_fields
         if not _has_evidence_value(evidence.get(field))
     ]
+
+
+def missing_external_adapter_run_gates(
+    artifact: AgencyArtifact,
+    *,
+    required_gates: list[str],
+) -> list[str]:
+    payload = artifact.payload if isinstance(artifact.payload, dict) else {}
+    gate_results = payload.get("gate_results")
+    gate_results = gate_results if isinstance(gate_results, dict) else {}
+    return [gate for gate in required_gates if gate_results.get(gate) is not True]
 
 
 def _has_evidence_value(value: Any) -> bool:

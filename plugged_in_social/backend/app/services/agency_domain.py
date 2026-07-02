@@ -43,6 +43,9 @@ from app.services.virtual_agency import (
     AGENT_SCHEDULING,
     publish_agent_task,
 )
+from app.services.external_adapter_contracts import (
+    external_adapter_strategy_requirement,
+)
 from app.services.virtual_agency_orchestration import (
     approve_task,
     build_event,
@@ -555,58 +558,13 @@ def _strategy_external_adapter_requirements(
     source_urls = _string_list(intake_payload.get("source_urls"))
     competitor_urls = _string_list(intake_payload.get("competitor_urls"))
     if engagement.client_url or source_urls or competitor_urls:
-        requirements.append(
-            {
-                "adapter_id": "browser_qa_harness",
-                "purpose": "client_platform_and_market_research",
-                "input_contracts": [
-                    "target_url",
-                    "operator_flow_prompt",
-                    "canary_session_start",
-                    "canary_execute_step",
-                    "canary_session_end",
-                ],
-                "expected_output_artifacts": [
-                    "session_manifest",
-                    "results_json",
-                    "report_html",
-                    "network_har",
-                    "step_screenshots",
-                ],
-                "required_evidence_fields": [
-                    "session_id",
-                    "report_html_hash",
-                    "network_har_hash",
-                    "screenshot_hashes",
-                ],
-            }
-        )
+        requirement = external_adapter_strategy_requirement("browser_qa_harness")
+        if requirement is not None:
+            requirements.append(requirement)
     if engagement.repo_url:
-        requirements.append(
-            {
-                "adapter_id": "agent_harness",
-                "purpose": "repository_context_review",
-                "input_contracts": [
-                    "virtual_agency_task",
-                    "pi_spawn_request",
-                    "pi_rpc_command",
-                    "agent_event_stream",
-                ],
-                "expected_output_artifacts": [
-                    "agent_session_tree",
-                    "agent_event_stream",
-                    "tool_execution_events",
-                    "artifact_payload",
-                ],
-                "required_evidence_fields": [
-                    "instance_id",
-                    "session_id",
-                    "agent_event_hash",
-                    "tool_call_hash",
-                    "output_payload_hash",
-                ],
-            }
-        )
+        requirement = external_adapter_strategy_requirement("agent_harness")
+        if requirement is not None:
+            requirements.append(requirement)
     return requirements
 
 

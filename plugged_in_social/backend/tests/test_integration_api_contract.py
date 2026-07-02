@@ -904,8 +904,12 @@ def test_strategy_adapter_readiness_marks_all_adapters_ready_with_full_evidence(
 
 def test_platform_manifest_exposes_agents_config_data_and_gates():
     import app.api.integration as module
+    from app.services.external_adapter_contracts import list_external_adapter_contracts
 
     manifest = module._platform_manifest()
+    contracts_by_id = {
+        contract.id: contract for contract in list_external_adapter_contracts()
+    }
 
     assert manifest.resource_type == "plugged_in_social_platform_manifest"
     assert manifest.closed_loop_stages == [
@@ -1097,6 +1101,15 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         "agent_harness",
         "browser_qa_harness",
     }
+    assert {adapter.id for adapter in manifest.external_adapters} == set(
+        contracts_by_id
+    )
+    for adapter in manifest.external_adapters:
+        contract = contracts_by_id[adapter.id]
+        assert adapter.required_gates == list(contract.required_gates)
+        assert adapter.evidence_fields == list(contract.evidence_fields)
+        assert adapter.input_contracts == list(contract.input_contracts)
+        assert adapter.output_artifacts == list(contract.output_artifacts)
     agent_adapter = next(
         adapter for adapter in manifest.external_adapters if adapter.id == "agent_harness"
     )
