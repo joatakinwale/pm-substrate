@@ -1,0 +1,43 @@
+{
+  "_doc": "Guardrail ratchet (refactor plan \u00a75). frozenFiles: files over budget at adoption, pinned at their adoption-day size \u2014 they may shrink, never grow. allowedDeepNames: exported identifiers over the 63-char Postgres ceiling that predate the v229 recursion-stop rule \u2014 the list may shrink, never grow. NEW violations are CI failures.",
+  "frozenFiles": {
+    "packages/agent-state-provenance/src/index.ts": 77832,
+    "packages/agent-state-provenance/src/index.test.ts": 53445,
+    "packages/agent-state-core/src/index.ts": 7462,
+    "packages/capability-finance-research-ingest/src/arrowhedge-integration.ts": 2526,
+    "packages/capability-finance-research-ingest/src/arrowhedge.ts": 3997
+  },
+  "allowedDeepNames": [
+    "OPERATIONAL_STATE_COMPOSITIONAL_QUORUM_INTERSECTION_PROOF_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_HISTORY_ROOT_SETTLEMENT_AUTHORITY_TRANSITION_ADMISSION_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_HISTORY_ROOT_SETTLEMENT_AUTHORITY_TRANSITION_ADMISSION_WITNESS_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_PRIVACY_PRESERVING_POLICY_PROOF_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_WITNESS_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_PRUNING_POLICY_ADMISSION_WITNESS_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_QUORUM_CERTIFICATE_PROOF_RECORD_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_RECOVERY_CUT_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_SCHEMA_VERSION",
+    "OPERATIONAL_STATE_RECOVERY_CUT_ADMISSION_WITNESS_AUTHORITY_TRANSITION_ADMISSION_WITNESS_SCHEMA_VERSION",
+    "OperationalStateCompositionalQuorumIntersectionProofEvaluationInput",
+    "OperationalStateHistoryRootSettlementAuthorityTransitionAdmissionRecord",
+    "OperationalStateHistoryRootSettlementAuthorityTransitionAdmissionReplay",
+    "OperationalStateHistoryRootSettlementAuthorityTransitionAdmissionWitnessRecord",
+    "OperationalStateHistoryRootSettlementAuthorityTransitionAdmissionWitnessReplay",
+    "OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionRecord",
+    "OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionReplay",
+    "OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord",
+    "OperationalStatePruningPolicyAdmissionWitnessAuthorityTransitionAdmissionWitnessReplay",
+    "OperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionRecord",
+    "OperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionReplay",
+    "OperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionWitnessRecord",
+    "OperationalStateRecoveryCutAdmissionWitnessAuthorityTransitionAdmissionWitnessReplay",
+    "WorkflowGraphWriteProjectionReplayRootSettlementCurrentnessPolicy",
+    "WorkflowGraphWriteProjectionReplayRootSettlementStoreHeadWitness",
+    "WorkflowGraphWriteProjectionReplayRootSettlementStoreHeadWitnessDecision",
+    "WorkflowGraphWriteProjectionReplayRootSettlementStoreHeadWitnessQuorum",
+    "WorkflowGraphWriteProjectionReplayRootSettlementStoreHeadWitnessQuorumCertificate",
+    "WorkflowGraphWriteProjectionReplayRootSettlementStoreVerification",
+    "computeOperationalStateCompositionalQuorumGlobalIntersectionWitnessIds",
+    "deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot"
+  ]
+}

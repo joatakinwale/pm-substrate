@@ -1,0 +1,29 @@
+{
+  "name": "@pm/agent-state-provenance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Quarantined operational-state provenance tower: witness ledgers, authority transitions, quorum certificates, epoch seals, pruning tombstones, settlement/finality proofs. No substrate runtime path may depend on this package (enforced by scripts/validate-budgets.ts). Opt-in SQL ledger: db/migrations-provenance/ behind PM_ENABLE_AGENT_STATE_PROVENANCE=1.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

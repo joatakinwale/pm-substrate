@@ -1,0 +1,26 @@
+{
+  "name": "@pm/profile-pmgovernance",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tier-2 profile: project-management methodology as multi-agent governance. RACI as typed edges (single accountability via exactly:1 cardinality), stage-gate lifecycles, approval gates. The objective the substrate exists to serve (refactor plan Phase 2).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@pm/graph": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

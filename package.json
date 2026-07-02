@@ -27,7 +27,10 @@
     "validate:arrowsmith-primitives": "tsx scripts/validate-arrowsmith-primitives.ts",
     "audit:plugged-in-social": "tsx scripts/audit-plugged-in-social-integration.ts",
     "evals:local-lab": "tsx scripts/run-local-lab-evals.ts",
-    "evals:local-agent-lab:live": "tsx scripts/run-local-agent-lab-live-evals.ts"
+    "evals:local-agent-lab:live": "tsx scripts/run-local-agent-lab-live-evals.ts",
+    "validate:budgets": "tsx scripts/validate-budgets.ts",
+    "validate:zero-edit": "tsx scripts/validate-zero-edit-plugin.ts",
+    "evals:amnesia": "tsx scripts/measure-amnesia-resume.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

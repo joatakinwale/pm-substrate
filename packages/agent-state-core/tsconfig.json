@@ -8,5 +8,5 @@
   },
   "include": ["src/**/*"],
   "exclude": ["**/*.test.ts", "dist"],
-  "references": [{ "path": "../agent-state" }]
+  "references": [{ "path": "../types" }]
 }

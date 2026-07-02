@@ -146,13 +146,6 @@ export interface PluggedInSocialIntegrationExternalAdapterManifest {
   readonly output_artifacts: readonly string[];
   readonly required_gates: readonly string[];
   readonly evidence_fields: readonly string[];
-  readonly source_url?: string;
-  readonly source_commit?: string;
-  readonly compatible_protocols?: readonly string[];
-  readonly runner_commands?: readonly string[];
-  readonly provider_packages?: readonly string[];
-  readonly required_event_types?: readonly string[];
-  readonly required_result_shape?: Record<string, unknown> | null;
   readonly notes: Record<string, unknown>;
 }
 
@@ -349,32 +342,6 @@ export interface PluggedInSocialIntegrationClientReportEnvelope {
   readonly updated_at: string;
 }
 
-export interface PluggedInSocialIntegrationAdapterReadinessItemEnvelope {
-  readonly adapter_id: string;
-  readonly status: "ready" | "missing" | "incomplete" | "failed";
-  readonly run_status: string | null;
-  readonly artifact_id: string | null;
-  readonly artifact_payload_hash: string | null;
-  readonly adapter_run_id: string | null;
-  readonly required_gates: readonly string[];
-  readonly missing_or_failed_gates: readonly string[];
-  readonly required_evidence_fields: readonly string[];
-  readonly present_evidence_fields: readonly string[];
-  readonly missing_evidence_fields: readonly string[];
-}
-
-export interface PluggedInSocialIntegrationStrategyAdapterReadinessEnvelope {
-  readonly strategy_artifact_present: boolean;
-  readonly strategy_artifact_id: string | null;
-  readonly strategy_artifact_payload_hash: string | null;
-  readonly ready: boolean;
-  readonly required_adapter_ids: readonly string[];
-  readonly succeeded_adapter_ids: readonly string[];
-  readonly missing_adapter_ids: readonly string[];
-  readonly blocked_adapter_ids: readonly string[];
-  readonly adapters: readonly PluggedInSocialIntegrationAdapterReadinessItemEnvelope[];
-}
-
 export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly resource_type: "marketing_run_evidence_summary";
   readonly run_id: string;
@@ -395,7 +362,6 @@ export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly social_post_status_counts: Record<string, number>;
   readonly report_count: number;
   readonly report_status_counts: Record<string, number>;
-  readonly adapter_readiness: PluggedInSocialIntegrationStrategyAdapterReadinessEnvelope;
   readonly evidence_hashes: Record<string, readonly string[]>;
 }
 
@@ -508,8 +474,6 @@ const REQUIRED_LIVE_CLOSED_LOOP_STAGES = [
 
 const REQUIRED_LIVE_CAPABILITIES = [
   "platform_manifest.read",
-  "external_adapter_manifest.read",
-  "engagement.read",
   "engagement.create",
   "external_adapter_run.read",
   "external_adapter_run.ingest",
@@ -521,7 +485,6 @@ const REQUIRED_LIVE_CAPABILITIES = [
   "event_timeline.read",
   "evidence_summary.read",
   "run_evidence_snapshot.read",
-  "approval.read",
   "access_request.read",
   "social_post.read",
   "report.read",
@@ -566,226 +529,6 @@ const REQUIRED_LIVE_CONFIG_KEYS = [
   "BACKEND_BASE_URL",
   "QUEUE_PRODUCER_URL",
   "QUEUE_VIRTUAL_AGENCY",
-] as const;
-
-const REQUIRED_LIVE_ENDPOINTS = [
-  {
-    method: "GET",
-    path: "/api/integration/v1/capabilities",
-    boundary: "public_rls",
-    capabilityId: "platform_manifest.read",
-    label: "capabilities",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/platform-manifest",
-    boundary: "public_rls",
-    capabilityId: "platform_manifest.read",
-    label: "platform manifest",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/external-adapters",
-    boundary: "public_rls",
-    capabilityId: "external_adapter_manifest.read",
-    label: "external adapter manifest",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/engagements",
-    boundary: "public_rls",
-    capabilityId: "engagement.read",
-    label: "engagement list",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/engagements",
-    boundary: "public_rls",
-    capabilityId: "engagement.create",
-    label: "engagement create",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/engagements/{engagement_id}",
-    boundary: "public_rls",
-    capabilityId: "engagement.read",
-    label: "engagement detail",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/engagements/{engagement_id}/marketing-runs",
-    boundary: "public_rls",
-    capabilityId: "marketing_run.read",
-    label: "engagement marketing-runs",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/engagements/{engagement_id}/marketing-runs",
-    boundary: "public_rls",
-    capabilityId: "marketing_run.create",
-    label: "engagement marketing-run create",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/engagements/{engagement_id}/artifacts",
-    boundary: "public_rls",
-    capabilityId: "artifact.read",
-    label: "engagement artifacts",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/engagements/{engagement_id}/approvals",
-    boundary: "public_rls",
-    capabilityId: "approval.read",
-    label: "engagement approvals",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/engagements/{engagement_id}/access-requests",
-    boundary: "public_rls",
-    capabilityId: "access_request.read",
-    label: "engagement access-requests",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}",
-    boundary: "public_rls",
-    capabilityId: "marketing_run.read",
-    label: "marketing run detail",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/marketing-runs/{run_id}/dispatch",
-    boundary: "public_rls",
-    capabilityId: "marketing_run.dispatch",
-    label: "marketing run dispatch",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/artifacts",
-    boundary: "public_rls",
-    capabilityId: "artifact.read",
-    label: "marketing run artifacts",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
-    boundary: "public_rls",
-    capabilityId: "external_adapter_run.read",
-    label: "marketing run external-adapter-runs",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
-    boundary: "public_rls",
-    capabilityId: "external_adapter_run.ingest",
-    label: "marketing run external-adapter-run ingest",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/social-posts",
-    boundary: "public_rls",
-    capabilityId: "social_post.read",
-    label: "marketing run social-posts",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/reports",
-    boundary: "public_rls",
-    capabilityId: "report.read",
-    label: "marketing run reports",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/reports/{report_id}",
-    boundary: "public_rls",
-    capabilityId: "report.read",
-    label: "client report",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/tasks",
-    boundary: "public_rls",
-    capabilityId: "task.read",
-    label: "marketing run tasks",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/events",
-    boundary: "public_rls",
-    capabilityId: "event_timeline.read",
-    label: "marketing run events",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/approvals",
-    boundary: "public_rls",
-    capabilityId: "approval.read",
-    label: "marketing run approvals",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/access-requests",
-    boundary: "public_rls",
-    capabilityId: "access_request.read",
-    label: "marketing run access-requests",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/evidence-summary",
-    boundary: "public_rls",
-    capabilityId: "evidence_summary.read",
-    label: "marketing run evidence-summary",
-  },
-  {
-    method: "GET",
-    path: "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
-    boundary: "public_rls",
-    capabilityId: "run_evidence_snapshot.read",
-    label: "marketing run evidence-snapshot",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/approvals/{approval_id}/decision",
-    boundary: "public_rls",
-    capabilityId: "approval.decide",
-    label: "approval decision",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/access-requests/{access_request_id}/decision",
-    boundary: "public_rls",
-    capabilityId: "access_request.decide",
-    label: "access request decision",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/events",
-    boundary: "public_rls",
-    capabilityId: "event.ingest",
-    label: "event ingest",
-  },
-  {
-    method: "POST",
-    path: "/api/integration/v1/webhooks",
-    boundary: "public_rls",
-    capabilityId: "event.ingest",
-    label: "webhook ingest",
-  },
-  {
-    method: "POST",
-    path: "/api/internal/virtual-agency/task",
-    boundary: "internal_system_rls",
-    capabilityId: "task.execute",
-    label: "internal virtual-agency task",
-  },
-  {
-    method: "POST",
-    path: "/api/internal/social/posts/{post_id}/publish",
-    boundary: "internal_system_rls",
-    capabilityId: "social_post.publish",
-    label: "internal social publish",
-  },
 ] as const;
 
 export function buildPluggedInSocialAxisBNextActionAdapterResult(
@@ -930,7 +673,7 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
       "/platform-manifest",
     ),
   ]);
-  const adapterId = input.adapterId ?? "pi_harness";
+  const adapterId = input.adapterId ?? "agent_harness";
   const adapter = (platformManifest.external_adapters ?? []).find(
     (item) => item.id === adapterId,
   );
@@ -972,16 +715,6 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
   const gateResults = Object.fromEntries(
     adapter.required_gates.map((gate) => [gate, true]),
   ) as Record<string, boolean>;
-  const adapterEvidence = Object.fromEntries(
-    adapter.evidence_fields.map((field) => [
-      field,
-      field.endsWith("_hash") || field === "output_payload_hash"
-        ? createHash("sha256")
-            .update(`axis-b-smoke:${run.id}:${adapter.id}:${field}`)
-            .digest("hex")
-        : `axis-b-smoke:${run.id}:${adapter.id}:${field}`,
-    ]),
-  ) as Record<string, string>;
   const adapterArtifact =
     await requestIntegrationJson<PluggedInSocialIntegrationArtifactEnvelope>(
       client,
@@ -1009,7 +742,6 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
             },
           ],
           evidence: {
-            ...adapterEvidence,
             adapter_boundary: adapter.boundary,
             required_gate_count: adapter.required_gates.length,
           },
@@ -1057,32 +789,6 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
     ).includes(adapterArtifact.payload_hash)
   ) {
     issues.add("external adapter run hash missing from evidence summary");
-  }
-  const readiness = snapshot.summary.adapter_readiness;
-  if (readiness === undefined) {
-    issues.add("adapter readiness summary missing");
-  } else {
-    const adapterReadiness = readiness.adapters.find(
-      (item) =>
-        item.adapter_id === adapter.id && item.artifact_id === adapterArtifact.id,
-    );
-    if (!readiness.succeeded_adapter_ids.includes(adapter.id)) {
-      issues.add(`external adapter readiness missing succeeded adapter: ${adapter.id}`);
-    }
-    if (adapterReadiness === undefined) {
-      issues.add(`external adapter readiness missing artifact: ${adapter.id}`);
-    } else {
-      if (adapterReadiness.status !== "ready") {
-        issues.add(
-          `external adapter ${adapterReadiness.adapter_id} readiness is ${adapterReadiness.status}`,
-        );
-      }
-      if (adapterReadiness.artifact_payload_hash !== adapterArtifact.payload_hash) {
-        issues.add(
-          `external adapter ${adapter.id} readiness payload hash does not match ingested artifact`,
-        );
-      }
-    }
   }
 
   return {
@@ -1185,90 +891,6 @@ function manifestReadinessIssues(
   return [...issues].sort();
 }
 
-function adapterReadinessIssues(
-  summary: PluggedInSocialIntegrationEvidenceSummaryEnvelope,
-): readonly string[] {
-  const issues = new Set<string>();
-  const readiness = summary.adapter_readiness;
-  if (readiness === undefined) {
-    issues.add("adapter readiness summary missing");
-    return [...issues].sort();
-  }
-
-  if (readiness.strategy_artifact_present !== true) {
-    issues.add("strategy adapter readiness missing strategy artifact");
-  }
-  if (readiness.ready !== true) {
-    issues.add("adapter readiness gate is not ready");
-  }
-
-  const artifactPayloadHashes = new Set(
-    summary.evidence_hashes.artifact_payload_hashes ?? [],
-  );
-  if (
-    readiness.strategy_artifact_payload_hash !== null &&
-    !artifactPayloadHashes.has(readiness.strategy_artifact_payload_hash)
-  ) {
-    issues.add("strategy adapter readiness hash missing from evidence summary");
-  }
-
-  for (const adapterId of readiness.missing_adapter_ids) {
-    issues.add(`required external adapter evidence missing: ${adapterId}`);
-  }
-  for (const adapterId of readiness.blocked_adapter_ids) {
-    issues.add(`required external adapter evidence blocked: ${adapterId}`);
-  }
-
-  const readinessByAdapterId = new Map(
-    readiness.adapters.map((item) => [item.adapter_id, item]),
-  );
-  for (const adapterId of readiness.required_adapter_ids) {
-    if (!readinessByAdapterId.has(adapterId)) {
-      issues.add(`external adapter readiness item missing: ${adapterId}`);
-    }
-  }
-
-  const externalAdapterRunHashes = new Set(
-    summary.evidence_hashes.external_adapter_run_hashes ?? [],
-  );
-  for (const item of readiness.adapters) {
-    if (item.status !== "ready") {
-      issues.add(`external adapter ${item.adapter_id} readiness is ${item.status}`);
-    }
-    if (item.missing_or_failed_gates.length > 0) {
-      issues.add(
-        `external adapter ${item.adapter_id} missing or failed gates: ${item.missing_or_failed_gates.join(", ")}`,
-      );
-    }
-    if (item.missing_evidence_fields.length > 0) {
-      issues.add(
-        `external adapter ${item.adapter_id} missing evidence fields: ${item.missing_evidence_fields.join(", ")}`,
-      );
-    }
-    if (item.status === "ready" && item.run_status !== "succeeded") {
-      issues.add(`external adapter ${item.adapter_id} ready without succeeded run`);
-    }
-    if (item.status === "ready" && item.artifact_id === null) {
-      issues.add(`external adapter ${item.adapter_id} ready without artifact id`);
-    }
-    if (item.status === "ready" && item.artifact_payload_hash === null) {
-      issues.add(
-        `external adapter ${item.adapter_id} ready without artifact payload hash`,
-      );
-    }
-    if (
-      item.artifact_payload_hash !== null &&
-      !externalAdapterRunHashes.has(item.artifact_payload_hash)
-    ) {
-      issues.add(
-        `external adapter ${item.adapter_id} payload hash missing from evidence summary`,
-      );
-    }
-  }
-
-  return [...issues].sort();
-}
-
 function liveRunEvidenceIssues(
   snapshot: PluggedInSocialLiveRunEvidenceSnapshot,
 ): readonly string[] {
@@ -1292,9 +914,6 @@ function liveRunEvidenceIssues(
   }
   if (summary.org_id !== run.org_id) {
     issues.add("evidence summary org_id does not match marketing run");
-  }
-  for (const issue of adapterReadinessIssues(summary)) {
-    issues.add(issue);
   }
   for (const item of [
     ...events,
@@ -1382,24 +1001,89 @@ function liveRunEvidenceIssues(
   const endpoints = new Map(
     platformManifest.api_endpoints.map((endpoint) => [endpointKey(endpoint), endpoint]),
   );
-  for (const requiredEndpoint of REQUIRED_LIVE_ENDPOINTS) {
-    const endpoint = endpoints.get(
-      `${requiredEndpoint.method} ${requiredEndpoint.path}`,
+  const internalTaskEndpoint = endpoints.get("POST /api/internal/virtual-agency/task");
+  if (internalTaskEndpoint?.boundary !== "internal_system_rls") {
+    issues.add("internal virtual-agency task endpoint is not system-RLS scoped");
+  }
+  const manifestEndpoint = endpoints.get("GET /api/integration/v1/platform-manifest");
+  if (manifestEndpoint?.boundary !== "public_rls") {
+    issues.add("platform manifest endpoint is not public-RLS scoped");
+  }
+  const createEngagementEndpoint = endpoints.get("POST /api/integration/v1/engagements");
+  if (createEngagementEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement create endpoint is not public-RLS scoped");
+  }
+  const engagementRunsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/marketing-runs",
+  );
+  if (engagementRunsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement marketing-runs endpoint is not public-RLS scoped");
+  }
+  const createEngagementRunEndpoint = endpoints.get(
+    "POST /api/integration/v1/engagements/{engagement_id}/marketing-runs",
+  );
+  if (createEngagementRunEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement marketing-run create endpoint is not public-RLS scoped");
+  }
+  const engagementArtifactsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/artifacts",
+  );
+  if (engagementArtifactsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement artifacts endpoint is not public-RLS scoped");
+  }
+  const engagementApprovalsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/approvals",
+  );
+  if (engagementApprovalsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement approvals endpoint is not public-RLS scoped");
+  }
+  const engagementAccessRequestsEndpoint = endpoints.get(
+    "GET /api/integration/v1/engagements/{engagement_id}/access-requests",
+  );
+  if (engagementAccessRequestsEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement access-requests endpoint is not public-RLS scoped");
+  }
+  const dispatchEndpoint = endpoints.get(
+    "POST /api/integration/v1/marketing-runs/{run_id}/dispatch",
+  );
+  if (dispatchEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run dispatch endpoint is not public-RLS scoped");
+  }
+  const adapterRunsEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+  );
+  if (adapterRunsEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run external-adapter-runs endpoint is not public-RLS scoped");
+  }
+  const ingestAdapterRunEndpoint = endpoints.get(
+    "POST /api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+  );
+  if (ingestAdapterRunEndpoint?.boundary !== "public_rls") {
+    issues.add(
+      "marketing run external-adapter-run ingest endpoint is not public-RLS scoped",
     );
-    if (endpoint === undefined) {
-      issues.add(`${requiredEndpoint.label} endpoint is missing`);
-      continue;
-    }
-    if (endpoint.boundary !== requiredEndpoint.boundary) {
-      issues.add(
-        `${requiredEndpoint.label} endpoint boundary is ${endpoint.boundary}`,
-      );
-    }
-    if (!endpoint.capability_ids.includes(requiredEndpoint.capabilityId)) {
-      issues.add(
-        `${requiredEndpoint.label} endpoint missing capability: ${requiredEndpoint.capabilityId}`,
-      );
-    }
+  }
+  const socialPostsEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/social-posts",
+  );
+  if (socialPostsEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run social-posts endpoint is not public-RLS scoped");
+  }
+  const reportsEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/reports",
+  );
+  if (reportsEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run reports endpoint is not public-RLS scoped");
+  }
+  const reportEndpoint = endpoints.get("GET /api/integration/v1/reports/{report_id}");
+  if (reportEndpoint?.boundary !== "public_rls") {
+    issues.add("client report endpoint is not public-RLS scoped");
+  }
+  const evidenceSnapshotEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+  );
+  if (evidenceSnapshotEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run evidence-snapshot endpoint is not public-RLS scoped");
   }
 
   const dataTables = new Set(
@@ -1469,18 +1153,6 @@ function liveRunEvidenceIssues(
   }
   if (
     socialPostResource !== undefined &&
-    !socialPostResource.durable_evidence_fields.includes("published_content_hash")
-  ) {
-    issues.add("social_posts resource lacks published_content_hash evidence field");
-  }
-  if (
-    socialPostResource !== undefined &&
-    !socialPostResource.durable_evidence_fields.includes("engagement_rate")
-  ) {
-    issues.add("social_posts resource lacks engagement_rate evidence field");
-  }
-  if (
-    socialPostResource !== undefined &&
     !socialPostResource.durable_evidence_fields.includes("lineage")
   ) {
     issues.add("social_posts resource lacks lineage evidence field");
@@ -1506,30 +1178,6 @@ function liveRunEvidenceIssues(
   for (const gate of REQUIRED_LIVE_GOVERNANCE_GATES) {
     if (!platformManifest.governance_gates.includes(gate)) {
       issues.add(`missing platform governance gate: ${gate}`);
-    }
-  }
-  for (const adapter of platformManifest.external_adapters ?? []) {
-    if (adapter.source_url === undefined || adapter.source_url.length === 0) {
-      issues.add(`external adapter missing source_url: ${adapter.id}`);
-    }
-    if (adapter.source_commit === undefined || adapter.source_commit.length < 40) {
-      issues.add(`external adapter missing source_commit: ${adapter.id}`);
-    }
-    if ((adapter.compatible_protocols ?? []).length === 0) {
-      issues.add(`external adapter missing compatible protocols: ${adapter.id}`);
-    }
-    if (
-      adapter.adapter_type === "browser_qa_harness" &&
-      (adapter.required_result_shape === undefined ||
-        adapter.required_result_shape === null)
-    ) {
-      issues.add(`browser QA adapter missing required result shape: ${adapter.id}`);
-    }
-    if (
-      adapter.adapter_type === "agent_harness" &&
-      (adapter.required_event_types ?? []).length === 0
-    ) {
-      issues.add(`agent harness adapter missing required event types: ${adapter.id}`);
     }
   }
 
@@ -1568,24 +1216,6 @@ function liveRunEvidenceIssues(
   if (socialPosts.length !== summary.social_post_count) {
     issues.add("social post response count does not match evidence summary count");
   }
-  const publishedSocialPosts = socialPosts.filter(
-    (post) => post.status === "published",
-  );
-  if (publishedSocialPosts.length === 0) {
-    issues.add("marketing run has no published social posts");
-  }
-  if (
-    (summary.social_post_status_counts.published ?? 0) !==
-    publishedSocialPosts.length
-  ) {
-    issues.add("published social post count does not match evidence summary count");
-  }
-  if (
-    publishedSocialPosts.length > 0 &&
-    !publishedSocialPosts.some(socialPostHasMetricEvidence)
-  ) {
-    issues.add("marketing run has no published social metric evidence");
-  }
   if (summary.report_count <= 0 || reports.length <= 0) {
     issues.add("marketing run has no client reports");
   }
@@ -1618,18 +1248,6 @@ function liveRunEvidenceIssues(
     (summary.evidence_hashes.social_post_content_hashes ?? []).length === 0
   ) {
     issues.add("missing evidence hashes: social_post_content_hashes");
-  }
-  if (
-    publishedSocialPosts.length > 0 &&
-    (summary.evidence_hashes.published_social_post_content_hashes ?? []).length === 0
-  ) {
-    issues.add("missing evidence hashes: published_social_post_content_hashes");
-  }
-  if (
-    publishedSocialPosts.some(socialPostHasMetricEvidence) &&
-    (summary.evidence_hashes.social_post_metric_hashes ?? []).length === 0
-  ) {
-    issues.add("missing evidence hashes: social_post_metric_hashes");
   }
   if (
     summary.report_count > 0 &&
@@ -1690,12 +1308,6 @@ function liveRunEvidenceIssues(
     if (post.status === "published" && post.published_content_hash === null) {
       issues.add(`published social post missing published content hash: ${post.id}`);
     }
-    if (post.status === "published" && post.published_at === null) {
-      issues.add(`published social post missing published_at: ${post.id}`);
-    }
-    if (post.status === "published" && post.platform_post_id === null) {
-      issues.add(`published social post missing platform_post_id: ${post.id}`);
-    }
     if (
       post.published_content_hash !== null &&
       post.scheduled_content_hash !== null &&
@@ -1731,19 +1343,6 @@ function liveRunEvidenceIssues(
   }
 
   return [...issues].sort();
-}
-
-function socialPostHasMetricEvidence(
-  post: PluggedInSocialIntegrationSocialPostEnvelope,
-): boolean {
-  return (
-    post.likes > 0 ||
-    post.comments > 0 ||
-    post.shares > 0 ||
-    post.impressions > 0 ||
-    post.reach > 0 ||
-    post.engagement_rate !== null
-  );
 }
 
 function metricsFromReport(

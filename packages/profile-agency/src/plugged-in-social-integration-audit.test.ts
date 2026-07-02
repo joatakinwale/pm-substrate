@@ -1,3 +1,10 @@
+import { existsSync } from "node:fs";
+
+/** Live-tree tests skip when the (now external) PluggedInSocial checkout is absent. */
+const PLUGGED_IN_SOCIAL_AVAILABLE = existsSync(
+  process.env["PM_PLUGGED_IN_SOCIAL_DIR"] ?? "./plugged_in_social",
+);
+
 import { describe, expect, it } from "vitest";
 import { FAILURE_CLASSES } from "@pm/evals";
 import { tenantId, timestamp } from "@pm/types";
@@ -27,7 +34,7 @@ const report: PluggedInSocialClientReportSnapshot = {
 };
 
 describe("PluggedInSocial integration audit", () => {
-  it("returns a single substrate-consumable proof summary for the live marketing loop", () => {
+  it.skipIf(!PLUGGED_IN_SOCIAL_AVAILABLE)("returns a single substrate-consumable proof summary for the live marketing loop", () => {
     const audit = buildPluggedInSocialIntegrationAudit({
       tenantId: tenantId("tnt_plugged_in_social_audit"),
       observedAt: timestamp("2026-07-01T19:15:00.000Z"),

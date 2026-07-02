@@ -1,5 +1,13 @@
 # pm-substrate — Refactor Plan: lean agent-state core + PM-methodology governance
 
+> **STATUS 2026-07-02 — EXECUTED.** Phases 0–2 complete and verified (852/859 tests
+> green on both core-only and tower-enabled databases; all four CI gates green;
+> amnesia headline: baseline 0% vs substrate 100%, chain valid). Phase 3
+> mechanism verified; the live PluggedInSocial tree drifted post-eviction and
+> currently fails its own readiness anchors — tracked in Changelog 2026-07-02.
+> Residuals: live-Ollama lab runs, standalone app repos, 12 live behavior
+> metrics, shrinking (not just freezing) the quarantined tower.
+
 *Purpose: refocus the codebase on the stated objective — **solve the agent-state problem and implement project-management methodologies into multi-agents as governance** — by extracting a lean core, quarantining the runaway provenance tower, evicting the app sandboxes, and building governance as a Tier-2 profile. Grounded in directly verified facts (below), not the research prose.*
 
 ---

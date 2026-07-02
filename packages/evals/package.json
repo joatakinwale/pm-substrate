@@ -23,7 +23,8 @@
     "@pm/graph": "workspace:*",
     "@pm/registry": "workspace:*",
     "@pm/types": "workspace:*",
-    "@pm/workflow": "workspace:*"
+    "@pm/workflow": "workspace:*",
+    "@pm/continuity": "workspace:*"
   },
   "devDependencies": {
     "@pm/capability-kit": "workspace:*",

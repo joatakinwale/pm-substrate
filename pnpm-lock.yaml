@@ -27,7 +27,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
-  packages/agent-state:
+  packages/agent-state-core:
     dependencies:
       '@pm/types':
         specifier: workspace:*
@@ -40,11 +40,14 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
-  packages/agent-state-core:
+  packages/agent-state-provenance:
     dependencies:
-      '@pm/agent-state':
+      '@pm/agent-state-core':
         specifier: workspace:*
-        version: link:../agent-state
+        version: link:../agent-state-core
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
       typescript:
         specifier: ^5.9.0
@@ -198,6 +201,40 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.17)
 
+  packages/capability-pmgovernance-stage-gate:
+    dependencies:
+      '@pm/capability-kit':
+        specifier: workspace:*
+        version: link:../capability-kit
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/profile-pmgovernance':
+        specifier: workspace:*
+        version: link:../profile-pmgovernance
+      '@pm/profile-registry':
+        specifier: workspace:*
+        version: link:../profile-registry
+      '@pm/registry':
+        specifier: workspace:*
+        version: link:../registry
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
+    devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
   packages/continuity:
     dependencies:
       '@pm/types':
@@ -244,6 +281,9 @@ importers:
       '@pm/agent-state-core':
         specifier: workspace:*
         version: link:../agent-state-core
+      '@pm/continuity':
+        specifier: workspace:*
+        version: link:../continuity
       '@pm/graph':
         specifier: workspace:*
         version: link:../graph
@@ -394,6 +434,28 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
+  packages/profile-pmgovernance:
+    dependencies:
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/profile-registry':
+        specifier: workspace:*
+        version: link:../profile-registry
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

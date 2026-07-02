@@ -1,0 +1,30 @@
+{
+  "name": "@pm/capability-pmgovernance-stage-gate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PM-governance stage-gate advancer: approval-gated WorkItem lifecycle transitions with freshness gating and idempotent, transactional application (refactor plan Phase 2, §4.5).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/capability-kit": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-pmgovernance": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -18,10 +18,14 @@ const FAILURE_CLASSES = [
 ] as const;
 
 describe("local-agent-lab action outcome packets", () => {
-  it("registers one dynamic scenario for every state-failure class", () => {
-    expect(SCENARIOS.map((scenario) => scenario.failureClass)).toEqual([
-      ...FAILURE_CLASSES,
-    ]);
+  it("covers every state-failure class with at least one dynamic scenario", () => {
+    const classes = SCENARIOS.map((scenario) => scenario.failureClass);
+    // Every canonical failure class has a scenario…
+    expect(new Set(classes)).toEqual(new Set(FAILURE_CLASSES));
+    // …and no scenario invents a class outside the taxonomy. Multiple
+    // scenarios may share a class (e.g. pm-governance-approval-gate is a
+    // second, governance-flavored workflow_invalidation probe).
+    for (const c of classes) expect(FAILURE_CLASSES).toContain(c);
   });
 
   it("builds hash-valid accepted packets from admitted dynamic runs", () => {

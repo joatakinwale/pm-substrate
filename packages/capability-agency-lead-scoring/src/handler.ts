@@ -59,6 +59,13 @@ export interface LeadScoringRuntimeDeps extends CapabilityRuntimeDeps {
    * resolution before the rollup mutates graph.nodes.
    */
   readonly graphWriteAuthority?: GraphWriteAuthorityResolver<LeadScoringEventPayload>;
+
+  /**
+   * Freshness budget for the locked scoring-config read (refactor plan
+   * Phase 1: staleness gating exercised end-to-end, not just exported).
+   * Defaults to 30 days; the kit throws StaleReadError beyond it.
+   */
+  readonly freshnessMaxAgeMs?: number;
 }
 
 interface LeadScoringApplyResult {
@@ -82,6 +89,7 @@ export class LeadScoringHandler {
           keyColumn: "scoring_event_id",
         },
         extractIdempotencyKey: (p) => p.scoringEventId,
+        freshness: { maxAgeMs: deps.freshnessMaxAgeMs ?? 30 * 24 * 60 * 60 * 1000 },
 
         // Walk: prefer lead-bound override; fall back via assigned user's
         // default scoring config.
