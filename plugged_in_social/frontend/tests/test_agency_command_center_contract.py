@@ -44,8 +44,15 @@ def test_agency_command_center_route_exposes_operator_workflow():
     assert "Evidence Artifacts" in source
     assert "Approvals" in source
     assert "Access Requests" in source
+    assert "source_urls" in source
+    assert "competitor_urls" in source
+    assert "auto_start_run" in source
+    assert "Start strategy run after intake" in source
+    assert "Create + Start Strategy" in source
+    assert "strategy_session" in source
     assert "createClientEngagement" in source
     assert "createMarketingRun" in source
+    assert "createMarketingRun(engagement.id" in source
     assert "createAgencyArtifact" in source
     assert "createAgencyApproval" in source
     assert "decideAgencyApproval" in source
@@ -73,6 +80,8 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "client_report_hashes" in source
     assert "client_report_metrics_hashes" in source
     assert "report_count" in source
+    assert "openGateCount" in source
+    assert "openAccessRequestCount > 0" in source
     assert "Report metrics evidence recorded." in source
     assert "Report Status" in source
 

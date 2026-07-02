@@ -67,6 +67,8 @@ const CLOSED_LOOP_STAGES = [
   "next_action",
 ] as const;
 
+const DEFAULT_RUN_OBJECTIVE = "Build a 30-day autonomous marketing strategy";
+
 const STAGE_LABELS: Record<(typeof CLOSED_LOOP_STAGES)[number], string> = {
   intake: "Intake",
   strategy: "Strategy",
@@ -219,14 +221,15 @@ export default function AgencyCommandCenterPage() {
     client_email: "",
     offer: "",
     copy_inputs: "Homepage\nSales deck\nExisting campaign copy",
+    source_urls: "",
+    competitor_urls: "",
     analytics_provider: "umami",
     social_channels: "linkedin",
     goals: "Increase qualified leads",
     constraints: "Approval required before publishing",
+    auto_start_run: true,
   });
-  const [runObjective, setRunObjective] = useState(
-    "Build a 30-day autonomous marketing strategy"
-  );
+  const [runObjective, setRunObjective] = useState(DEFAULT_RUN_OBJECTIVE);
   const [artifactForm, setArtifactForm] = useState({
     artifact_type: "research_brief",
     title: "Research brief",
@@ -269,6 +272,15 @@ export default function AgencyCommandCenterPage() {
   const openAccessRequests = accessRequests.filter(
     (item) => item.status === "requested" || item.status === "blocked"
   );
+  const pendingApprovalCount = Math.max(
+    pendingApprovals.length,
+    evidenceSummary?.pending_approval_count ?? 0
+  );
+  const openAccessRequestCount = Math.max(
+    openAccessRequests.length,
+    evidenceSummary?.open_access_request_count ?? 0
+  );
+  const openGateCount = pendingApprovalCount + openAccessRequestCount;
   const recentRunEvents = useMemo(
     () => runEvents.slice(-8).reverse(),
     [runEvents]
@@ -437,12 +449,12 @@ export default function AgencyCommandCenterPage() {
       },
       {
         label: "Access Gate",
-        status: openAccessRequests.length > 0 ? "blocked" : "clear",
+        status: openAccessRequestCount > 0 ? "blocked" : "clear",
         detail:
-          openAccessRequests.length > 0
-            ? `${openAccessRequests.length} open`
+          openAccessRequestCount > 0
+            ? `${openAccessRequestCount} open`
             : `${accessRequests.length} recorded`,
-        tone: openAccessRequests.length > 0 ? "blocked" : "complete",
+        tone: openAccessRequestCount > 0 ? "blocked" : "complete",
       },
       {
         label: "Approval Hash",
@@ -487,7 +499,7 @@ export default function AgencyCommandCenterPage() {
   }, [
     accessRequests.length,
     evidenceSummary,
-    openAccessRequests.length,
+    openAccessRequestCount,
     runTasks,
     selectedEngagement,
   ]);
@@ -602,6 +614,9 @@ export default function AgencyCommandCenterPage() {
     setActionLoading("engagement");
     setError(null);
     try {
+      const sourceUrls = splitLines(engagementForm.source_urls);
+      const competitorUrls = splitLines(engagementForm.competitor_urls);
+      const objective = runObjective.trim() || DEFAULT_RUN_OBJECTIVE;
       const engagement = await createClientEngagement({
         name: engagementForm.name.trim() || undefined,
         client_url: engagementForm.client_url.trim() || undefined,
@@ -613,6 +628,14 @@ export default function AgencyCommandCenterPage() {
         intake_payload: {
           offer: engagementForm.offer.trim() || undefined,
           copy_inputs: splitLines(engagementForm.copy_inputs),
+          source_urls: sourceUrls,
+          competitor_urls: competitorUrls,
+          strategy_session: {
+            objective: objective || undefined,
+            requested_autonomous_start: engagementForm.auto_start_run,
+            source_urls: sourceUrls,
+            competitor_urls: competitorUrls,
+          },
           source: "agency_command_center",
         },
         integration_state: {
@@ -624,6 +647,9 @@ export default function AgencyCommandCenterPage() {
               : ["linkedin"],
         },
       });
+      if (engagementForm.auto_start_run) {
+        await createMarketingRun(engagement.id, { objective });
+      }
       setSelectedId(engagement.id);
       setEngagementForm({
         name: "",
@@ -633,12 +659,15 @@ export default function AgencyCommandCenterPage() {
         client_email: "",
         offer: "",
         copy_inputs: "Homepage\nSales deck\nExisting campaign copy",
+        source_urls: "",
+        competitor_urls: "",
         analytics_provider: "umami",
         social_channels: "linkedin",
         goals: "Increase qualified leads",
         constraints: "Approval required before publishing",
+        auto_start_run: true,
       });
-      await loadEngagements();
+      await Promise.all([loadEngagements(), loadEngagementDetail(engagement.id)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create engagement.");
     } finally {
@@ -838,7 +867,7 @@ export default function AgencyCommandCenterPage() {
           { label: "Engagements", value: engagements.length, icon: Sparkles },
           { label: "Strategy Runs", value: runs.length, icon: Clock3 },
           { label: "Evidence Artifacts", value: artifacts.length, icon: FileText },
-          { label: "Open Gates", value: pendingApprovals.length + openAccessRequests.length, icon: ShieldCheck },
+          { label: "Open Gates", value: openGateCount, icon: ShieldCheck },
         ].map((stat) => (
           <div key={stat.label} className="rounded-lg border border-border bg-white p-5">
             <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-stevie-green/10 text-stevie-green">
@@ -957,6 +986,30 @@ export default function AgencyCommandCenterPage() {
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm"
               />
               <textarea
+                value={engagementForm.source_urls}
+                onChange={(event) =>
+                  setEngagementForm({
+                    ...engagementForm,
+                    source_urls: event.target.value,
+                  })
+                }
+                rows={3}
+                placeholder="Marketing page URLs, one per line"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+              />
+              <textarea
+                value={engagementForm.competitor_urls}
+                onChange={(event) =>
+                  setEngagementForm({
+                    ...engagementForm,
+                    competitor_urls: event.target.value,
+                  })
+                }
+                rows={3}
+                placeholder="Competitor or market URLs, one per line"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+              />
+              <textarea
                 value={engagementForm.goals}
                 onChange={(event) =>
                   setEngagementForm({ ...engagementForm, goals: event.target.value })
@@ -975,14 +1028,42 @@ export default function AgencyCommandCenterPage() {
                 rows={3}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm"
               />
+              <label className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={engagementForm.auto_start_run}
+                  onChange={(event) =>
+                    setEngagementForm({
+                      ...engagementForm,
+                      auto_start_run: event.target.checked,
+                    })
+                  }
+                  className="h-4 w-4"
+                />
+                <span>Start strategy run after intake</span>
+              </label>
+              {engagementForm.auto_start_run && (
+                <input
+                  value={runObjective}
+                  onChange={(event) => setRunObjective(event.target.value)}
+                  placeholder="Strategy run objective"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+                />
+              )}
               <button
                 type="button"
                 onClick={() => void handleCreateEngagement()}
                 disabled={actionLoading === "engagement"}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-white transition hover:bg-foreground/90 disabled:opacity-60"
               >
-                <Plus className="h-4 w-4" />
-                Create Engagement
+                {actionLoading === "engagement" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {engagementForm.auto_start_run
+                  ? "Create + Start Strategy"
+                  : "Create Engagement"}
               </button>
             </div>
           </section>
@@ -1090,7 +1171,7 @@ export default function AgencyCommandCenterPage() {
                     type="button"
                     onClick={() => void handleDispatchRun()}
                     disabled={
-                      openAccessRequests.length > 0 ||
+                      openAccessRequestCount > 0 ||
                       actionLoading === `dispatch:${activeRun.id}`
                     }
                     className="inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
@@ -1098,7 +1179,7 @@ export default function AgencyCommandCenterPage() {
                     {actionLoading === `dispatch:${activeRun.id}` && (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     )}
-                    {openAccessRequests.length > 0
+                    {openAccessRequestCount > 0
                       ? "Resolve Access"
                       : "Dispatch Agents"}
                   </button>
@@ -1148,11 +1229,7 @@ export default function AgencyCommandCenterPage() {
                     },
                     {
                       label: "Open Gates",
-                      value:
-                        (evidenceSummary?.pending_approval_count ??
-                          pendingApprovals.length) +
-                        (evidenceSummary?.open_access_request_count ??
-                          openAccessRequests.length),
+                      value: openGateCount,
                       icon: ShieldCheck,
                     },
                   ].map((item) => (

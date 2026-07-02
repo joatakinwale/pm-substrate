@@ -1023,6 +1023,14 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       agencyCommandCenter.includes("Governance Gates") &&
       agencyCommandCenter.includes("External Adapter Boundary") &&
       agencyCommandCenter.includes("Agent Task Queue") &&
+      agencyCommandCenter.includes("source_urls") &&
+      agencyCommandCenter.includes("competitor_urls") &&
+      agencyCommandCenter.includes("auto_start_run") &&
+      agencyCommandCenter.includes("strategy_session") &&
+      agencyCommandCenter.includes("Create + Start Strategy") &&
+      agencyCommandCenter.includes("createMarketingRun(engagement.id") &&
+      agencyCommandCenter.includes("openGateCount") &&
+      agencyCommandCenter.includes("openAccessRequestCount > 0") &&
       agencyCommandCenter.includes("CLOSED_LOOP_STAGES") &&
       agencyCommandCenter.includes("externalAdapters") &&
       agencyCommandCenter.includes("getIntegrationRunEvidenceSnapshot") &&
