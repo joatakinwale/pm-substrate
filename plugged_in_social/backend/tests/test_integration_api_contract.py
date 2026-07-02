@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import inspect
+import uuid
+from datetime import datetime, timezone
 
 
 def test_integration_router_imports_with_neutral_v1_prefix():
@@ -30,6 +32,10 @@ def test_integration_router_imports_with_neutral_v1_prefix():
     ) in route_methods
     assert (
         "/integration/v1/marketing-runs/{run_id}/artifacts",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/marketing-runs/{run_id}/social-posts",
         frozenset({"GET"}),
     ) in route_methods
     assert (
@@ -99,6 +105,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationRunDispatchEnvelope,
         IntegrationRunEventEnvelope,
         IntegrationMarketingRunEnvelope,
+        IntegrationSocialPostEnvelope,
         IntegrationTaskEnvelope,
     )
 
@@ -107,6 +114,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
     run_fields = set(IntegrationMarketingRunEnvelope.model_fields)
     dispatch_fields = set(IntegrationRunDispatchEnvelope.model_fields)
     artifact_fields = set(IntegrationArtifactEnvelope.model_fields)
+    social_post_fields = set(IntegrationSocialPostEnvelope.model_fields)
     task_fields = set(IntegrationTaskEnvelope.model_fields)
     access_request_fields = set(IntegrationAccessRequestEnvelope.model_fields)
     run_event_fields = set(IntegrationRunEventEnvelope.model_fields)
@@ -162,6 +170,18 @@ def test_integration_schemas_expose_stable_external_envelopes():
     }.issubset(artifact_fields)
     assert {
         "id",
+        "project_id",
+        "social_account_id",
+        "platform",
+        "status",
+        "current_content_hash",
+        "scheduled_content_hash",
+        "published_content_hash",
+        "lineage",
+        "links",
+    }.issubset(social_post_fields)
+    assert {
+        "id",
         "agent_role",
         "task_type",
         "status",
@@ -205,6 +225,8 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "pending_approval_count",
         "access_request_count",
         "open_access_request_count",
+        "social_post_count",
+        "social_post_status_counts",
         "evidence_hashes",
     }.issubset(evidence_summary_fields)
     assert {"engagement_id", "event_type", "source", "payload"}.issubset(
@@ -277,8 +299,78 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for endpoint in manifest.api_endpoints
     )
     assert any(
+        endpoint.path == "/api/integration/v1/marketing-runs/{run_id}/social-posts"
+        and endpoint.boundary == "public_rls"
+        and "social_post.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        resource.table == "social_posts"
+        and "current_content_hash" in resource.durable_evidence_fields
+        and "lineage" in resource.durable_evidence_fields
+        for resource in manifest.data_resources
+    )
+    assert any(
         config.key == "BACKEND_BASE_URL" and config.kind == "secret"
         for config in manifest.configuration_requirements
     )
     assert "tenant_rls" in manifest.governance_gates
     assert "content_hash_gate" in manifest.governance_gates
+
+
+def test_social_post_integration_envelope_derives_hash_and_lineage():
+    import app.api.integration as module
+    from app.models.agency import MarketingRun
+    from app.models.social_media import SocialPost
+    from app.services.virtual_agency_orchestration import social_post_content_hash
+
+    org_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    project_id = uuid.uuid4()
+    account_id = uuid.uuid4()
+    post = SocialPost(
+        id=uuid.uuid4(),
+        org_id=org_id,
+        project_id=project_id,
+        social_account_id=account_id,
+        platform="linkedin",
+        status="scheduled",
+        caption="Approved campaign draft",
+        hashtags=["launch"],
+        media_urls=["r2://media/launch.png"],
+        media_type="image",
+        scheduled_at=datetime.now(timezone.utc),
+        created_by_agent="content_creative",
+        version=2,
+        scheduled_content_hash="a" * 64,
+        likes=0,
+        comments=0,
+        shares=0,
+        impressions=0,
+        reach=0,
+        engagement_rate=None,
+        internal_notes=(
+            'Lineage: {"client_request":"Launch","project_id":"'
+            f'{project_id}","legacy_task_id":"{uuid.uuid4()}",'
+            f'"marketing_run_id":"{run_id}"}}'
+        ),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    run = MarketingRun(
+        id=run_id,
+        org_id=org_id,
+        engagement_id=uuid.uuid4(),
+        project_id=project_id,
+        status="active",
+        stage="execution",
+        objective="Launch campaign",
+    )
+
+    envelope = module._to_social_post(post)
+
+    assert module._social_post_belongs_to_run(post, run)
+    assert envelope.resource_type == "social_post"
+    assert envelope.lineage["marketing_run_id"] == str(run_id)
+    assert envelope.current_content_hash == social_post_content_hash(post)
+    assert envelope.scheduled_content_hash == "a" * 64

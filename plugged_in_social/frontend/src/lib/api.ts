@@ -909,6 +909,8 @@ export interface IntegrationEvidenceSummary {
   pending_approval_count: number;
   access_request_count: number;
   open_access_request_count: number;
+  social_post_count: number;
+  social_post_status_counts: Record<string, number>;
   evidence_hashes: Record<string, string[]>;
   links: Array<{ rel: string; href: string }>;
 }

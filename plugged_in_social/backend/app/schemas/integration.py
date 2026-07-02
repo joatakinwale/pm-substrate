@@ -167,6 +167,40 @@ class IntegrationArtifactEnvelope(BaseModel):
     links: list[IntegrationLink]
 
 
+class IntegrationSocialPostEnvelope(BaseModel):
+    resource_type: Literal["social_post"] = "social_post"
+    id: uuid.UUID
+    org_id: uuid.UUID
+    project_id: uuid.UUID | None
+    social_account_id: uuid.UUID
+    platform: str
+    status: str
+    caption: str | None
+    hashtags: list[Any] | None
+    media_urls: list[Any] | None
+    media_type: str | None
+    scheduled_at: datetime | None
+    published_at: datetime | None
+    platform_post_id: str | None
+    platform_url: str | None
+    compound_phase: str | None
+    created_by_agent: str | None
+    version: int
+    current_content_hash: str
+    scheduled_content_hash: str | None
+    published_content_hash: str | None
+    likes: int
+    comments: int
+    shares: int
+    impressions: int
+    reach: int
+    engagement_rate: float | None
+    lineage: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+    links: list[IntegrationLink]
+
+
 class IntegrationTaskEnvelope(BaseModel):
     resource_type: Literal["virtual_agency_task"] = "virtual_agency_task"
     id: uuid.UUID
@@ -274,6 +308,8 @@ class IntegrationEvidenceSummaryEnvelope(BaseModel):
     pending_approval_count: int
     access_request_count: int
     open_access_request_count: int
+    social_post_count: int = 0
+    social_post_status_counts: dict[str, int] = Field(default_factory=dict)
     evidence_hashes: dict[str, list[str]]
     links: list[IntegrationLink]
 

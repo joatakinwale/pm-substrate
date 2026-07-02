@@ -427,6 +427,8 @@ async def test_scheduling_agent_marks_posts_scheduled_for_publish_sweep(monkeypa
     assert posts[0].scheduled_at is not None
     assert posts[0].status == "scheduled"
     assert posts[0].scheduled_content_hash == social_post_content_hash(posts[0])
+    assert str(project.id) in (posts[0].internal_notes or "")
+    assert "orchestration_task_id" in (posts[0].internal_notes or "")
 
 
 @pytest.mark.asyncio

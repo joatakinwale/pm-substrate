@@ -638,9 +638,24 @@ def link_artifact_lineage(
             legacy_task_id=task.source_task_id or task.id,
             orchestration_task_id=task.id,
             artifact_id=getattr(artifact, "id", None),
+            engagement_id=_uuid_from_lineage(task.lineage, "engagement_id"),
+            marketing_run_id=_uuid_from_lineage(task.lineage, "marketing_run_id"),
         )
         if hasattr(artifact, "internal_notes"):
             artifact.internal_notes = f"Lineage: {_canonical_json(lineage)}"
+
+
+def _uuid_from_lineage(
+    lineage: dict[str, Any] | None,
+    key: str,
+) -> uuid.UUID | None:
+    value = dict(lineage or {}).get(key)
+    if value is None:
+        return None
+    try:
+        return uuid.UUID(str(value))
+    except ValueError:
+        return None
 
 
 def sync_legacy_task_completion(task: Task | None) -> None:

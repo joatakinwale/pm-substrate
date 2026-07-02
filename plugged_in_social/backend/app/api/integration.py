@@ -1,6 +1,7 @@
 """Neutral external integration API for PluggedInSocial agency state."""
 from __future__ import annotations
 
+import json
 import uuid
 from collections import Counter
 from typing import Any
@@ -17,6 +18,7 @@ from app.models.agency import (
     ClientEngagement,
     MarketingRun,
 )
+from app.models.social_media import SocialPost
 from app.models.virtual_agency import VirtualAgencyEvent, VirtualAgencyTask
 from app.schemas.agency import AgencyArtifactCreate
 from app.schemas.integration import (
@@ -41,6 +43,7 @@ from app.schemas.integration import (
     IntegrationQueueManifest,
     IntegrationRunDispatchEnvelope,
     IntegrationRunEventEnvelope,
+    IntegrationSocialPostEnvelope,
     IntegrationTaskEnvelope,
     IntegrationWebhookIngest,
 )
@@ -52,7 +55,10 @@ from app.services.agency_domain import (
     decide_approval_request,
     MarketingRunAccessGateError,
 )
-from app.services.virtual_agency_orchestration import AGENT_CAPABILITIES
+from app.services.virtual_agency_orchestration import (
+    AGENT_CAPABILITIES,
+    social_post_content_hash,
+)
 
 router = APIRouter(prefix="/integration/v1", tags=["integration"])
 
@@ -97,6 +103,10 @@ def _run_links(run_id: uuid.UUID) -> list[IntegrationLink]:
     return [
         _link("self", f"/api/integration/v1/marketing-runs/{run_id}"),
         _link("artifacts", f"/api/integration/v1/marketing-runs/{run_id}/artifacts"),
+        _link(
+            "social_posts",
+            f"/api/integration/v1/marketing-runs/{run_id}/social-posts",
+        ),
         _link("tasks", f"/api/integration/v1/marketing-runs/{run_id}/tasks"),
         _link("approvals", f"/api/integration/v1/marketing-runs/{run_id}/approvals"),
         _link(
@@ -184,6 +194,53 @@ def _to_artifact(item: AgencyArtifact) -> IntegrationArtifactEnvelope:
         links=[
             _link("engagement", f"/api/integration/v1/engagements/{item.engagement_id}"),
         ],
+    )
+
+
+def _social_post_lineage(item: SocialPost) -> dict[str, Any]:
+    notes = item.internal_notes or ""
+    prefix = "Lineage: "
+    if not notes.startswith(prefix):
+        return {}
+    try:
+        parsed = json.loads(notes[len(prefix):])
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _to_social_post(item: SocialPost) -> IntegrationSocialPostEnvelope:
+    return IntegrationSocialPostEnvelope(
+        id=item.id,
+        org_id=item.org_id,
+        project_id=item.project_id,
+        social_account_id=item.social_account_id,
+        platform=item.platform,
+        status=item.status,
+        caption=item.caption,
+        hashtags=list(item.hashtags or []) if item.hashtags is not None else None,
+        media_urls=list(item.media_urls or []) if item.media_urls is not None else None,
+        media_type=item.media_type,
+        scheduled_at=item.scheduled_at,
+        published_at=item.published_at,
+        platform_post_id=item.platform_post_id,
+        platform_url=item.platform_url,
+        compound_phase=item.compound_phase,
+        created_by_agent=item.created_by_agent,
+        version=item.version,
+        current_content_hash=social_post_content_hash(item),
+        scheduled_content_hash=item.scheduled_content_hash,
+        published_content_hash=item.published_content_hash,
+        likes=item.likes,
+        comments=item.comments,
+        shares=item.shares,
+        impressions=item.impressions,
+        reach=item.reach,
+        engagement_rate=item.engagement_rate,
+        lineage=_social_post_lineage(item),
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+        links=[],
     )
 
 
@@ -385,6 +442,11 @@ def _event_belongs_to_run(
     return _task_belongs_to_run(task, run)
 
 
+def _social_post_belongs_to_run(item: SocialPost, run: MarketingRun) -> bool:
+    lineage_run_id = str(_social_post_lineage(item).get("marketing_run_id") or "")
+    return bool(lineage_run_id) and lineage_run_id == str(run.id)
+
+
 async def _list_run_tasks(
     db: AsyncSession,
     *,
@@ -428,6 +490,29 @@ async def _list_run_events(
         if _event_belongs_to_run(event, task=task, run=run)
     ]
     return items[:limit] if limit is not None else items
+
+
+async def _list_run_social_posts(
+    db: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    run: MarketingRun,
+) -> list[SocialPost]:
+    if run.project_id is None:
+        return []
+    result = await db.execute(
+        select(SocialPost)
+        .where(
+            SocialPost.org_id == org_id,
+            SocialPost.project_id == run.project_id,
+        )
+        .order_by(SocialPost.created_at.desc())
+    )
+    return [
+        item
+        for item in result.scalars().all()
+        if _social_post_belongs_to_run(item, run)
+    ]
 
 
 def _count_by(items: list[Any], attr: str) -> dict[str, int]:
@@ -712,6 +797,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             capability_ids=["access_request.read"],
         ),
         IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/social-posts",
+            boundary="public_rls",
+            capability_ids=["social_post.read"],
+        ),
+        IntegrationEndpointManifest(
             method="POST",
             path="/api/internal/virtual-agency/task",
             boundary="internal_system_rls",
@@ -831,10 +922,12 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
             table="social_posts",
             resource_type="social_post",
             durable_evidence_fields=[
+                "current_content_hash",
                 "scheduled_content_hash",
                 "published_content_hash",
                 "platform_post_id",
                 "platform_url",
+                "lineage",
             ],
             read_capability_ids=["social_post.read"],
             write_capability_ids=["social_post.publish"],
@@ -1055,6 +1148,21 @@ async def list_run_artifacts(
 
 
 @router.get(
+    "/marketing-runs/{run_id}/social-posts",
+    response_model=list[IntegrationSocialPostEnvelope],
+)
+async def list_run_social_posts(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    run = await _get_run(db, org_id=org_id, run_id=run_id)
+    posts = await _list_run_social_posts(db, org_id=org_id, run=run)
+    return [_to_social_post(item) for item in posts]
+
+
+@router.get(
     "/marketing-runs/{run_id}/tasks",
     response_model=list[IntegrationTaskEnvelope],
 )
@@ -1168,6 +1276,7 @@ async def get_run_evidence_summary(
     tasks = await _list_run_tasks(db, org_id=org_id, run=run)
     events = await _list_run_events(db, org_id=org_id, run=run)
     event_items = [event for event, _task in events]
+    social_posts = await _list_run_social_posts(db, org_id=org_id, run=run)
 
     return IntegrationEvidenceSummaryEnvelope(
         run_id=run.id,
@@ -1186,6 +1295,8 @@ async def get_run_evidence_summary(
         open_access_request_count=sum(
             1 for item in access_requests if item.status in {"requested", "blocked"}
         ),
+        social_post_count=len(social_posts),
+        social_post_status_counts=_count_by(social_posts, "status"),
         evidence_hashes={
             "artifact_payload_hashes": sorted(
                 {item.payload_hash for item in artifacts if item.payload_hash}
@@ -1218,6 +1329,13 @@ async def get_run_evidence_summary(
             ),
             "task_latest_event_hashes": sorted(
                 {item.latest_event_hash for item in tasks if item.latest_event_hash}
+            ),
+            "social_post_content_hashes": sorted(
+                {
+                    social_post_content_hash(item)
+                    for item in social_posts
+                    if item.scheduled_content_hash or item.published_content_hash
+                }
             ),
         },
         links=_run_links(run.id),

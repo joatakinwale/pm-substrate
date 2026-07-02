@@ -244,6 +244,37 @@ export interface PluggedInSocialIntegrationAccessRequestEnvelope {
   readonly resolved_by_user_id: string | null;
 }
 
+export interface PluggedInSocialIntegrationSocialPostEnvelope {
+  readonly resource_type: "social_post";
+  readonly id: string;
+  readonly org_id: string;
+  readonly project_id: string | null;
+  readonly social_account_id: string;
+  readonly platform: string;
+  readonly status: string;
+  readonly caption: string | null;
+  readonly hashtags: readonly unknown[] | null;
+  readonly media_urls: readonly unknown[] | null;
+  readonly media_type: string | null;
+  readonly scheduled_at: string | null;
+  readonly published_at: string | null;
+  readonly platform_post_id: string | null;
+  readonly platform_url: string | null;
+  readonly compound_phase: string | null;
+  readonly created_by_agent: string | null;
+  readonly version: number;
+  readonly current_content_hash: string;
+  readonly scheduled_content_hash: string | null;
+  readonly published_content_hash: string | null;
+  readonly likes: number;
+  readonly comments: number;
+  readonly shares: number;
+  readonly impressions: number;
+  readonly reach: number;
+  readonly engagement_rate: number | null;
+  readonly lineage: Record<string, unknown>;
+}
+
 export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly resource_type: "marketing_run_evidence_summary";
   readonly run_id: string;
@@ -260,6 +291,8 @@ export interface PluggedInSocialIntegrationEvidenceSummaryEnvelope {
   readonly pending_approval_count: number;
   readonly access_request_count: number;
   readonly open_access_request_count: number;
+  readonly social_post_count: number;
+  readonly social_post_status_counts: Record<string, number>;
   readonly evidence_hashes: Record<string, readonly string[]>;
 }
 
@@ -273,6 +306,7 @@ export interface PluggedInSocialLiveRunEvidenceSnapshot {
   readonly artifacts: readonly PluggedInSocialIntegrationArtifactEnvelope[];
   readonly approvals: readonly PluggedInSocialIntegrationApprovalEnvelope[];
   readonly accessRequests: readonly PluggedInSocialIntegrationAccessRequestEnvelope[];
+  readonly socialPosts: readonly PluggedInSocialIntegrationSocialPostEnvelope[];
 }
 
 export interface PluggedInSocialLiveRunEvidenceFetchInput
@@ -338,6 +372,7 @@ const REQUIRED_LIVE_CAPABILITIES = [
   "event_timeline.read",
   "evidence_summary.read",
   "access_request.read",
+  "social_post.read",
   "approval.decide",
   "access_request.decide",
   "event.ingest",
@@ -482,6 +517,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
     artifacts,
     approvals,
     accessRequests,
+    socialPosts,
   ] = await Promise.all([
     fetchIntegrationJson<PluggedInSocialIntegrationCapabilityResponse>(
       client,
@@ -519,6 +555,10 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
       client,
       `${runPath}/access-requests`,
     ),
+    fetchIntegrationJson<PluggedInSocialIntegrationSocialPostEnvelope[]>(
+      client,
+      `${runPath}/social-posts`,
+    ),
   ]);
 
   return {
@@ -531,6 +571,7 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
     artifacts,
     approvals,
     accessRequests,
+    socialPosts,
   };
 }
 
@@ -637,6 +678,7 @@ function liveRunEvidenceIssues(
     artifacts,
     approvals,
     accessRequests,
+    socialPosts,
   } = snapshot;
 
   if (summary.run_id !== run.id) {
@@ -651,6 +693,7 @@ function liveRunEvidenceIssues(
     ...artifacts,
     ...approvals,
     ...accessRequests,
+    ...socialPosts,
   ]) {
     if (item.org_id !== run.org_id) {
       issues.add(`cross-org integration envelope detected: ${item.resource_type}`);
@@ -743,6 +786,12 @@ function liveRunEvidenceIssues(
   if (dispatchEndpoint?.boundary !== "public_rls") {
     issues.add("marketing run dispatch endpoint is not public-RLS scoped");
   }
+  const socialPostsEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/social-posts",
+  );
+  if (socialPostsEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run social-posts endpoint is not public-RLS scoped");
+  }
 
   const dataTables = new Set(
     platformManifest.data_resources.map((resource) => resource.table),
@@ -769,6 +818,21 @@ function liveRunEvidenceIssues(
     !marketingRunResource.write_capability_ids.includes("marketing_run.dispatch")
   ) {
     issues.add("marketing_runs resource lacks marketing_run.dispatch write capability");
+  }
+  const socialPostResource = platformManifest.data_resources.find(
+    (resource) => resource.table === "social_posts",
+  );
+  if (
+    socialPostResource !== undefined &&
+    !socialPostResource.durable_evidence_fields.includes("current_content_hash")
+  ) {
+    issues.add("social_posts resource lacks current_content_hash evidence field");
+  }
+  if (
+    socialPostResource !== undefined &&
+    !socialPostResource.durable_evidence_fields.includes("lineage")
+  ) {
+    issues.add("social_posts resource lacks lineage evidence field");
   }
 
   const configKeys = new Set(
@@ -817,6 +881,9 @@ function liveRunEvidenceIssues(
   if (accessRequests.length !== summary.access_request_count) {
     issues.add("access request response count does not match evidence summary count");
   }
+  if (socialPosts.length !== summary.social_post_count) {
+    issues.add("social post response count does not match evidence summary count");
+  }
 
   for (const [group, hashes] of Object.entries(summary.evidence_hashes)) {
     if (!Array.isArray(hashes)) {
@@ -838,6 +905,12 @@ function liveRunEvidenceIssues(
   ) {
     issues.add("missing evidence hashes: access_request_hashes");
   }
+  if (
+    summary.social_post_count > 0 &&
+    (summary.evidence_hashes.social_post_content_hashes ?? []).length === 0
+  ) {
+    issues.add("missing evidence hashes: social_post_content_hashes");
+  }
 
   const seenEventHashes = new Set<string>();
   for (const event of [...events].sort((a, b) =>
@@ -853,6 +926,36 @@ function liveRunEvidenceIssues(
       issues.add(`event references unseen previous hash: ${event.id}`);
     }
     seenEventHashes.add(event.event_hash);
+  }
+  for (const post of socialPosts) {
+    if (post.lineage.marketing_run_id !== run.id) {
+      issues.add(`social post is missing marketing-run lineage: ${post.id}`);
+    }
+    if (post.current_content_hash.length !== 64) {
+      issues.add(`social post missing current content hash: ${post.id}`);
+    }
+    if (
+      (post.status === "scheduled" || post.status === "published") &&
+      post.scheduled_content_hash === null
+    ) {
+      issues.add(`scheduled social post missing scheduled content hash: ${post.id}`);
+    }
+    if (
+      post.scheduled_content_hash !== null &&
+      post.scheduled_content_hash !== post.current_content_hash
+    ) {
+      issues.add(`social post scheduled content hash is stale: ${post.id}`);
+    }
+    if (post.status === "published" && post.published_content_hash === null) {
+      issues.add(`published social post missing published content hash: ${post.id}`);
+    }
+    if (
+      post.published_content_hash !== null &&
+      post.scheduled_content_hash !== null &&
+      post.published_content_hash !== post.scheduled_content_hash
+    ) {
+      issues.add(`published social post hash does not match schedule: ${post.id}`);
+    }
   }
 
   return [...issues].sort();
@@ -1108,6 +1211,13 @@ function liveRunEvidenceRefs(
         "source_record",
         `plugged_in_social:agency_access_requests:${request.id}`,
         `PluggedInSocial access gate: ${request.request_type}`,
+      ),
+    ),
+    ...snapshot.socialPosts.map((post) =>
+      stateRef(
+        "source_record",
+        `plugged_in_social:social_posts:${post.id}`,
+        `PluggedInSocial social post: ${post.platform}/${post.status}`,
       ),
     ),
     ...manifest.evidenceRefs.map(manifestRefToStateRef),

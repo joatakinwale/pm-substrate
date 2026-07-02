@@ -40,6 +40,7 @@ const liveEventHashA = "a".repeat(64);
 const liveEventHashB = "b".repeat(64);
 const liveArtifactHash = "c".repeat(64);
 const liveAccessRequestHash = "d".repeat(64);
+const liveSocialPostHash = "e".repeat(64);
 
 const closedLoopStages = [
   "intake",
@@ -68,6 +69,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "event_timeline.read",
         "evidence_summary.read",
         "access_request.read",
+        "social_post.read",
         "approval.decide",
         "access_request.decide",
         "event.ingest",
@@ -176,6 +178,12 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["access_request.read"],
         },
         {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/social-posts",
+          boundary: "public_rls",
+          capability_ids: ["social_post.read"],
+        },
+        {
           method: "POST",
           path: "/api/integration/v1/access-requests/{access_request_id}/decision",
           boundary: "public_rls",
@@ -251,7 +259,11 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           table: "social_posts",
           resource_type: "social_post",
           org_scoped: true,
-          durable_evidence_fields: ["scheduled_content_hash"],
+          durable_evidence_fields: [
+            "current_content_hash",
+            "scheduled_content_hash",
+            "lineage",
+          ],
           read_capability_ids: ["social_post.read"],
           write_capability_ids: ["social_post.publish"],
         },
@@ -320,11 +332,14 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       pending_approval_count: 0,
       access_request_count: 1,
       open_access_request_count: 0,
+      social_post_count: 1,
+      social_post_status_counts: { scheduled: 1 },
       evidence_hashes: {
         artifact_payload_hashes: [liveArtifactHash],
         access_request_hashes: [liveAccessRequestHash],
         event_hashes: [liveEventHashA, liveEventHashB],
         task_latest_event_hashes: [liveEventHashB],
+        social_post_content_hashes: [liveSocialPostHash],
       },
     },
     events: [
@@ -426,6 +441,38 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         },
         resolved_at: "2026-07-01T16:30:00.000Z",
         resolved_by_user_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      },
+    ],
+    socialPosts: [
+      {
+        resource_type: "social_post",
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        org_id: liveOrgId,
+        project_id: "33333333-3333-4333-8333-333333333333",
+        social_account_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        platform: "linkedin",
+        status: "scheduled",
+        caption: "Approved launch campaign draft",
+        hashtags: ["launch"],
+        media_urls: [],
+        media_type: null,
+        scheduled_at: "2026-07-02T16:00:00.000Z",
+        published_at: null,
+        platform_post_id: null,
+        platform_url: null,
+        compound_phase: "create",
+        created_by_agent: "content_creative",
+        version: 2,
+        current_content_hash: liveSocialPostHash,
+        scheduled_content_hash: liveSocialPostHash,
+        published_content_hash: null,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        impressions: 0,
+        reach: 0,
+        engagement_rate: null,
+        lineage: { marketing_run_id: liveRunId },
       },
     ],
   };
