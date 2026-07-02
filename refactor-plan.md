@@ -1,5 +1,7 @@
 # pm-substrate — Refactor Plan: lean agent-state core + PM-methodology governance
 
+> **Forward plan: [`ROADMAP.md`](./ROADMAP.md).** This document is the executed refactor charter, kept for history.
+>
 > **STATUS 2026-07-02 — EXECUTED.** Phases 0–2 complete and verified (852/859 tests
 > green on both core-only and tower-enabled databases; all four CI gates green;
 > amnesia headline: baseline 0% vs substrate 100%, chain valid). Phase 3

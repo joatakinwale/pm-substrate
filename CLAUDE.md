@@ -10,6 +10,8 @@ is not the source of truth; the continuity ledger is.
 PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate pnpm dev:resume
 ```
 
+Then read [`ROADMAP.md`](./ROADMAP.md) — north star, hard requirements, current phase.
+
 Read the briefing before doing anything: last handoff, open work, standing
 decisions, lessons, claims under test. Do not re-litigate standing decisions
 from chat memory — if you disagree, record a superseding `decision` checkpoint

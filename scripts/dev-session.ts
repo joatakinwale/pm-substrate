@@ -307,6 +307,25 @@ const main = async (): Promise<void> => {
           status: "open",
         },
         {
+          kind: "decision",
+          title: "ROADMAP.md is the single forward plan; the ledger is authoritative",
+          summary:
+            "2026-07-03: root ROADMAP.md carries north star (two labs viable, owner is customer #1), hard requirements (zero-rewrite kit, sidecar, MCP protocol edge, five-question control plane, shadow-first adoption, no unconsumed primitives) and phases D1-D7 with the 07-16 keep/kill gate. Old plans moved to docs/history/. If ledger and documents disagree, ledger wins.",
+        },
+        {
+          kind: "decision",
+          title: "Control plane must answer five questions from the admitted log",
+          summary:
+            "What is being done; what governance did (admitted/blocked/gated); what it cost (tokens per session/agent); what the results are (eval metric lanes); what got optimized (closed work + superseding decisions). Never from agent self-report. v0 = dev:status; v1 = dashboard page (D4).",
+        },
+        {
+          kind: "work",
+          title: "ArrowHedge executor + paired 12-metric run (D6)",
+          summary:
+            "Action executor mapping admitted portfolio decisions back into the backtest engine, then one paired run (gates off vs blocking): 0 false-positive blocks on fresh in-limit actions, 0 false-negatives on stale/source-conflicted ones, replayable event ids for every block.",
+          status: "open",
+        },
+        {
           kind: "work",
           title: "Control-plane dashboard page",
           summary:
