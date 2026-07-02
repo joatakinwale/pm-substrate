@@ -1635,6 +1635,13 @@ def _external_adapter_manifest() -> list[IntegrationExternalAdapterManifest]:
             output_artifacts=list(contract.output_artifacts),
             required_gates=list(contract.required_gates),
             evidence_fields=list(contract.evidence_fields),
+            source_url=contract.source_url,
+            source_commit=contract.source_commit,
+            compatible_protocols=list(contract.compatible_protocols),
+            runner_commands=list(contract.runner_commands),
+            provider_packages=list(contract.provider_packages),
+            required_event_types=list(contract.required_event_types),
+            required_result_shape=contract.required_result_shape,
             notes=dict(contract.notes),
         )
         for contract in list_external_adapter_contracts()
@@ -2187,9 +2194,13 @@ async def ingest_run_external_adapter_run(
             "required_gates": adapter.required_gates,
             "evidence_fields": adapter.evidence_fields,
             "output_artifacts": adapter.output_artifacts,
-            "compatible_protocols": adapter.notes.get("compatible_protocols", []),
-            "required_result_shape": adapter.notes.get("required_result_shape"),
-            "required_event_types": adapter.notes.get("required_event_types"),
+            "source_url": adapter.source_url,
+            "source_commit": adapter.source_commit,
+            "compatible_protocols": adapter.compatible_protocols,
+            "runner_commands": adapter.runner_commands,
+            "provider_packages": adapter.provider_packages,
+            "required_event_types": adapter.required_event_types,
+            "required_result_shape": adapter.required_result_shape,
         },
     }
     artifact_body = AgencyArtifactCreate(

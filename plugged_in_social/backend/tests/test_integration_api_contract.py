@@ -255,6 +255,13 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "output_artifacts",
         "required_gates",
         "evidence_fields",
+        "source_url",
+        "source_commit",
+        "compatible_protocols",
+        "runner_commands",
+        "provider_packages",
+        "required_event_types",
+        "required_result_shape",
         "notes",
     }.issubset(external_adapter_fields)
     assert {
@@ -1110,6 +1117,13 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         assert adapter.evidence_fields == list(contract.evidence_fields)
         assert adapter.input_contracts == list(contract.input_contracts)
         assert adapter.output_artifacts == list(contract.output_artifacts)
+        assert adapter.source_url == contract.source_url
+        assert adapter.source_commit == contract.source_commit
+        assert adapter.compatible_protocols == list(contract.compatible_protocols)
+        assert adapter.runner_commands == list(contract.runner_commands)
+        assert adapter.provider_packages == list(contract.provider_packages)
+        assert adapter.required_event_types == list(contract.required_event_types)
+        assert adapter.required_result_shape == contract.required_result_shape
     agent_adapter = next(
         adapter for adapter in manifest.external_adapters if adapter.id == "agent_harness"
     )
@@ -1123,12 +1137,13 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert "pi_spawn_request" in agent_adapter.input_contracts
     assert "agent_event_stream" in agent_adapter.output_artifacts
     assert "tool_execution_events" in agent_adapter.output_artifacts
-    assert "pi.orchestrator.spawn" in agent_adapter.notes["compatible_protocols"]
-    assert agent_adapter.notes["source_commit"] == (
+    assert "pi.orchestrator.spawn" in agent_adapter.compatible_protocols
+    assert agent_adapter.source_url == "https://github.com/earendil-works/pi"
+    assert agent_adapter.source_commit == (
         "e285e90fdbf9b05934ce90168156e2aa511d9a7c"
     )
-    assert "@earendil-works/pi-agent-core" in agent_adapter.notes["packages"]
-    assert "tool_execution_start" in agent_adapter.notes["required_event_types"]
+    assert "@earendil-works/pi-agent-core" in agent_adapter.provider_packages
+    assert "tool_execution_start" in agent_adapter.required_event_types
     assert "agent_event_hash" in agent_adapter.evidence_fields
     assert "tool_call_hash" in agent_adapter.evidence_fields
     assert browser_adapter.boundary == "sandboxed_process"
@@ -1137,12 +1152,13 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert "results_json" in browser_adapter.output_artifacts
     assert "network_har" in browser_adapter.output_artifacts
     assert "evidence_hash_gate" in browser_adapter.required_gates
-    assert "canary.session-start" in browser_adapter.notes["compatible_protocols"]
-    assert browser_adapter.notes["source_commit"] == (
+    assert "canary.session-start" in browser_adapter.compatible_protocols
+    assert browser_adapter.source_url == "https://github.com/LopeWale/canary"
+    assert browser_adapter.source_commit == (
         "36a29a052987aec11815422bd774368412e92b08"
     )
-    assert "canary session start" in browser_adapter.notes["commands"]
-    assert browser_adapter.notes["required_result_shape"]["artifacts"] == [
+    assert "canary session start" in browser_adapter.runner_commands
+    assert browser_adapter.required_result_shape["artifacts"] == [
         "kind",
         "path",
         "bytes",

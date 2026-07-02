@@ -1067,6 +1067,13 @@ export interface IntegrationExternalAdapter {
   output_artifacts: string[];
   required_gates: string[];
   evidence_fields: string[];
+  source_url: string;
+  source_commit: string;
+  compatible_protocols: string[];
+  runner_commands: string[];
+  provider_packages: string[];
+  required_event_types: string[];
+  required_result_shape: Record<string, unknown> | null;
   notes: Record<string, unknown>;
 }
 

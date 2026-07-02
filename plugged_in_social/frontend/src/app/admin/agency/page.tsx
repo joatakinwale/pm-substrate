@@ -1901,6 +1901,24 @@ export default function AgencyCommandCenterPage() {
                             <span>{adapter.output_artifacts.length} artifacts</span>
                             <span>{adapter.required_gates.length} gates</span>
                             <span>{adapter.evidence_fields.length} evidence fields</span>
+                            <span>{adapter.compatible_protocols.length} protocols</span>
+                            <span>{adapter.runner_commands.length} commands</span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5">
+                              {adapter.source_url.replace("https://github.com/", "")}
+                            </span>
+                            <span className="rounded bg-gray-100 px-1.5 py-0.5">
+                              {shortHash(adapter.source_commit)}
+                            </span>
+                            {adapter.compatible_protocols.slice(0, 3).map((protocol) => (
+                              <span
+                                key={`${adapter.id}:${protocol}`}
+                                className="rounded bg-gray-100 px-1.5 py-0.5"
+                              >
+                                {protocol}
+                              </span>
+                            ))}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-1.5">
                             {adapter.required_gates.slice(0, 6).map((gate) => (

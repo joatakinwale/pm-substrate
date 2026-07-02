@@ -99,6 +99,13 @@ class IntegrationExternalAdapterManifest(BaseModel):
     output_artifacts: list[str] = Field(default_factory=list)
     required_gates: list[str] = Field(default_factory=list)
     evidence_fields: list[str] = Field(default_factory=list)
+    source_url: str = Field(min_length=1)
+    source_commit: str = Field(min_length=40, max_length=64)
+    compatible_protocols: list[str] = Field(default_factory=list)
+    runner_commands: list[str] = Field(default_factory=list)
+    provider_packages: list[str] = Field(default_factory=list)
+    required_event_types: list[str] = Field(default_factory=list)
+    required_result_shape: dict[str, Any] | None = None
     notes: dict[str, Any] = Field(default_factory=dict)
 
 

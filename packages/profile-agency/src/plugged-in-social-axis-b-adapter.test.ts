@@ -809,6 +809,22 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         "durable_event_hash",
       ],
       evidence_fields: ["session_id", "output_payload_hash"],
+      source_url: "https://github.com/earendil-works/pi",
+      source_commit: "e285e90fdbf9b05934ce90168156e2aa511d9a7c",
+      compatible_protocols: [
+        "pi.orchestrator.spawn",
+        "pi.orchestrator.rpc",
+        "pi.agent_event_stream",
+      ],
+      runner_commands: [],
+      provider_packages: ["@earendil-works/pi-agent-core"],
+      required_event_types: [
+        "agent_start",
+        "tool_execution_start",
+        "tool_execution_end",
+        "agent_end",
+      ],
+      required_result_shape: null,
       notes: { inspired_by: "pi" },
     };
     const platformManifest = {

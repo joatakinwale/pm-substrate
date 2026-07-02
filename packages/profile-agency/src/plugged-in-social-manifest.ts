@@ -113,6 +113,13 @@ export interface PluggedInSocialExternalAdapterManifest {
   readonly outputArtifacts: readonly string[];
   readonly requiredGates: readonly string[];
   readonly evidenceFields: readonly string[];
+  readonly sourceUrl: string;
+  readonly sourceCommit: string;
+  readonly compatibleProtocols: readonly string[];
+  readonly runnerCommands: readonly string[];
+  readonly providerPackages: readonly string[];
+  readonly requiredEventTypes: readonly string[];
+  readonly requiredResultShape: Record<string, unknown> | null;
 }
 
 export interface PluggedInSocialDataModelManifest {
@@ -419,6 +426,9 @@ function buildExternalAdapters(
     contractSource.includes("EXTERNAL_ADAPTER_CONTRACTS") &&
     contractSource.includes("ExternalAdapterContract") &&
     schemaSource.includes("IntegrationExternalAdapterManifest") &&
+    schemaSource.includes("source_url") &&
+    schemaSource.includes("compatible_protocols") &&
+    schemaSource.includes("required_result_shape") &&
     schemaSource.includes("IntegrationExternalAdapterRunIngest") &&
     schemaSource.includes("external_adapters") &&
     apiSource.includes("_external_adapter_manifest") &&
@@ -445,6 +455,9 @@ function buildExternalAdapters(
       "no_secret_exfiltration",
       "playwright_script_hash",
       "console_error_count",
+      "source_url",
+      "compatible_protocols",
+      "required_result_shape",
     ])
   ) {
     adapters.push({
@@ -499,6 +512,26 @@ function buildExternalAdapters(
         "screenshot_hashes",
         "console_error_count",
       ],
+      sourceUrl: "https://github.com/LopeWale/canary",
+      sourceCommit: "36a29a052987aec11815422bd774368412e92b08",
+      compatibleProtocols: [
+        "canary.session-start",
+        "canary.execute",
+        "canary.session-end",
+      ],
+      runnerCommands: [
+        "canary session start",
+        "canary run",
+        "canary session end",
+        "canary-browser",
+      ],
+      providerPackages: [],
+      requiredEventTypes: [],
+      requiredResultShape: {
+        session: ["sessionId", "phase", "runCount", "artifactsDir"],
+        artifacts: ["kind", "path", "bytes"],
+        artifact_kinds: ["trace", "video", "har", "console", "screenshot"],
+      },
     });
   }
 
@@ -516,6 +549,9 @@ function buildExternalAdapters(
       "durable_event_hash",
       "tool_call_hash",
       "output_payload_hash",
+      "source_url",
+      "compatible_protocols",
+      "required_event_types",
     ])
   ) {
     adapters.push({
@@ -569,6 +605,30 @@ function buildExternalAdapters(
         "approval_payload_hash",
         "output_payload_hash",
       ],
+      sourceUrl: "https://github.com/earendil-works/pi",
+      sourceCommit: "e285e90fdbf9b05934ce90168156e2aa511d9a7c",
+      compatibleProtocols: [
+        "pi.orchestrator.spawn",
+        "pi.orchestrator.rpc",
+        "pi.agent_event_stream",
+      ],
+      runnerCommands: [],
+      providerPackages: [
+        "@earendil-works/pi-agent-core",
+        "@earendil-works/pi-coding-agent",
+        "@earendil-works/pi-ai",
+      ],
+      requiredEventTypes: [
+        "agent_start",
+        "turn_start",
+        "message_start",
+        "message_end",
+        "tool_execution_start",
+        "tool_execution_end",
+        "turn_end",
+        "agent_end",
+      ],
+      requiredResultShape: null,
     });
   }
 
@@ -1046,6 +1106,11 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       externalAdapterContracts.includes("no_secret_exfiltration") &&
       externalAdapterContracts.includes("tool_call_hash") &&
       externalAdapterContracts.includes("network_har") &&
+      externalAdapterContracts.includes("source_url") &&
+      externalAdapterContracts.includes("source_commit") &&
+      externalAdapterContracts.includes("compatible_protocols") &&
+      externalAdapterContracts.includes("runner_commands") &&
+      externalAdapterContracts.includes("required_event_types") &&
       integrationApi.includes('"/marketing-runs/{run_id}/external-adapter-runs"') &&
       integrationApi.includes("external_adapter_run.read") &&
       integrationApi.includes("external_adapter_run.ingest") &&
@@ -1054,6 +1119,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes("external_adapter_idempotency_conflict") &&
       integrationApi.includes("external_adapter_run_hashes") &&
       integrationSchemas.includes("IntegrationExternalAdapterManifest") &&
+      integrationSchemas.includes("source_url") &&
+      integrationSchemas.includes("source_commit") &&
+      integrationSchemas.includes("compatible_protocols") &&
+      integrationSchemas.includes("required_result_shape") &&
       integrationSchemas.includes("IntegrationExternalAdapterRunIngest") &&
       integrationSchemas.includes("idempotency_key or adapter_run_id is required") &&
       integrationSchemas.includes("external_adapters") &&
@@ -1072,6 +1141,9 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       frontendApi.includes("export interface IntegrationRunEvidenceSnapshot") &&
       frontendApi.includes("export interface IntegrationClientReport") &&
       frontendApi.includes("export interface IntegrationExternalAdapter") &&
+      frontendApi.includes("source_url: string") &&
+      frontendApi.includes("compatible_protocols: string[]") &&
+      frontendApi.includes("required_result_shape: Record<string, unknown> | null") &&
       frontendApi.includes("listIntegrationRunTasks") &&
       frontendApi.includes("getIntegrationRunEvidenceSnapshot") &&
       frontendApi.includes("listIntegrationExternalAdapters") &&
@@ -1095,6 +1167,8 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       agencyCommandCenter.includes("openAccessRequestCount > 0") &&
       agencyCommandCenter.includes("CLOSED_LOOP_STAGES") &&
       agencyCommandCenter.includes("externalAdapters") &&
+      agencyCommandCenter.includes("adapter.compatible_protocols") &&
+      agencyCommandCenter.includes("adapter.source_commit") &&
       agencyCommandCenter.includes("externalAdapterRuns") &&
       agencyCommandCenter.includes("Adapter Run Evidence") &&
       agencyCommandCenter.includes("external_adapter_run") &&

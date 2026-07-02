@@ -1,7 +1,7 @@
 """Shared external adapter contracts for autonomous agency orchestration."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 
@@ -27,12 +27,27 @@ class ExternalAdapterContract:
     output_artifacts: tuple[str, ...]
     required_gates: tuple[str, ...]
     evidence_fields: tuple[str, ...]
-    notes: dict[str, Any]
+    source_url: str
+    source_commit: str
+    compatible_protocols: tuple[str, ...]
+    runner_commands: tuple[str, ...] = ()
+    provider_packages: tuple[str, ...] = ()
+    required_event_types: tuple[str, ...] = ()
+    required_result_shape: dict[str, Any] | None = None
+    notes: dict[str, Any] = field(default_factory=dict)
 
     def strategy_requirement(self) -> dict[str, Any]:
         return {
             "adapter_id": self.id,
             "purpose": self.purpose,
+            "adapter_source": {
+                "source_url": self.source_url,
+                "source_commit": self.source_commit,
+            },
+            "compatible_protocols": list(self.compatible_protocols),
+            "runner_commands": list(self.runner_commands),
+            "required_event_types": list(self.required_event_types),
+            "required_result_shape": self.required_result_shape,
             "input_contracts": list(self.input_contracts),
             "expected_output_artifacts": list(self.output_artifacts),
             "required_gates": list(self.required_gates),
@@ -105,38 +120,38 @@ EXTERNAL_ADAPTER_CONTRACTS: tuple[ExternalAdapterContract, ...] = (
             "screenshot_hashes",
             "console_error_count",
         ),
+        source_url="https://github.com/LopeWale/canary",
+        source_commit="36a29a052987aec11815422bd774368412e92b08",
+        compatible_protocols=(
+            "canary.session-start",
+            "canary.execute",
+            "canary.session-end",
+        ),
+        runner_commands=(
+            "canary session start",
+            "canary run",
+            "canary session end",
+            "canary-browser",
+        ),
+        required_result_shape={
+            "session": [
+                "sessionId",
+                "phase",
+                "runCount",
+                "artifactsDir",
+            ],
+            "artifacts": ["kind", "path", "bytes"],
+            "artifact_kinds": [
+                "trace",
+                "video",
+                "har",
+                "console",
+                "screenshot",
+            ],
+        },
         notes={
             "inspired_by": "canary",
             "coupling": "adapter_contract_only",
-            "source": "https://github.com/LopeWale/canary",
-            "source_commit": "36a29a052987aec11815422bd774368412e92b08",
-            "commands": [
-                "canary session start",
-                "canary run",
-                "canary session end",
-                "canary-browser",
-            ],
-            "compatible_protocols": [
-                "canary.session-start",
-                "canary.execute",
-                "canary.session-end",
-            ],
-            "required_result_shape": {
-                "session": [
-                    "sessionId",
-                    "phase",
-                    "runCount",
-                    "artifactsDir",
-                ],
-                "artifacts": ["kind", "path", "bytes"],
-                "artifact_kinds": [
-                    "trace",
-                    "video",
-                    "har",
-                    "console",
-                    "screenshot",
-                ],
-            },
         },
     ),
     ExternalAdapterContract(
@@ -209,31 +224,31 @@ EXTERNAL_ADAPTER_CONTRACTS: tuple[ExternalAdapterContract, ...] = (
             "approval_payload_hash",
             "output_payload_hash",
         ),
+        source_url="https://github.com/earendil-works/pi",
+        source_commit="e285e90fdbf9b05934ce90168156e2aa511d9a7c",
+        compatible_protocols=(
+            "pi.orchestrator.spawn",
+            "pi.orchestrator.rpc",
+            "pi.agent_event_stream",
+        ),
+        provider_packages=(
+            "@earendil-works/pi-agent-core",
+            "@earendil-works/pi-coding-agent",
+            "@earendil-works/pi-ai",
+        ),
+        required_event_types=(
+            "agent_start",
+            "turn_start",
+            "message_start",
+            "message_end",
+            "tool_execution_start",
+            "tool_execution_end",
+            "turn_end",
+            "agent_end",
+        ),
         notes={
             "inspired_by": "pi",
             "coupling": "adapter_contract_only",
-            "source": "https://github.com/earendil-works/pi",
-            "source_commit": "e285e90fdbf9b05934ce90168156e2aa511d9a7c",
-            "packages": [
-                "@earendil-works/pi-agent-core",
-                "@earendil-works/pi-coding-agent",
-                "@earendil-works/pi-ai",
-            ],
-            "compatible_protocols": [
-                "pi.orchestrator.spawn",
-                "pi.orchestrator.rpc",
-                "pi.agent_event_stream",
-            ],
-            "required_event_types": [
-                "agent_start",
-                "turn_start",
-                "message_start",
-                "message_end",
-                "tool_execution_start",
-                "tool_execution_end",
-                "turn_end",
-                "agent_end",
-            ],
             "security": (
                 "External harnesses without built-in permission systems must run "
                 "behind PluggedInSocial gates and a containerized boundary."

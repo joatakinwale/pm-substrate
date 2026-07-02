@@ -146,6 +146,13 @@ export interface PluggedInSocialIntegrationExternalAdapterManifest {
   readonly output_artifacts: readonly string[];
   readonly required_gates: readonly string[];
   readonly evidence_fields: readonly string[];
+  readonly source_url?: string;
+  readonly source_commit?: string;
+  readonly compatible_protocols?: readonly string[];
+  readonly runner_commands?: readonly string[];
+  readonly provider_packages?: readonly string[];
+  readonly required_event_types?: readonly string[];
+  readonly required_result_shape?: Record<string, unknown> | null;
   readonly notes: Record<string, unknown>;
 }
 
@@ -1329,6 +1336,30 @@ function liveRunEvidenceIssues(
   for (const gate of REQUIRED_LIVE_GOVERNANCE_GATES) {
     if (!platformManifest.governance_gates.includes(gate)) {
       issues.add(`missing platform governance gate: ${gate}`);
+    }
+  }
+  for (const adapter of platformManifest.external_adapters ?? []) {
+    if (adapter.source_url === undefined || adapter.source_url.length === 0) {
+      issues.add(`external adapter missing source_url: ${adapter.id}`);
+    }
+    if (adapter.source_commit === undefined || adapter.source_commit.length < 40) {
+      issues.add(`external adapter missing source_commit: ${adapter.id}`);
+    }
+    if ((adapter.compatible_protocols ?? []).length === 0) {
+      issues.add(`external adapter missing compatible protocols: ${adapter.id}`);
+    }
+    if (
+      adapter.adapter_type === "browser_qa_harness" &&
+      (adapter.required_result_shape === undefined ||
+        adapter.required_result_shape === null)
+    ) {
+      issues.add(`browser QA adapter missing required result shape: ${adapter.id}`);
+    }
+    if (
+      adapter.adapter_type === "agent_harness" &&
+      (adapter.required_event_types ?? []).length === 0
+    ) {
+      issues.add(`agent harness adapter missing required event types: ${adapter.id}`);
     }
   }
 

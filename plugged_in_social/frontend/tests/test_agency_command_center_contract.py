@@ -20,6 +20,11 @@ def test_agency_api_types_and_helpers_are_declared():
     assert "export interface IntegrationStrategyAdapterReadiness" in source
     assert "adapter_readiness: IntegrationStrategyAdapterReadiness" in source
     assert "export interface IntegrationExternalAdapter" in source
+    assert "source_url: string" in source
+    assert "source_commit: string" in source
+    assert "compatible_protocols: string[]" in source
+    assert "runner_commands: string[]" in source
+    assert "required_result_shape: Record<string, unknown> | null" in source
     assert "export async function listClientEngagements" in source
     assert "export async function createClientEngagement" in source
     assert "export async function createMarketingRun" in source
@@ -78,6 +83,10 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "next_action" in source
     assert "runTasks" in source
     assert "externalAdapters" in source
+    assert "adapter.compatible_protocols" in source
+    assert "adapter.runner_commands" in source
+    assert "adapter.source_url" in source
+    assert "adapter.source_commit" in source
     assert "externalAdapterRuns" in source
     assert "Adapter Run Evidence" in source
     assert "external_adapter_run" in source

@@ -315,6 +315,20 @@ describe("PluggedInSocial source manifest", () => {
             "tool_call_hash",
             "output_payload_hash",
           ]),
+          sourceUrl: "https://github.com/earendil-works/pi",
+          sourceCommit: "e285e90fdbf9b05934ce90168156e2aa511d9a7c",
+          compatibleProtocols: expect.arrayContaining([
+            "pi.orchestrator.spawn",
+            "pi.agent_event_stream",
+          ]),
+          providerPackages: expect.arrayContaining([
+            "@earendil-works/pi-agent-core",
+          ]),
+          requiredEventTypes: expect.arrayContaining([
+            "agent_start",
+            "tool_execution_start",
+            "agent_end",
+          ]),
         }),
         expect.objectContaining({
           id: "browser_qa_harness",
@@ -336,6 +350,19 @@ describe("PluggedInSocial source manifest", () => {
             "playwright_script_hash",
             "console_error_count",
           ]),
+          sourceUrl: "https://github.com/LopeWale/canary",
+          sourceCommit: "36a29a052987aec11815422bd774368412e92b08",
+          compatibleProtocols: expect.arrayContaining([
+            "canary.session-start",
+            "canary.execute",
+          ]),
+          runnerCommands: expect.arrayContaining([
+            "canary session start",
+            "canary run",
+          ]),
+          requiredResultShape: expect.objectContaining({
+            artifacts: ["kind", "path", "bytes"],
+          }),
         }),
       ]),
     );
