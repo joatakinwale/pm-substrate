@@ -8,6 +8,7 @@ const deployScript = read("scripts/deploy.sh");
 const queueProducerSource = read("workers/queue-producer/src/index.ts");
 const queueProducerConfig = read("workers/queue-producer/wrangler.toml");
 const virtualAgencyConfig = read("workers/virtual-agency/wrangler.toml");
+const virtualAgencyReadme = read("workers/virtual-agency/README.md");
 
 const queues = extractBashArray(deployScript, "QUEUES");
 const workers = extractBashArray(deployScript, "WORKERS");
@@ -82,6 +83,31 @@ requireConsumer(stagingVirtualAgencyConsumers, {
 
 if (producerAllowList.get("stevie-virtual-agency") !== "QUEUE_VIRTUAL_AGENCY") {
   failures.push("stevie-virtual-agency must map to QUEUE_VIRTUAL_AGENCY");
+}
+
+for (const required of [
+  "virtual_agency.task",
+  "stevie-virtual-agency",
+  "stevie-virtual-agency-dlq",
+  "/api/internal/virtual-agency/task",
+  "pnpm validate:deploy",
+]) {
+  if (!virtualAgencyReadme.includes(required)) {
+    failures.push(`virtual-agency README missing ${required}`);
+  }
+}
+
+for (const forbidden of [
+  "stevie-automation-runner",
+  "automation_tasks.py",
+  "/api/internal/automations",
+]) {
+  if (virtualAgencyReadme.includes(forbidden)) {
+    failures.push(`virtual-agency README still references ${forbidden}`);
+  }
+  if (virtualAgencyConfig.includes(forbidden)) {
+    failures.push(`virtual-agency wrangler.toml still references ${forbidden}`);
+  }
 }
 
 if (failures.length > 0) {
