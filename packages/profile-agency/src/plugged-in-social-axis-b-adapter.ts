@@ -64,7 +64,9 @@ export interface PluggedInSocialIntegrationFetchResponse {
 export type PluggedInSocialIntegrationFetch = (
   url: string,
   init?: {
+    readonly method?: string;
     readonly headers?: Record<string, string>;
+    readonly body?: string;
   },
 ) => Promise<PluggedInSocialIntegrationFetchResponse>;
 
@@ -129,6 +131,24 @@ export interface PluggedInSocialIntegrationConfigurationRequirement {
   readonly required_for: readonly string[];
 }
 
+export interface PluggedInSocialIntegrationExternalAdapterManifest {
+  readonly id: string;
+  readonly name: string;
+  readonly adapter_type: "browser_qa_harness" | "agent_harness";
+  readonly boundary:
+    | "external_process"
+    | "sandboxed_process"
+    | "containerized_process"
+    | "hosted_service";
+  readonly description: string;
+  readonly capabilities: readonly string[];
+  readonly input_contracts: readonly string[];
+  readonly output_artifacts: readonly string[];
+  readonly required_gates: readonly string[];
+  readonly evidence_fields: readonly string[];
+  readonly notes: Record<string, unknown>;
+}
+
 export interface PluggedInSocialIntegrationPlatformManifestEnvelope {
   readonly resource_type: "plugged_in_social_platform_manifest";
   readonly version: "v1";
@@ -140,6 +160,25 @@ export interface PluggedInSocialIntegrationPlatformManifestEnvelope {
   readonly api_endpoints: readonly PluggedInSocialIntegrationEndpointManifest[];
   readonly data_resources: readonly PluggedInSocialIntegrationDataResourceManifest[];
   readonly configuration_requirements: readonly PluggedInSocialIntegrationConfigurationRequirement[];
+  readonly external_adapters?: readonly PluggedInSocialIntegrationExternalAdapterManifest[];
+}
+
+export interface PluggedInSocialIntegrationEngagementEnvelope {
+  readonly resource_type: "client_engagement";
+  readonly id: string;
+  readonly org_id: string;
+  readonly lead_id: string | null;
+  readonly project_id: string | null;
+  readonly name: string;
+  readonly client_url: string | null;
+  readonly repo_url: string | null;
+  readonly status: string;
+  readonly goals: readonly unknown[];
+  readonly constraints: readonly unknown[];
+  readonly intake_payload: Record<string, unknown>;
+  readonly integration_state: Record<string, unknown>;
+  readonly created_at: string;
+  readonly updated_at: string;
 }
 
 export interface PluggedInSocialIntegrationMarketingRunEnvelope {
@@ -379,6 +418,32 @@ export interface PluggedInSocialAxisBLiveRunEvidenceAdapterResult {
   readonly substrateRefs: readonly StateRef[];
 }
 
+export interface PluggedInSocialNeutralApiSmokeEvalInput
+  extends PluggedInSocialIntegrationClientInput {
+  readonly name?: string;
+  readonly clientUrl: string;
+  readonly repoUrl?: string;
+  readonly objective: string;
+  readonly goals?: readonly string[];
+  readonly constraints?: readonly string[];
+  readonly intakePayload?: Record<string, unknown>;
+  readonly adapterId?: string;
+  readonly adapterRunId?: string;
+  readonly workspaceRoot?: string;
+  readonly sourcePath?: string;
+  readonly manifest?: PluggedInSocialSourceManifest;
+}
+
+export interface PluggedInSocialNeutralApiSmokeEvalResult {
+  readonly ready: boolean;
+  readonly issues: readonly string[];
+  readonly engagement: PluggedInSocialIntegrationEngagementEnvelope;
+  readonly run: PluggedInSocialIntegrationMarketingRunEnvelope;
+  readonly adapterArtifact: PluggedInSocialIntegrationArtifactEnvelope;
+  readonly snapshot: PluggedInSocialLiveRunEvidenceSnapshot;
+  readonly liveRunEvidenceAdapterResult: PluggedInSocialAxisBLiveRunEvidenceAdapterResult;
+}
+
 export class PluggedInSocialIntegrationFetchError extends Error {
   readonly url: string;
   readonly status: number;
@@ -588,6 +653,152 @@ export async function fetchPluggedInSocialLiveRunEvidenceSnapshot(
     accessRequests: runSnapshot.access_requests,
     socialPosts: runSnapshot.social_posts,
     reports: runSnapshot.reports,
+  };
+}
+
+export async function runPluggedInSocialNeutralApiSmokeEval(
+  input: PluggedInSocialNeutralApiSmokeEvalInput,
+): Promise<PluggedInSocialNeutralApiSmokeEvalResult> {
+  const client = buildIntegrationClient(input);
+  const [
+    capabilities,
+    platformManifest,
+  ] = await Promise.all([
+    fetchIntegrationJson<PluggedInSocialIntegrationCapabilityResponse>(
+      client,
+      "/capabilities",
+    ),
+    fetchIntegrationJson<PluggedInSocialIntegrationPlatformManifestEnvelope>(
+      client,
+      "/platform-manifest",
+    ),
+  ]);
+  const adapterId = input.adapterId ?? "agent_harness";
+  const adapter = (platformManifest.external_adapters ?? []).find(
+    (item) => item.id === adapterId,
+  );
+  if (adapter === undefined) {
+    throw new Error(`PluggedInSocial external adapter not found: ${adapterId}`);
+  }
+  const engagement =
+    await requestIntegrationJson<PluggedInSocialIntegrationEngagementEnvelope>(
+      client,
+      "/engagements",
+      {
+        method: "POST",
+        body: {
+          name: input.name ?? "Axis B neutral API smoke eval",
+          client_url: input.clientUrl,
+          ...(input.repoUrl === undefined ? {} : { repo_url: input.repoUrl }),
+          goals: input.goals ?? ["Validate autonomous marketing orchestration"],
+          constraints: input.constraints ?? ["Respect tenant and approval gates"],
+          intake_payload: {
+            source: "pm_substrate_axis_b_smoke_eval",
+            client_url: input.clientUrl,
+            ...(input.repoUrl === undefined ? {} : { repo_url: input.repoUrl }),
+            ...(input.intakePayload ?? {}),
+          },
+        },
+      },
+    );
+  const run = await requestIntegrationJson<PluggedInSocialIntegrationMarketingRunEnvelope>(
+    client,
+    `/engagements/${encodeURIComponent(engagement.id)}/marketing-runs`,
+    {
+      method: "POST",
+      body: {
+        objective: input.objective,
+        project_id: engagement.project_id,
+      },
+    },
+  );
+  const gateResults = Object.fromEntries(
+    adapter.required_gates.map((gate) => [gate, true]),
+  ) as Record<string, boolean>;
+  const adapterArtifact =
+    await requestIntegrationJson<PluggedInSocialIntegrationArtifactEnvelope>(
+      client,
+      `/marketing-runs/${encodeURIComponent(run.id)}/external-adapter-runs`,
+      {
+        method: "POST",
+        body: {
+          adapter_id: adapter.id,
+          adapter_run_id:
+            input.adapterRunId ?? `axis-b-smoke:${run.id}:${adapter.id}`,
+          status: "succeeded",
+          gate_results: gateResults,
+          input_refs: [
+            {
+              kind: "source_record",
+              id: `plugged_in_social:marketing_runs:${run.id}`,
+              label: "PluggedInSocial marketing run",
+            },
+          ],
+          output_artifacts: [
+            {
+              kind: "axis_b_smoke_eval",
+              run_id: run.id,
+              adapter_id: adapter.id,
+            },
+          ],
+          evidence: {
+            adapter_boundary: adapter.boundary,
+            required_gate_count: adapter.required_gates.length,
+          },
+          metrics: {
+            checked_endpoint_count: 6,
+          },
+          idempotency_key: `axis-b-smoke:${run.id}:${adapter.id}`,
+        },
+      },
+    );
+  const runSnapshot =
+    await fetchIntegrationJson<PluggedInSocialIntegrationRunEvidenceSnapshotEnvelope>(
+      client,
+      `/marketing-runs/${encodeURIComponent(run.id)}/evidence-snapshot`,
+    );
+  const snapshot: PluggedInSocialLiveRunEvidenceSnapshot = {
+    capabilities,
+    platformManifest,
+    run: runSnapshot.run,
+    summary: runSnapshot.summary,
+    events: runSnapshot.events,
+    tasks: runSnapshot.tasks,
+    artifacts: runSnapshot.artifacts,
+    approvals: runSnapshot.approvals,
+    accessRequests: runSnapshot.access_requests,
+    socialPosts: runSnapshot.social_posts,
+    reports: runSnapshot.reports,
+  };
+  const liveRunEvidenceAdapterResult =
+    buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult({
+      snapshot,
+      ...(input.workspaceRoot === undefined
+        ? {}
+        : { workspaceRoot: input.workspaceRoot }),
+      ...(input.sourcePath === undefined ? {} : { sourcePath: input.sourcePath }),
+      ...(input.manifest === undefined ? {} : { manifest: input.manifest }),
+    });
+  const issues = new Set<string>(liveRunEvidenceAdapterResult.issues);
+  if (!snapshot.artifacts.some((artifact) => artifact.id === adapterArtifact.id)) {
+    issues.add("external adapter run artifact missing from evidence snapshot");
+  }
+  if (
+    !(
+      snapshot.summary.evidence_hashes.external_adapter_run_hashes ?? []
+    ).includes(adapterArtifact.payload_hash)
+  ) {
+    issues.add("external adapter run hash missing from evidence summary");
+  }
+
+  return {
+    ready: issues.size === 0,
+    issues: [...issues].sort(),
+    engagement,
+    run,
+    adapterArtifact,
+    snapshot,
+    liveRunEvidenceAdapterResult,
   };
 }
 
@@ -1050,6 +1261,15 @@ function liveRunEvidenceIssues(
   ) {
     issues.add("missing evidence hashes: client_report_metrics_hashes");
   }
+  const externalAdapterRunArtifacts = artifacts.filter(
+    (artifact) => artifact.artifact_type === "external_adapter_run",
+  );
+  if (
+    externalAdapterRunArtifacts.length > 0 &&
+    (summary.evidence_hashes.external_adapter_run_hashes ?? []).length === 0
+  ) {
+    issues.add("missing evidence hashes: external_adapter_run_hashes");
+  }
 
   const seenEventHashes = new Set<string>();
   for (const event of [...events].sort((a, b) =>
@@ -1108,6 +1328,17 @@ function liveRunEvidenceIssues(
     }
     if (report.report_hash.length !== 64) {
       issues.add(`client report missing report hash: ${report.id}`);
+    }
+  }
+  for (const artifact of externalAdapterRunArtifacts) {
+    if (artifact.marketing_run_id !== run.id) {
+      issues.add(`external adapter run is outside marketing run: ${artifact.id}`);
+    }
+    if (artifact.payload_hash.length !== 64) {
+      issues.add(`external adapter run missing payload hash: ${artifact.id}`);
+    }
+    if (artifact.lineage.adapter_id === undefined) {
+      issues.add(`external adapter run missing adapter lineage: ${artifact.id}`);
     }
   }
 
@@ -1291,8 +1522,33 @@ async function fetchIntegrationJson<T>(
   },
   path: string,
 ): Promise<T> {
+  return requestIntegrationJson<T>(client, path);
+}
+
+async function requestIntegrationJson<T>(
+  client: {
+    readonly baseUrl: string;
+    readonly fetchFn: PluggedInSocialIntegrationFetch;
+    readonly headers: Record<string, string>;
+  },
+  path: string,
+  options: {
+    readonly method?: string;
+    readonly body?: Record<string, unknown>;
+  } = {},
+): Promise<T> {
   const url = `${client.baseUrl}${path}`;
-  const response = await client.fetchFn(url, { headers: client.headers });
+  const headers =
+    options.body === undefined
+      ? client.headers
+      : { ...client.headers, "content-type": "application/json" };
+  const response = await client.fetchFn(url, {
+    headers,
+    ...(options.method === undefined ? {} : { method: options.method }),
+    ...(options.body === undefined
+      ? {}
+      : { body: JSON.stringify(options.body) }),
+  });
   if (!response.ok) {
     let body = "";
     try {

@@ -6,6 +6,7 @@ import {
   buildPluggedInSocialAxisBNextActionAdapterResult,
   buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult,
   fetchPluggedInSocialLiveRunEvidenceSnapshot,
+  runPluggedInSocialNeutralApiSmokeEval,
   type PluggedInSocialIntegrationFetch,
   type PluggedInSocialIntegrationFetchResponse,
   type PluggedInSocialLiveRunEvidenceSnapshot,
@@ -40,6 +41,7 @@ const liveAccessRequestHash = "d".repeat(64);
 const liveSocialPostHash = "e".repeat(64);
 const liveReportHash = "f".repeat(64);
 const liveReportMetricsHash = "a1".repeat(32);
+const liveExternalAdapterRunHash = "b1".repeat(32);
 
 function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
   return {
@@ -771,6 +773,195 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
           id: `plugged_in_social:marketing_runs:${liveRunId}:live-axis-b-review`,
         }),
       ]),
+    );
+  });
+
+  it("runs a neutral API smoke eval from intake through external adapter evidence", async () => {
+    const snapshot = liveSnapshotFixture();
+    const externalAdapter = {
+      id: "agent_harness",
+      name: "External agent harness",
+      adapter_type: "agent_harness" as const,
+      boundary: "containerized_process" as const,
+      description: "Executes external agent loops against approved task contracts.",
+      capabilities: ["tool_calling"],
+      input_contracts: ["virtual_agency_task", "approval_payload_hash"],
+      output_artifacts: ["agent_session_tree", "next_action_proposal"],
+      required_gates: [
+        "tenant_rls",
+        "capability_gate",
+        "approval_payload_hash",
+        "content_hash_gate",
+        "sandbox_boundary",
+        "durable_event_hash",
+      ],
+      evidence_fields: ["session_id", "output_payload_hash"],
+      notes: { inspired_by: "pi" },
+    };
+    const platformManifest = {
+      ...snapshot.platformManifest,
+      external_adapters: [externalAdapter],
+    };
+    const engagement = {
+      resource_type: "client_engagement",
+      id: "66666666-6666-4666-8666-666666666666",
+      org_id: liveOrgId,
+      lead_id: null,
+      project_id: null,
+      name: "Axis B neutral API smoke eval",
+      client_url: "https://client.example",
+      repo_url: "https://github.com/example/client",
+      status: "active",
+      goals: ["Validate autonomous marketing orchestration"],
+      constraints: ["Respect tenant and approval gates"],
+      intake_payload: { source: "pm_substrate_axis_b_smoke_eval" },
+      integration_state: {},
+      created_at: "2026-07-01T16:00:00.000Z",
+      updated_at: "2026-07-01T16:00:00.000Z",
+    };
+    const adapterArtifact = {
+      resource_type: "agency_artifact",
+      id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      org_id: liveOrgId,
+      engagement_id: engagement.id,
+      marketing_run_id: liveRunId,
+      virtual_agency_task_id: null,
+      artifact_type: "external_adapter_run",
+      title: "External adapter run: agent_harness",
+      payload_hash: liveExternalAdapterRunHash,
+      version: 1,
+      evidence_refs: [],
+      lineage: {
+        source: "external_adapter",
+        adapter_id: "agent_harness",
+        boundary: "containerized_process",
+      },
+      author_role: "external_adapter",
+    };
+    const snapshotWithAdapter = {
+      ...snapshot,
+      platformManifest,
+      summary: {
+        ...snapshot.summary,
+        artifact_count: snapshot.summary.artifact_count + 1,
+        artifact_type_counts: {
+          ...snapshot.summary.artifact_type_counts,
+          external_adapter_run: 1,
+        },
+        evidence_hashes: {
+          ...snapshot.summary.evidence_hashes,
+          external_adapter_run_hashes: [liveExternalAdapterRunHash],
+        },
+      },
+      artifacts: [...snapshot.artifacts, adapterArtifact],
+    };
+    const calls: Array<{
+      url: string;
+      method: string;
+      authorization: string | undefined;
+      contentType: string | undefined;
+      body: unknown;
+    }> = [];
+    const fetchFn: PluggedInSocialIntegrationFetch = async (url, init) => {
+      calls.push({
+        url,
+        method: init?.method ?? "GET",
+        authorization: init?.headers?.authorization,
+        contentType: init?.headers?.["content-type"],
+        body: init?.body === undefined ? undefined : JSON.parse(init.body),
+      });
+      if (url === "https://api.example/api/integration/v1/capabilities") {
+        return jsonResponse(snapshot.capabilities);
+      }
+      if (url === "https://api.example/api/integration/v1/platform-manifest") {
+        return jsonResponse(platformManifest);
+      }
+      if (url === "https://api.example/api/integration/v1/engagements") {
+        return jsonResponse(engagement, 201);
+      }
+      if (
+        url ===
+        `https://api.example/api/integration/v1/engagements/${engagement.id}/marketing-runs`
+      ) {
+        return jsonResponse(snapshot.run, 201);
+      }
+      if (
+        url ===
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/external-adapter-runs`
+      ) {
+        return jsonResponse(adapterArtifact, 201);
+      }
+      if (
+        url ===
+        `https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-snapshot`
+      ) {
+        return jsonResponse({
+          resource_type: "marketing_run_evidence_snapshot",
+          run: snapshotWithAdapter.run,
+          summary: snapshotWithAdapter.summary,
+          events: snapshotWithAdapter.events,
+          tasks: snapshotWithAdapter.tasks,
+          artifacts: snapshotWithAdapter.artifacts,
+          approvals: snapshotWithAdapter.approvals,
+          access_requests: snapshotWithAdapter.accessRequests,
+          social_posts: snapshotWithAdapter.socialPosts,
+          reports: snapshotWithAdapter.reports,
+        });
+      }
+      return jsonResponse({ error: "not found" }, 404);
+    };
+
+    const result = await runPluggedInSocialNeutralApiSmokeEval({
+      integrationBaseUrl: "https://api.example",
+      bearerToken: "jwt-token",
+      clientUrl: "https://client.example",
+      repoUrl: "https://github.com/example/client",
+      objective: "Autonomously improve launch conversion",
+      fetchFn,
+    });
+
+    expect(result.ready).toBe(true);
+    expect(result.issues).toEqual([]);
+    expect(result.engagement.id).toBe(engagement.id);
+    expect(result.run.id).toBe(liveRunId);
+    expect(result.adapterArtifact.id).toBe(adapterArtifact.id);
+    expect(result.snapshot.summary.evidence_hashes.external_adapter_run_hashes).toEqual(
+      [liveExternalAdapterRunHash],
+    );
+    expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
+      "GET https://api.example/api/integration/v1/capabilities",
+      "GET https://api.example/api/integration/v1/platform-manifest",
+      "POST https://api.example/api/integration/v1/engagements",
+      `POST https://api.example/api/integration/v1/engagements/${engagement.id}/marketing-runs`,
+      `POST https://api.example/api/integration/v1/marketing-runs/${liveRunId}/external-adapter-runs`,
+      `GET https://api.example/api/integration/v1/marketing-runs/${liveRunId}/evidence-snapshot`,
+    ]);
+    expect(new Set(calls.map((call) => call.authorization))).toEqual(
+      new Set(["Bearer jwt-token"]),
+    );
+    expect(calls[2]).toMatchObject({
+      contentType: "application/json",
+      body: {
+        client_url: "https://client.example",
+        repo_url: "https://github.com/example/client",
+      },
+    });
+    expect(calls[3]).toMatchObject({
+      body: {
+        objective: "Autonomously improve launch conversion",
+        project_id: null,
+      },
+    });
+    expect(calls[4]).toMatchObject({
+      body: {
+        adapter_id: "agent_harness",
+        status: "succeeded",
+      },
+    });
+    expect(
+      (calls[4]?.body as { gate_results?: Record<string, boolean> }).gate_results,
+    ).toEqual(
+        Object.fromEntries(externalAdapter.required_gates.map((gate) => [gate, true])),
     );
   });
 
