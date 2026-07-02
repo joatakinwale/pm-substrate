@@ -808,6 +808,7 @@ async def approve_and_dispatch_marketing_run(
     engagement: ClientEngagement,
     run: MarketingRun,
     actor_id: str | None = None,
+    approve_tasks: bool = True,
 ) -> MarketingRunDispatch:
     if run.org_id != engagement.org_id or run.engagement_id != engagement.id:
         raise ValueError("Marketing run does not belong to engagement")
@@ -832,6 +833,8 @@ async def approve_and_dispatch_marketing_run(
         if task.status == VirtualAgencyTaskStatus.superseded.value:
             continue
         if not task.approval_active and task.status == VirtualAgencyTaskStatus.todo.value:
+            if not approve_tasks:
+                continue
             approval_key = f"agency-run:approve:{run.id}:{task.id}:{task.task_version}"
             if await find_event_by_idempotency_key(db, approval_key) is None:
                 db.add(

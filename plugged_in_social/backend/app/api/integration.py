@@ -2148,6 +2148,16 @@ async def ingest_run_external_adapter_run(
         engagement=engagement,
         body=artifact_body,
     )
+    try:
+        await approve_and_dispatch_marketing_run(
+            db,
+            engagement=engagement,
+            run=run,
+            actor_id=f"external_adapter:{adapter.id}",
+            approve_tasks=False,
+        )
+    except MarketingRunAccessGateError:
+        pass
     await db.commit()
     await db.refresh(artifact)
     return _to_artifact(artifact)

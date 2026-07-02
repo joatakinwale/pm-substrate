@@ -514,6 +514,17 @@ async def test_external_adapter_run_ingest_is_idempotent_for_matching_payload(
 
     monkeypatch.setattr(module, "_get_run", _fake_get_run)
     monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+    dispatch_calls = []
+
+    async def _fake_dispatch(_db, **kwargs):
+        dispatch_calls.append(kwargs)
+        return SimpleNamespace(approved_tasks=[], dispatched_messages=[])
+
+    monkeypatch.setattr(
+        module,
+        "approve_and_dispatch_marketing_run",
+        _fake_dispatch,
+    )
 
     body = _external_adapter_body()
     first = await module.ingest_run_external_adapter_run(
@@ -547,6 +558,9 @@ async def test_external_adapter_run_ingest_is_idempotent_for_matching_payload(
         "required_event_types"
     ]
     assert second.payload["adapter_contract"]["required_result_shape"] is None
+    assert len(dispatch_calls) == 1
+    assert dispatch_calls[0]["actor_id"] == "external_adapter:agent_harness"
+    assert dispatch_calls[0]["approve_tasks"] is False
 
 
 @pytest.mark.asyncio
@@ -577,6 +591,15 @@ async def test_external_adapter_run_ingest_rejects_idempotency_conflict(
 
     monkeypatch.setattr(module, "_get_run", _fake_get_run)
     monkeypatch.setattr(module, "_get_engagement", _fake_get_engagement)
+
+    async def _fake_dispatch(_db, **_kwargs):
+        return SimpleNamespace(approved_tasks=[], dispatched_messages=[])
+
+    monkeypatch.setattr(
+        module,
+        "approve_and_dispatch_marketing_run",
+        _fake_dispatch,
+    )
 
     await module.ingest_run_external_adapter_run(
         run_id=run_id,
