@@ -10,7 +10,7 @@ export interface ArrowHedgeIntegrationFetchResponse {
 }
 
 export interface ArrowHedgeIntegrationFetchInit {
-  readonly method?: "GET" | "POST";
+  readonly method?: "GET" | "POST" | "PUT";
   readonly headers?: Record<string, string>;
   readonly body?: string;
 }

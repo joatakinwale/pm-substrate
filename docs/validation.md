@@ -145,8 +145,12 @@ Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
   It also supports conservative `discover-plan-from-integration` plan discovery
   from saved adapter runs, which only admits explicit baseline/substrate mode
   labels with readiness-equal envelopes and records unlabeled or non-comparable
-  runs in `plan-discovery-report.json`. `batch-from-integration` then writes one
-  verified bundle directory per admitted historical pair plus a
+  runs in `plan-discovery-report.json`. The same tool now supports
+  `run-paired-from-integration`, an external runner that creates labeled saved
+  ArrowHedge flow runs, streams `/hedge-fund/backtest`, persists collected
+  backtest days/final metrics into those runs, and emits scoped discovery for
+  the created run IDs without importing ArrowHedge code. `batch-from-integration`
+  then writes one verified bundle directory per admitted historical pair plus a
   `batch-report.json` summarizing market aggregates, governance aggregates,
   claim-denial issues, and verification issues. Automated paired experiment
   execution over real historical windows is still required before live or
@@ -154,9 +158,9 @@ Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
 
 The next valid historical experiment path is:
 
-1. Add a paired experiment runner that executes baseline/substrate ArrowHedgeLab
-   arms with explicit mode labels; adapter-side discovery can then emit the
-   conservative batch plan from saved runs automatically.
+1. Run the external paired runner against ArrowHedgeLab with small historical
+   windows and inspect the scoped `paired-run-report.json` plus
+   `plan-discovery-report.json`.
 2. Collect enough saved historical windows to estimate market/PnL deltas
    separately from governance/protection deltas without claiming improvement
    from governance-only wins.
@@ -203,4 +207,4 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).
-- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, ArrowHedge-generated runtime provenance, connector-side `arrowhedge.run-envelope.v1` generation, per-record evidence IDs/runtime provenance in expanded connector envelopes, paired baseline/substrate envelope readiness gates, paired experiment bundle/report claim gates, local replayable bundle writer/verifier, batch-from-integration collector reports, and pm-substrate finance-ingest client plus HTTP readiness/bundle endpoints landed.
+- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, ArrowHedge-generated runtime provenance, connector-side `arrowhedge.run-envelope.v1` generation, per-record evidence IDs/runtime provenance in expanded connector envelopes, paired baseline/substrate envelope readiness gates, paired experiment bundle/report claim gates, local replayable bundle writer/verifier, conservative plan discovery, external paired-run execution/persistence tooling, batch-from-integration collector reports, and pm-substrate finance-ingest client plus HTTP readiness/bundle endpoints landed.

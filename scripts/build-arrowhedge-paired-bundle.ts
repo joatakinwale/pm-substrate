@@ -112,6 +112,7 @@ export interface DiscoverArrowHedgePairedBatchPlanFromIntegrationInput {
   readonly outputDir: string;
   readonly bearerToken?: string;
   readonly generatedAt?: string;
+  readonly runIds?: readonly number[];
   readonly fetchFn?: ArrowHedgeIntegrationFetch;
 }
 
@@ -142,6 +143,61 @@ export interface DiscoverArrowHedgePairedBatchPlanFromIntegrationResult {
   readonly outputPaths: {
     readonly plan: string;
     readonly report: string;
+  };
+}
+
+export interface RunArrowHedgePairedExperimentFromIntegrationInput {
+  readonly planPath: string;
+  readonly outputDir: string;
+  readonly bearerToken?: string;
+  readonly fetchFn?: ArrowHedgeIntegrationFetch;
+}
+
+export interface ArrowHedgePairedRunPlan {
+  readonly schemaVersion?: "arrowhedge.paired-run-plan.v1";
+  readonly integrationBaseUrl: string;
+  readonly flowId: number;
+  readonly experimentId: string;
+  readonly bearerToken?: string;
+  readonly generatedAt?: string;
+  readonly request: Record<string, unknown>;
+  readonly baseline?: {
+    readonly mode?: string;
+    readonly requestOverrides?: Record<string, unknown>;
+  };
+  readonly substrate?: {
+    readonly mode?: string;
+    readonly requestOverrides?: Record<string, unknown>;
+  };
+}
+
+export interface ArrowHedgePairedRunReport {
+  readonly schemaVersion: "arrowhedge.paired-run-report.v1";
+  readonly generatedAt: string;
+  readonly integrationBaseUrl: string;
+  readonly flowId: number;
+  readonly experimentId: string;
+  readonly baseline: ArrowHedgePairedRunArmReport;
+  readonly substrate: ArrowHedgePairedRunArmReport;
+  readonly discovery: ArrowHedgePairedBatchPlanDiscoveryReport;
+}
+
+export interface ArrowHedgePairedRunArmReport {
+  readonly role: "baseline" | "substrate";
+  readonly mode: string;
+  readonly runId: number;
+  readonly flowId: number;
+  readonly status: string;
+  readonly backtestDayCount: number;
+}
+
+export interface RunArrowHedgePairedExperimentFromIntegrationResult {
+  readonly report: ArrowHedgePairedRunReport;
+  readonly discovery: DiscoverArrowHedgePairedBatchPlanFromIntegrationResult;
+  readonly outputPaths: {
+    readonly runReport: string;
+    readonly plan: string;
+    readonly discoveryReport: string;
   };
 }
 
@@ -361,11 +417,16 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
     );
   }
 
-  const backtestRunIds = uniqueNumbers(
+  const discoveredBacktestRunIds = uniqueNumbers(
     inventory.backtests.backtests.map((backtest) => backtest.run_id),
   );
+  const backtestRunIds = uniqueNumbers(
+    input.runIds === undefined ? discoveredBacktestRunIds : input.runIds,
+  );
   const flowIds = uniqueNumbers(
-    inventory.backtests.backtests.map((backtest) => backtest.flow_id),
+    inventory.backtests.backtests
+      .filter((backtest) => backtestRunIds.includes(backtest.run_id))
+      .map((backtest) => backtest.flow_id),
   );
   const snapshot = await fetchArrowHedgeIntegrationSnapshot({
     integrationBaseUrl: input.integrationBaseUrl,
@@ -507,6 +568,60 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
   };
 }
 
+export async function runArrowHedgePairedExperimentFromIntegration(
+  input: RunArrowHedgePairedExperimentFromIntegrationInput,
+): Promise<RunArrowHedgePairedExperimentFromIntegrationResult> {
+  const plan = readPairedRunPlan(input.planPath);
+  const bearerToken = input.bearerToken ?? plan.bearerToken;
+  const generatedAt = plan.generatedAt ?? new Date().toISOString();
+  const baseline = await runArrowHedgeBacktestArm({
+    plan,
+    role: "baseline",
+    mode: plan.baseline?.mode ?? "off",
+    requestOverrides: plan.baseline?.requestOverrides,
+    ...(bearerToken === undefined ? {} : { bearerToken }),
+    ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+  });
+  const substrate = await runArrowHedgeBacktestArm({
+    plan,
+    role: "substrate",
+    mode: plan.substrate?.mode ?? "blocking",
+    requestOverrides: plan.substrate?.requestOverrides,
+    ...(bearerToken === undefined ? {} : { bearerToken }),
+    ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+  });
+  const discovery = await discoverArrowHedgePairedBatchPlanFromIntegration({
+    integrationBaseUrl: plan.integrationBaseUrl,
+    outputDir: join(input.outputDir, "discovery"),
+    generatedAt,
+    runIds: [baseline.runId, substrate.runId],
+    ...(bearerToken === undefined ? {} : { bearerToken }),
+    ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+  });
+  const report: ArrowHedgePairedRunReport = {
+    schemaVersion: "arrowhedge.paired-run-report.v1",
+    generatedAt,
+    integrationBaseUrl: plan.integrationBaseUrl,
+    flowId: plan.flowId,
+    experimentId: plan.experimentId,
+    baseline,
+    substrate,
+    discovery: discovery.report,
+  };
+  mkdirSync(input.outputDir, { recursive: true });
+  const runReport = join(input.outputDir, "paired-run-report.json");
+  writeJsonFile(runReport, report);
+  return {
+    report,
+    discovery,
+    outputPaths: {
+      runReport,
+      plan: discovery.outputPaths.plan,
+      discoveryReport: discovery.outputPaths.report,
+    },
+  };
+}
+
 export function verifyArrowHedgePairedBundleDirectory(input: {
   readonly bundleDir: string;
 }): VerifyArrowHedgePairedBundleDirectoryResult {
@@ -590,6 +705,271 @@ function writePairedBundleArtifacts(
   return outputPaths;
 }
 
+async function runArrowHedgeBacktestArm(input: {
+  readonly plan: ArrowHedgePairedRunPlan;
+  readonly role: "baseline" | "substrate";
+  readonly mode: string;
+  readonly bearerToken?: string;
+  readonly requestOverrides?: Record<string, unknown>;
+  readonly fetchFn?: ArrowHedgeIntegrationFetch;
+}): Promise<ArrowHedgePairedRunArmReport> {
+  const fetchFn = arrowHedgeFetch(input.fetchFn);
+  const requestData = buildPairedRunRequestData({
+    plan: input.plan,
+    role: input.role,
+    mode: input.mode,
+    requestOverrides: input.requestOverrides,
+  });
+  const headers = arrowHedgeJsonHeaders(input.bearerToken);
+  const created = await arrowHedgeRequestJson<{
+    readonly id: number;
+    readonly flow_id: number;
+    readonly status: string;
+  }>({
+    fetchFn,
+    url: arrowHedgeAppUrl(
+      input.plan.integrationBaseUrl,
+      `/flows/${input.plan.flowId}/runs/`,
+    ),
+    method: "POST",
+    headers,
+    body: { request_data: requestData },
+  });
+  const runId = integerValue(created["id"], "created flow run id");
+  const flowId = integerValue(created["flow_id"], "created flow run flow_id");
+  await arrowHedgeRequestJson<unknown>({
+    fetchFn,
+    url: arrowHedgeAppUrl(
+      input.plan.integrationBaseUrl,
+      `/flows/${input.plan.flowId}/runs/${runId}`,
+    ),
+    method: "PUT",
+    headers,
+    body: { status: "IN_PROGRESS" },
+  });
+
+  try {
+    const streamText = await arrowHedgeRequestText({
+      fetchFn,
+      url: arrowHedgeAppUrl(input.plan.integrationBaseUrl, "/hedge-fund/backtest"),
+      method: "POST",
+      headers,
+      body: requestData,
+    });
+    const backtest = parseArrowHedgeBacktestSse(streamText);
+    const saved = await arrowHedgeRequestJson<{
+      readonly status: string;
+    }>({
+      fetchFn,
+      url: arrowHedgeAppUrl(
+        input.plan.integrationBaseUrl,
+        `/flows/${input.plan.flowId}/runs/${runId}`,
+      ),
+      method: "PUT",
+      headers,
+      body: {
+        status: "COMPLETE",
+        results: {
+          backtest: {
+            results: backtest.days,
+            performance_metrics: backtest.finalData.performance_metrics ?? {},
+            final_portfolio: backtest.finalData.final_portfolio ?? {},
+            total_days: backtest.finalData.total_days ?? backtest.days.length,
+            ...(backtest.finalData.provenance === undefined
+              ? {}
+              : { provenance: backtest.finalData.provenance }),
+          },
+          pairedExperiment: {
+            experimentId: input.plan.experimentId,
+            arm: input.role,
+            substrateMode: input.mode,
+          },
+        },
+      },
+    });
+    return {
+      role: input.role,
+      mode: input.mode,
+      runId,
+      flowId,
+      status: typeof saved["status"] === "string" ? saved["status"] : "COMPLETE",
+      backtestDayCount: backtest.days.length,
+    };
+  } catch (error) {
+    await arrowHedgeRequestJson<unknown>({
+      fetchFn,
+      url: arrowHedgeAppUrl(
+        input.plan.integrationBaseUrl,
+        `/flows/${input.plan.flowId}/runs/${runId}`,
+      ),
+      method: "PUT",
+      headers,
+      body: {
+        status: "ERROR",
+        error_message: error instanceof Error ? error.message : String(error),
+      },
+    });
+    throw error;
+  }
+}
+
+function buildPairedRunRequestData(input: {
+  readonly plan: ArrowHedgePairedRunPlan;
+  readonly role: "baseline" | "substrate";
+  readonly mode: string;
+  readonly requestOverrides?: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    ...input.plan.request,
+    ...(input.requestOverrides ?? {}),
+    substrate_mode: input.mode,
+    pm_substrate_mode: input.mode,
+    paired_experiment_id: input.plan.experimentId,
+    paired_experiment_arm: input.role,
+  };
+}
+
+function parseArrowHedgeBacktestSse(text: string): {
+  readonly days: readonly Record<string, unknown>[];
+  readonly finalData: Record<string, unknown>;
+} {
+  const days: Record<string, unknown>[] = [];
+  let finalData: Record<string, unknown> | undefined;
+  for (const event of parseSseEvents(text)) {
+    const payload = recordOrThrow(event.data, `SSE ${event.event} data`);
+    if (event.event === "progress" && payload["agent"] === "backtest") {
+      const analysis = payload["analysis"];
+      if (typeof analysis !== "string" || analysis.trim() === "") continue;
+      const parsed = JSON.parse(analysis) as unknown;
+      days.push(recordOrThrow(parsed, "backtest progress analysis"));
+      continue;
+    }
+    if (event.event === "complete") {
+      finalData = recordOrThrow(payload["data"], "backtest complete data");
+      continue;
+    }
+    if (event.event === "error") {
+      const message = typeof payload["message"] === "string"
+        ? payload["message"]
+        : "ArrowHedge backtest stream returned an error";
+      throw new Error(message);
+    }
+  }
+  if (finalData === undefined) {
+    throw new Error("ArrowHedge backtest stream did not include a complete event");
+  }
+  if (days.length === 0) {
+    throw new Error("ArrowHedge backtest stream did not include backtest day results");
+  }
+  return { days, finalData };
+}
+
+function parseSseEvents(text: string): readonly {
+  readonly event: string;
+  readonly data: unknown;
+}[] {
+  return text
+    .split(/\r?\n\r?\n/)
+    .flatMap((block) => {
+      const lines = block.split(/\r?\n/);
+      const eventLine = lines.find((line) => line.startsWith("event:"));
+      const dataLines = lines.filter((line) => line.startsWith("data:"));
+      if (eventLine === undefined || dataLines.length === 0) return [];
+      const event = eventLine.slice("event:".length).trim();
+      const dataText = dataLines
+        .map((line) => line.slice("data:".length).trimStart())
+        .join("\n");
+      return [{ event, data: JSON.parse(dataText) }];
+    });
+}
+
+async function arrowHedgeRequestJson<T>(input: {
+  readonly fetchFn: ArrowHedgeIntegrationFetch;
+  readonly url: string;
+  readonly method: "POST" | "PUT";
+  readonly headers: Record<string, string>;
+  readonly body: unknown;
+}): Promise<T> {
+  const response = await input.fetchFn(input.url, {
+    method: input.method,
+    headers: input.headers,
+    body: JSON.stringify(input.body),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `${input.method} ${input.url} failed: ${response.status} ${response.statusText ?? ""} ${await response.text()}`.trim(),
+    );
+  }
+  return response.json() as Promise<T>;
+}
+
+async function arrowHedgeRequestText(input: {
+  readonly fetchFn: ArrowHedgeIntegrationFetch;
+  readonly url: string;
+  readonly method: "POST";
+  readonly headers: Record<string, string>;
+  readonly body: unknown;
+}): Promise<string> {
+  const response = await input.fetchFn(input.url, {
+    method: input.method,
+    headers: input.headers,
+    body: JSON.stringify(input.body),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `${input.method} ${input.url} failed: ${response.status} ${response.statusText ?? ""} ${text}`.trim(),
+    );
+  }
+  return text;
+}
+
+function arrowHedgeFetch(
+  fetchFn: ArrowHedgeIntegrationFetch | undefined,
+): ArrowHedgeIntegrationFetch {
+  const resolved =
+    fetchFn ?? (globalThis as unknown as { fetch?: ArrowHedgeIntegrationFetch }).fetch;
+  if (resolved === undefined) {
+    throw new Error("No fetch implementation available for ArrowHedge runner");
+  }
+  return resolved;
+}
+
+function arrowHedgeJsonHeaders(
+  bearerToken: string | undefined,
+): Record<string, string> {
+  return {
+    accept: "application/json",
+    "content-type": "application/json",
+    ...(bearerToken === undefined ? {} : { authorization: `Bearer ${bearerToken}` }),
+  };
+}
+
+function arrowHedgeAppUrl(baseUrl: string, path: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, "");
+  const appBase = trimmed.endsWith("/integration/v1")
+    ? trimmed.slice(0, -"/integration/v1".length)
+    : trimmed;
+  return `${appBase}${path}`;
+}
+
+function integerValue(value: unknown, path: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${path} must be an integer`);
+  }
+  return value;
+}
+
+function recordOrThrow(
+  value: unknown,
+  path: string,
+): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new Error(`${path} must be an object`);
+  }
+  return value;
+}
+
 function uniqueNumbers(values: readonly number[]): readonly number[] {
   return [...new Set(values)];
 }
@@ -671,6 +1051,63 @@ function readBatchPlan(path: string): ArrowHedgePairedBundleBatchPlan {
       readBatchPlanExperiment(item, index),
     ),
   };
+}
+
+function readPairedRunPlan(path: string): ArrowHedgePairedRunPlan {
+  const value = readJsonFile<unknown>(path);
+  if (!isRecord(value)) {
+    throw new Error("paired run plan must be an object");
+  }
+  const integrationBaseUrl = value["integrationBaseUrl"];
+  if (typeof integrationBaseUrl !== "string" || integrationBaseUrl.trim() === "") {
+    throw new Error("paired run plan integrationBaseUrl must be a non-empty string");
+  }
+  const experimentId = value["experimentId"];
+  if (typeof experimentId !== "string" || experimentId.trim() === "") {
+    throw new Error("paired run plan experimentId must be a non-empty string");
+  }
+  const request = value["request"];
+  if (!isRecord(request)) {
+    throw new Error("paired run plan request must be an object");
+  }
+  return {
+    ...(value["schemaVersion"] === undefined
+      ? {}
+      : { schemaVersion: "arrowhedge.paired-run-plan.v1" as const }),
+    integrationBaseUrl,
+    experimentId,
+    flowId: integerField(value, "flowId", "paired run plan flowId"),
+    ...(typeof value["bearerToken"] === "string"
+      ? { bearerToken: value["bearerToken"] }
+      : {}),
+    ...(typeof value["generatedAt"] === "string"
+      ? { generatedAt: value["generatedAt"] }
+      : {}),
+    request,
+    ...readPairedRunPlanArm(value, "baseline"),
+    ...readPairedRunPlanArm(value, "substrate"),
+  };
+}
+
+function readPairedRunPlanArm(
+  value: Record<string, unknown>,
+  field: "baseline" | "substrate",
+): Pick<ArrowHedgePairedRunPlan, typeof field> | Record<string, never> {
+  const arm = value[field];
+  if (arm === undefined) return {};
+  if (!isRecord(arm)) {
+    throw new Error(`paired run plan ${field} must be an object`);
+  }
+  const requestOverrides = arm["requestOverrides"];
+  if (requestOverrides !== undefined && !isRecord(requestOverrides)) {
+    throw new Error(`paired run plan ${field}.requestOverrides must be an object`);
+  }
+  return {
+    [field]: {
+      ...(typeof arm["mode"] === "string" ? { mode: arm["mode"] } : {}),
+      ...(requestOverrides === undefined ? {} : { requestOverrides }),
+    },
+  } as Pick<ArrowHedgePairedRunPlan, typeof field>;
 }
 
 function readBatchPlanExperiment(
@@ -827,6 +1264,7 @@ function parseArgs(argv: readonly string[]):
   | { readonly command: "from-integration"; readonly input: WriteArrowHedgePairedBundleFromIntegrationInput }
   | { readonly command: "batch-from-integration"; readonly input: WriteArrowHedgePairedBundleBatchFromIntegrationInput }
   | { readonly command: "discover-plan-from-integration"; readonly input: DiscoverArrowHedgePairedBatchPlanFromIntegrationInput }
+  | { readonly command: "run-paired-from-integration"; readonly input: RunArrowHedgePairedExperimentFromIntegrationInput }
   | { readonly command: "verify"; readonly bundleDir: string } {
   const [command, ...rest] = argv;
   const args = new Map<string, string>();
@@ -939,11 +1377,32 @@ function parseArgs(argv: readonly string[]):
       input: {
         integrationBaseUrl,
         outputDir,
+        ...(args.has("--run-ids")
+          ? { runIds: parseNumberList(args.get("--run-ids")!) }
+          : {}),
         ...(args.has("--bearer-token")
           ? { bearerToken: args.get("--bearer-token")! }
           : {}),
         ...(args.has("--generated-at")
           ? { generatedAt: args.get("--generated-at")! }
+          : {}),
+      },
+    };
+  }
+
+  if (command === "run-paired-from-integration") {
+    const planPath = args.get("--plan");
+    const outputDir = args.get("--out");
+    if (!planPath || !outputDir) {
+      throw new Error(usage());
+    }
+    return {
+      command,
+      input: {
+        planPath,
+        outputDir,
+        ...(args.has("--bearer-token")
+          ? { bearerToken: args.get("--bearer-token")! }
           : {}),
       },
     };
@@ -979,13 +1438,28 @@ function optionalNumberArg<TField extends string>(
   return parsed === undefined ? {} : ({ [field]: parsed } as Record<TField, number>);
 }
 
+function parseNumberList(value: string): readonly number[] {
+  const numbers = value.split(",").map((item) => {
+    const parsed = Number.parseInt(item.trim(), 10);
+    if (!Number.isFinite(parsed)) {
+      throw new Error("--run-ids must be a comma-separated list of integers");
+    }
+    return parsed;
+  });
+  if (numbers.length === 0) {
+    throw new Error("--run-ids must include at least one integer");
+  }
+  return numbers;
+}
+
 function usage(): string {
   return [
     "usage:",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts write --experiment-id <id> --baseline-envelope <path> --substrate-envelope <path> --out <dir> [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts from-integration --experiment-id <id> --base-url <url> --baseline-run-id <id> --substrate-run-id <id> --out <dir> [--bearer-token <token>] [--baseline-flow-id <id>] [--substrate-flow-id <id>] [--baseline-backtest-run-id <id>] [--substrate-backtest-run-id <id>] [--baseline-mode <mode>] [--substrate-mode <mode>] [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts batch-from-integration --plan <path> --out <dir> [--bearer-token <token>]",
-    "  tsx scripts/build-arrowhedge-paired-bundle.ts discover-plan-from-integration --base-url <url> --out <dir> [--bearer-token <token>] [--generated-at <iso>]",
+    "  tsx scripts/build-arrowhedge-paired-bundle.ts discover-plan-from-integration --base-url <url> --out <dir> [--run-ids <id,id>] [--bearer-token <token>] [--generated-at <iso>]",
+    "  tsx scripts/build-arrowhedge-paired-bundle.ts run-paired-from-integration --plan <path> --out <dir> [--bearer-token <token>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts verify --bundle-dir <dir>",
   ].join("\n");
 }
@@ -1066,6 +1540,31 @@ async function main(): Promise<void> {
           skippedRunCount: result.report.skippedRuns.length,
           planPath: result.outputPaths.plan,
           reportPath: result.outputPaths.report,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  if (parsed.command === "run-paired-from-integration") {
+    const result = await runArrowHedgePairedExperimentFromIntegration(
+      parsed.input,
+    );
+    console.log(
+      JSON.stringify(
+        {
+          schemaVersion: result.report.schemaVersion,
+          experimentId: result.report.experimentId,
+          baselineRunId: result.report.baseline.runId,
+          substrateRunId: result.report.substrate.runId,
+          plannedExperimentCount:
+            result.discovery.report.plannedExperimentCount,
+          discoveryIssueCount: result.discovery.report.issues.length,
+          runReportPath: result.outputPaths.runReport,
+          planPath: result.outputPaths.plan,
+          discoveryReportPath: result.outputPaths.discoveryReport,
         },
         null,
         2,

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   discoverArrowHedgePairedBatchPlanFromIntegration,
+  runArrowHedgePairedExperimentFromIntegration,
   writeArrowHedgePairedBundleBatchFromIntegration,
   writeArrowHedgePairedBundleFromIntegration,
   verifyArrowHedgePairedBundleDirectory,
@@ -416,6 +417,134 @@ describe("build-arrowhedge-paired-bundle script", () => {
       plannedExperimentCount: 1,
     });
   });
+
+  it("runs external labeled ArrowHedge paired backtests before scoped discovery", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "arrowhedge-paired-runner-"));
+    const planPath = join(dir, "paired-run-plan.json");
+    writeJson(planPath, {
+      schemaVersion: "arrowhedge.paired-run-plan.v1",
+      integrationBaseUrl: "https://arrow.example",
+      generatedAt: "2026-06-03T14:30:00.000Z",
+      flowId: 7,
+      experimentId: "exp_arrowhedge_runner_001",
+      request: {
+        tickers: ["AAPL"],
+        start_date: "2026-05-01",
+        end_date: "2026-06-03",
+        initial_capital: 1000000,
+        margin_requirement: 0.25,
+        graph_nodes: [{ id: "warren_buffett_ab12cd", type: "agent" }],
+        graph_edges: [],
+      },
+      baseline: { mode: "off" },
+      substrate: { mode: "blocking" },
+    });
+    const responses = integrationDiscoveryResponses();
+    const createdRequests: Record<string, unknown>[] = [];
+    const updates: { readonly runId: number; readonly body: Record<string, unknown> }[] = [];
+    const fetchFn: ArrowHedgeIntegrationFetch = async (url, init) => {
+      if (url === "https://arrow.example/flows/7/runs/" && init?.method === "POST") {
+        const body = JSON.parse(init.body ?? "{}") as {
+          request_data: Record<string, unknown>;
+        };
+        createdRequests.push(body.request_data);
+        return jsonResponse({
+          id: body.request_data["substrate_mode"] === "off" ? 11 : 12,
+          flow_id: 7,
+          status: "IDLE",
+        });
+      }
+      const updateMatch = url.match(
+        /^https:\/\/arrow\.example\/flows\/7\/runs\/(\d+)$/,
+      );
+      if (updateMatch && init?.method === "PUT") {
+        const body = JSON.parse(init.body ?? "{}") as Record<string, unknown>;
+        updates.push({ runId: Number(updateMatch[1]), body });
+        return jsonResponse({
+          id: Number(updateMatch[1]),
+          flow_id: 7,
+          status: body["status"],
+        });
+      }
+      if (url === "https://arrow.example/hedge-fund/backtest" && init?.method === "POST") {
+        return textResponse(backtestSseText());
+      }
+      return jsonResponse(
+        responses.get(url) ?? { error: "not found" },
+        responses.has(url) ? 200 : 404,
+      );
+    };
+
+    const result = await runArrowHedgePairedExperimentFromIntegration({
+      planPath,
+      outputDir: join(dir, "runner-output"),
+      fetchFn,
+    });
+
+    expect(createdRequests).toEqual([
+      expect.objectContaining({
+        substrate_mode: "off",
+        pm_substrate_mode: "off",
+        paired_experiment_id: "exp_arrowhedge_runner_001",
+        paired_experiment_arm: "baseline",
+      }),
+      expect.objectContaining({
+        substrate_mode: "blocking",
+        pm_substrate_mode: "blocking",
+        paired_experiment_id: "exp_arrowhedge_runner_001",
+        paired_experiment_arm: "substrate",
+      }),
+    ]);
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        { runId: 11, body: { status: "IN_PROGRESS" } },
+        { runId: 12, body: { status: "IN_PROGRESS" } },
+        expect.objectContaining({
+          runId: 11,
+          body: expect.objectContaining({
+            status: "COMPLETE",
+            results: expect.objectContaining({
+              backtest: expect.objectContaining({
+                results: [
+                  expect.objectContaining({
+                    date: "2026-06-03",
+                    decisions: { AAPL: { action: "buy", quantity: 100 } },
+                  }),
+                ],
+                performance_metrics: { total_return: 0.0025 },
+                final_portfolio: { cash: 1002500 },
+                total_days: 1,
+              }),
+            }),
+          }),
+        }),
+        expect.objectContaining({
+          runId: 12,
+          body: expect.objectContaining({ status: "COMPLETE" }),
+        }),
+      ]),
+    );
+    expect(result.report).toMatchObject({
+      schemaVersion: "arrowhedge.paired-run-report.v1",
+      experimentId: "exp_arrowhedge_runner_001",
+      baseline: { runId: 11, mode: "off", backtestDayCount: 1 },
+      substrate: { runId: 12, mode: "blocking", backtestDayCount: 1 },
+      discovery: {
+        backtestRunCount: 2,
+        plannedExperimentCount: 1,
+        skippedRuns: [],
+      },
+    });
+    expect(readJson(result.outputPaths.plan)).toMatchObject({
+      experiments: [
+        {
+          experimentId: "exp_arrowhedge_11_12",
+          baseline: { runId: 11, mode: "off" },
+          substrate: { runId: 12, mode: "blocking" },
+        },
+      ],
+    });
+  });
 });
 
 function writeInputFiles(dir: string): {
@@ -484,6 +613,59 @@ function jsonResponse(
       return JSON.stringify(body);
     },
   };
+}
+
+function textResponse(
+  body: string,
+  status = 200,
+): ArrowHedgeIntegrationFetchResponse {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? "OK" : "Error",
+    async json() {
+      return JSON.parse(body) as unknown;
+    },
+    async text() {
+      return body;
+    },
+  };
+}
+
+function backtestSseText(): string {
+  return [
+    sseEvent("start", { type: "start" }),
+    sseEvent("progress", {
+      type: "progress",
+      agent: "backtest",
+      ticker: null,
+      status: "Completed 2026-06-03 - Portfolio: $1,002,500.00",
+      timestamp: null,
+      analysis: JSON.stringify({
+        date: "2026-06-03",
+        portfolio_value: 1002500,
+        cash: 250000,
+        decisions: { AAPL: { action: "buy", quantity: 100 } },
+        executed_trades: { AAPL: 100 },
+        analyst_signals: {
+          warren_buffett: { AAPL: { signal: "bullish", confidence: 0.74 } },
+        },
+        current_prices: { AAPL: 189.25 },
+      }),
+    }),
+    sseEvent("complete", {
+      type: "complete",
+      data: {
+        performance_metrics: { total_return: 0.0025 },
+        final_portfolio: { cash: 1002500 },
+        total_days: 1,
+      },
+    }),
+  ].join("");
+}
+
+function sseEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 function integrationResponses(): Map<string, unknown> {
