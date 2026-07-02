@@ -42,7 +42,7 @@ Data/provenance:
 
 Backtesting:
 
-- Backend `BacktestService` returns day-level backtest results with decisions, executed trades, analyst signals, current prices, exposures, metrics, and generated `arrowhedgelab.runtime-provenance.v1` blocks. Saved flow-run updates also attach that provenance at persistence time. The adapter now exposes saved results through backtest inventory/detail/day endpoints with redaction and hashes, source-artifact endpoints expose cache-derived provider/window/hash metadata, and the pm-substrate connector can build a canonical `arrowhedge.run-envelope.v1` from those adapter responses. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records, preserve ArrowHedge runtime provenance on signal/decision records, and carry those IDs through expansion and analyst-signal typed events. The pm-substrate HTTP demo now exposes `POST /tenants/:tenantId/arrowhedge/experiments/paired-readiness` and `POST /tenants/:tenantId/arrowhedge/experiments/paired-bundles` to admit or reject comparable arms, preserve envelope/report hashes, separate market deltas from governance deltas, and deny market-win claims unless readiness and false-positive/false-negative evidence gates pass. The local `pnpm arrowhedge:paired-bundle` script writes and verifies replayable `baseline-envelope.json`, `substrate-envelope.json`, `paired-report.json`, `manifest.json`, and `paired-bundle.json` artifacts from saved envelopes plus explicit metrics. It can now also drive ArrowHedge externally: create labeled saved flow runs, stream `/hedge-fund/backtest`, persist collected backtest days/final metrics back into those runs, and run scoped adapter discovery over the created run IDs. The remaining gap is collecting enough real historical paired windows and substrate-governed execution evidence.
+- Backend `BacktestService` returns day-level backtest results with decisions, executed trades, analyst signals, current prices, exposures, metrics, and generated `arrowhedgelab.runtime-provenance.v1` blocks. Saved flow-run updates also attach that provenance at persistence time. The adapter now exposes saved results through backtest inventory/detail/day endpoints with redaction and hashes, source-artifact endpoints expose cache-derived provider/window/hash metadata, and the pm-substrate connector can build a canonical `arrowhedge.run-envelope.v1` from those adapter responses. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records, preserve ArrowHedge runtime provenance on signal/decision records, and carry those IDs through expansion and analyst-signal typed events. The pm-substrate HTTP demo now exposes `POST /tenants/:tenantId/arrowhedge/experiments/paired-readiness` and `POST /tenants/:tenantId/arrowhedge/experiments/paired-bundles` to admit or reject comparable arms, preserve envelope/report hashes, separate market deltas from governance deltas, and deny market-win claims unless readiness and false-positive/false-negative evidence gates pass. The local `pnpm arrowhedge:paired-bundle` script writes and verifies replayable `baseline-envelope.json`, `substrate-envelope.json`, `paired-report.json`, `manifest.json`, and `paired-bundle.json` artifacts from saved envelopes plus explicit metrics. It can now also drive ArrowHedge externally: create labeled saved flow runs, stream `/hedge-fund/backtest`, persist collected backtest days/final metrics back into those runs, run scoped adapter discovery over the created run IDs, and review each admitted envelope through the pm-substrate offline finance-research path to attach event/block counts. The remaining gap is collecting enough real historical paired windows and explicit false-positive/false-negative substrate-governance evidence.
 - Newer `src/backtesting/*` components are cleaner and more testable, but are not exposed as an integration service.
 - `v2/*` provides an emerging protocol/data/backtesting research direction, but it is not wired into the app adapter surface.
 
@@ -158,9 +158,12 @@ pnpm arrowhedge:paired-bundle -- discover-plan-from-integration \
 
 The discovery command writes `paired-batch-plan.json` and
 `plan-discovery-report.json`. It only emits experiments for runs with explicit
-baseline/substrate mode labels and readiness-equal envelopes; unlabeled,
-unsupported, or non-comparable runs stay in the discovery report as skipped
-runs or candidate issues.
+baseline/substrate mode labels, valid pm-substrate offline review, and
+readiness-equal envelopes; unlabeled, unsupported, invalid-review, or
+non-comparable runs stay in the discovery report as skipped runs or candidate
+issues. Review-derived event and block counts are included in arm metrics, but
+false-positive/false-negative counts are not fabricated; market-win claims
+remain denied until that evidence is supplied by a real governance evaluation.
 
 Batch many historical pairs from one plan:
 
@@ -187,6 +190,7 @@ The market-win hypothesis cannot be claimed from a single run or from governance
 - substrate blocks only stale, source-conflicted, unauthorized, or out-of-policy actions;
 - false-positive blocks equal zero on fresh in-policy decisions;
 - false-negative stale/invalid actions equal zero when the fixture intentionally contains stale/conflicted state;
+- a `blocking` or `substrate` label alone is not evidence of substrate governance;
 - replayable substrate event IDs and evidence hashes for every accepted or blocked terminal decision;
 - PnL/market delta reported separately from governance/protection delta.
 

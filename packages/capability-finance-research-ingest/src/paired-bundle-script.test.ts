@@ -375,21 +375,49 @@ describe("build-arrowhedge-paired-bundle script", () => {
           flowId: 7,
           backtestRunId: 11,
           mode: "off",
+          metrics: expect.objectContaining({
+            decisionCount: 1,
+            acceptedDecisionCount: 0,
+            blockedDecisionCount: 1,
+            staleBlockCount: 1,
+            invalidActionBlockCount: 0,
+            eventIds: expect.arrayContaining([
+              expect.stringContaining("workflow_blocked_stale_state"),
+            ]),
+            blockedEventIds: expect.arrayContaining([
+              expect.stringContaining("workflow_blocked_stale_state"),
+            ]),
+          }),
         }),
         substrate: expect.objectContaining({
           runId: 12,
           flowId: 7,
           backtestRunId: 12,
           mode: "blocking",
+          metrics: expect.objectContaining({
+            decisionCount: 1,
+            acceptedDecisionCount: 0,
+            blockedDecisionCount: 1,
+            staleBlockCount: 1,
+            invalidActionBlockCount: 0,
+          }),
         }),
       }),
     ]);
+    expect(result.plan.experiments[0]?.substrate.metrics).not.toHaveProperty(
+      "falsePositiveBlockCount",
+    );
+    expect(result.plan.experiments[0]?.substrate.metrics).not.toHaveProperty(
+      "falseNegativeBlockCount",
+    );
     expect(result.report).toMatchObject({
       schemaVersion: "arrowhedge.paired-batch-plan-discovery-report.v1",
       generatedAt: "2026-06-03T14:20:00.000Z",
       backtestRunCount: 3,
       labeledBaselineCount: 1,
       labeledSubstrateCount: 1,
+      reviewedRunCount: 2,
+      governanceClaimEvidenceReadyCount: 0,
       plannedExperimentCount: 1,
       issues: [],
       skippedRuns: [{ runId: 13, reason: "missing substrate mode label" }],

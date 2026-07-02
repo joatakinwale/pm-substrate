@@ -7,6 +7,9 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  reviewArrowHedgeRunEnvelopeOffline,
+} from "../packages/capability-finance-research-ingest/src/arrowhedge.js";
+import {
   buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
   compareArrowHedgeIntegrationRunEnvelopePair,
   deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot,
@@ -24,6 +27,8 @@ import {
   type ArrowHedgePairedExperimentBundle,
   type ArrowHedgePairedExperimentBundleVerification,
 } from "../packages/capability-finance-research-ingest/src/arrowhedge-integration.js";
+import { FINANCE_RESEARCH_PROFILE } from "../packages/profile-finance-research/src/profile.js";
+import type { TenantId, Timestamp } from "@pm/types";
 
 export interface WriteArrowHedgePairedBundleFilesInput {
   readonly experimentId: string;
@@ -122,6 +127,8 @@ export interface ArrowHedgePairedBatchPlanDiscoveryReport {
   readonly backtestRunCount: number;
   readonly labeledBaselineCount: number;
   readonly labeledSubstrateCount: number;
+  readonly reviewedRunCount: number;
+  readonly governanceClaimEvidenceReadyCount: number;
   readonly plannedExperimentCount: number;
   readonly planPath: string;
   readonly issues: readonly string[];
@@ -444,16 +451,24 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
   }
 
   const skippedRuns: ArrowHedgePairedBatchPlanDiscoveryReport["skippedRuns"] = [];
-  const arms = backtestRunIds.flatMap((runId) => {
+  const arms: {
+    readonly run: ArrowHedgeIntegrationFlowRun;
+    readonly runId: number;
+    readonly mode: string;
+    readonly role: "baseline" | "substrate";
+    readonly envelope: ArrowHedgeIntegrationRunEnvelope;
+    readonly metrics: ArrowHedgePairedExperimentArmMetrics;
+  }[] = [];
+  for (const runId of backtestRunIds) {
     const run = snapshot.runDetails.find((candidate) => candidate.id === runId);
     if (run === undefined) {
       skippedRuns.push({ runId, reason: "missing run details" });
-      return [];
+      continue;
     }
     const mode = inferArrowHedgeRunMode(run);
     if (mode === undefined) {
       skippedRuns.push({ runId, reason: "missing substrate mode label" });
-      return [];
+      continue;
     }
     const role = modeRole(mode);
     if (role === "unknown") {
@@ -461,7 +476,7 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
         runId,
         reason: `unsupported substrate mode label: ${mode}`,
       });
-      return [];
+      continue;
     }
     const envelope = buildArrowHedgeRunEnvelopeFromIntegrationSnapshot({
       snapshot,
@@ -473,22 +488,29 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
         runId,
         reason: `invalid envelope: ${envelope.issues.join("; ")}`,
       });
-      return [];
+      continue;
     }
-    return [
-      {
-        run,
+    const reviewedMetrics = await buildArrowHedgeReviewedArmMetrics({
+      snapshot,
+      runId,
+      envelope: envelope.envelope,
+    });
+    if (!reviewedMetrics.valid) {
+      skippedRuns.push({
         runId,
-        mode,
-        role,
-        envelope: envelope.envelope,
-        metrics: deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot(
-          snapshot,
-          runId,
-        ),
-      },
-    ];
-  });
+        reason: `invalid substrate offline review: ${reviewedMetrics.issues.join("; ")}`,
+      });
+      continue;
+    }
+    arms.push({
+      run,
+      runId,
+      mode,
+      role,
+      envelope: envelope.envelope,
+      metrics: reviewedMetrics.metrics,
+    });
+  }
   const baselines = arms.filter((arm) => arm.role === "baseline");
   const substrates = arms.filter((arm) => arm.role === "substrate");
   const candidates: ArrowHedgePairedBatchPlanDiscoveryReport["candidates"] = [];
@@ -551,6 +573,10 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
     backtestRunCount: backtestRunIds.length,
     labeledBaselineCount: baselines.length,
     labeledSubstrateCount: substrates.length,
+    reviewedRunCount: arms.length,
+    governanceClaimEvidenceReadyCount: arms.filter((arm) =>
+      governanceClaimEvidenceReady(arm.metrics),
+    ).length,
     plannedExperimentCount: experiments.length,
     planPath: outputPaths.plan,
     issues,
@@ -703,6 +729,78 @@ function writePairedBundleArtifacts(
   writeJsonFile(outputPaths.manifest, bundle.manifest);
   writeJsonFile(outputPaths.pairedBundle, bundle);
   return outputPaths;
+}
+
+async function buildArrowHedgeReviewedArmMetrics(input: {
+  readonly snapshot: Parameters<typeof deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot>[0];
+  readonly runId: number;
+  readonly envelope: ArrowHedgeIntegrationRunEnvelope;
+}): Promise<
+  | {
+      readonly valid: true;
+      readonly metrics: ArrowHedgePairedExperimentArmMetrics;
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly string[];
+    }
+> {
+  const marketMetrics =
+    deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot(
+      input.snapshot,
+      input.runId,
+    );
+  const review = await reviewArrowHedgeRunEnvelopeOffline(input.envelope, {
+    tenantId: "tnt_arrowhedge_paired_discovery" as TenantId,
+    profile: FINANCE_RESEARCH_PROFILE,
+    adapterStartedAt: input.envelope.observedAt as Timestamp,
+    emittedBy: "pm-substrate:arrowhedge-paired-discovery",
+    projectionName: `arrowhedge_paired_discovery_${sanitizePathSegment(String(input.runId))}`,
+  });
+  if (!review.valid) {
+    return {
+      valid: false,
+      issues: review.issues.map((issue) => `${issue.path}: ${issue.message}`),
+    };
+  }
+  const eventIds = review.ingested.eventIds;
+  const blockedEventIds = review.ingested.blockedEventIds;
+  const staleBlockCount = blockedEventIds.filter((eventId) =>
+    eventId.includes("workflow.blocked.stale_state") ||
+    eventId.includes("workflow_blocked_stale_state"),
+  ).length;
+  const invalidActionBlockCount = blockedEventIds.filter((eventId) =>
+    eventId.includes("workflow.blocked.invalid_action") ||
+    eventId.includes("workflow_blocked_invalid_action"),
+  ).length;
+  const acceptedDecisionCount = eventIds.filter((eventId) =>
+    eventId.includes("portfolio.decision.accepted") ||
+    eventId.includes("portfolio_decision_accepted"),
+  ).length;
+  const blockedDecisionCount = blockedEventIds.length;
+
+  return {
+    valid: true,
+    metrics: {
+      ...marketMetrics,
+      decisionCount: acceptedDecisionCount + blockedDecisionCount,
+      acceptedDecisionCount,
+      blockedDecisionCount,
+      staleBlockCount,
+      invalidActionBlockCount,
+      eventIds,
+      blockedEventIds,
+    },
+  };
+}
+
+function governanceClaimEvidenceReady(
+  metrics: ArrowHedgePairedExperimentArmMetrics,
+): boolean {
+  return (
+    metrics.falsePositiveBlockCount !== undefined &&
+    metrics.falseNegativeBlockCount !== undefined
+  );
 }
 
 async function runArrowHedgeBacktestArm(input: {
