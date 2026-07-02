@@ -175,6 +175,16 @@ function artifactStatusValue(artifact: AgencyArtifact) {
   return stringValue(lineage.status) || stringValue(payload.status);
 }
 
+function artifactIdempotencyValue(artifact: AgencyArtifact) {
+  const lineage = objectValue(artifact.lineage) || {};
+  const payload = objectValue(artifact.payload) || {};
+  return (
+    stringValue(lineage.idempotency_key) ||
+    stringValue(payload.idempotency_key) ||
+    stringValue(payload.client_idempotency_key)
+  );
+}
+
 function splitLines(value: string) {
   return value
     .split("\n")
@@ -1959,6 +1969,7 @@ export default function AgencyCommandCenterPage() {
                               objectValue(payload.adapter_contract)?.boundary
                             ) ||
                             "boundary recorded";
+                          const idempotencyKey = artifactIdempotencyValue(artifact);
 
                           return (
                             <div
@@ -1989,6 +2000,7 @@ export default function AgencyCommandCenterPage() {
                                   output {shortHash(stringValue(lineage.output_payload_hash))}
                                 </span>
                                 <span>run {compactDateTime(artifact.created_at)}</span>
+                                <span>retry {compactEvidenceValue(idempotencyKey)}</span>
                               </div>
                             </div>
                           );
@@ -2151,6 +2163,7 @@ export default function AgencyCommandCenterPage() {
                             <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
                               <span>payload {shortHash(event.payload_hash)}</span>
                               <span>previous {shortHash(event.previous_event_hash)}</span>
+                              <span>retry {compactEvidenceValue(event.idempotency_key)}</span>
                             </div>
                           </div>
                         ))}

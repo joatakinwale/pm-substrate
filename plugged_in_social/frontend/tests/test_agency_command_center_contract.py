@@ -92,6 +92,8 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "external_adapter_run" in source
     assert "gate_results_hash" in source
     assert "output_payload_hash" in source
+    assert "artifactIdempotencyValue" in source
+    assert "event.idempotency_key" in source
     assert "listIntegrationExternalAdapters" in source
     assert "getIntegrationRunEvidenceSnapshot" in source
     assert "approval_payload_hash" in source

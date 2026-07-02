@@ -1185,6 +1185,8 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       agencyCommandCenter.includes("external_adapter_run") &&
       agencyCommandCenter.includes("gate_results_hash") &&
       agencyCommandCenter.includes("output_payload_hash") &&
+      agencyCommandCenter.includes("artifactIdempotencyValue") &&
+      agencyCommandCenter.includes("event.idempotency_key") &&
       agencyCommandCenter.includes("getIntegrationRunEvidenceSnapshot") &&
       agencyCommandCenter.includes("listIntegrationExternalAdapters") &&
       agencyCommandCenter.includes("clientReports") &&
