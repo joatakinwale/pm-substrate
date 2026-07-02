@@ -246,6 +246,30 @@ def test_public_integration_routes_are_represented_in_platform_manifest():
     ) in manifest_surface
 
 
+def test_public_integration_routes_enforce_advertised_capabilities():
+    import app.api.integration as module
+
+    manifest_by_route = {
+        (endpoint.method, endpoint.path): set(endpoint.capability_ids)
+        for endpoint in module._endpoint_manifest()
+        if endpoint.boundary == "public_rls"
+    }
+
+    for route in module.router.routes:
+        for method in route.methods or set():
+            if method not in {"GET", "POST", "PATCH", "PUT", "DELETE"}:
+                continue
+            route_key = (method, f"/api{route.path}")
+            advertised_capabilities = manifest_by_route[route_key]
+            dependency_capabilities = {
+                getattr(dependency.call, "integration_capability_id", None)
+                for dependency in route.dependant.dependencies
+                if dependency.name == "current_user"
+            }
+            assert dependency_capabilities <= advertised_capabilities
+            assert dependency_capabilities
+
+
 def test_main_registers_neutral_integration_router():
     import app.main as module
 

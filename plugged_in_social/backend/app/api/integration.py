@@ -184,6 +184,7 @@ def require_integration_capability(capability_id: str):
         _assert_integration_capability(current_user, capability_id)
         return current_user
 
+    _check.integration_capability_id = capability_id  # type: ignore[attr-defined]
     return _check
 
 
