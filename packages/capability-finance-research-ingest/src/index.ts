@@ -7,6 +7,7 @@ export {
 } from "./capability.js";
 export {
   buildArrowHedgeIntegrationEvidenceRefs,
+  buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
   fetchArrowHedgeIntegrationSnapshot,
   validateArrowHedgeIntegrationSnapshot,
   ArrowHedgeIntegrationFetchError,
@@ -39,6 +40,9 @@ export {
   type ArrowHedgeIntegrationModelRecord,
   type ArrowHedgeIntegrationRunEvent,
   type ArrowHedgeIntegrationRunEvents,
+  type ArrowHedgeIntegrationRunEnvelope,
+  type ArrowHedgeIntegrationRunEnvelopeBuildInput,
+  type ArrowHedgeIntegrationRunEnvelopeBuildResult,
   type ArrowHedgeIntegrationRunSourceArtifacts,
   type ArrowHedgeIntegrationSnapshot,
   type ArrowHedgeIntegrationSnapshotFetchInput,

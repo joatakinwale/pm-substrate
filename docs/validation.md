@@ -115,23 +115,22 @@ Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
   `fetchArrowHedgeIntegrationSnapshot`, that validates those external surfaces,
   optional flow/run details, run events, source artifacts, run-specific source
   artifacts, backtest inventory/details/days, model inventory, redacted API-key
-  summaries, and emits source-record refs without importing ArrowHedgeLab
+  summaries, emits source-record refs, and builds canonical
+  `arrowhedge.run-envelope.v1` payloads without importing ArrowHedgeLab
   internals.
 - The TypeScript substrate side still supports `arrowhedge.run-envelope.v1`
   through `packages/capability-finance-research-ingest` and
-  `packages/substrate-http-demo`, but the connector must still build canonical
-  envelopes from the external adapter and ArrowHedgeLab should still add deeper
-  per-agent/per-tool provenance before paired live/backtest experiments can make
-  strong market-win claims.
+  `packages/substrate-http-demo`, and the connector now builds canonical
+  envelopes from external adapter snapshots. ArrowHedgeLab should still add
+  deeper per-agent/per-tool provenance, and paired experiment automation is
+  still required before live/backtest experiments can make strong market-win
+  claims.
 
 The next valid historical experiment path is:
 
-1. Extend the pm-substrate-side connector so it pulls the adapter surfaces and builds
-   `arrowhedge.run-envelope.v1` or its successor without importing pm-substrate
-   into ArrowHedgeLab core.
-2. Add deeper per-agent/per-tool provenance in ArrowHedge saved results so the
+1. Add deeper per-agent/per-tool provenance in ArrowHedge saved results so the
    envelope can cite the exact source artifacts behind each signal and decision.
-3. Reintroduce paired experiment commands only after the adapter can prove that
+2. Reintroduce paired experiment commands only after the adapter can prove that
    baseline and substrate arms share identical request, graph, model, portfolio,
    and source-data hashes.
 
@@ -177,4 +176,4 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).
-- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, and redacted config plus pm-substrate finance-ingest client landed.
+- **2026-07-01** — upstream ArrowHedgeLab reset preserved as an external repo and neutral `/integration/v1/*` adapter slices for discovery, cache, source artifacts, saved flows/runs, run events, backtests, backtest days, redacted config, and connector-side `arrowhedge.run-envelope.v1` generation plus pm-substrate finance-ingest client landed.

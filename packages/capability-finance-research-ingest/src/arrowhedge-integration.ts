@@ -309,6 +309,40 @@ export interface ArrowHedgeIntegrationSnapshot {
   readonly evidenceRefs: readonly StateRef[];
 }
 
+export interface ArrowHedgeIntegrationRunEnvelope {
+  readonly schemaVersion: "arrowhedge.run-envelope.v1";
+  readonly runId: string;
+  readonly surface: string;
+  readonly substrateMode: string;
+  readonly observedAt: string;
+  readonly scope: {
+    readonly startDate: string;
+    readonly endDate: string;
+    readonly tickers: readonly string[];
+  };
+  readonly graph: Record<string, unknown>;
+  readonly modelConfig: Record<string, unknown>;
+  readonly portfolio: Record<string, unknown>;
+  readonly signals: readonly Record<string, unknown>[];
+  readonly riskStates: readonly Record<string, unknown>[];
+  readonly decisions: readonly Record<string, unknown>[];
+  readonly evidence: readonly Record<string, unknown>[];
+}
+
+export interface ArrowHedgeIntegrationRunEnvelopeBuildInput {
+  readonly snapshot: ArrowHedgeIntegrationSnapshot;
+  readonly runId: number;
+  readonly substrateMode?: string;
+  readonly surface?: string;
+  readonly backtestDaySequence?: number;
+}
+
+export interface ArrowHedgeIntegrationRunEnvelopeBuildResult {
+  readonly valid: boolean;
+  readonly issues: readonly string[];
+  readonly envelope?: ArrowHedgeIntegrationRunEnvelope;
+}
+
 export interface ArrowHedgeIntegrationValidationResult {
   readonly ready: boolean;
   readonly issues: readonly string[];
@@ -499,6 +533,129 @@ export async function fetchArrowHedgeIntegrationSnapshot(
   return {
     ...snapshot,
     evidenceRefs: buildArrowHedgeIntegrationEvidenceRefs(snapshot),
+  };
+}
+
+export function buildArrowHedgeRunEnvelopeFromIntegrationSnapshot(
+  input: ArrowHedgeIntegrationRunEnvelopeBuildInput,
+): ArrowHedgeIntegrationRunEnvelopeBuildResult {
+  const issues: string[] = [];
+  const run = input.snapshot.runDetails.find((candidate) => candidate.id === input.runId);
+  if (run === undefined) {
+    return {
+      valid: false,
+      issues: [`runDetails is missing run ${input.runId}`],
+    };
+  }
+
+  const runId = String(run.id);
+  const flow = input.snapshot.flowDetails.find((candidate) => candidate.id === run.flow_id);
+  const runSources = input.snapshot.runSourceArtifacts.find(
+    (candidate) => candidate.run_id === input.runId,
+  );
+  const backtest = input.snapshot.backtestDetails.find(
+    (candidate) => candidate.run_id === input.runId,
+  ) ?? input.snapshot.backtests.backtests.find((candidate) => candidate.run_id === input.runId);
+  const backtestDays = input.snapshot.backtestDays.find(
+    (candidate) => candidate.run_id === input.runId,
+  );
+  const selectedDay = selectBacktestDay(backtestDays, input.backtestDaySequence);
+  const runResult = recordOrUndefined(run.results);
+  const resultRecord = selectedDay ?? runResult;
+
+  if (resultRecord === undefined) {
+    issues.push(`run ${input.runId} has no backtest day or result payload to envelope`);
+  }
+
+  const tickers = extractEnvelopeTickers({
+    run,
+    runSources,
+    resultRecord,
+  });
+  if (tickers.length === 0) {
+    issues.push(`run ${input.runId} has no tickers in request or results`);
+  }
+
+  const startDate = stringField(recordOrUndefined(run.requestData), "start_date")
+    ?? stringField(recordOrUndefined(runSources?.request), "start_date")
+    ?? backtest?.first_date
+    ?? stringField(resultRecord, "date");
+  const endDate = stringField(recordOrUndefined(run.requestData), "end_date")
+    ?? stringField(recordOrUndefined(runSources?.request), "end_date")
+    ?? backtest?.last_date
+    ?? stringField(resultRecord, "date");
+  if (startDate === undefined) {
+    issues.push(`run ${input.runId} has no start_date`);
+  }
+  if (endDate === undefined) {
+    issues.push(`run ${input.runId} has no end_date`);
+  }
+
+  const observedAt = firstTimestamp([
+    stringField(run, "completed_at"),
+    stringField(run, "updated_at"),
+    stringField(run, "created_at"),
+    endDate,
+  ]);
+  if (observedAt === undefined) {
+    issues.push(`run ${input.runId} has no valid observed timestamp`);
+  }
+
+  const sourceArtifacts =
+    runSources !== undefined && runSources.artifacts.length > 0
+      ? runSources.artifacts
+      : input.snapshot.sourceArtifacts.artifacts.filter((artifact) =>
+          artifact.ticker === undefined || tickers.includes(String(artifact.ticker)),
+        );
+
+  const envelopeEvidence = [
+    ...sourceArtifacts.map(sourceArtifactToEnvelopeEvidence),
+    ...(selectedDay === undefined
+      ? []
+      : backtestDayToEnvelopeEvidence(selectedDay, runId, tickers, observedAt)),
+  ];
+
+  const signals = resultRecord === undefined
+    ? []
+    : buildEnvelopeSignals(resultRecord, runId, tickers, observedAt, issues);
+  const riskStates = resultRecord === undefined
+    ? []
+    : buildEnvelopeRiskStates(resultRecord, tickers, runId, observedAt, issues);
+  const decisions = resultRecord === undefined
+    ? []
+    : buildEnvelopeDecisions(resultRecord, tickers, runId, issues);
+  const portfolio = buildEnvelopePortfolio({
+    resultRecord,
+    backtest,
+    run,
+  });
+
+  if (issues.length > 0) {
+    return { valid: false, issues };
+  }
+
+  return {
+    valid: true,
+    issues: [],
+    envelope: {
+      schemaVersion: "arrowhedge.run-envelope.v1",
+      runId,
+      surface: input.surface ?? (backtest !== undefined ? "backtest" : "flow-run"),
+      substrateMode: input.substrateMode ?? "observe",
+      observedAt: observedAt!,
+      scope: {
+        startDate: startDate!,
+        endDate: endDate!,
+        tickers,
+      },
+      graph: flowToEnvelopeGraph(flow, input.snapshot.effectiveGraph),
+      modelConfig: modelConfigToEnvelope(input.snapshot.modelConfig),
+      portfolio,
+      signals,
+      riskStates,
+      decisions,
+      evidence: envelopeEvidence,
+    },
   };
 }
 
@@ -932,6 +1089,302 @@ function uniqueNumbers(values: readonly number[]): readonly number[] {
 
 function includesRawSecret(value: unknown): boolean {
   return JSON.stringify(value)?.includes("sk-") ?? false;
+}
+
+function recordOrUndefined(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function stringField(
+  record: Record<string, unknown> | undefined,
+  field: string,
+): string | undefined {
+  const value = record?.[field];
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function numberField(
+  record: Record<string, unknown> | undefined,
+  field: string,
+): number | undefined {
+  const value = record?.[field];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function numberFromFields(
+  record: Record<string, unknown> | undefined,
+  fields: readonly string[],
+): number | undefined {
+  for (const field of fields) {
+    const value = numberField(record, field);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+function dateToTimestamp(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? `${value}T00:00:00.000Z`
+    : value;
+  return Number.isNaN(Date.parse(normalized))
+    ? undefined
+    : new Date(normalized).toISOString();
+}
+
+function firstTimestamp(values: readonly (string | null | undefined)[]): string | undefined {
+  for (const value of values) {
+    const timestamp = dateToTimestamp(value ?? undefined);
+    if (timestamp !== undefined) return timestamp;
+  }
+  return undefined;
+}
+
+function selectBacktestDay(
+  backtestDays: ArrowHedgeIntegrationBacktestDays | undefined,
+  sequence: number | undefined,
+): ArrowHedgeIntegrationBacktestDay | undefined {
+  if (backtestDays === undefined || backtestDays.days.length === 0) return undefined;
+  if (sequence !== undefined) {
+    return backtestDays.days.find((day) => day.sequence === sequence);
+  }
+  return backtestDays.days.at(-1);
+}
+
+function extractEnvelopeTickers(input: {
+  readonly run: ArrowHedgeIntegrationFlowRun;
+  readonly runSources: ArrowHedgeIntegrationRunSourceArtifacts | undefined;
+  readonly resultRecord: Record<string, unknown> | undefined;
+}): readonly string[] {
+  const requestTickers = arrayOfStrings(recordOrUndefined(input.run.requestData)?.["tickers"]);
+  const sourceTickers = arrayOfStrings(input.runSources?.request["tickers"]);
+  const currentPrices = recordOrUndefined(input.resultRecord?.["current_prices"]);
+  const decisionTickers = recordOrUndefined(input.resultRecord?.["decisions"]);
+  return uniqueStrings([
+    ...requestTickers,
+    ...sourceTickers,
+    ...Object.keys(currentPrices ?? {}),
+    ...Object.keys(decisionTickers ?? {}),
+  ]);
+}
+
+function arrayOfStrings(value: unknown): readonly string[] {
+  if (typeof value === "string") {
+    return value.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) =>
+    typeof item === "string" && item.trim().length > 0 ? [item] : [],
+  );
+}
+
+function uniqueStrings(values: readonly string[]): readonly string[] {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function sourceArtifactToEnvelopeEvidence(
+  artifact: ArrowHedgeIntegrationSourceArtifact,
+): Record<string, unknown> {
+  const observed = recordOrUndefined(artifact.observed);
+  const retrievedAt = firstTimestamp([
+    stringField(observed, "max_observed_at"),
+    stringField(observed, "min_observed_at"),
+  ]);
+  return {
+    id: `ev_source_${sanitizeToken(artifact.kind)}_${sanitizeToken(artifact.cache_key)}`,
+    sha256: artifact.sha256,
+    mimeType: "application/json",
+    filename: `${sanitizeToken(artifact.cache_key)}.json`,
+    sourceUri: `arrowhedge://source-artifacts/${encodeURIComponent(artifact.cache_key)}`,
+    ...(typeof artifact.ticker === "string" ? { ticker: artifact.ticker } : {}),
+    ...(retrievedAt !== undefined ? { retrievedAt, freshnessExpiresAt: retrievedAt } : {}),
+  };
+}
+
+function backtestDayToEnvelopeEvidence(
+  day: ArrowHedgeIntegrationBacktestDay,
+  runId: string,
+  tickers: readonly string[],
+  observedAt: string | undefined,
+): readonly Record<string, unknown>[] {
+  return tickers.map((ticker) => ({
+    id: tickers.length === 1
+      ? `ev_backtest_day_${runId}_${day.sequence}`
+      : `ev_backtest_day_${runId}_${day.sequence}_${sanitizeToken(ticker)}`,
+    ticker,
+    sha256: day.sha256,
+    mimeType: "application/json",
+    filename: `${runId}-backtest-day-${day.sequence}-${sanitizeToken(ticker)}.json`,
+    sourceUri: `arrowhedge://backtests/${runId}/days/${day.sequence}`,
+    retrievedAt: firstTimestamp([day.date, observedAt]),
+    freshnessExpiresAt: firstTimestamp([day.date, observedAt]),
+  }));
+}
+
+function buildEnvelopeSignals(
+  resultRecord: Record<string, unknown>,
+  runId: string,
+  tickers: readonly string[],
+  observedAt: string | undefined,
+  issues: string[],
+): readonly Record<string, unknown>[] {
+  const analystSignals = recordOrUndefined(resultRecord["analyst_signals"]);
+  const occurredAt = firstTimestamp([stringField(resultRecord, "date"), observedAt]);
+  const signals: Record<string, unknown>[] = [];
+  for (const ticker of tickers) {
+    let tickerSignalCount = 0;
+    for (const [agentId, agentPayload] of Object.entries(analystSignals ?? {})) {
+      const agentRecord = recordOrUndefined(agentPayload);
+      const signalRecord = recordOrUndefined(agentRecord?.[ticker]);
+      if (signalRecord === undefined) continue;
+      const signal = stringField(signalRecord, "signal");
+      if (signal === undefined) continue;
+      signals.push({
+        id: `sig_${sanitizeToken(agentId)}_${sanitizeToken(ticker)}_${sanitizeToken(runId)}`,
+        ticker,
+        agentId,
+        signal,
+        confidence: numberField(signalRecord, "confidence") ?? 0.5,
+        ...(occurredAt !== undefined
+          ? { evidenceWindowStart: occurredAt, evidenceWindowEnd: occurredAt }
+          : {}),
+      });
+      tickerSignalCount += 1;
+    }
+    if (tickerSignalCount === 0) {
+      issues.push(`run ${runId} is missing analyst signal for ${ticker}`);
+    }
+  }
+  return signals;
+}
+
+function buildEnvelopeRiskStates(
+  resultRecord: Record<string, unknown>,
+  tickers: readonly string[],
+  runId: string,
+  observedAt: string | undefined,
+  issues: string[],
+): readonly Record<string, unknown>[] {
+  const currentPrices = recordOrUndefined(resultRecord["current_prices"]);
+  const decisions = recordOrUndefined(resultRecord["decisions"]);
+  const executedTrades = recordOrUndefined(resultRecord["executed_trades"]);
+  const cash = numberField(resultRecord, "cash") ?? 0;
+  return tickers.flatMap((ticker) => {
+    const currentPrice = numberField(currentPrices, ticker);
+    if (currentPrice === undefined) {
+      issues.push(`run ${runId} is missing current price for ${ticker}`);
+      return [];
+    }
+    const decision = recordOrUndefined(decisions?.[ticker]);
+    const requestedQuantity =
+      numberField(decision, "quantity") ?? Math.abs(numberField(executedTrades, ticker) ?? 0);
+    const maxShares = currentPrice > 0
+      ? Math.max(Math.floor(cash / currentPrice), requestedQuantity)
+      : requestedQuantity;
+    return [
+      {
+        id: `risk_${sanitizeToken(runId)}_${sanitizeToken(ticker)}`,
+        ticker,
+        agentId: "risk_management",
+        currentPrice,
+        remainingPositionLimit: cash,
+        maxShares,
+        bindingConstraint: "cash_available",
+        freshnessExpiresAt: firstTimestamp([stringField(resultRecord, "date"), observedAt]),
+      },
+    ];
+  });
+}
+
+function buildEnvelopeDecisions(
+  resultRecord: Record<string, unknown>,
+  tickers: readonly string[],
+  runId: string,
+  issues: string[],
+): readonly Record<string, unknown>[] {
+  const decisions = recordOrUndefined(resultRecord["decisions"]);
+  const executedTrades = recordOrUndefined(resultRecord["executed_trades"]);
+  return tickers.flatMap((ticker) => {
+    const decision = recordOrUndefined(decisions?.[ticker]);
+    if (decision === undefined) {
+      issues.push(`run ${runId} is missing portfolio decision for ${ticker}`);
+      return [];
+    }
+    const action = stringField(decision, "action");
+    if (action === undefined) {
+      issues.push(`run ${runId} decision for ${ticker} is missing action`);
+      return [];
+    }
+    const quantity = numberField(decision, "quantity") ?? Math.abs(numberField(executedTrades, ticker) ?? 0);
+    return [
+      {
+        id: `dec_${sanitizeToken(runId)}_${sanitizeToken(ticker)}`,
+        ticker,
+        action,
+        quantity,
+        confidence: numberField(decision, "confidence") ?? 0.5,
+        reasoning: stringField(decision, "reasoning") ?? `ArrowHedge ${ticker} ${action} decision`,
+        accepted: action !== "hold" && quantity > 0,
+        allowedActions: allowedActionsForDecision(action, quantity),
+      },
+    ];
+  });
+}
+
+function buildEnvelopePortfolio(input: {
+  readonly resultRecord: Record<string, unknown> | undefined;
+  readonly backtest: ArrowHedgeIntegrationBacktestSummary | undefined;
+  readonly run: ArrowHedgeIntegrationFlowRun;
+}): Record<string, unknown> {
+  const backtestPortfolio = recordOrUndefined(input.backtest?.final_portfolio);
+  const runPortfolio = recordOrUndefined(input.run["finalPortfolio"]);
+  const source = backtestPortfolio ?? runPortfolio ?? input.resultRecord;
+  const cash = numberField(source, "cash") ?? numberField(input.resultRecord, "cash") ?? 0;
+  const equity = numberFromFields(source, ["equity", "portfolio_value"])
+    ?? numberField(input.resultRecord, "portfolio_value")
+    ?? cash;
+  return {
+    cash,
+    equity,
+    margin_requirement: numberFromFields(source, ["marginRequirement", "margin_requirement"]) ?? 0.25,
+    margin_used: numberFromFields(source, ["marginUsed", "margin_used"]) ?? 0,
+  };
+}
+
+function allowedActionsForDecision(action: string, quantity: number): Record<string, number> {
+  return {
+    hold: 0,
+    [action]: Math.max(quantity, 0),
+  };
+}
+
+function flowToEnvelopeGraph(
+  flow: ArrowHedgeIntegrationFlow | undefined,
+  effectiveGraph: ArrowHedgeIntegrationEffectiveGraph,
+): Record<string, unknown> {
+  return {
+    ...(flow === undefined ? {} : { flowId: flow.id, name: flow.name }),
+    nodes: flow?.nodes ?? effectiveGraph.nodes,
+    edges: flow?.edges ?? effectiveGraph.edges,
+    effectiveGraph: flow?.effectiveGraph ?? effectiveGraph,
+  };
+}
+
+function modelConfigToEnvelope(
+  modelConfig: ArrowHedgeIntegrationModelConfig,
+): Record<string, unknown> {
+  return {
+    defaults: modelConfig.defaults,
+    models: modelConfig.models,
+    providers: modelConfig.providers,
+    hashes: modelConfig.hashes ?? {},
+  };
+}
+
+function sanitizeToken(value: string): string {
+  return value.replace(/[^A-Za-z0-9_.-]+/g, "_");
 }
 
 function validateSourceArtifacts(

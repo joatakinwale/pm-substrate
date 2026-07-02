@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
   fetchArrowHedgeIntegrationSnapshot,
   validateArrowHedgeIntegrationSnapshot,
   type ArrowHedgeIntegrationFetch,
   type ArrowHedgeIntegrationFetchResponse,
 } from "./arrowhedge-integration.js";
+import { expandArrowHedgeRunEnvelope } from "./arrowhedge.js";
 
 function jsonResponse(
   body: unknown,
@@ -233,8 +235,11 @@ describe("ArrowHedge integration API client", () => {
           id: 11,
           flow_id: 7,
           status: "COMPLETE",
+          completed_at: "2024-01-02T16:00:00.000Z",
           requestData: {
             tickers: ["AAPL"],
+            start_date: "2024-01-01",
+            end_date: "2024-01-02",
             api_keys: { OPENAI_API_KEY: { present: true } },
           },
           results: { decisions: { AAPL: { action: "buy" } } },
@@ -348,10 +353,11 @@ describe("ArrowHedge integration API client", () => {
               sequence: 1,
               date: "2024-01-02",
               portfolio_value: 101500,
+              cash: 99000,
               decisions: { AAPL: { action: "buy", quantity: 3 } },
               executed_trades: { AAPL: 3 },
               analyst_signals: {
-                warren_buffett: { AAPL: { signal: "bullish" } },
+                warren_buffett: { AAPL: { signal: "bullish", confidence: 0.74 } },
               },
               current_prices: { AAPL: 185 },
               sha256: "a1".repeat(32),
@@ -497,6 +503,68 @@ describe("ArrowHedge integration API client", () => {
         `arrowhedgelab:cache:prices:AAPL_2024-01-01_2024-01-02:${"a".repeat(64)}`,
       ]),
     );
+
+    const envelopeResult = buildArrowHedgeRunEnvelopeFromIntegrationSnapshot({
+      snapshot,
+      runId: 11,
+      substrateMode: "blocking",
+    });
+    expect(envelopeResult).toMatchObject({
+      valid: true,
+      issues: [],
+      envelope: {
+        schemaVersion: "arrowhedge.run-envelope.v1",
+        runId: "11",
+        surface: "backtest",
+        substrateMode: "blocking",
+        scope: {
+          startDate: "2024-01-01",
+          endDate: "2024-01-02",
+          tickers: ["AAPL"],
+        },
+      },
+    });
+    expect(envelopeResult.envelope?.signals).toEqual([
+      expect.objectContaining({
+        ticker: "AAPL",
+        agentId: "warren_buffett",
+        signal: "bullish",
+        confidence: 0.74,
+      }),
+    ]);
+    expect(envelopeResult.envelope?.riskStates).toEqual([
+      expect.objectContaining({
+        ticker: "AAPL",
+        currentPrice: 185,
+      }),
+    ]);
+    expect(envelopeResult.envelope?.decisions).toEqual([
+      expect.objectContaining({
+        ticker: "AAPL",
+        action: "buy",
+        quantity: 3,
+      }),
+    ]);
+    expect(envelopeResult.envelope?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.stringContaining("AAPL_2024-01-01_2024-01-02"),
+          ticker: "AAPL",
+          sha256: "c1".repeat(32),
+        }),
+        expect.objectContaining({
+          id: "ev_backtest_day_11_1",
+          ticker: "AAPL",
+          sha256: "a1".repeat(32),
+        }),
+      ]),
+    );
+    const expandedEnvelope = expandArrowHedgeRunEnvelope(envelopeResult.envelope);
+    expect(expandedEnvelope).toMatchObject({
+      valid: true,
+      issues: [],
+    });
+    expect(expandedEnvelope.snapshots).toHaveLength(1);
   });
 
   it("reports contract issues instead of accepting a partial adapter surface", () => {
