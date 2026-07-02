@@ -346,7 +346,7 @@ export default function AgencyCommandCenterPage() {
           : "Analytics task queued."
         : "Waiting for metrics task.",
       report: hasReportEvidence
-        ? `${reportCount || 1} report evidence record${(reportCount || 1) === 1 ? "" : "s"} recorded.`
+        ? `${reportCount || 1} report evidence record${(reportCount || 1) === 1 ? "" : "s"} present.`
         : "Waiting for report evidence.",
       next_action: hasNextAction
         ? "Next action proposal recorded."
