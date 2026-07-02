@@ -204,7 +204,144 @@ const runEnvelope = {
   ],
 };
 
+const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const pairedReadinessApp = (): Hono => {
+  const app = new Hono();
+  app.route(
+    "/tenants/:tenantId/arrowhedge",
+    arrowhedgeRoutes({
+      pool: {} as unknown as pg.Pool,
+      graph: {
+        createNode: async () => undefined,
+        updateNode: async () => undefined,
+        createEdge: async () => undefined,
+      },
+      events: {
+        publishWith: async (_tx: unknown, input: unknown) => input as PMEvent,
+      },
+      projections: {
+        register: async () => undefined,
+        catchUp: async () => undefined,
+        getState: async () => undefined,
+      } as unknown as ProjectionRunner,
+    }),
+  );
+  return app;
+};
+
 describe("ArrowHedge run-envelope HTTP route contract", () => {
+  it("POST /experiments/paired-readiness admits comparable baseline and substrate envelopes", async () => {
+    const app = pairedReadinessApp();
+    const baseline = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "observe",
+    };
+    const substrate = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "blocking",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-readiness", {
+        method: "POST",
+        body: JSON.stringify({ baseline, substrate }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      ready: boolean;
+      issues: readonly string[];
+      admitted: {
+        baselineRunId: string;
+        substrateRunId: string;
+        tickers: readonly string[];
+      };
+      fingerprints: {
+        scopeEqual: boolean;
+        graphEqual: boolean;
+        modelConfigEqual: boolean;
+        portfolioEqual: boolean;
+        sourceDataEqual: boolean;
+      };
+    };
+    expect(body.ready).toBe(true);
+    expect(body.issues).toEqual([]);
+    expect(body.admitted).toMatchObject({
+      baselineRunId: "run_http_demo_001",
+      substrateRunId: "run_http_demo_001",
+      tickers: ["AAPL", "MSFT"],
+    });
+    expect(body.fingerprints).toMatchObject({
+      scopeEqual: true,
+      graphEqual: true,
+      modelConfigEqual: true,
+      portfolioEqual: true,
+      sourceDataEqual: true,
+    });
+  });
+
+  it("POST /experiments/paired-readiness refuses mismatched experiment arms", async () => {
+    const app = pairedReadinessApp();
+    const substrate = cloneJson(runEnvelope);
+    substrate.modelConfig = {
+      ...substrate.modelConfig,
+      model: "gpt-4o",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-readiness", {
+        method: "POST",
+        body: JSON.stringify({
+          baseline: runEnvelope,
+          substrate,
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    const body = await response.json() as {
+      ready: boolean;
+      issues: readonly string[];
+      admitted: null;
+      fingerprints: { modelConfigEqual: boolean };
+    };
+    expect(body.ready).toBe(false);
+    expect(body.admitted).toBeNull();
+    expect(body.issues).toEqual(["modelConfig hash mismatch"]);
+    expect(body.fingerprints.modelConfigEqual).toBe(false);
+  });
+
+  it("POST /experiments/paired-readiness rejects malformed envelopes before comparing", async () => {
+    const app = pairedReadinessApp();
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-readiness", {
+        method: "POST",
+        body: JSON.stringify({
+          baseline: { schemaVersion: "arrowhedge.run-envelope.v1" },
+          substrate: runEnvelope,
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    const body = await response.json() as {
+      ready: boolean;
+      error: string;
+      issues: readonly string[];
+    };
+    expect(body.ready).toBe(false);
+    expect(body.error).toBe("invalid paired run envelopes");
+    expect(body.issues).toEqual(
+      expect.arrayContaining([expect.stringContaining("baseline:")]),
+    );
+  });
+
   it("POST /run-envelopes expands and ingests every ticker snapshot", async () => {
     const app = new Hono();
     let graphNodeWrites = 0;

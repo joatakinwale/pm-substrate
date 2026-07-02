@@ -19,8 +19,10 @@ import {
   buildArrowHedgeIngestionPlan,
   executeArrowHedgeIngestionPlan,
   createArrowHedgeCommonOperatingPictureProjection,
+  compareArrowHedgeIntegrationRunEnvelopePair,
   expandArrowHedgeRunEnvelope,
   type ArrowHedgeCommonOperatingPictureState,
+  type ArrowHedgeIntegrationRunEnvelope,
 } from "@pm/capability-finance-research-ingest";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import type { ProfileRegistry } from "@pm/profile-registry";
@@ -31,6 +33,9 @@ const errorResponse = (err: unknown): { status: 500; body: { error: string } } =
   status: 500,
   body: { error: err instanceof Error ? err.message : String(err) },
 });
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
  * Tx-aware graph + events ports (PostgresGraph / PostgresEventStore satisfy
@@ -245,6 +250,69 @@ export const arrowhedgeRoutes = (deps: ArrowHedgeIngestDeps): Hono => {
       const { status, body } = errorResponse(err);
       return c.json(body, status);
     }
+  });
+
+  // POST /tenants/:tenantId/arrowhedge/experiments/paired-readiness
+  // Body: { baseline, substrate } where both are arrowhedge.run-envelope.v1.
+  // This route is an admission gate for market-win experiments: it validates
+  // both envelopes and refuses comparison when scope, graph, model config,
+  // portfolio, or source-data fingerprints differ.
+  app.post("/experiments/paired-readiness", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON body" }, 400);
+    }
+
+    if (!isRecord(body)) {
+      return c.json({ error: "request body must be an object" }, 400);
+    }
+
+    const baseline = body["baseline"];
+    const substrate = body["substrate"];
+    const baselineExpanded = expandArrowHedgeRunEnvelope(baseline);
+    const substrateExpanded = expandArrowHedgeRunEnvelope(substrate);
+    const issues = [
+      ...(!baselineExpanded.valid
+        ? baselineExpanded.issues.map((issue) => `baseline: ${issue.message}`)
+        : []),
+      ...(!substrateExpanded.valid
+        ? substrateExpanded.issues.map((issue) => `substrate: ${issue.message}`)
+        : []),
+    ];
+    if (issues.length > 0) {
+      return c.json(
+        {
+          schemaVersion: "arrowhedge.paired-readiness.v1",
+          ready: false,
+          error: "invalid paired run envelopes",
+          issues,
+        },
+        422,
+      );
+    }
+
+    const gate = compareArrowHedgeIntegrationRunEnvelopePair({
+      baseline: baseline as ArrowHedgeIntegrationRunEnvelope,
+      substrate: substrate as ArrowHedgeIntegrationRunEnvelope,
+    });
+    const response = {
+      schemaVersion: "arrowhedge.paired-readiness.v1",
+      ready: gate.ready,
+      issues: gate.issues,
+      fingerprints: gate.fingerprints,
+      admitted: gate.ready
+        ? {
+            baselineRunId: (baseline as ArrowHedgeIntegrationRunEnvelope).runId,
+            substrateRunId: (substrate as ArrowHedgeIntegrationRunEnvelope).runId,
+            tickers: (baseline as ArrowHedgeIntegrationRunEnvelope).scope.tickers,
+            startDate: (baseline as ArrowHedgeIntegrationRunEnvelope).scope.startDate,
+            endDate: (baseline as ArrowHedgeIntegrationRunEnvelope).scope.endDate,
+          }
+        : null,
+    };
+    return c.json(response, gate.ready ? 200 : 409);
   });
 
   // GET /tenants/:tenantId/arrowhedge/cop — read current COP without ingesting.
