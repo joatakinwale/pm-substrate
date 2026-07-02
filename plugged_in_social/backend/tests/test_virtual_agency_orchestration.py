@@ -364,6 +364,7 @@ async def test_virtual_agency_closed_loop_reaches_next_action_with_durable_evide
     assert next_action_task.context["required_gates"] == [
         "tenant_rls",
         "client_report_generated",
+        "metrics_snapshot_evidence_present",
         "metrics_snapshot_hash",
         "pm_substrate_next_action_adapter",
         "client_approval_before_execution",

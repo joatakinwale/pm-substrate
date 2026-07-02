@@ -51,13 +51,15 @@ def create_next_action_proposal_task_for_report(
         return None
     if report.status not in _GENERATED_REPORT_STATUSES:
         return None
+    metrics_snapshot = report.metrics_snapshot or {}
+    if not _metrics_snapshot_has_evidence(metrics_snapshot):
+        return None
 
     idempotency_key = f"va-next-action:{report.id}"
     existing = _find_task_by_creation_idempotency_key(db, idempotency_key)
     if existing is not None:
         return existing
 
-    metrics_snapshot = report.metrics_snapshot or {}
     metrics_snapshot_hash = compute_hash(metrics_snapshot)
     report_hash = compute_hash(
         {
@@ -107,13 +109,15 @@ async def create_next_action_proposal_task_for_report_async(
         return None
     if report.status not in _GENERATED_REPORT_STATUSES:
         return None
+    metrics_snapshot = report.metrics_snapshot or {}
+    if not _metrics_snapshot_has_evidence(metrics_snapshot):
+        return None
 
     idempotency_key = f"va-next-action:{report.id}"
     existing = await _find_task_by_creation_idempotency_key_async(db, idempotency_key)
     if existing is not None:
         return existing
 
-    metrics_snapshot = report.metrics_snapshot or {}
     metrics_snapshot_hash = compute_hash(metrics_snapshot)
     report_hash = compute_hash(
         {
@@ -250,11 +254,28 @@ def _build_context(
         "required_gates": [
             "tenant_rls",
             "client_report_generated",
+            "metrics_snapshot_evidence_present",
             "metrics_snapshot_hash",
             "pm_substrate_next_action_adapter",
             "client_approval_before_execution",
         ],
     }
+
+
+def _metrics_snapshot_has_evidence(metrics_snapshot: dict[str, Any]) -> bool:
+    if not metrics_snapshot:
+        return False
+    return any(_has_metric_value(value) for value in metrics_snapshot.values())
+
+
+def _has_metric_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return len(value) > 0
+    return True
 
 
 def _find_task_by_creation_idempotency_key(

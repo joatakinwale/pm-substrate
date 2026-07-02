@@ -135,6 +135,21 @@ def test_report_without_project_does_not_create_invalid_orchestration_task():
     assert list(db._store.get(VirtualAgencyEvent, {}).values()) == []
 
 
+def test_generated_report_without_metrics_evidence_does_not_create_next_action_task():
+    db = _FakeSyncSession()
+    report = _report(metrics_snapshot={})
+
+    task = create_next_action_proposal_task_for_report(
+        db,
+        report=report,
+        actor_id="system:report-builder",
+    )
+
+    assert task is None
+    assert list(db._store.get(VirtualAgencyTask, {}).values()) == []
+    assert list(db._store.get(VirtualAgencyEvent, {}).values()) == []
+
+
 def test_report_render_persists_next_action_task_before_terminal_commit():
     src = inspect.getsource(internal_reports._render_report_sync)
 
