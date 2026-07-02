@@ -1398,6 +1398,24 @@ function liveRunEvidenceIssues(
   if (socialPosts.length !== summary.social_post_count) {
     issues.add("social post response count does not match evidence summary count");
   }
+  const publishedSocialPosts = socialPosts.filter(
+    (post) => post.status === "published",
+  );
+  if (publishedSocialPosts.length === 0) {
+    issues.add("marketing run has no published social posts");
+  }
+  if (
+    (summary.social_post_status_counts.published ?? 0) !==
+    publishedSocialPosts.length
+  ) {
+    issues.add("published social post count does not match evidence summary count");
+  }
+  if (
+    publishedSocialPosts.length > 0 &&
+    !publishedSocialPosts.some(socialPostHasMetricEvidence)
+  ) {
+    issues.add("marketing run has no published social metric evidence");
+  }
   if (summary.report_count <= 0 || reports.length <= 0) {
     issues.add("marketing run has no client reports");
   }
@@ -1490,6 +1508,12 @@ function liveRunEvidenceIssues(
     if (post.status === "published" && post.published_content_hash === null) {
       issues.add(`published social post missing published content hash: ${post.id}`);
     }
+    if (post.status === "published" && post.published_at === null) {
+      issues.add(`published social post missing published_at: ${post.id}`);
+    }
+    if (post.status === "published" && post.platform_post_id === null) {
+      issues.add(`published social post missing platform_post_id: ${post.id}`);
+    }
     if (
       post.published_content_hash !== null &&
       post.scheduled_content_hash !== null &&
@@ -1525,6 +1549,19 @@ function liveRunEvidenceIssues(
   }
 
   return [...issues].sort();
+}
+
+function socialPostHasMetricEvidence(
+  post: PluggedInSocialIntegrationSocialPostEnvelope,
+): boolean {
+  return (
+    post.likes > 0 ||
+    post.comments > 0 ||
+    post.shares > 0 ||
+    post.impressions > 0 ||
+    post.reach > 0 ||
+    post.engagement_rate !== null
+  );
 }
 
 function metricsFromReport(

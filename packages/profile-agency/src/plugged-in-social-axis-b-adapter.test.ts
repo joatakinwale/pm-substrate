@@ -417,7 +417,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       access_request_count: 1,
       open_access_request_count: 0,
       social_post_count: 1,
-      social_post_status_counts: { scheduled: 1 },
+      social_post_status_counts: { published: 1 },
       report_count: 1,
       report_status_counts: { generated: 1 },
       adapter_readiness: {
@@ -550,27 +550,27 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         project_id: "33333333-3333-4333-8333-333333333333",
         social_account_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         platform: "linkedin",
-        status: "scheduled",
+        status: "published",
         caption: "Approved launch campaign draft",
         hashtags: ["launch"],
         media_urls: [],
         media_type: null,
         scheduled_at: "2026-07-02T16:00:00.000Z",
-        published_at: null,
-        platform_post_id: null,
-        platform_url: null,
+        published_at: "2026-07-02T16:05:00.000Z",
+        platform_post_id: "urn:li:share:123",
+        platform_url: "https://linkedin.example/posts/123",
         compound_phase: "create",
         created_by_agent: "content_creative",
         version: 2,
         current_content_hash: liveSocialPostHash,
         scheduled_content_hash: liveSocialPostHash,
-        published_content_hash: null,
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        impressions: 0,
-        reach: 0,
-        engagement_rate: null,
+        published_content_hash: liveSocialPostHash,
+        likes: 12,
+        comments: 3,
+        shares: 2,
+        impressions: 840,
+        reach: 650,
+        engagement_rate: 0.026,
         lineage: { marketing_run_id: liveRunId },
       },
     ],
@@ -1161,6 +1161,59 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     expect(result.ready).toBe(false);
     expect(result.issues).toContain(
       "social post is missing marketing-run lineage: bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    );
+  });
+
+  it("blocks live run evidence when social posts never publish", () => {
+    const snapshot = liveSnapshotFixture();
+    const result = buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult({
+      snapshot: {
+        ...snapshot,
+        summary: {
+          ...snapshot.summary,
+          social_post_status_counts: { scheduled: 1 },
+        },
+        socialPosts: snapshot.socialPosts.map((post) => ({
+          ...post,
+          status: "scheduled",
+          published_at: null,
+          platform_post_id: null,
+          platform_url: null,
+          published_content_hash: null,
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          impressions: 0,
+          reach: 0,
+          engagement_rate: null,
+        })),
+      },
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.issues).toContain("marketing run has no published social posts");
+  });
+
+  it("blocks live run evidence when published posts have no metric evidence", () => {
+    const snapshot = liveSnapshotFixture();
+    const result = buildPluggedInSocialAxisBLiveRunEvidenceAdapterResult({
+      snapshot: {
+        ...snapshot,
+        socialPosts: snapshot.socialPosts.map((post) => ({
+          ...post,
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          impressions: 0,
+          reach: 0,
+          engagement_rate: null,
+        })),
+      },
+    });
+
+    expect(result.ready).toBe(false);
+    expect(result.issues).toContain(
+      "marketing run has no published social metric evidence",
     );
   });
 
