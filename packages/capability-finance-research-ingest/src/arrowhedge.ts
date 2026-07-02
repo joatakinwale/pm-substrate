@@ -136,7 +136,12 @@ export const ARROWHEDGE_ENTITY_MAPPING: EntityMapping = {
       tier1: "Event",
       concrete: "AnalystSignal",
       identityFields: ["kind", "occurredAt", "agentId", "signal", "confidence"],
-      optionalFields: ["evidenceWindowStart", "evidenceWindowEnd", "sourceSnapshotId"],
+      optionalFields: [
+        "evidenceWindowStart",
+        "evidenceWindowEnd",
+        "sourceSnapshotId",
+        "evidenceDocumentIds",
+      ],
       schemaVersion: 1,
       edges: {
         ticker: {
@@ -161,7 +166,12 @@ export const ARROWHEDGE_ENTITY_MAPPING: EntityMapping = {
         "remainingPositionLimit",
         "maxShares",
       ],
-      optionalFields: ["volatility", "bindingConstraint", "sourceSnapshotId"],
+      optionalFields: [
+        "volatility",
+        "bindingConstraint",
+        "sourceSnapshotId",
+        "evidenceDocumentIds",
+      ],
       schemaVersion: 1,
       edges: {
         ticker: {
@@ -191,7 +201,7 @@ export const ARROWHEDGE_ENTITY_MAPPING: EntityMapping = {
       fieldMap: {
         allowedActions: "allowedActions",
       },
-      optionalFields: ["rejectionReason"],
+      optionalFields: ["rejectionReason", "evidenceDocumentIds"],
       schemaVersion: 1,
       edges: {
         ticker: {
@@ -788,6 +798,7 @@ export function parseArrowHedgeSnapshot(
           `${signalPath}/evidenceWindowEnd`,
           issues,
         ),
+        evidenceDocumentIds: stringArray(rawSignal["evidenceDocumentIds"]),
         sourceSnapshotId: snapshotId,
       });
     }
@@ -799,6 +810,7 @@ export function parseArrowHedgeSnapshot(
       maxShares: numberAt(risk!, "/risk/maxShares", issues),
       volatility: optionalNumberAt(risk!, "/risk/volatility", issues),
       bindingConstraint: optionalStringAt(risk!, "/risk/bindingConstraint", issues),
+      evidenceDocumentIds: stringArray(risk!["evidenceDocumentIds"]),
       sourceSnapshotId: snapshotId,
     });
     pushRecord("PortfolioDecisionSource", `decision:${stringAt(decision!, "/decision/id", issues)}`, {
@@ -815,6 +827,7 @@ export function parseArrowHedgeSnapshot(
         "/decision/allowedActions",
         issues,
       ),
+      evidenceDocumentIds: stringArray(decision!["evidenceDocumentIds"]),
     });
   }
 
@@ -882,7 +895,13 @@ export function buildArrowHedgeIngestionPlan(
   }
 
   const edges = buildEdges(ctx.tenantId, parsed.records);
-  const typedEvents = buildTypedEvents(ctx.tenantId, emittedBy, parsed.snapshot, mapping.items);
+  const typedEvents = buildTypedEvents(
+    ctx.tenantId,
+    emittedBy,
+    parsed.snapshot,
+    parsed.records,
+    mapping.items,
+  );
   const typedPayloadIssues = validateTypedEventPayloads(typedEvents);
   if (typedPayloadIssues.length > 0) {
     return {
@@ -2135,6 +2154,16 @@ function buildEdges(
   const portfolio = one(bySourceName, "PortfolioStateSource");
   const decision = one(bySourceName, "PortfolioDecisionSource");
   const evidence = bySourceName.get("EvidenceDocumentSource") ?? [];
+  const evidenceFor = (
+    record: SourceEntityRecord,
+  ): readonly SourceEntityRecord[] => {
+    const evidenceDocumentIds = stringArray(record.row["evidenceDocumentIds"]);
+    if (evidenceDocumentIds.length === 0) return evidence;
+    const sourceRecordIds = new Set(evidenceDocumentIds.map((id) => `evidence:${id}`));
+    return evidence.filter((item) =>
+      item.sourceRecordId !== undefined && sourceRecordIds.has(item.sourceRecordId),
+    );
+  };
 
   const edgeSpecs = [
     spec("BacktestRunSource", "researchRun", backtest, research),
@@ -2145,10 +2174,10 @@ function buildEdges(
     spec("ResearchRunSource", "decision", research, decision),
     ...signals.flatMap((signal) => [
       spec("AnalystSignalSource", "ticker", signal, ticker),
-      ...evidence.map((item) => spec("AnalystSignalSource", "evidence", signal, item)),
+      ...evidenceFor(signal).map((item) => spec("AnalystSignalSource", "evidence", signal, item)),
     ]),
     spec("RiskStateSource", "ticker", risk, ticker),
-    ...evidence.map((item) => spec("RiskStateSource", "evidence", risk, item)),
+    ...evidenceFor(risk).map((item) => spec("RiskStateSource", "evidence", risk, item)),
     spec("PortfolioDecisionSource", "ticker", decision, ticker),
     spec("PortfolioDecisionSource", "riskState", decision, risk),
     spec("PortfolioDecisionSource", "signal", decision, primarySignal),
@@ -2179,6 +2208,7 @@ function buildTypedEvents(
   tenantId: TenantId,
   emittedBy: string,
   snapshot: ParsedArrowHedgeSnapshot,
+  records: readonly SourceEntityRecord[],
   items: readonly EntityIngestionPlanItem[],
 ): readonly MappingEventInput[] {
   const bySource = new Map(items.map((item) => [item.sourceName, item]));
@@ -2194,6 +2224,35 @@ function buildTypedEvents(
   const evidenceDocumentIds = items
     .filter((item) => item.sourceName === "EvidenceDocumentSource")
     .map((item) => item.event.entityId);
+  const sourceRowsByRecordId = new Map(
+    records.flatMap((record) =>
+      record.sourceRecordId === undefined
+        ? []
+        : [[record.sourceRecordId, record.row] as const],
+    ),
+  );
+  const evidenceEntityIdsBySourceRecordId = new Map(
+    items.flatMap((item) =>
+      item.sourceName !== "EvidenceDocumentSource" || item.sourceRecordId === undefined
+        ? []
+        : [[item.sourceRecordId, item.event.entityId] as const],
+    ),
+  );
+  const evidenceDocumentIdsFor = (
+    item: EntityIngestionPlanItem,
+  ): readonly string[] => {
+    const sourceRow = item.sourceRecordId === undefined
+      ? undefined
+      : sourceRowsByRecordId.get(item.sourceRecordId);
+    const itemEvidenceDocumentIds = stringArray(sourceRow?.["evidenceDocumentIds"]);
+    const mappedEvidenceDocumentIds = itemEvidenceDocumentIds.flatMap((id) => {
+      const entityId = evidenceEntityIdsBySourceRecordId.get(`evidence:${id}`);
+      return entityId === undefined ? [] : [entityId];
+    });
+    return mappedEvidenceDocumentIds.length > 0
+      ? mappedEvidenceDocumentIds
+      : evidenceDocumentIds;
+  };
   const decisionPayload = {
     researchRunId,
     tickerId,
@@ -2209,6 +2268,7 @@ function buildTypedEvents(
     allowedActions: decision.node.identity["allowedActions"] ?? null,
     riskSourceSnapshotId: snapshot.decisionRiskSourceSnapshotId,
     signalSourceSnapshotId: snapshot.decisionSignalSourceSnapshotId,
+    evidenceDocumentIds: evidenceDocumentIdsFor(decision),
     currentPrice: risk.node.identity["currentPrice"],
     occurredAt: snapshot.observedAt,
   };
@@ -2235,7 +2295,7 @@ function buildTypedEvents(
         confidence: signal.node.identity["confidence"],
         agentId: signal.node.identity["agentId"],
         occurredAt: snapshot.observedAt,
-        evidenceDocumentIds,
+        evidenceDocumentIds: evidenceDocumentIdsFor(signal),
       },
     }),
   );
@@ -2260,6 +2320,7 @@ function buildTypedEvents(
         maxShares: risk.node.identity["maxShares"],
         bindingConstraint: risk.node.identity["bindingConstraint"] ?? null,
         freshnessExpiresAt: snapshot.riskFreshnessExpiresAt,
+        evidenceDocumentIds: evidenceDocumentIdsFor(risk),
         occurredAt: snapshot.observedAt,
       },
     }),
@@ -3111,6 +3172,7 @@ function expandRunEnvelopeSignal(
     confidence,
     ...(evidenceWindowStart !== null ? { evidenceWindowStart } : {}),
     ...(evidenceWindowEnd !== null ? { evidenceWindowEnd } : {}),
+    evidenceDocumentIds: stringArray(rawSignal["evidenceDocumentIds"]),
     ticker,
     observedAt,
   };
@@ -3155,6 +3217,7 @@ function expandRunEnvelopeRiskState(
     maxShares,
     ...(volatility !== null ? { volatility } : {}),
     ...(bindingConstraint !== null ? { bindingConstraint } : {}),
+    evidenceDocumentIds: stringArray(rawRisk["evidenceDocumentIds"]),
     freshnessExpiresAt,
   };
 }
@@ -3246,6 +3309,7 @@ function expandRunEnvelopeDecision(
         : `ArrowHedge ${ticker} ${action} decision`,
     accepted: accepted ?? inferredAccepted,
     ...(rejectionReason !== null ? { rejectionReason } : {}),
+    evidenceDocumentIds: stringArray(rawDecision["evidenceDocumentIds"]),
     allowedActions,
     riskSourceSnapshotId: snapshotId,
     signalSourceSnapshotId: snapshotId,

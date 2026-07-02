@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
+import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
@@ -7,7 +9,10 @@ import {
   type ArrowHedgeIntegrationFetch,
   type ArrowHedgeIntegrationFetchResponse,
 } from "./arrowhedge-integration.js";
-import { expandArrowHedgeRunEnvelope } from "./arrowhedge.js";
+import {
+  buildArrowHedgeIngestionPlan,
+  expandArrowHedgeRunEnvelope,
+} from "./arrowhedge.js";
 
 function jsonResponse(
   body: unknown,
@@ -559,12 +564,62 @@ describe("ArrowHedge integration API client", () => {
         }),
       ]),
     );
+    const evidenceIds = [
+      "ev_source_prices_AAPL_2024-01-01_2024-01-02",
+      "ev_backtest_day_11_1",
+    ];
+    expect(envelopeResult.envelope?.signals[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(envelopeResult.envelope?.riskStates[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(envelopeResult.envelope?.decisions[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
     const expandedEnvelope = expandArrowHedgeRunEnvelope(envelopeResult.envelope);
     expect(expandedEnvelope).toMatchObject({
       valid: true,
       issues: [],
     });
     expect(expandedEnvelope.snapshots).toHaveLength(1);
+    expect(expandedEnvelope.snapshots[0]?.signals[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(expandedEnvelope.snapshots[0]?.risk.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(expandedEnvelope.snapshots[0]?.decision.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    const ingestionPlan = buildArrowHedgeIngestionPlan(
+      expandedEnvelope.snapshots[0]!,
+      {
+        tenantId: tenantId("tnt_arrowhedge_integration"),
+        profile: FINANCE_RESEARCH_PROFILE,
+        adapterStartedAt: timestamp("2024-01-02T16:00:00.000Z"),
+      },
+    );
+    expect(ingestionPlan.valid).toBe(true);
+    const evidenceEntityIdsBySourceRecordId = new Map(
+      ingestionPlan.mapping.items
+        .filter((item) => item.sourceName === "EvidenceDocumentSource")
+        .map((item) => [item.sourceRecordId, item.event.entityId] as const),
+    );
+    const expectedEvidenceEntityIds = evidenceIds.map(
+      (id) => evidenceEntityIdsBySourceRecordId.get(`evidence:${id}`)!,
+    );
+    expect(
+      ingestionPlan.typedEvents.find((event) => event.type === "analyst.signal.created")?.payload,
+    ).toMatchObject({
+      tickerSymbol: "AAPL",
+      evidenceDocumentIds: expect.arrayContaining(expectedEvidenceEntityIds),
+    });
+    expect(
+      ingestionPlan.typedEvents.find((event) => event.type === "analyst.signal.created")?.payload[
+        "evidenceDocumentIds"
+      ],
+    ).toHaveLength(2);
   });
 
   it("reports contract issues instead of accepting a partial adapter surface", () => {

@@ -42,14 +42,14 @@ Data/provenance:
 
 Backtesting:
 
-- Backend `BacktestService` returns day-level backtest results with decisions, executed trades, analyst signals, current prices, exposures, and metrics. The adapter now exposes those saved results through backtest inventory/detail/day endpoints with redaction and hashes, source-artifact endpoints expose cache-derived provider/window/hash metadata, and the pm-substrate connector can build a canonical `arrowhedge.run-envelope.v1` from those adapter responses. The remaining gap is stronger per-agent/per-source provenance inside saved results and paired experiment automation.
+- Backend `BacktestService` returns day-level backtest results with decisions, executed trades, analyst signals, current prices, exposures, and metrics. The adapter now exposes those saved results through backtest inventory/detail/day endpoints with redaction and hashes, source-artifact endpoints expose cache-derived provider/window/hash metadata, and the pm-substrate connector can build a canonical `arrowhedge.run-envelope.v1` from those adapter responses. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records and preserve those IDs through expansion and analyst-signal typed events. The remaining gap is stronger ArrowHedge runtime provenance inside saved results and paired experiment automation.
 - Newer `src/backtesting/*` components are cleaner and more testable, but are not exposed as an integration service.
 - `v2/*` provides an emerging protocol/data/backtesting research direction, but it is not wired into the app adapter surface.
 
 ## Current pm-substrate State
 
 - `packages/capability-finance-research-ingest` already understands `arrowhedge.run-envelope.v1`, expands full run envelopes into per-ticker snapshots, emits typed finance-research events, builds COP state, and blocks stale or invalid actions.
-- `packages/capability-finance-research-ingest/src/arrowhedge-integration.ts` now fetches and validates ArrowHedgeLab `/integration/v1/*` capabilities, agents, effective graphs, saved flows, optional flow/run details, run events, source artifacts, run-specific source artifacts, backtest inventory, optional backtest details/days, model inventory, redacted API-key summaries, and cache summaries, producing evidence refs and canonical `arrowhedge.run-envelope.v1` payloads without importing ArrowHedgeLab code.
+- `packages/capability-finance-research-ingest/src/arrowhedge-integration.ts` now fetches and validates ArrowHedgeLab `/integration/v1/*` capabilities, agents, effective graphs, saved flows, optional flow/run details, run events, source artifacts, run-specific source artifacts, backtest inventory, optional backtest details/days, model inventory, redacted API-key summaries, and cache summaries, producing evidence refs and canonical `arrowhedge.run-envelope.v1` payloads with per-record evidence IDs without importing ArrowHedgeLab code.
 - `packages/substrate-http-demo` mounts ArrowHedge routes at `/tenants/:tenantId/arrowhedge` with `/snapshots` and `/run-envelopes`.
 - `docs/validation.md` and `docs/arrowhedgelab-pm-substrate-integration-audit-2026-07-01.md` previously referenced the old local Python bridge (`arrowhedgelab/src/substrate/*` and `arrowhedgelab/examples/substrate/*`). Those paths no longer exist in the fresh upstream clone, so the docs now point to this current review instead.
 - The parent pm-substrate repo now represents `arrowhedgelab` as an external Git submodule-style reference at upstream commit `65a0349`, rather than owning the upstream source files directly.
@@ -74,14 +74,14 @@ Implemented first adapter surface:
 
 Remaining minimum ArrowHedgeLab adapter surface:
 
-- Deeper provenance: per-agent/per-tool source refs inside saved result payloads, especially for line-item consumers once `search_line_items()` writes to the shared cache.
+- Deeper ArrowHedge runtime provenance: per-agent/per-tool source refs inside saved result payloads at generation time, especially for line-item consumers once `search_line_items()` writes to the shared cache.
 - Paired experiment surfaces or commands: baseline/substrate-arm run selection with identical request, graph, model, portfolio, and source-data hashes.
 
 pm-substrate connector requirements:
 
 - Treat ArrowHedgeLab as an external HTTP system.
 - Pull from `/integration/v1/*`, then build `arrowhedge.run-envelope.v1` or successor schemas. `buildArrowHedgeRunEnvelopeFromIntegrationSnapshot` now performs this connector-side translation for saved run/backtest adapter snapshots.
-- Preserve graph, model config, agent outputs, risk state, portfolio state, data hashes, freshness windows, and evidence refs.
+- Preserve graph, model config, agent outputs, risk state, portfolio state, data hashes, freshness windows, and evidence refs. Connector-built envelopes now attach source-artifact/backtest-day evidence IDs to signal, risk, and decision records before expansion.
 - Never read raw API key values.
 - Keep ArrowHedge-specific mapping in finance-research capability/profile packages or a dedicated connector package, not substrate core.
 
@@ -99,7 +99,7 @@ The market-win hypothesis cannot be claimed from a single run or from governance
 
 ## Next Implementation Order
 
-1. Add deeper per-agent/per-tool provenance in ArrowHedge saved results so envelopes can cite the exact source artifacts behind each signal.
+1. Add deeper per-agent/per-tool provenance in ArrowHedge saved results at generation time so envelopes no longer rely on connector-side inference for source refs.
 2. Add paired experiment commands that select baseline/substrate arms only when request, graph, model, portfolio, and source-data hashes match.
 3. Run paired contract tests against the fresh upstream clone, then run substrate-side TypeScript tests for envelope expansion, COP projection, stale-state blocking, invalid-action blocking, and clean-current acceptance.
 

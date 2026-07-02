@@ -617,13 +617,13 @@ export function buildArrowHedgeRunEnvelopeFromIntegrationSnapshot(
 
   const signals = resultRecord === undefined
     ? []
-    : buildEnvelopeSignals(resultRecord, runId, tickers, observedAt, issues);
+    : buildEnvelopeSignals(resultRecord, runId, tickers, observedAt, envelopeEvidence, issues);
   const riskStates = resultRecord === undefined
     ? []
-    : buildEnvelopeRiskStates(resultRecord, tickers, runId, observedAt, issues);
+    : buildEnvelopeRiskStates(resultRecord, tickers, runId, observedAt, envelopeEvidence, issues);
   const decisions = resultRecord === undefined
     ? []
-    : buildEnvelopeDecisions(resultRecord, tickers, runId, issues);
+    : buildEnvelopeDecisions(resultRecord, tickers, runId, envelopeEvidence, issues);
   const portfolio = buildEnvelopePortfolio({
     resultRecord,
     backtest,
@@ -1228,6 +1228,7 @@ function buildEnvelopeSignals(
   runId: string,
   tickers: readonly string[],
   observedAt: string | undefined,
+  evidence: readonly Record<string, unknown>[],
   issues: string[],
 ): readonly Record<string, unknown>[] {
   const analystSignals = recordOrUndefined(resultRecord["analyst_signals"]);
@@ -1250,6 +1251,7 @@ function buildEnvelopeSignals(
         ...(occurredAt !== undefined
           ? { evidenceWindowStart: occurredAt, evidenceWindowEnd: occurredAt }
           : {}),
+        evidenceDocumentIds: evidenceIdsForTicker(evidence, ticker),
       });
       tickerSignalCount += 1;
     }
@@ -1265,6 +1267,7 @@ function buildEnvelopeRiskStates(
   tickers: readonly string[],
   runId: string,
   observedAt: string | undefined,
+  evidence: readonly Record<string, unknown>[],
   issues: string[],
 ): readonly Record<string, unknown>[] {
   const currentPrices = recordOrUndefined(resultRecord["current_prices"]);
@@ -1293,6 +1296,7 @@ function buildEnvelopeRiskStates(
         maxShares,
         bindingConstraint: "cash_available",
         freshnessExpiresAt: firstTimestamp([stringField(resultRecord, "date"), observedAt]),
+        evidenceDocumentIds: evidenceIdsForTicker(evidence, ticker),
       },
     ];
   });
@@ -1302,6 +1306,7 @@ function buildEnvelopeDecisions(
   resultRecord: Record<string, unknown>,
   tickers: readonly string[],
   runId: string,
+  evidence: readonly Record<string, unknown>[],
   issues: string[],
 ): readonly Record<string, unknown>[] {
   const decisions = recordOrUndefined(resultRecord["decisions"]);
@@ -1328,6 +1333,7 @@ function buildEnvelopeDecisions(
         reasoning: stringField(decision, "reasoning") ?? `ArrowHedge ${ticker} ${action} decision`,
         accepted: action !== "hold" && quantity > 0,
         allowedActions: allowedActionsForDecision(action, quantity),
+        evidenceDocumentIds: evidenceIdsForTicker(evidence, ticker),
       },
     ];
   });
@@ -1358,6 +1364,19 @@ function allowedActionsForDecision(action: string, quantity: number): Record<str
     hold: 0,
     [action]: Math.max(quantity, 0),
   };
+}
+
+function evidenceIdsForTicker(
+  evidence: readonly Record<string, unknown>[],
+  ticker: string,
+): readonly string[] {
+  return evidence.flatMap((item) => {
+    const id = stringField(item, "id");
+    if (id === undefined) return [];
+    const itemTicker = item["ticker"];
+    if (typeof itemTicker === "string" && itemTicker !== ticker) return [];
+    return [id];
+  });
 }
 
 function flowToEnvelopeGraph(
