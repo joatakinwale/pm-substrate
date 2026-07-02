@@ -76,6 +76,22 @@ function countEntries(value: Record<string, number> | undefined) {
   return Object.entries(value || {}).sort(([a], [b]) => a.localeCompare(b));
 }
 
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function stringArrayValue(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function splitLines(value: string) {
   return value
     .split("\n")
@@ -149,7 +165,12 @@ export default function AgencyCommandCenterPage() {
     name: "",
     client_url: "",
     repo_url: "",
+    client_name: "",
     client_email: "",
+    offer: "",
+    copy_inputs: "Homepage\nSales deck\nExisting campaign copy",
+    analytics_provider: "umami",
+    social_channels: "linkedin",
     goals: "Increase qualified leads",
     constraints: "Approval required before publishing",
   });
@@ -183,6 +204,17 @@ export default function AgencyCommandCenterPage() {
     [engagements, selectedId]
   );
   const activeRun = runs[0] || null;
+  const kickoffSummary = useMemo(() => {
+    const kickoff = objectValue(activeRun?.strategy_summary?.kickoff);
+    if (!kickoff) return null;
+    return {
+      taskCount: numberValue(kickoff.task_count),
+      accessRequestCount: numberValue(kickoff.access_request_count),
+      agentRoles: stringArrayValue(kickoff.agent_roles),
+      artifactId:
+        typeof kickoff.artifact_id === "string" ? kickoff.artifact_id : null,
+    };
+  }, [activeRun]);
   const pendingApprovals = approvals.filter((item) => item.status === "pending");
   const openAccessRequests = accessRequests.filter(
     (item) => item.status === "requested" || item.status === "blocked"
@@ -290,16 +322,35 @@ export default function AgencyCommandCenterPage() {
         name: engagementForm.name.trim() || undefined,
         client_url: engagementForm.client_url.trim() || undefined,
         repo_url: engagementForm.repo_url.trim() || undefined,
+        client_name: engagementForm.client_name.trim() || undefined,
         client_email: engagementForm.client_email.trim() || undefined,
         goals: splitLines(engagementForm.goals),
         constraints: splitLines(engagementForm.constraints),
+        intake_payload: {
+          offer: engagementForm.offer.trim() || undefined,
+          copy_inputs: splitLines(engagementForm.copy_inputs),
+          source: "agency_command_center",
+        },
+        integration_state: {
+          analytics_provider:
+            engagementForm.analytics_provider.trim() || "analytics",
+          preferred_social_channels:
+            splitLines(engagementForm.social_channels).length > 0
+              ? splitLines(engagementForm.social_channels)
+              : ["linkedin"],
+        },
       });
       setSelectedId(engagement.id);
       setEngagementForm({
         name: "",
         client_url: "",
         repo_url: "",
+        client_name: "",
         client_email: "",
+        offer: "",
+        copy_inputs: "Homepage\nSales deck\nExisting campaign copy",
+        analytics_provider: "umami",
+        social_channels: "linkedin",
         goals: "Increase qualified leads",
         constraints: "Approval required before publishing",
       });
@@ -317,7 +368,7 @@ export default function AgencyCommandCenterPage() {
     setError(null);
     try {
       await createMarketingRun(selectedId, { objective: runObjective.trim() });
-      await loadEngagementDetail(selectedId);
+      await Promise.all([loadEngagements(), loadEngagementDetail(selectedId)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start strategy run.");
     } finally {
@@ -525,6 +576,62 @@ export default function AgencyCommandCenterPage() {
                 placeholder="Client email"
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm"
               />
+              <input
+                value={engagementForm.client_name}
+                onChange={(event) =>
+                  setEngagementForm({
+                    ...engagementForm,
+                    client_name: event.target.value,
+                  })
+                }
+                placeholder="Client contact name"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+              />
+              <input
+                value={engagementForm.offer}
+                onChange={(event) =>
+                  setEngagementForm({ ...engagementForm, offer: event.target.value })
+                }
+                placeholder="Primary offer"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input
+                  value={engagementForm.analytics_provider}
+                  onChange={(event) =>
+                    setEngagementForm({
+                      ...engagementForm,
+                      analytics_provider: event.target.value,
+                    })
+                  }
+                  placeholder="Analytics provider"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+                />
+                <textarea
+                  value={engagementForm.social_channels}
+                  onChange={(event) =>
+                    setEngagementForm({
+                      ...engagementForm,
+                      social_channels: event.target.value,
+                    })
+                  }
+                  rows={2}
+                  placeholder="Social channels, one per line"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+                />
+              </div>
+              <textarea
+                value={engagementForm.copy_inputs}
+                onChange={(event) =>
+                  setEngagementForm({
+                    ...engagementForm,
+                    copy_inputs: event.target.value,
+                  })
+                }
+                rows={3}
+                placeholder="Existing copy or source documents, one per line"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+              />
               <textarea
                 value={engagementForm.goals}
                 onChange={(event) =>
@@ -714,6 +821,35 @@ export default function AgencyCommandCenterPage() {
                     </div>
                   ))}
                 </div>
+
+                {kickoffSummary && (
+                  <div className="rounded-lg border border-border px-4 py-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Kickoff Workbreakdown</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {kickoffSummary.taskCount} tasks,{" "}
+                          {kickoffSummary.accessRequestCount} access requests
+                        </p>
+                      </div>
+                      {kickoffSummary.artifactId && (
+                        <span className="w-fit rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                          {kickoffSummary.artifactId.slice(0, 8)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {kickoffSummary.agentRoles.map((role) => (
+                        <span
+                          key={role}
+                          className="rounded-full bg-stevie-green/10 px-2.5 py-1 text-xs text-stevie-green"
+                        >
+                          {role.replaceAll("_", " ")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                   <div className="space-y-4">
