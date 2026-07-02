@@ -493,6 +493,33 @@ export interface ArrowHedgePairedExperimentBundleVerification {
   };
 }
 
+export interface ArrowHedgePairedIntegrationExperimentArmInput {
+  readonly runId: number;
+  readonly flowId?: number;
+  readonly backtestRunId?: number;
+  readonly substrateMode?: string;
+  readonly backtestDaySequence?: number;
+  readonly metrics?: ArrowHedgePairedExperimentArmMetrics;
+}
+
+export interface ArrowHedgePairedIntegrationExperimentFetchInput
+  extends ArrowHedgeIntegrationClientInput {
+  readonly experimentId: string;
+  readonly generatedAt?: string;
+  readonly graph?: ArrowHedgeIntegrationGraphPayload;
+  readonly baseline: ArrowHedgePairedIntegrationExperimentArmInput;
+  readonly substrate: ArrowHedgePairedIntegrationExperimentArmInput;
+}
+
+export interface ArrowHedgePairedIntegrationExperimentBuildResult {
+  readonly valid: boolean;
+  readonly issues: readonly string[];
+  readonly validation: ArrowHedgeIntegrationValidationResult;
+  readonly snapshot: ArrowHedgeIntegrationSnapshot;
+  readonly bundle?: ArrowHedgePairedExperimentBundle;
+  readonly verification?: ArrowHedgePairedExperimentBundleVerification;
+}
+
 export interface ArrowHedgeIntegrationValidationResult {
   readonly ready: boolean;
   readonly issues: readonly string[];
@@ -1055,6 +1082,165 @@ export function verifyArrowHedgePairedExperimentBundle(
     valid: issues.length === 0,
     issues,
     expected,
+  };
+}
+
+export async function buildArrowHedgePairedExperimentBundleFromIntegrationRuns(
+  input: ArrowHedgePairedIntegrationExperimentFetchInput,
+): Promise<ArrowHedgePairedIntegrationExperimentBuildResult> {
+  const snapshot = await fetchArrowHedgeIntegrationSnapshot({
+    integrationBaseUrl: input.integrationBaseUrl,
+    ...(input.bearerToken === undefined ? {} : { bearerToken: input.bearerToken }),
+    ...(input.headers === undefined ? {} : { headers: input.headers }),
+    ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+    ...(input.graph === undefined ? {} : { graph: input.graph }),
+    flowIds: uniqueNumbers(
+      [input.baseline.flowId, input.substrate.flowId].flatMap((value) =>
+        value === undefined ? [] : [value],
+      ),
+    ),
+    runIds: uniqueNumbers([input.baseline.runId, input.substrate.runId]),
+    backtestRunIds: uniqueNumbers([
+      input.baseline.backtestRunId ?? input.baseline.runId,
+      input.substrate.backtestRunId ?? input.substrate.runId,
+    ]),
+  });
+  const validation = validateArrowHedgeIntegrationSnapshot(snapshot);
+  if (!validation.ready) {
+    return {
+      valid: false,
+      issues: validation.issues.map((issue) => `integration: ${issue}`),
+      validation,
+      snapshot,
+    };
+  }
+
+  const baselineEnvelope = buildArrowHedgeRunEnvelopeFromIntegrationSnapshot({
+    snapshot,
+    runId: input.baseline.runId,
+    substrateMode: input.baseline.substrateMode ?? "observe",
+    ...(input.baseline.backtestDaySequence === undefined
+      ? {}
+      : { backtestDaySequence: input.baseline.backtestDaySequence }),
+  });
+  const substrateEnvelope = buildArrowHedgeRunEnvelopeFromIntegrationSnapshot({
+    snapshot,
+    runId: input.substrate.runId,
+    substrateMode: input.substrate.substrateMode ?? "blocking",
+    ...(input.substrate.backtestDaySequence === undefined
+      ? {}
+      : { backtestDaySequence: input.substrate.backtestDaySequence }),
+  });
+  const issues = [
+    ...(!baselineEnvelope.valid
+      ? baselineEnvelope.issues.map((issue) => `baseline: ${issue}`)
+      : []),
+    ...(!substrateEnvelope.valid
+      ? substrateEnvelope.issues.map((issue) => `substrate: ${issue}`)
+      : []),
+  ];
+  if (issues.length > 0) {
+    return {
+      valid: false,
+      issues,
+      validation,
+      snapshot,
+    };
+  }
+
+  const bundle = buildArrowHedgePairedExperimentBundle({
+    experimentId: input.experimentId,
+    ...(input.generatedAt === undefined ? {} : { generatedAt: input.generatedAt }),
+    baseline: {
+      envelope: baselineEnvelope.envelope!,
+      metrics: mergePairedExperimentArmMetrics(
+        deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot(
+          snapshot,
+          input.baseline.runId,
+        ),
+        input.baseline.metrics,
+      ),
+    },
+    substrate: {
+      envelope: substrateEnvelope.envelope!,
+      metrics: mergePairedExperimentArmMetrics(
+        deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot(
+          snapshot,
+          input.substrate.runId,
+        ),
+        input.substrate.metrics,
+      ),
+    },
+  });
+  const verification = verifyArrowHedgePairedExperimentBundle(bundle);
+  return {
+    valid: verification.valid,
+    issues: verification.issues,
+    validation,
+    snapshot,
+    bundle,
+    verification,
+  };
+}
+
+export function deriveArrowHedgePairedExperimentArmMetricsFromIntegrationSnapshot(
+  snapshot: ArrowHedgeIntegrationSnapshot,
+  runId: number,
+): ArrowHedgePairedExperimentArmMetrics {
+  const backtest = findBacktestForRun(snapshot, runId);
+  const performance = recordOrUndefined(backtest?.performance_metrics);
+  const finalPortfolio = recordOrUndefined(backtest?.final_portfolio);
+  const portfolioValues = arrayOfRecords(
+    recordOrUndefined(backtest)?.["portfolioValues"],
+  );
+  const startingEquity = portfolioValue(portfolioValues.at(0));
+  const endingEquity =
+    portfolioValue(portfolioValues.at(-1)) ??
+    numberFromFields(finalPortfolio, [
+      "equity",
+      "portfolio_value",
+      "portfolioValue",
+      "Portfolio Value",
+      "value",
+      "cash",
+    ]);
+  const realizedPnl =
+    numberFromFields(performance, [
+      "realized_pnl",
+      "realizedPnl",
+      "pnl",
+      "total_pnl",
+      "totalPnl",
+      "profit_loss",
+      "profitLoss",
+    ]) ??
+    (startingEquity === undefined || endingEquity === undefined
+      ? undefined
+      : normalizedNumberDelta(startingEquity, endingEquity));
+  const returnPct =
+    numberFromFields(performance, [
+      "return_pct",
+      "returnPct",
+      "total_return",
+      "totalReturn",
+      "cumulative_return",
+      "cumulativeReturn",
+    ]) ??
+    (startingEquity === undefined ||
+    startingEquity === 0 ||
+    realizedPnl === undefined
+      ? undefined
+      : Number((realizedPnl / startingEquity).toFixed(12)));
+  const eventIds = snapshot.runEvents
+    .find((events) => events.run_id === runId)
+    ?.events.map((event) => event.id);
+
+  return {
+    ...optionalNumberMetric("startingEquity", startingEquity),
+    ...optionalNumberMetric("endingEquity", endingEquity),
+    ...optionalNumberMetric("realizedPnl", realizedPnl),
+    ...optionalNumberMetric("returnPct", returnPct),
+    ...(eventIds === undefined || eventIds.length === 0 ? {} : { eventIds }),
   };
 }
 
@@ -1884,6 +2070,50 @@ function modelConfigToEnvelope(
     models: modelConfig.models,
     providers: modelConfig.providers,
     hashes: modelConfig.hashes ?? {},
+  };
+}
+
+function findBacktestForRun(
+  snapshot: ArrowHedgeIntegrationSnapshot,
+  runId: number,
+): ArrowHedgeIntegrationBacktest | ArrowHedgeIntegrationBacktestSummary | undefined {
+  return snapshot.backtestDetails.find((candidate) => candidate.run_id === runId)
+    ?? snapshot.backtests.backtests.find((candidate) => candidate.run_id === runId);
+}
+
+function portfolioValue(
+  record: Record<string, unknown> | undefined,
+): number | undefined {
+  return numberFromFields(record, [
+    "Portfolio Value",
+    "portfolio_value",
+    "portfolioValue",
+    "equity",
+    "value",
+    "cash",
+  ]);
+}
+
+function optionalNumberMetric<
+  TField extends keyof Pick<
+    ArrowHedgePairedExperimentArmMetrics,
+    "startingEquity" | "endingEquity" | "realizedPnl" | "returnPct"
+  >,
+>(
+  field: TField,
+  value: number | undefined,
+): Pick<ArrowHedgePairedExperimentArmMetrics, TField> | Record<string, never> {
+  if (value === undefined || !Number.isFinite(value)) return {};
+  return { [field]: value } as Pick<ArrowHedgePairedExperimentArmMetrics, TField>;
+}
+
+function mergePairedExperimentArmMetrics(
+  derived: ArrowHedgePairedExperimentArmMetrics,
+  overrides: ArrowHedgePairedExperimentArmMetrics | undefined,
+): ArrowHedgePairedExperimentArmMetrics {
+  return {
+    ...derived,
+    ...(overrides ?? {}),
   };
 }
 

@@ -86,6 +86,8 @@ pm-substrate connector requirements:
 
 Replayable bundle command:
 
+From saved envelope files:
+
 ```bash
 pnpm arrowhedge:paired-bundle -- write \
   --experiment-id exp_arrowhedge_axis_a_001 \
@@ -97,6 +99,19 @@ pnpm arrowhedge:paired-bundle -- write \
 
 pnpm arrowhedge:paired-bundle -- verify \
   --bundle-dir artifacts/arrowhedge/exp_arrowhedge_axis_a_001
+```
+
+Directly from the external ArrowHedgeLab adapter:
+
+```bash
+pnpm arrowhedge:paired-bundle -- from-integration \
+  --experiment-id exp_arrowhedge_axis_a_001 \
+  --base-url http://127.0.0.1:8000 \
+  --baseline-run-id 101 \
+  --substrate-run-id 102 \
+  --baseline-metrics artifacts/arrowhedge/baseline-metrics.json \
+  --substrate-metrics artifacts/arrowhedge/substrate-metrics.json \
+  --out artifacts/arrowhedge/exp_arrowhedge_axis_a_001
 ```
 
 ## False-Positive Controls

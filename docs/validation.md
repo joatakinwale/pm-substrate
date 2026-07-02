@@ -140,10 +140,11 @@ Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
   market/PnL deltas, governance/protection deltas, and claim gates that deny
   market-win claims unless readiness plus false-positive and false-negative
   evidence gates pass. The `pnpm arrowhedge:paired-bundle` script now writes
-  and verifies replayable local bundle directories from saved envelope and
-  metrics files. Automated paired experiment execution over real historical
-  windows is still required before live or backtest experiments can make strong
-  market-win claims.
+  and verifies replayable local bundle directories either from saved envelope
+  and metrics files or directly from ArrowHedgeLab `/integration/v1/*` run IDs.
+  Automated paired experiment execution over real historical windows is still
+  required before live or backtest experiments can make strong market-win
+  claims.
 
 The next valid historical experiment path is:
 

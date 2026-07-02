@@ -4,6 +4,7 @@ import { tenantId, timestamp } from "@pm/types";
 
 import {
   buildArrowHedgePairedExperimentBundle,
+  buildArrowHedgePairedExperimentBundleFromIntegrationRuns,
   buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
   compareArrowHedgeIntegrationRunEnvelopePair,
   fetchArrowHedgeIntegrationSnapshot,
@@ -880,6 +881,86 @@ describe("ArrowHedge integration API client", () => {
         "substrate false-negative blocks must be zero",
       ]),
     );
+
+    const fetchedPairedBundle =
+      await buildArrowHedgePairedExperimentBundleFromIntegrationRuns({
+        integrationBaseUrl: "https://arrow.example",
+        bearerToken: "substrate-token",
+        fetchFn,
+        experimentId: "exp_arrowhedge_aapl_from_integration",
+        generatedAt: "2024-01-02T16:03:00.000Z",
+        graph: {
+          nodes: [
+            { id: "warren_buffett_ab12cd", type: "agent" },
+            { id: "portfolio_manager_ef34gh", type: "agent" },
+          ],
+          edges: [
+            {
+              id: "edge-1",
+              source: "warren_buffett_ab12cd",
+              target: "portfolio_manager_ef34gh",
+            },
+          ],
+        },
+        baseline: {
+          runId: 11,
+          flowId: 7,
+          substrateMode: "observe",
+          metrics: {
+            endingEquity: 101000,
+            realizedPnl: 1000,
+            returnPct: 0.01,
+          },
+        },
+        substrate: {
+          runId: 11,
+          flowId: 7,
+          substrateMode: "blocking",
+          metrics: {
+            endingEquity: 102500,
+            realizedPnl: 2500,
+            returnPct: 0.025,
+            blockedDecisionCount: 1,
+            staleBlockCount: 1,
+            falsePositiveBlockCount: 0,
+            falseNegativeBlockCount: 0,
+          },
+        },
+      });
+    expect(fetchedPairedBundle.valid).toBe(true);
+    expect(fetchedPairedBundle.issues).toEqual([]);
+    expect(fetchedPairedBundle.validation).toEqual({ ready: true, issues: [] });
+    expect(fetchedPairedBundle.bundle?.report).toMatchObject({
+      ready: true,
+      marketWinClaimAllowed: true,
+      market: {
+        baseline: {
+          endingEquity: 101000,
+          realizedPnl: 1000,
+          returnPct: 0.01,
+          eventIds: [
+            "flow-run-11-1-flow_run.created",
+            "flow-run-11-2-flow_run.results_recorded",
+          ],
+        },
+        substrate: {
+          endingEquity: 102500,
+          realizedPnl: 2500,
+          returnPct: 0.025,
+          eventIds: [
+            "flow-run-11-1-flow_run.created",
+            "flow-run-11-2-flow_run.results_recorded",
+          ],
+        },
+      },
+    });
+    expect(fetchedPairedBundle.bundle?.manifest).toMatchObject({
+      experimentId: "exp_arrowhedge_aapl_from_integration",
+      ready: true,
+      marketWinClaimAllowed: true,
+      baselineRunId: "11",
+      substrateRunId: "11",
+    });
   });
 
   it("reports contract issues instead of accepting a partial adapter surface", () => {

@@ -7,8 +7,10 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  buildArrowHedgePairedExperimentBundleFromIntegrationRuns,
   buildArrowHedgePairedExperimentBundle,
   verifyArrowHedgePairedExperimentBundle,
+  type ArrowHedgeIntegrationFetch,
   type ArrowHedgeIntegrationRunEnvelope,
   type ArrowHedgePairedExperimentArmMetrics,
   type ArrowHedgePairedExperimentBundle,
@@ -35,6 +37,25 @@ export interface WriteArrowHedgePairedBundleFilesResult {
     readonly manifest: string;
     readonly pairedBundle: string;
   };
+}
+
+export interface WriteArrowHedgePairedBundleFromIntegrationInput {
+  readonly experimentId: string;
+  readonly integrationBaseUrl: string;
+  readonly outputDir: string;
+  readonly baselineRunId: number;
+  readonly substrateRunId: number;
+  readonly bearerToken?: string;
+  readonly generatedAt?: string;
+  readonly baselineFlowId?: number;
+  readonly substrateFlowId?: number;
+  readonly baselineBacktestRunId?: number;
+  readonly substrateBacktestRunId?: number;
+  readonly baselineMode?: string;
+  readonly substrateMode?: string;
+  readonly baselineMetricsPath?: string;
+  readonly substrateMetricsPath?: string;
+  readonly fetchFn?: ArrowHedgeIntegrationFetch;
 }
 
 export interface VerifyArrowHedgePairedBundleDirectoryResult {
@@ -105,25 +126,61 @@ export function writeArrowHedgePairedBundleFiles(
       `generated paired bundle failed verification: ${verification.issues.join("; ")}`,
     );
   }
-
-  const outputPaths = {
-    baselineEnvelope: join(input.outputDir, "baseline-envelope.json"),
-    substrateEnvelope: join(input.outputDir, "substrate-envelope.json"),
-    pairedReport: join(input.outputDir, "paired-report.json"),
-    manifest: join(input.outputDir, "manifest.json"),
-    pairedBundle: join(input.outputDir, "paired-bundle.json"),
-  };
-
-  mkdirSync(input.outputDir, { recursive: true });
-  writeJsonFile(outputPaths.baselineEnvelope, bundle.baselineEnvelope);
-  writeJsonFile(outputPaths.substrateEnvelope, bundle.substrateEnvelope);
-  writeJsonFile(outputPaths.pairedReport, bundle.report);
-  writeJsonFile(outputPaths.manifest, bundle.manifest);
-  writeJsonFile(outputPaths.pairedBundle, bundle);
+  const outputPaths = writePairedBundleArtifacts(input.outputDir, bundle);
 
   return {
     bundle,
     verification,
+    outputPaths,
+  };
+}
+
+export async function writeArrowHedgePairedBundleFromIntegration(
+  input: WriteArrowHedgePairedBundleFromIntegrationInput,
+): Promise<WriteArrowHedgePairedBundleFilesResult> {
+  const baselineMetrics = readMetricsFile(
+    input.baselineMetricsPath,
+    "baselineMetrics",
+  );
+  const substrateMetrics = readMetricsFile(
+    input.substrateMetricsPath,
+    "substrateMetrics",
+  );
+  const result = await buildArrowHedgePairedExperimentBundleFromIntegrationRuns({
+    experimentId: input.experimentId,
+    integrationBaseUrl: input.integrationBaseUrl,
+    ...(input.bearerToken === undefined ? {} : { bearerToken: input.bearerToken }),
+    ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+    ...(input.generatedAt === undefined ? {} : { generatedAt: input.generatedAt }),
+    baseline: {
+      runId: input.baselineRunId,
+      ...(input.baselineFlowId === undefined ? {} : { flowId: input.baselineFlowId }),
+      ...(input.baselineBacktestRunId === undefined
+        ? {}
+        : { backtestRunId: input.baselineBacktestRunId }),
+      ...(input.baselineMode === undefined ? {} : { substrateMode: input.baselineMode }),
+      ...(baselineMetrics === undefined ? {} : { metrics: baselineMetrics }),
+    },
+    substrate: {
+      runId: input.substrateRunId,
+      ...(input.substrateFlowId === undefined ? {} : { flowId: input.substrateFlowId }),
+      ...(input.substrateBacktestRunId === undefined
+        ? {}
+        : { backtestRunId: input.substrateBacktestRunId }),
+      ...(input.substrateMode === undefined ? {} : { substrateMode: input.substrateMode }),
+      ...(substrateMetrics === undefined ? {} : { metrics: substrateMetrics }),
+    },
+  });
+
+  if (!result.bundle || !result.verification?.valid) {
+    throw new Error(
+      `paired integration bundle failed: ${result.issues.join("; ")}`,
+    );
+  }
+  const outputPaths = writePairedBundleArtifacts(input.outputDir, result.bundle);
+  return {
+    bundle: result.bundle,
+    verification: result.verification,
     outputPaths,
   };
 }
@@ -188,6 +245,27 @@ export function verifyArrowHedgePairedBundleDirectory(input: {
       ],
     };
   }
+}
+
+function writePairedBundleArtifacts(
+  outputDir: string,
+  bundle: ArrowHedgePairedExperimentBundle,
+): WriteArrowHedgePairedBundleFilesResult["outputPaths"] {
+  const outputPaths = {
+    baselineEnvelope: join(outputDir, "baseline-envelope.json"),
+    substrateEnvelope: join(outputDir, "substrate-envelope.json"),
+    pairedReport: join(outputDir, "paired-report.json"),
+    manifest: join(outputDir, "manifest.json"),
+    pairedBundle: join(outputDir, "paired-bundle.json"),
+  };
+
+  mkdirSync(outputDir, { recursive: true });
+  writeJsonFile(outputPaths.baselineEnvelope, bundle.baselineEnvelope);
+  writeJsonFile(outputPaths.substrateEnvelope, bundle.substrateEnvelope);
+  writeJsonFile(outputPaths.pairedReport, bundle.report);
+  writeJsonFile(outputPaths.manifest, bundle.manifest);
+  writeJsonFile(outputPaths.pairedBundle, bundle);
+  return outputPaths;
 }
 
 function readMetricsFile(
@@ -276,6 +354,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseArgs(argv: readonly string[]):
   | { readonly command: "write"; readonly input: WriteArrowHedgePairedBundleFilesInput }
+  | { readonly command: "from-integration"; readonly input: WriteArrowHedgePairedBundleFromIntegrationInput }
   | { readonly command: "verify"; readonly bundleDir: string } {
   const [command, ...rest] = argv;
   const args = new Map<string, string>();
@@ -316,6 +395,49 @@ function parseArgs(argv: readonly string[]):
     };
   }
 
+  if (command === "from-integration") {
+    const experimentId = args.get("--experiment-id");
+    const integrationBaseUrl = args.get("--base-url");
+    const outputDir = args.get("--out");
+    const baselineRunId = numberArg(args, "--baseline-run-id");
+    const substrateRunId = numberArg(args, "--substrate-run-id");
+    if (!experimentId || !integrationBaseUrl || !outputDir || baselineRunId === undefined || substrateRunId === undefined) {
+      throw new Error(usage());
+    }
+    return {
+      command,
+      input: {
+        experimentId,
+        integrationBaseUrl,
+        outputDir,
+        baselineRunId,
+        substrateRunId,
+        ...(args.has("--bearer-token")
+          ? { bearerToken: args.get("--bearer-token")! }
+          : {}),
+        ...(args.has("--generated-at")
+          ? { generatedAt: args.get("--generated-at")! }
+          : {}),
+        ...optionalNumberArg(args, "--baseline-flow-id", "baselineFlowId"),
+        ...optionalNumberArg(args, "--substrate-flow-id", "substrateFlowId"),
+        ...optionalNumberArg(args, "--baseline-backtest-run-id", "baselineBacktestRunId"),
+        ...optionalNumberArg(args, "--substrate-backtest-run-id", "substrateBacktestRunId"),
+        ...(args.has("--baseline-mode")
+          ? { baselineMode: args.get("--baseline-mode")! }
+          : {}),
+        ...(args.has("--substrate-mode")
+          ? { substrateMode: args.get("--substrate-mode")! }
+          : {}),
+        ...(args.has("--baseline-metrics")
+          ? { baselineMetricsPath: args.get("--baseline-metrics")! }
+          : {}),
+        ...(args.has("--substrate-metrics")
+          ? { substrateMetricsPath: args.get("--substrate-metrics")! }
+          : {}),
+      },
+    };
+  }
+
   if (command === "verify") {
     const bundleDir = args.get("--bundle-dir");
     if (!bundleDir) {
@@ -327,18 +449,56 @@ function parseArgs(argv: readonly string[]):
   throw new Error(usage());
 }
 
+function numberArg(args: ReadonlyMap<string, string>, key: string): number | undefined {
+  const value = args.get(key);
+  if (value === undefined) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${key} must be an integer`);
+  }
+  return parsed;
+}
+
+function optionalNumberArg<TField extends string>(
+  args: ReadonlyMap<string, string>,
+  key: string,
+  field: TField,
+): Record<TField, number> | Record<string, never> {
+  const parsed = numberArg(args, key);
+  return parsed === undefined ? {} : ({ [field]: parsed } as Record<TField, number>);
+}
+
 function usage(): string {
   return [
     "usage:",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts write --experiment-id <id> --baseline-envelope <path> --substrate-envelope <path> --out <dir> [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
+    "  tsx scripts/build-arrowhedge-paired-bundle.ts from-integration --experiment-id <id> --base-url <url> --baseline-run-id <id> --substrate-run-id <id> --out <dir> [--bearer-token <token>] [--baseline-flow-id <id>] [--substrate-flow-id <id>] [--baseline-backtest-run-id <id>] [--substrate-backtest-run-id <id>] [--baseline-mode <mode>] [--substrate-mode <mode>] [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts verify --bundle-dir <dir>",
   ].join("\n");
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const parsed = parseArgs(process.argv.slice(2));
   if (parsed.command === "write") {
     const result = writeArrowHedgePairedBundleFiles(parsed.input);
+    console.log(
+      JSON.stringify(
+        {
+          valid: result.verification.valid,
+          ready: result.bundle.report.ready,
+          marketWinClaimAllowed: result.bundle.report.marketWinClaimAllowed,
+          claimIssues: result.bundle.report.claimIssues,
+          manifestPath: result.outputPaths.manifest,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+
+  if (parsed.command === "from-integration") {
+    const result = await writeArrowHedgePairedBundleFromIntegration(parsed.input);
     console.log(
       JSON.stringify(
         {
@@ -374,10 +534,8 @@ function main(): void {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
-  }
+  });
 }
