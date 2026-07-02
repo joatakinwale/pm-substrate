@@ -79,6 +79,7 @@ AGENT_CAPABILITIES: dict[str, dict[str, set[str]]] = {
 }
 
 REQUIRED_LINEAGE_KEYS = {"client_request", "project_id", "legacy_task_id"}
+EXTERNAL_ADAPTER_RUN_ARTIFACT_TYPE = "external_adapter_run"
 STRATEGY_RESEARCH_ARTIFACT_TYPE = "strategy_research_brief"
 
 
@@ -217,14 +218,52 @@ async def ensure_strategy_research_artifact_ready(
             "Content task requires a strategy research dependency"
         )
 
-    missing = [
-        str(dependency.id)
-        for dependency in strategy_dependencies
-        if not await has_strategy_research_artifact(db, dependency)
-    ]
+    strategy_artifacts_by_task: dict[uuid.UUID, list[AgencyArtifact]] = {}
+    missing = []
+    for dependency in strategy_dependencies:
+        artifacts = await list_strategy_research_artifacts(db, dependency)
+        if not artifacts:
+            missing.append(str(dependency.id))
+        strategy_artifacts_by_task[dependency.id] = artifacts
     if missing:
         raise DependencyNotSatisfiedError(
             "Content task requires strategy research artifact evidence: "
+            + ", ".join(missing)
+        )
+
+    required_adapter_ids = sorted(
+        {
+            adapter_id
+            for artifacts in strategy_artifacts_by_task.values()
+            for adapter_id in strategy_artifact_required_adapter_ids(artifacts)
+        }
+    )
+    if required_adapter_ids:
+        await ensure_external_adapter_run_evidence_ready(
+            db,
+            task=task,
+            adapter_ids=required_adapter_ids,
+        )
+
+
+async def ensure_external_adapter_run_evidence_ready(
+    db: AsyncSession,
+    *,
+    task: VirtualAgencyTask,
+    adapter_ids: list[str],
+) -> None:
+    missing = []
+    for adapter_id in adapter_ids:
+        artifacts = await list_external_adapter_run_artifacts(
+            db,
+            task=task,
+            adapter_id=adapter_id,
+        )
+        if not any(external_adapter_run_succeeded(artifact) for artifact in artifacts):
+            missing.append(adapter_id)
+    if missing:
+        raise DependencyNotSatisfiedError(
+            "Content task requires external adapter run evidence: "
             + ", ".join(missing)
         )
 
@@ -472,19 +511,95 @@ async def has_strategy_research_artifact(
     db: AsyncSession,
     strategy_task: VirtualAgencyTask,
 ) -> bool:
+    return bool(await list_strategy_research_artifacts(db, strategy_task))
+
+
+async def list_strategy_research_artifacts(
+    db: AsyncSession,
+    strategy_task: VirtualAgencyTask,
+) -> list[AgencyArtifact]:
     if hasattr(db, "list_strategy_research_artifacts_for_task"):
-        artifacts = db.list_strategy_research_artifacts_for_task(strategy_task.id)
-        return bool(artifacts)
+        return list(db.list_strategy_research_artifacts_for_task(strategy_task.id))
     result = await db.execute(
-        select(AgencyArtifact.id)
-        .where(
+        select(AgencyArtifact).where(
             AgencyArtifact.org_id == strategy_task.org_id,
             AgencyArtifact.virtual_agency_task_id == strategy_task.id,
             AgencyArtifact.artifact_type == STRATEGY_RESEARCH_ARTIFACT_TYPE,
         )
-        .limit(1)
     )
-    return result.scalar_one_or_none() is not None
+    return list(result.scalars().all())
+
+
+async def list_external_adapter_run_artifacts(
+    db: AsyncSession,
+    *,
+    task: VirtualAgencyTask,
+    adapter_id: str,
+) -> list[AgencyArtifact]:
+    run_id = _uuid_from_lineage(task.lineage, "marketing_run_id")
+    if run_id is None:
+        return []
+    if hasattr(db, "list_external_adapter_run_artifacts"):
+        try:
+            artifacts = db.list_external_adapter_run_artifacts(
+                org_id=task.org_id,
+                run_id=run_id,
+                adapter_id=adapter_id,
+            )
+        except TypeError:
+            artifacts = db.list_external_adapter_run_artifacts(
+                org_id=task.org_id,
+                run_id=run_id,
+            )
+        return [
+            artifact
+            for artifact in artifacts
+            if artifact_adapter_id(artifact) == adapter_id
+        ]
+    result = await db.execute(
+        select(AgencyArtifact).where(
+            AgencyArtifact.org_id == task.org_id,
+            AgencyArtifact.marketing_run_id == run_id,
+            AgencyArtifact.artifact_type == EXTERNAL_ADAPTER_RUN_ARTIFACT_TYPE,
+        )
+    )
+    return [
+        artifact
+        for artifact in result.scalars().all()
+        if artifact_adapter_id(artifact) == adapter_id
+    ]
+
+
+def strategy_artifact_required_adapter_ids(
+    artifacts: Iterable[AgencyArtifact],
+) -> list[str]:
+    adapter_ids: set[str] = set()
+    for artifact in artifacts:
+        payload = artifact.payload if isinstance(artifact.payload, dict) else {}
+        requirements = payload.get("external_adapter_requirements")
+        if not isinstance(requirements, list):
+            continue
+        for requirement in requirements:
+            if not isinstance(requirement, dict):
+                continue
+            adapter_id = requirement.get("adapter_id")
+            if isinstance(adapter_id, str) and adapter_id.strip():
+                adapter_ids.add(adapter_id)
+    return sorted(adapter_ids)
+
+
+def artifact_adapter_id(artifact: AgencyArtifact) -> str | None:
+    lineage = artifact.lineage if isinstance(artifact.lineage, dict) else {}
+    payload = artifact.payload if isinstance(artifact.payload, dict) else {}
+    adapter_id = lineage.get("adapter_id") or payload.get("adapter_id")
+    return adapter_id if isinstance(adapter_id, str) else None
+
+
+def external_adapter_run_succeeded(artifact: AgencyArtifact) -> bool:
+    lineage = artifact.lineage if isinstance(artifact.lineage, dict) else {}
+    payload = artifact.payload if isinstance(artifact.payload, dict) else {}
+    status = lineage.get("status") or payload.get("status")
+    return status == "succeeded"
 
 
 def post_has_metric_evidence(post: SocialPost) -> bool:

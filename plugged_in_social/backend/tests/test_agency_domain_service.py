@@ -125,6 +125,20 @@ class _FakeAgencySession:
             and artifact.artifact_type == "strategy_research_brief"
         ]
 
+    def list_external_adapter_run_artifacts(self, *, org_id, run_id, adapter_id=None):
+        return [
+            artifact
+            for artifact in self._store.get(AgencyArtifact, {}).values()
+            if artifact.org_id == org_id
+            and artifact.marketing_run_id == run_id
+            and artifact.artifact_type == "external_adapter_run"
+            and (
+                adapter_id is None
+                or dict(artifact.lineage or {}).get("adapter_id") == adapter_id
+                or dict(artifact.payload or {}).get("adapter_id") == adapter_id
+            )
+        ]
+
 
 async def _capture_publish(monkeypatch):
     sent: list[dict] = []
@@ -134,6 +148,40 @@ async def _capture_publish(monkeypatch):
 
     monkeypatch.setattr("app.services.virtual_agency._publish", _fake_publish)
     return sent
+
+
+def _add_external_adapter_run_artifact(
+    db: _FakeAgencySession,
+    *,
+    org_id: uuid.UUID,
+    engagement_id: uuid.UUID,
+    run_id: uuid.UUID,
+    adapter_id: str,
+    status: str = "succeeded",
+) -> AgencyArtifact:
+    artifact = AgencyArtifact(
+        id=uuid.uuid4(),
+        org_id=org_id,
+        engagement_id=engagement_id,
+        marketing_run_id=run_id,
+        artifact_type="external_adapter_run",
+        title=f"External adapter run: {adapter_id}",
+        payload={
+            "adapter_id": adapter_id,
+            "status": status,
+            "evidence": {"session_id": f"{adapter_id}-session"},
+        },
+        payload_hash=adapter_id.ljust(64, "0")[:64],
+        evidence_refs=[],
+        lineage={
+            "source": "external_adapter",
+            "adapter_id": adapter_id,
+            "status": status,
+        },
+        author_role="external_adapter",
+    )
+    db.add(artifact)
+    return artifact
 
 
 @pytest.mark.asyncio
@@ -497,6 +545,91 @@ async def test_content_generation_requires_strategy_research_artifact(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_content_generation_waits_for_declared_external_adapter_runs(
+    monkeypatch,
+):
+    from app.services.agency_domain import (
+        approve_and_dispatch_marketing_run,
+        create_client_engagement,
+        kickoff_marketing_run,
+        start_marketing_run,
+    )
+    from app.services.virtual_agency_agents import route_virtual_agency_task
+
+    sent = await _capture_publish(monkeypatch)
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(
+            name="Acme Launch",
+            client_url="https://acme.example",
+            repo_url="https://github.com/acme/app",
+        ),
+        created_by_agent="chief_of_staff",
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective="Build campaign",
+    )
+    await kickoff_marketing_run(db, engagement=engagement, run=run)
+    for request in db._store.get(AgencyAccessRequest, {}).values():
+        request.status = "granted"
+
+    dispatch = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+    assert dispatch.dispatched_messages[0]["agent_role"] == "chief_of_staff"
+
+    chief_result = await route_virtual_agency_task(
+        db=db,
+        **dispatch.dispatched_messages[0],
+    )
+
+    assert chief_result["dispatched_dependents"] == 0
+    assert [item["message"]["agent_role"] for item in sent] == ["chief_of_staff"]
+
+    _add_external_adapter_run_artifact(
+        db,
+        org_id=org_id,
+        engagement_id=engagement.id,
+        run_id=run.id,
+        adapter_id="browser_qa_harness",
+    )
+    still_blocked = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+    assert still_blocked.dispatched_messages == []
+
+    _add_external_adapter_run_artifact(
+        db,
+        org_id=org_id,
+        engagement_id=engagement.id,
+        run_id=run.id,
+        adapter_id="agent_harness",
+    )
+    resumed = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+
+    assert [message["agent_role"] for message in resumed.dispatched_messages] == [
+        "content_creative"
+    ]
+    assert sent[-1]["message"] == resumed.dispatched_messages[0]
+
+
+@pytest.mark.asyncio
 async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_action(
     monkeypatch,
 ):
@@ -575,8 +708,32 @@ async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_act
     assert dispatch.dispatched_messages[0]["agent_role"] == "chief_of_staff"
     assert sent[-1]["message"] == dispatch.dispatched_messages[0]
 
+    chief_result = await route_virtual_agency_task(
+        db=db,
+        **dispatch.dispatched_messages[0],
+    )
+    assert chief_result["dispatched_dependents"] == 0
+
+    for adapter_id in ["browser_qa_harness", "agent_harness"]:
+        _add_external_adapter_run_artifact(
+            db,
+            org_id=org_id,
+            engagement_id=engagement.id,
+            run_id=run.id,
+            adapter_id=adapter_id,
+        )
+
+    resumed = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="external-adapter:research-complete",
+    )
+    assert [message["agent_role"] for message in resumed.dispatched_messages] == [
+        "content_creative"
+    ]
+
     for role in [
-        "chief_of_staff",
         "content_creative",
         "scheduling_distribution",
         "community_engagement",
