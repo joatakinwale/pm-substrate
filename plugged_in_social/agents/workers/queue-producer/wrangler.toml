@@ -29,6 +29,10 @@ queue = "stevie-email-sender"
 binding = "QUEUE_EMAIL_SENDER"
 
 [[queues.producers]]
+queue = "stevie-mux-ingest"
+binding = "QUEUE_MUX_INGEST"
+
+[[queues.producers]]
 queue = "stevie-ai-content"
 binding = "QUEUE_AI_CONTENT"
 

@@ -8,6 +8,9 @@
       "path": "./packages/agent-state"
     },
     {
+      "path": "./packages/agent-state-core"
+    },
+    {
       "path": "./packages/continuity"
     },
     {

@@ -390,8 +390,10 @@ export interface ArrowHedgePairedExperimentArmMetrics {
   readonly falsePositiveBlockCount?: number;
   readonly falseNegativeBlockCount?: number;
   readonly rawDecisionSha256?: string;
+  readonly governanceEvidenceSha256?: string;
   readonly eventIds?: readonly string[];
   readonly blockedEventIds?: readonly string[];
+  readonly governanceEvidenceCaseIds?: readonly string[];
 }
 
 export interface ArrowHedgePairedExperimentArmInput {

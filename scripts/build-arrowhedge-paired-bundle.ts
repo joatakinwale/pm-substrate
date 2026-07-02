@@ -1,4 +1,7 @@
 import {
+  createHash,
+} from "node:crypto";
+import {
   mkdirSync,
   readFileSync,
   writeFileSync,
@@ -118,6 +121,7 @@ export interface DiscoverArrowHedgePairedBatchPlanFromIntegrationInput {
   readonly bearerToken?: string;
   readonly generatedAt?: string;
   readonly runIds?: readonly number[];
+  readonly governanceEvidencePath?: string;
   readonly fetchFn?: ArrowHedgeIntegrationFetch;
 }
 
@@ -128,6 +132,7 @@ export interface ArrowHedgePairedBatchPlanDiscoveryReport {
   readonly labeledBaselineCount: number;
   readonly labeledSubstrateCount: number;
   readonly reviewedRunCount: number;
+  readonly governanceEvidenceRunCount: number;
   readonly governanceClaimEvidenceReadyCount: number;
   readonly plannedExperimentCount: number;
   readonly planPath: string;
@@ -205,7 +210,29 @@ export interface RunArrowHedgePairedExperimentFromIntegrationResult {
     readonly runReport: string;
     readonly plan: string;
     readonly discoveryReport: string;
+    readonly governanceEvidenceTemplate: string;
   };
+}
+
+export interface ArrowHedgeGovernanceEvidenceManifest {
+  readonly schemaVersion?: "arrowhedge.governance-evidence.v1";
+  readonly generatedAt?: string;
+  readonly entries: readonly ArrowHedgeGovernanceEvidenceEntry[];
+}
+
+export interface ArrowHedgeGovernanceEvidenceEntry {
+  readonly runId: number;
+  readonly role?: "baseline" | "substrate";
+  readonly mode?: string;
+  readonly cases: readonly ArrowHedgeGovernanceEvidenceCase[];
+}
+
+export interface ArrowHedgeGovernanceEvidenceCase {
+  readonly caseId: string;
+  readonly expectedDisposition: "allow" | "block";
+  readonly observedDisposition: "allow" | "block";
+  readonly artifact?: Record<string, unknown>;
+  readonly artifactSha256?: string;
 }
 
 export interface VerifyArrowHedgePairedBundleDirectoryResult {
@@ -232,13 +259,18 @@ const metricCountFields = new Set([
   "falseNegativeBlockCount",
 ]);
 
-const metricStringArrayFields = new Set(["eventIds", "blockedEventIds"]);
+const metricStringArrayFields = new Set([
+  "eventIds",
+  "blockedEventIds",
+  "governanceEvidenceCaseIds",
+]);
 
 const metricFields = new Set([
   ...metricNumberFields,
   ...metricCountFields,
   ...metricStringArrayFields,
   "rawDecisionSha256",
+  "governanceEvidenceSha256",
 ]);
 
 export function writeArrowHedgePairedBundleFiles(
@@ -449,6 +481,14 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
       `integration details failed validation: ${validation.issues.join("; ")}`,
     );
   }
+  const governanceEvidence = input.governanceEvidencePath === undefined
+    ? new Map<number, ArrowHedgePairedExperimentArmMetrics>()
+    : readGovernanceEvidenceManifest(input.governanceEvidencePath);
+  assertGovernanceEvidenceRunIdsSelected(
+    governanceEvidence,
+    backtestRunIds,
+    input.governanceEvidencePath,
+  );
 
   const skippedRuns: ArrowHedgePairedBatchPlanDiscoveryReport["skippedRuns"] = [];
   const arms: {
@@ -508,7 +548,10 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
       mode,
       role,
       envelope: envelope.envelope,
-      metrics: reviewedMetrics.metrics,
+      metrics: mergePairedMetrics(
+        reviewedMetrics.metrics,
+        governanceEvidence.get(runId),
+      ),
     });
   }
   const baselines = arms.filter((arm) => arm.role === "baseline");
@@ -574,6 +617,7 @@ export async function discoverArrowHedgePairedBatchPlanFromIntegration(
     labeledBaselineCount: baselines.length,
     labeledSubstrateCount: substrates.length,
     reviewedRunCount: arms.length,
+    governanceEvidenceRunCount: governanceEvidence.size,
     governanceClaimEvidenceReadyCount: arms.filter((arm) =>
       governanceClaimEvidenceReady(arm.metrics),
     ).length,
@@ -636,7 +680,30 @@ export async function runArrowHedgePairedExperimentFromIntegration(
   };
   mkdirSync(input.outputDir, { recursive: true });
   const runReport = join(input.outputDir, "paired-run-report.json");
+  const governanceEvidenceTemplate = join(
+    input.outputDir,
+    "governance-evidence-template.json",
+  );
   writeJsonFile(runReport, report);
+  writeJsonFile(governanceEvidenceTemplate, {
+    schemaVersion: "arrowhedge.governance-evidence.v1",
+    generatedAt,
+    experimentId: plan.experimentId,
+    entries: [
+      {
+        runId: baseline.runId,
+        role: "baseline",
+        mode: baseline.mode,
+        cases: [],
+      },
+      {
+        runId: substrate.runId,
+        role: "substrate",
+        mode: substrate.mode,
+        cases: [],
+      },
+    ],
+  });
   return {
     report,
     discovery,
@@ -644,6 +711,7 @@ export async function runArrowHedgePairedExperimentFromIntegration(
       runReport,
       plan: discovery.outputPaths.plan,
       discoveryReport: discovery.outputPaths.report,
+      governanceEvidenceTemplate,
     },
   };
 }
@@ -801,6 +869,193 @@ function governanceClaimEvidenceReady(
     metrics.falsePositiveBlockCount !== undefined &&
     metrics.falseNegativeBlockCount !== undefined
   );
+}
+
+function mergePairedMetrics(
+  base: ArrowHedgePairedExperimentArmMetrics,
+  override: ArrowHedgePairedExperimentArmMetrics | undefined,
+): ArrowHedgePairedExperimentArmMetrics {
+  return {
+    ...base,
+    ...(override ?? {}),
+  };
+}
+
+function readGovernanceEvidenceManifest(
+  path: string,
+): Map<number, ArrowHedgePairedExperimentArmMetrics> {
+  const value = readJsonFile<unknown>(path);
+  if (!isRecord(value)) {
+    throw new Error("governance evidence manifest must be an object");
+  }
+  const entriesValue = value["entries"];
+  if (!Array.isArray(entriesValue)) {
+    throw new Error("governance evidence manifest entries must be an array");
+  }
+  const entries = new Map<number, ArrowHedgePairedExperimentArmMetrics>();
+  entriesValue.forEach((entryValue, index) => {
+    const entry = readGovernanceEvidenceEntry(entryValue, index);
+    if (entries.has(entry.runId)) {
+      throw new Error(
+        `governance evidence entries[${index}].runId duplicates run ${entry.runId}`,
+      );
+    }
+    entries.set(entry.runId, entry.metrics);
+  });
+  return entries;
+}
+
+function readGovernanceEvidenceEntry(
+  value: unknown,
+  index: number,
+): {
+  readonly runId: number;
+  readonly metrics: ArrowHedgePairedExperimentArmMetrics;
+} {
+  if (!isRecord(value)) {
+    throw new Error(`governance evidence entries[${index}] must be an object`);
+  }
+  const runId = integerField(
+    value,
+    "runId",
+    `governance evidence entries[${index}].runId`,
+  );
+  const casesValue = value["cases"];
+  if (!Array.isArray(casesValue) || casesValue.length === 0) {
+    throw new Error(
+      `governance evidence entries[${index}].cases must be a non-empty array`,
+    );
+  }
+  let expectedAllowCount = 0;
+  let expectedBlockCount = 0;
+  let falsePositiveBlockCount = 0;
+  let falseNegativeBlockCount = 0;
+  const caseIds: string[] = [];
+  const normalizedCases = casesValue.map((caseValue, caseIndex) => {
+    const evidenceCase = readGovernanceEvidenceCase(
+      caseValue,
+      `governance evidence entries[${index}].cases[${caseIndex}]`,
+    );
+    if (caseIds.includes(evidenceCase.caseId)) {
+      throw new Error(
+        `governance evidence entries[${index}].cases[${caseIndex}].caseId duplicates ${evidenceCase.caseId}`,
+      );
+    }
+    caseIds.push(evidenceCase.caseId);
+    if (evidenceCase.expectedDisposition === "allow") expectedAllowCount += 1;
+    if (evidenceCase.expectedDisposition === "block") expectedBlockCount += 1;
+    if (
+      evidenceCase.expectedDisposition === "allow" &&
+      evidenceCase.observedDisposition === "block"
+    ) {
+      falsePositiveBlockCount += 1;
+    }
+    if (
+      evidenceCase.expectedDisposition === "block" &&
+      evidenceCase.observedDisposition === "allow"
+    ) {
+      falseNegativeBlockCount += 1;
+    }
+    return evidenceCase;
+  });
+  if (expectedAllowCount === 0 || expectedBlockCount === 0) {
+    throw new Error(
+      `governance evidence entries[${index}].cases must include at least one expected allow case and one expected block case`,
+    );
+  }
+
+  return {
+    runId,
+    metrics: {
+      falsePositiveBlockCount,
+      falseNegativeBlockCount,
+      governanceEvidenceCaseIds: caseIds,
+      governanceEvidenceSha256: sha256StableJson({
+        runId,
+        role: value["role"],
+        mode: value["mode"],
+        cases: normalizedCases,
+      }),
+    },
+  };
+}
+
+function readGovernanceEvidenceCase(
+  value: unknown,
+  path: string,
+): {
+  readonly caseId: string;
+  readonly expectedDisposition: "allow" | "block";
+  readonly observedDisposition: "allow" | "block";
+  readonly artifactSha256: string;
+} {
+  if (!isRecord(value)) {
+    throw new Error(`${path} must be an object`);
+  }
+  const caseId = stringField(value, "caseId");
+  if (caseId === undefined) {
+    throw new Error(`${path}.caseId must be a non-empty string`);
+  }
+  const expectedDisposition = readDisposition(
+    value["expectedDisposition"],
+    `${path}.expectedDisposition`,
+  );
+  const observedDisposition = readDisposition(
+    value["observedDisposition"],
+    `${path}.observedDisposition`,
+  );
+  const artifact = value["artifact"];
+  const artifactSha256 = stringField(value, "artifactSha256");
+  const computedArtifactSha256 =
+    artifact === undefined ? undefined : sha256StableJson(artifact);
+  if (
+    artifactSha256 !== undefined &&
+    computedArtifactSha256 !== undefined &&
+    artifactSha256 !== computedArtifactSha256
+  ) {
+    throw new Error(`${path}.artifactSha256 does not match artifact`);
+  }
+  const resolvedArtifactSha256 = artifactSha256 ?? computedArtifactSha256;
+  if (!isSha256(resolvedArtifactSha256)) {
+    throw new Error(
+      `${path} must include artifactSha256 or an inline artifact object`,
+    );
+  }
+  return {
+    caseId,
+    expectedDisposition,
+    observedDisposition,
+    artifactSha256: resolvedArtifactSha256,
+  };
+}
+
+function readDisposition(
+  value: unknown,
+  path: string,
+): "allow" | "block" {
+  if (value !== "allow" && value !== "block") {
+    throw new Error(`${path} must be allow or block`);
+  }
+  return value;
+}
+
+function assertGovernanceEvidenceRunIdsSelected(
+  evidence: ReadonlyMap<number, ArrowHedgePairedExperimentArmMetrics>,
+  selectedRunIds: readonly number[],
+  path: string | undefined,
+): void {
+  if (path === undefined) return;
+  const selected = new Set(selectedRunIds);
+  const extraRunIds = [...evidence.keys()].filter((runId) => !selected.has(runId));
+  if (extraRunIds.length > 0) {
+    throw new Error(
+      `governance evidence ${path} references run ids outside discovery scope: ${extraRunIds.join(", ")}`,
+    );
+  }
+}
+
+function isSha256(value: string | undefined): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
 }
 
 async function runArrowHedgeBacktestArm(input: {
@@ -1349,6 +1604,24 @@ function writeJsonFile(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function sha256StableJson(value: unknown): string {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJson(item)).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`)
+    .join(",")}}`;
+}
+
 function sanitizePathSegment(value: string): string {
   return value.replace(/[^A-Za-z0-9_.-]+/g, "_");
 }
@@ -1478,6 +1751,9 @@ function parseArgs(argv: readonly string[]):
         ...(args.has("--run-ids")
           ? { runIds: parseNumberList(args.get("--run-ids")!) }
           : {}),
+        ...(args.has("--governance-evidence")
+          ? { governanceEvidencePath: args.get("--governance-evidence")! }
+          : {}),
         ...(args.has("--bearer-token")
           ? { bearerToken: args.get("--bearer-token")! }
           : {}),
@@ -1556,7 +1832,7 @@ function usage(): string {
     "  tsx scripts/build-arrowhedge-paired-bundle.ts write --experiment-id <id> --baseline-envelope <path> --substrate-envelope <path> --out <dir> [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts from-integration --experiment-id <id> --base-url <url> --baseline-run-id <id> --substrate-run-id <id> --out <dir> [--bearer-token <token>] [--baseline-flow-id <id>] [--substrate-flow-id <id>] [--baseline-backtest-run-id <id>] [--substrate-backtest-run-id <id>] [--baseline-mode <mode>] [--substrate-mode <mode>] [--baseline-metrics <path>] [--substrate-metrics <path>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts batch-from-integration --plan <path> --out <dir> [--bearer-token <token>]",
-    "  tsx scripts/build-arrowhedge-paired-bundle.ts discover-plan-from-integration --base-url <url> --out <dir> [--run-ids <id,id>] [--bearer-token <token>] [--generated-at <iso>]",
+    "  tsx scripts/build-arrowhedge-paired-bundle.ts discover-plan-from-integration --base-url <url> --out <dir> [--run-ids <id,id>] [--governance-evidence <path>] [--bearer-token <token>] [--generated-at <iso>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts run-paired-from-integration --plan <path> --out <dir> [--bearer-token <token>]",
     "  tsx scripts/build-arrowhedge-paired-bundle.ts verify --bundle-dir <dir>",
   ].join("\n");
@@ -1633,6 +1909,10 @@ async function main(): Promise<void> {
           backtestRunCount: result.report.backtestRunCount,
           labeledBaselineCount: result.report.labeledBaselineCount,
           labeledSubstrateCount: result.report.labeledSubstrateCount,
+          governanceEvidenceRunCount:
+            result.report.governanceEvidenceRunCount,
+          governanceClaimEvidenceReadyCount:
+            result.report.governanceClaimEvidenceReadyCount,
           plannedExperimentCount: result.report.plannedExperimentCount,
           issueCount: result.report.issues.length,
           skippedRunCount: result.report.skippedRuns.length,
@@ -1663,6 +1943,8 @@ async function main(): Promise<void> {
           runReportPath: result.outputPaths.runReport,
           planPath: result.outputPaths.plan,
           discoveryReportPath: result.outputPaths.discoveryReport,
+          governanceEvidenceTemplatePath:
+            result.outputPaths.governanceEvidenceTemplate,
         },
         null,
         2,

@@ -1,0 +1,28 @@
+{
+  "name": "@pm/agent-state-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lean agent-state surface: CurrentStateView, ObservationContract, ActionProposalReview, StateReviewArtifact, ActionOutcomeEnvelope, and external-evidence admission. Interim re-export shim over @pm/agent-state (refactor plan Phase 0, step 2.1); implementations move here next, the provenance tower stays behind.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/agent-state": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

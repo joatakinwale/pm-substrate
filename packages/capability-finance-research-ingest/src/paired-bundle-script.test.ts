@@ -417,6 +417,7 @@ describe("build-arrowhedge-paired-bundle script", () => {
       labeledBaselineCount: 1,
       labeledSubstrateCount: 1,
       reviewedRunCount: 2,
+      governanceEvidenceRunCount: 0,
       governanceClaimEvidenceReadyCount: 0,
       plannedExperimentCount: 1,
       issues: [],
@@ -444,6 +445,114 @@ describe("build-arrowhedge-paired-bundle script", () => {
       schemaVersion: "arrowhedge.paired-batch-plan-discovery-report.v1",
       plannedExperimentCount: 1,
     });
+  });
+
+  it("merges explicit governance evidence only for matching discovery run ids", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "arrowhedge-governance-evidence-"));
+    const evidencePath = join(dir, "governance-evidence.json");
+    writeJson(evidencePath, {
+      schemaVersion: "arrowhedge.governance-evidence.v1",
+      entries: [
+        {
+          runId: 12,
+          role: "substrate",
+          mode: "blocking",
+          cases: [
+            {
+              caseId: "fresh_in_policy_allowed",
+              expectedDisposition: "allow",
+              observedDisposition: "allow",
+              artifact: {
+                reviewId: "review_fresh_in_policy_allowed",
+                runId: 12,
+                action: "buy",
+                reason: "fresh in-policy action was allowed",
+              },
+            },
+            {
+              caseId: "stale_state_blocked",
+              expectedDisposition: "block",
+              observedDisposition: "block",
+              artifact: {
+                reviewId: "review_stale_state_blocked",
+                runId: 12,
+                action: "buy",
+                reason: "stale state action was blocked",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const responses = integrationDiscoveryResponses();
+    const fetchFn: ArrowHedgeIntegrationFetch = async (url) =>
+      jsonResponse(
+        responses.get(url) ?? { error: "not found" },
+        responses.has(url) ? 200 : 404,
+      );
+
+    const result = await discoverArrowHedgePairedBatchPlanFromIntegration({
+      integrationBaseUrl: "https://arrow.example",
+      generatedAt: "2026-06-03T14:25:00.000Z",
+      outputDir: join(dir, "discovery"),
+      runIds: [11, 12],
+      governanceEvidencePath: evidencePath,
+      fetchFn,
+    });
+
+    expect(result.report).toMatchObject({
+      backtestRunCount: 2,
+      governanceEvidenceRunCount: 1,
+      governanceClaimEvidenceReadyCount: 1,
+      plannedExperimentCount: 1,
+      skippedRuns: [],
+    });
+    expect(result.plan.experiments[0]?.substrate.metrics).toMatchObject({
+      falsePositiveBlockCount: 0,
+      falseNegativeBlockCount: 0,
+      governanceEvidenceCaseIds: [
+        "fresh_in_policy_allowed",
+        "stale_state_blocked",
+      ],
+      governanceEvidenceSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+
+    const mismatchedEvidencePath = join(dir, "bad-governance-evidence.json");
+    writeJson(mismatchedEvidencePath, {
+      schemaVersion: "arrowhedge.governance-evidence.v1",
+      entries: [
+        {
+          runId: 99,
+          cases: [
+            {
+              caseId: "fresh_in_policy_allowed",
+              expectedDisposition: "allow",
+              observedDisposition: "allow",
+              artifact: { reviewId: "wrong_run_allow" },
+            },
+            {
+              caseId: "stale_state_blocked",
+              expectedDisposition: "block",
+              observedDisposition: "block",
+              artifact: { reviewId: "wrong_run_block" },
+            },
+          ],
+        },
+      ],
+    });
+    await expect(
+      discoverArrowHedgePairedBatchPlanFromIntegration({
+        integrationBaseUrl: "https://arrow.example",
+        outputDir: join(dir, "bad-discovery"),
+        runIds: [11, 12],
+        governanceEvidencePath: mismatchedEvidencePath,
+        fetchFn,
+      }),
+    ).rejects.toThrow(
+      "governance evidence " +
+        mismatchedEvidencePath +
+        " references run ids outside discovery scope: 99",
+    );
   });
 
   it("runs external labeled ArrowHedge paired backtests before scoped discovery", async () => {
@@ -570,6 +679,14 @@ describe("build-arrowhedge-paired-bundle script", () => {
           baseline: { runId: 11, mode: "off" },
           substrate: { runId: 12, mode: "blocking" },
         },
+      ],
+    });
+    expect(readJson(result.outputPaths.governanceEvidenceTemplate)).toMatchObject({
+      schemaVersion: "arrowhedge.governance-evidence.v1",
+      experimentId: "exp_arrowhedge_runner_001",
+      entries: [
+        { runId: 11, role: "baseline", mode: "off", cases: [] },
+        { runId: 12, role: "substrate", mode: "blocking", cases: [] },
       ],
     });
   });

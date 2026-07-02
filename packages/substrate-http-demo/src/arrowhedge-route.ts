@@ -59,6 +59,7 @@ const pairedMetricCountFields = [
 const pairedMetricStringArrayFields = [
   "eventIds",
   "blockedEventIds",
+  "governanceEvidenceCaseIds",
 ] as const;
 
 const pairedMetricFieldNames = new Set<string>([
@@ -66,6 +67,7 @@ const pairedMetricFieldNames = new Set<string>([
   ...pairedMetricCountFields,
   ...pairedMetricStringArrayFields,
   "rawDecisionSha256",
+  "governanceEvidenceSha256",
 ]);
 
 const validatePairedEnvelope = (

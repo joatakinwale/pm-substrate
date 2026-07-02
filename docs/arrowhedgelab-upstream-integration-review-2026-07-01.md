@@ -145,7 +145,38 @@ pnpm arrowhedge:paired-bundle -- run-paired-from-integration \
 The runner does not import ArrowHedge code. It uses `POST /flows/{id}/runs`,
 `PUT /flows/{id}/runs/{run_id}`, and `POST /hedge-fund/backtest`, then writes
 `paired-run-report.json` plus a scoped discovery directory containing
-`paired-batch-plan.json` and `plan-discovery-report.json`.
+`paired-batch-plan.json` and `plan-discovery-report.json`. It also writes
+`governance-evidence-template.json` with the new run IDs so a real governance
+review can attach expected/observed allow/block cases.
+
+Explicit governance evidence is supplied separately and keyed to saved run IDs:
+
+```json
+{
+  "schemaVersion": "arrowhedge.governance-evidence.v1",
+  "entries": [
+    {
+      "runId": 102,
+      "role": "substrate",
+      "mode": "blocking",
+      "cases": [
+        {
+          "caseId": "fresh_in_policy_allowed",
+          "expectedDisposition": "allow",
+          "observedDisposition": "allow",
+          "artifactSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        },
+        {
+          "caseId": "stale_state_blocked",
+          "expectedDisposition": "block",
+          "observedDisposition": "block",
+          "artifactSha256": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+        }
+      ]
+    }
+  ]
+}
+```
 
 Discover a conservative batch plan from saved ArrowHedgeLab adapter runs:
 
@@ -153,6 +184,7 @@ Discover a conservative batch plan from saved ArrowHedgeLab adapter runs:
 pnpm arrowhedge:paired-bundle -- discover-plan-from-integration \
   --base-url http://127.0.0.1:8000 \
   --run-ids 101,102 \
+  --governance-evidence artifacts/arrowhedge/governance-evidence.json \
   --out artifacts/arrowhedge/discovery_axis_a_001
 ```
 
@@ -162,8 +194,11 @@ baseline/substrate mode labels, valid pm-substrate offline review, and
 readiness-equal envelopes; unlabeled, unsupported, invalid-review, or
 non-comparable runs stay in the discovery report as skipped runs or candidate
 issues. Review-derived event and block counts are included in arm metrics, but
-false-positive/false-negative counts are not fabricated; market-win claims
-remain denied until that evidence is supplied by a real governance evaluation.
+false-positive/false-negative counts are only merged from a governance evidence
+manifest whose run IDs match the discovery scope. Each manifest entry must
+include at least one expected-allow case and one expected-block case, so a
+market-win claim cannot be unlocked by testing only one side of the governance
+gate.
 
 Batch many historical pairs from one plan:
 
