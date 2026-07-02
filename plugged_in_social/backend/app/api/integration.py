@@ -41,6 +41,7 @@ from app.schemas.integration import (
     IntegrationEvidenceSummaryEnvelope,
     IntegrationEventIngest,
     IntegrationExternalAdapterManifest,
+    IntegrationExternalAdapterRunIngest,
     IntegrationLink,
     IntegrationMarketingRunCreate,
     IntegrationMarketingRunEnvelope,
@@ -128,6 +129,10 @@ def _run_links(run_id: uuid.UUID) -> list[IntegrationLink]:
     return [
         _link("self", f"/api/integration/v1/marketing-runs/{run_id}"),
         _link("artifacts", f"/api/integration/v1/marketing-runs/{run_id}/artifacts"),
+        _link(
+            "external_adapter_runs",
+            f"/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+        ),
         _link(
             "social_posts",
             f"/api/integration/v1/marketing-runs/{run_id}/social-posts",
@@ -698,6 +703,14 @@ async def _build_run_evidence_snapshot_rows(
             "artifact_payload_hashes": sorted(
                 {item.payload_hash for item in artifacts if item.payload_hash}
             ),
+            "external_adapter_run_hashes": sorted(
+                {
+                    item.payload_hash
+                    for item in artifacts
+                    if item.artifact_type == "external_adapter_run"
+                    and item.payload_hash
+                }
+            ),
             "approval_payload_hashes": sorted(
                 {
                     item.approval_payload_hash
@@ -781,6 +794,24 @@ def _capabilities() -> list[IntegrationCapability]:
             ),
             methods=["GET"],
             resources=["external_adapter"],
+        ),
+        IntegrationCapability(
+            id="external_adapter_run.read",
+            name="Read external adapter run evidence",
+            description="Inspect durable Canary/Pi-style adapter run artifacts for a marketing run.",
+            methods=["GET"],
+            resources=["agency_artifact", "external_adapter_run"],
+        ),
+        IntegrationCapability(
+            id="external_adapter_run.ingest",
+            name="Ingest external adapter run evidence",
+            description=(
+                "Record sandboxed browser QA or containerized agent harness evidence "
+                "after adapter-specific required gates pass."
+            ),
+            methods=["POST"],
+            resources=["agency_artifact", "external_adapter_run"],
+            events=["external_adapter_run.ingested"],
         ),
         IntegrationCapability(
             id="engagement.read",
@@ -1140,6 +1171,18 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
         ),
         IntegrationEndpointManifest(
             method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+            boundary="public_rls",
+            capability_ids=["external_adapter_run.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+            boundary="public_rls",
+            capability_ids=["external_adapter_run.ingest"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
             path="/api/integration/v1/marketing-runs/{run_id}/social-posts",
             boundary="public_rls",
             capability_ids=["social_post.read"],
@@ -1243,8 +1286,12 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
                 "evidence_refs",
                 "lineage",
             ],
-            read_capability_ids=["artifact.read"],
-            write_capability_ids=["event.ingest", "marketing_run.create"],
+            read_capability_ids=["artifact.read", "external_adapter_run.read"],
+            write_capability_ids=[
+                "event.ingest",
+                "external_adapter_run.ingest",
+                "marketing_run.create",
+            ],
         ),
         IntegrationDataResourceManifest(
             id="agency_approval_request",
@@ -1445,6 +1492,26 @@ def _external_adapter_manifest() -> list[IntegrationExternalAdapterManifest]:
                 ),
             },
         ),
+    ]
+
+
+def _external_adapter_by_id(
+    adapter_id: str,
+) -> IntegrationExternalAdapterManifest | None:
+    return next(
+        (adapter for adapter in _external_adapter_manifest() if adapter.id == adapter_id),
+        None,
+    )
+
+
+def _missing_external_adapter_gates(
+    adapter: IntegrationExternalAdapterManifest,
+    gate_results: dict[str, bool],
+) -> list[str]:
+    return [
+        gate
+        for gate in adapter.required_gates
+        if gate_results.get(gate) is not True
     ]
 
 
@@ -1780,6 +1847,131 @@ async def list_run_artifacts(
         .order_by(AgencyArtifact.created_at.desc())
     )
     return [_to_artifact(item) for item in result.scalars().all()]
+
+
+@router.get(
+    "/marketing-runs/{run_id}/external-adapter-runs",
+    response_model=list[IntegrationArtifactEnvelope],
+)
+async def list_run_external_adapter_runs(
+    run_id: uuid.UUID,
+    adapter_id: str | None = Query(None, min_length=1, max_length=120),
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    await _get_run(db, org_id=org_id, run_id=run_id)
+    result = await db.execute(
+        select(AgencyArtifact)
+        .where(
+            AgencyArtifact.org_id == org_id,
+            AgencyArtifact.marketing_run_id == run_id,
+            AgencyArtifact.artifact_type == "external_adapter_run",
+        )
+        .order_by(AgencyArtifact.created_at.desc())
+    )
+    artifacts = list(result.scalars().all())
+    if adapter_id:
+        artifacts = [
+            artifact
+            for artifact in artifacts
+            if dict(artifact.lineage or {}).get("adapter_id") == adapter_id
+        ]
+    return [_to_artifact(item) for item in artifacts]
+
+
+@router.post(
+    "/marketing-runs/{run_id}/external-adapter-runs",
+    response_model=IntegrationArtifactEnvelope,
+    status_code=status.HTTP_201_CREATED,
+)
+async def ingest_run_external_adapter_run(
+    run_id: uuid.UUID,
+    body: IntegrationExternalAdapterRunIngest,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    run = await _get_run(db, org_id=org_id, run_id=run_id)
+    adapter = _external_adapter_by_id(body.adapter_id)
+    if adapter is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "external_adapter_not_found",
+                "message": "External adapter is not registered.",
+                "adapter_id": body.adapter_id,
+            },
+        )
+    missing_gates = _missing_external_adapter_gates(adapter, body.gate_results)
+    if missing_gates:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "external_adapter_gates_failed",
+                "message": "Resolve external adapter gates before recording evidence.",
+                "adapter_id": adapter.id,
+                "missing_or_failed_gates": missing_gates,
+            },
+        )
+
+    engagement = await _get_engagement(
+        db,
+        org_id=org_id,
+        engagement_id=run.engagement_id,
+    )
+    input_refs = [item.model_dump() for item in body.input_refs]
+    payload = {
+        "adapter_id": body.adapter_id,
+        "adapter_type": adapter.adapter_type,
+        "adapter_run_id": body.adapter_run_id,
+        "status": body.status,
+        "gate_results": body.gate_results,
+        "input_refs": input_refs,
+        "output_artifacts": body.output_artifacts,
+        "evidence": body.evidence,
+        "metrics": body.metrics,
+        "idempotency_key": body.idempotency_key,
+        "adapter_contract": {
+            "boundary": adapter.boundary,
+            "required_gates": adapter.required_gates,
+            "evidence_fields": adapter.evidence_fields,
+            "output_artifacts": adapter.output_artifacts,
+        },
+    }
+    artifact = await create_agency_artifact(
+        db,
+        org_id=org_id,
+        engagement=engagement,
+        body=AgencyArtifactCreate(
+            marketing_run_id=run.id,
+            artifact_type="external_adapter_run",
+            title=f"External adapter run: {adapter.id}",
+            payload=payload,
+            evidence_refs=list(body.input_refs),
+            lineage={
+                "source": "external_adapter",
+                "adapter_id": adapter.id,
+                "adapter_type": adapter.adapter_type,
+                "adapter_run_id": body.adapter_run_id,
+                "boundary": adapter.boundary,
+                "status": body.status,
+                "gate_results_hash": compute_payload_hash(body.gate_results),
+                "output_payload_hash": compute_payload_hash(
+                    {
+                        "output_artifacts": body.output_artifacts,
+                        "evidence": body.evidence,
+                        "metrics": body.metrics,
+                    }
+                ),
+                "idempotency_key": body.idempotency_key,
+            },
+            author_role="external_adapter",
+        ),
+    )
+    await db.commit()
+    await db.refresh(artifact)
+    return _to_artifact(artifact)
 
 
 @router.get(

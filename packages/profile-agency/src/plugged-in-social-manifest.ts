@@ -411,9 +411,12 @@ function buildExternalAdapters(
   const schemaSource = readSource(sourceRoot, "backend/app/schemas/integration.py");
   const hasAdapterContract =
     schemaSource.includes("IntegrationExternalAdapterManifest") &&
+    schemaSource.includes("IntegrationExternalAdapterRunIngest") &&
     schemaSource.includes("external_adapters") &&
     apiSource.includes("_external_adapter_manifest") &&
     apiSource.includes('"/external-adapters"') &&
+    apiSource.includes('"/marketing-runs/{run_id}/external-adapter-runs"') &&
+    apiSource.includes("external_adapter_run.ingest") &&
     apiSource.includes("external_adapter_manifest.read");
 
   if (!hasAdapterContract) {
@@ -1000,9 +1003,16 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes("no_secret_exfiltration") &&
       integrationApi.includes("tool_call_hash") &&
       integrationApi.includes("network_har") &&
+      integrationApi.includes('"/marketing-runs/{run_id}/external-adapter-runs"') &&
+      integrationApi.includes("external_adapter_run.read") &&
+      integrationApi.includes("external_adapter_run.ingest") &&
+      integrationApi.includes("_missing_external_adapter_gates") &&
+      integrationApi.includes("external_adapter_run_hashes") &&
       integrationSchemas.includes("IntegrationExternalAdapterManifest") &&
+      integrationSchemas.includes("IntegrationExternalAdapterRunIngest") &&
       integrationSchemas.includes("external_adapters") &&
       integrationTests.includes("external_adapter_manifest.read") &&
+      integrationTests.includes("external_adapter_run.ingest") &&
       integrationTests.includes("browser_qa_harness") &&
       integrationTests.includes("sandbox_boundary"),
     operatorRunMonitorSurface:

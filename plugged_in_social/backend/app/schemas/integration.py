@@ -400,6 +400,18 @@ class IntegrationWebhookIngest(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict)
 
 
+class IntegrationExternalAdapterRunIngest(BaseModel):
+    adapter_id: str = Field(min_length=1, max_length=120)
+    adapter_run_id: str | None = Field(default=None, max_length=160)
+    status: Literal["succeeded", "failed", "blocked", "partial"]
+    gate_results: dict[str, bool] = Field(default_factory=dict)
+    input_refs: list[EvidenceRef] = Field(default_factory=list)
+    output_artifacts: list[dict[str, Any]] = Field(default_factory=list)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+    idempotency_key: str | None = Field(default=None, max_length=160)
+
+
 class IntegrationAcceptedResponse(BaseModel):
     ok: bool
     status: Literal["accepted"]

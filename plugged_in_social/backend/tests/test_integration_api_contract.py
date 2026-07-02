@@ -57,6 +57,14 @@ def test_integration_router_imports_with_neutral_v1_prefix():
         frozenset({"GET"}),
     ) in route_methods
     assert (
+        "/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+        frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+        frozenset({"POST"}),
+    ) in route_methods
+    assert (
         "/integration/v1/marketing-runs/{run_id}/social-posts",
         frozenset({"GET"}),
     ) in route_methods
@@ -151,6 +159,19 @@ def test_engagement_envelope_links_expose_neutral_related_resources():
     }
 
 
+def test_marketing_run_links_expose_adapter_run_evidence_resource():
+    import app.api.integration as module
+
+    run_id = uuid.uuid4()
+
+    links = {link.rel: link.href for link in module._run_links(run_id)}
+
+    assert (
+        links["external_adapter_runs"]
+        == f"/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs"
+    )
+
+
 def test_integration_schemas_expose_stable_external_envelopes():
     from app.schemas.integration import (
         IntegrationAcceptedResponse,
@@ -163,6 +184,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationEvidenceSummaryEnvelope,
         IntegrationEventIngest,
         IntegrationExternalAdapterManifest,
+        IntegrationExternalAdapterRunIngest,
         IntegrationMarketingRunCreate,
         IntegrationRunDispatchEnvelope,
         IntegrationRunEventEnvelope,
@@ -188,6 +210,9 @@ def test_integration_schemas_expose_stable_external_envelopes():
     )
     event_fields = set(IntegrationEventIngest.model_fields)
     external_adapter_fields = set(IntegrationExternalAdapterManifest.model_fields)
+    external_adapter_run_fields = set(
+        IntegrationExternalAdapterRunIngest.model_fields
+    )
     accepted_fields = set(IntegrationAcceptedResponse.model_fields)
 
     assert {"version", "service", "capabilities", "closed_loop_stages"}.issubset(
@@ -221,6 +246,17 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "evidence_fields",
         "notes",
     }.issubset(external_adapter_fields)
+    assert {
+        "adapter_id",
+        "adapter_run_id",
+        "status",
+        "gate_results",
+        "input_refs",
+        "output_artifacts",
+        "evidence",
+        "metrics",
+        "idempotency_key",
+    }.issubset(external_adapter_run_fields)
     assert {
         "id",
         "org_id",
@@ -490,6 +526,20 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for endpoint in manifest.api_endpoints
     )
     assert any(
+        endpoint.path == "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs"
+        and endpoint.method == "GET"
+        and endpoint.boundary == "public_rls"
+        and "external_adapter_run.read" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs"
+        and endpoint.method == "POST"
+        and endpoint.boundary == "public_rls"
+        and "external_adapter_run.ingest" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
         capability.id == "run_evidence_snapshot.read"
         and "virtual_agency_task" in capability.resources
         and "social_post" in capability.resources
@@ -499,6 +549,18 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert any(
         capability.id == "report.read"
         and "client_report" in capability.resources
+        for capability in module._capabilities()
+    )
+    assert any(
+        capability.id == "external_adapter_run.read"
+        and "external_adapter_run" in capability.resources
+        and "agency_artifact" in capability.resources
+        for capability in module._capabilities()
+    )
+    assert any(
+        capability.id == "external_adapter_run.ingest"
+        and "external_adapter_run" in capability.resources
+        and "agency_artifact" in capability.resources
         for capability in module._capabilities()
     )
     assert any(
@@ -550,6 +612,12 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for resource in manifest.data_resources
     )
     assert any(
+        resource.table == "agency_artifacts"
+        and "external_adapter_run.read" in resource.read_capability_ids
+        and "external_adapter_run.ingest" in resource.write_capability_ids
+        for resource in manifest.data_resources
+    )
+    assert any(
         config.key == "BACKEND_BASE_URL" and config.kind == "secret"
         for config in manifest.configuration_requirements
     )
@@ -557,6 +625,31 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert "content_hash_gate" in manifest.governance_gates
     assert "external_adapter_boundary" in manifest.governance_gates
     assert "sandbox_boundary" in manifest.governance_gates
+
+
+def test_external_adapter_run_gate_validation_requires_manifest_gates():
+    import app.api.integration as module
+
+    adapter = module._external_adapter_by_id("agent_harness")
+    assert adapter is not None
+
+    missing = module._missing_external_adapter_gates(
+        adapter,
+        {
+            "tenant_rls": True,
+            "capability_gate": True,
+            "approval_payload_hash": True,
+        },
+    )
+    satisfied = module._missing_external_adapter_gates(
+        adapter,
+        {gate: True for gate in adapter.required_gates},
+    )
+
+    assert "content_hash_gate" in missing
+    assert "sandbox_boundary" in missing
+    assert "durable_event_hash" in missing
+    assert satisfied == []
 
 
 def test_social_post_integration_envelope_derives_hash_and_lineage():

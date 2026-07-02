@@ -61,6 +61,8 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "platform_manifest.read",
         "engagement.read",
         "engagement.create",
+        "external_adapter_run.read",
+        "external_adapter_run.ingest",
         "marketing_run.read",
         "marketing_run.create",
         "marketing_run.dispatch",
@@ -214,6 +216,18 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["marketing_run.dispatch"],
         },
         {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+          boundary: "public_rls",
+          capability_ids: ["external_adapter_run.read"],
+        },
+        {
+          method: "POST",
+          path: "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+          boundary: "public_rls",
+          capability_ids: ["external_adapter_run.ingest"],
+        },
+        {
           method: "POST",
           path: "/api/internal/virtual-agency/task",
           boundary: "internal_system_rls",
@@ -299,8 +313,8 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           resource_type: "agency_artifact",
           org_scoped: true,
           durable_evidence_fields: ["payload_hash"],
-          read_capability_ids: ["artifact.read"],
-          write_capability_ids: ["event.ingest"],
+          read_capability_ids: ["artifact.read", "external_adapter_run.read"],
+          write_capability_ids: ["event.ingest", "external_adapter_run.ingest"],
         },
         {
           id: "agency_approval_request",

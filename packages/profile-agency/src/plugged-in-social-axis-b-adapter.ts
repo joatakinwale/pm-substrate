@@ -410,6 +410,8 @@ const REQUIRED_LIVE_CLOSED_LOOP_STAGES = [
 const REQUIRED_LIVE_CAPABILITIES = [
   "platform_manifest.read",
   "engagement.create",
+  "external_adapter_run.read",
+  "external_adapter_run.ingest",
   "marketing_run.read",
   "marketing_run.create",
   "marketing_run.dispatch",
@@ -836,6 +838,20 @@ function liveRunEvidenceIssues(
   if (dispatchEndpoint?.boundary !== "public_rls") {
     issues.add("marketing run dispatch endpoint is not public-RLS scoped");
   }
+  const adapterRunsEndpoint = endpoints.get(
+    "GET /api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+  );
+  if (adapterRunsEndpoint?.boundary !== "public_rls") {
+    issues.add("marketing run external-adapter-runs endpoint is not public-RLS scoped");
+  }
+  const ingestAdapterRunEndpoint = endpoints.get(
+    "POST /api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+  );
+  if (ingestAdapterRunEndpoint?.boundary !== "public_rls") {
+    issues.add(
+      "marketing run external-adapter-run ingest endpoint is not public-RLS scoped",
+    );
+  }
   const socialPostsEndpoint = endpoints.get(
     "GET /api/integration/v1/marketing-runs/{run_id}/social-posts",
   );
@@ -899,6 +915,21 @@ function liveRunEvidenceIssues(
     !marketingRunResource.write_capability_ids.includes("marketing_run.dispatch")
   ) {
     issues.add("marketing_runs resource lacks marketing_run.dispatch write capability");
+  }
+  const artifactResource = platformManifest.data_resources.find(
+    (resource) => resource.table === "agency_artifacts",
+  );
+  if (
+    artifactResource !== undefined &&
+    !artifactResource.read_capability_ids.includes("external_adapter_run.read")
+  ) {
+    issues.add("agency_artifacts resource lacks external_adapter_run.read capability");
+  }
+  if (
+    artifactResource !== undefined &&
+    !artifactResource.write_capability_ids.includes("external_adapter_run.ingest")
+  ) {
+    issues.add("agency_artifacts resource lacks external_adapter_run.ingest capability");
   }
   const socialPostResource = platformManifest.data_resources.find(
     (resource) => resource.table === "social_posts",
