@@ -23,6 +23,7 @@ import {
   type IntegrationEvidenceSummary,
   type IntegrationExternalAdapter,
   type IntegrationRunEvent,
+  type IntegrationSocialPost,
   type IntegrationTask,
   type MarketingRun,
   createAgencyAccessRequest,
@@ -200,6 +201,25 @@ function CountMap({
   );
 }
 
+function nextActionProposalFromEvent(event: IntegrationRunEvent) {
+  const payload = objectValue(event.payload);
+  const proposal = objectValue(payload?.next_action_proposal);
+  if (!proposal) return null;
+
+  return {
+    eventId: event.id,
+    eventHash: event.event_hash,
+    occurredAt: event.occurred_at,
+    recommendedAction:
+      stringValue(proposal.recommended_action) || "next_action_proposal",
+    sourceReportId:
+      stringValue(proposal.source_report_id) || stringValue(proposal.report_id),
+    evidenceRefCount: numberValue(proposal.evidence_ref_count),
+    pmSubstrateActionType: stringValue(proposal.pm_substrate_action_type),
+    contentHashes: objectValue(proposal.content_hashes) || {},
+  };
+}
+
 export default function AgencyCommandCenterPage() {
   const [engagements, setEngagements] = useState<ClientEngagement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -209,6 +229,7 @@ export default function AgencyCommandCenterPage() {
   const [accessRequests, setAccessRequests] = useState<AgencyAccessRequest[]>([]);
   const [runTasks, setRunTasks] = useState<IntegrationTask[]>([]);
   const [runEvents, setRunEvents] = useState<IntegrationRunEvent[]>([]);
+  const [runSocialPosts, setRunSocialPosts] = useState<IntegrationSocialPost[]>([]);
   const [clientReports, setClientReports] = useState<IntegrationClientReport[]>([]);
   const [evidenceSummary, setEvidenceSummary] =
     useState<IntegrationEvidenceSummary | null>(null);
@@ -296,6 +317,16 @@ export default function AgencyCommandCenterPage() {
     () => runEvents.slice(-8).reverse(),
     [runEvents]
   );
+  const nextActionProposals = useMemo(
+    () =>
+      runEvents
+        .map(nextActionProposalFromEvent)
+        .filter((proposal): proposal is NonNullable<typeof proposal> =>
+          Boolean(proposal)
+        )
+        .reverse(),
+    [runEvents]
+  );
   const evidenceHashGroups = useMemo(
     () =>
       Object.entries(evidenceSummary?.evidence_hashes || {}).filter(
@@ -322,8 +353,12 @@ export default function AgencyCommandCenterPage() {
   );
   const closedLoopMonitor = useMemo(() => {
     const socialStatusCounts = evidenceSummary?.social_post_status_counts || {};
-    const hasScheduledPost = Number(socialStatusCounts.scheduled || 0) > 0;
-    const hasPublishedPost = Number(socialStatusCounts.published || 0) > 0;
+    const hasScheduledPost =
+      Number(socialStatusCounts.scheduled || 0) > 0 ||
+      runSocialPosts.some((post) => post.status === "scheduled");
+    const hasPublishedPost =
+      Number(socialStatusCounts.published || 0) > 0 ||
+      runSocialPosts.some((post) => post.status === "published");
     const reportCount = evidenceSummary?.report_count ?? clientReports.length;
     const reportEvidenceCount = reportCount || 1;
     const hasReportMetricsEvidence =
@@ -337,7 +372,8 @@ export default function AgencyCommandCenterPage() {
     const hasReportEvidence = reportCount > 0 || hasReportArtifact;
     const hasNextAction =
       taskTypeSet.has("next_action_proposal") ||
-      eventTypeSet.has("marketing.next_action.proposed");
+      eventTypeSet.has("marketing.next_action.proposed") ||
+      nextActionProposals.length > 0;
 
     const details: Record<(typeof CLOSED_LOOP_STAGES)[number], string> = {
       intake: selectedEngagement
@@ -378,7 +414,7 @@ export default function AgencyCommandCenterPage() {
         ? `${reportEvidenceCount} report evidence record${reportEvidenceCount === 1 ? "" : "s"} present.`
         : "Waiting for report evidence.",
       next_action: hasNextAction
-        ? "Next action proposal recorded."
+        ? `${nextActionProposals.length || 1} next action proposal recorded.`
         : "Waiting for next action proposal.",
     };
 
@@ -435,7 +471,9 @@ export default function AgencyCommandCenterPage() {
     completedTaskTypeSet,
     evidenceSummary,
     eventTypeSet,
+    nextActionProposals.length,
     pendingApprovals.length,
+    runSocialPosts,
     selectedEngagement,
     taskTypeSet,
   ]);
@@ -551,6 +589,7 @@ export default function AgencyCommandCenterPage() {
       const latestRun = runData[0] || null;
       let eventData: IntegrationRunEvent[] = [];
       let taskData: IntegrationTask[] = [];
+      let socialPostData: IntegrationSocialPost[] = [];
       let reportData: IntegrationClientReport[] = [];
       let summaryData: IntegrationEvidenceSummary | null = null;
       let artifactsForDisplay = artifactData;
@@ -560,6 +599,7 @@ export default function AgencyCommandCenterPage() {
         const snapshot = await getIntegrationRunEvidenceSnapshot(latestRun.id);
         eventData = snapshot.events;
         taskData = snapshot.tasks;
+        socialPostData = snapshot.social_posts;
         reportData = snapshot.reports;
         summaryData = snapshot.summary;
         artifactsForDisplay = snapshot.artifacts;
@@ -572,6 +612,7 @@ export default function AgencyCommandCenterPage() {
       setAccessRequests(accessRequestsForDisplay);
       setRunTasks(taskData);
       setRunEvents(eventData);
+      setRunSocialPosts(socialPostData);
       setClientReports(reportData);
       setEvidenceSummary(summaryData);
       setApprovalForm((current) => ({
@@ -606,6 +647,7 @@ export default function AgencyCommandCenterPage() {
         setAccessRequests([]);
         setRunTasks([]);
         setRunEvents([]);
+        setRunSocialPosts([]);
         setClientReports([]);
         setEvidenceSummary(null);
         return;
@@ -1306,6 +1348,161 @@ export default function AgencyCommandCenterPage() {
                         </p>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <Activity className="h-4 w-4 text-muted-foreground" />
+                      Scheduled & Published Posts
+                    </div>
+                    {runSocialPosts.length === 0 ? (
+                      <EmptyState>No social post evidence.</EmptyState>
+                    ) : (
+                      <div className="space-y-2">
+                        {runSocialPosts.map((post) => (
+                          <div
+                            key={post.id}
+                            className="rounded-lg border border-border px-3 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {post.platform}
+                                </p>
+                                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                  {post.caption || "No caption recorded."}
+                                </p>
+                              </div>
+                              <span
+                                className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(post.status)}`}
+                              >
+                                {post.status}
+                              </span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                              <span>scheduled {compactDateTime(post.scheduled_at)}</span>
+                              <span>published {compactDateTime(post.published_at)}</span>
+                              <span>reach {post.reach}</span>
+                              <span>
+                                engagement{" "}
+                                {post.engagement_rate === null
+                                  ? "-"
+                                  : `${(post.engagement_rate * 100).toFixed(1)}%`}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                              <span>
+                                current {shortHash(post.current_content_hash)}
+                              </span>
+                              <span>
+                                scheduled {shortHash(post.scheduled_content_hash)}
+                              </span>
+                              <span>
+                                published {shortHash(post.published_content_hash)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      Client Reports
+                    </div>
+                    {clientReports.length === 0 ? (
+                      <EmptyState>No client report evidence.</EmptyState>
+                    ) : (
+                      <div className="space-y-2">
+                        {clientReports.map((report) => (
+                          <div
+                            key={report.id}
+                            className="rounded-lg border border-border px-3 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium">{report.title}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {compactDate(report.period_start)} -{" "}
+                                  {compactDate(report.period_end)}
+                                </p>
+                              </div>
+                              <span
+                                className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(report.status)}`}
+                              >
+                                {report.status}
+                              </span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                              {Object.entries(report.metrics_snapshot || {})
+                                .slice(0, 4)
+                                .map(([key, value]) => (
+                                  <span key={`${report.id}:${key}`}>
+                                    {key.replaceAll("_", " ")} {String(value)}
+                                  </span>
+                                ))}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                              <span>report {shortHash(report.report_hash)}</span>
+                              <span>
+                                metrics {shortHash(report.metrics_snapshot_hash)}
+                              </span>
+                              {report.pdf_url && <span>pdf recorded</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
+                      Next Action Proposals
+                    </div>
+                    {nextActionProposals.length === 0 ? (
+                      <EmptyState>No next action proposal.</EmptyState>
+                    ) : (
+                      <div className="space-y-2">
+                        {nextActionProposals.map((proposal) => (
+                          <div
+                            key={proposal.eventId}
+                            className="rounded-lg border border-border px-3 py-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {proposal.recommendedAction.replaceAll("_", " ")}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {proposal.pmSubstrateActionType ||
+                                    "marketing.next_action.propose"}
+                                </p>
+                              </div>
+                              <span className="w-fit rounded-full bg-gray-100 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                {shortHash(proposal.eventHash)}
+                              </span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                              <span>evidence {proposal.evidenceRefCount}</span>
+                              <span>
+                                proposed {compactDateTime(proposal.occurredAt)}
+                              </span>
+                              <span>
+                                report {shortHash(proposal.sourceReportId)}
+                              </span>
+                              <span>
+                                hashes {Object.keys(proposal.contentHashes).length}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 

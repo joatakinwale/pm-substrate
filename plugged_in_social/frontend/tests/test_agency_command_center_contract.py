@@ -89,6 +89,15 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "openAccessRequestCount > 0" in source
     assert "Report metrics evidence recorded." in source
     assert "Report Status" in source
+    assert "IntegrationSocialPost" in source
+    assert "runSocialPosts" in source
+    assert "snapshot.social_posts" in source
+    assert "Scheduled & Published Posts" in source
+    assert "Client Reports" in source
+    assert "Next Action Proposals" in source
+    assert "nextActionProposalFromEvent" in source
+    assert "next_action_proposal" in source
+    assert "marketing.next_action.propose" in source
 
 
 def test_sidebar_links_to_agency_command_center():
