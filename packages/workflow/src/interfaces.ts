@@ -64,6 +64,14 @@ export interface InvokeNode {
    */
   readonly inputs: Readonly<Record<string, string>>;
   /**
+   * Optional substrate procedure-admission binding. When present, the workflow
+   * runtime resolves this binding and executes the registered deterministic
+   * procedure through the Procedure Admission Kernel instead of dispatching
+   * arbitrary capability code. The step completes only if admission and replay
+   * accept the resulting authority-scoped transition.
+   */
+  readonly procedureAdmission?: ProcedureAdmissionInvokeBinding;
+  /**
    * G8.3: optional retry policy. Omitted = single attempt (legacy behavior).
    * On dispatcher failure (success=false), the runtime will retry up to
    * `maxAttempts` total times (counting the first attempt) with `backoffMs`
@@ -79,6 +87,19 @@ export interface InvokeNode {
    * dead-letter with reason='permission_denied' or 'capability_not_found'.
    */
   readonly retry?: RetryPolicy;
+}
+
+export interface ProcedureAdmissionInvokeBinding {
+  readonly procedureId: string;
+  readonly version: number | string;
+  readonly runId: string;
+  readonly requestedBy: string;
+  readonly inputHash: string;
+  readonly inputEvidence: string;
+  readonly input?: string;
+  readonly startedAt?: string;
+  readonly evaluatedAt?: string;
+  readonly admittedBy?: string;
 }
 
 export interface RetryPolicy {

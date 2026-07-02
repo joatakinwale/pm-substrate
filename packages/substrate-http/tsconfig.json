@@ -32,6 +32,9 @@
       "path": "../projections"
     },
     {
+      "path": "../procedure-admission"
+    },
+    {
       "path": "../registry"
     }
   ]

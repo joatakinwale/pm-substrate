@@ -21,7 +21,7 @@ pnpm typecheck
 
 Result:
 
-- `validate:budgets`: passed, 229 files checked.
+- `validate:budgets`: passed, 230 files checked.
 - `validate:zero-edit`: passed, 26 packages checked.
 - `validate:arrowsmith-primitives`: passed, 230 versioned agent-state research
   files scanned.
@@ -56,7 +56,7 @@ Core-only:
 PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate_verify_core_20260702 pnpm test
 ```
 
-Result: 85 test files, 875 tests total; 82 files passed, 3 skipped; 868 tests
+Result: 85 test files, 880 tests total; 82 files passed, 3 skipped; 873 tests
 passed, 7 skipped.
 
 Provenance-enabled:
@@ -67,7 +67,7 @@ PM_ENABLE_AGENT_STATE_PROVENANCE=1 \
 pnpm test
 ```
 
-Result: 85 test files, 875 tests total; 82 files passed, 3 skipped; 868 tests
+Result: 85 test files, 880 tests total; 82 files passed, 3 skipped; 873 tests
 passed, 7 skipped.
 
 Interpretation: the current workspace test suite has identical results with
@@ -98,8 +98,9 @@ not claim a live model/Ollama delete-context run.
   expected to skip when `PM_PLUGGED_IN_SOCIAL_DIR` is absent after app eviction.
 - Live local-agent-lab/Ollama behavior remains separate from this baseline.
 - Procedure admission is implemented as a replay kernel with a Postgres-backed
-  admission store. Durable admission now refuses unstored or substituted
-  procedure definitions, non-current stored heads, stale evidence, and hash
-  mismatches, and it is validated against the PM-governance local-agent-lab
-  surface. Workflow-runtime ports, HTTP endpoints, and real Pi runner
-  invocation remain outside this baseline.
+  admission store, runner-port runtime, and optional substrate HTTP route.
+  Durable admission now refuses unstored or substituted procedure definitions,
+  non-current stored heads, stale evidence, hash mismatches, and invalid prior
+  replay history, and it is validated against the PM-governance local-agent-lab
+  surface through a Pi-Harness-style runtime port. Workflow invoke-node wiring
+  and real external Pi process invocation remain outside this baseline.

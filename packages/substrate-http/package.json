@@ -23,6 +23,7 @@
     "@pm/graph": "workspace:*",
     "@pm/profile-registry": "workspace:*",
     "@pm/projections": "workspace:*",
+    "@pm/procedure-admission": "workspace:*",
     "@pm/registry": "workspace:*",
     "@pm/types": "workspace:*",
     "hono": "^4.6.0",
@@ -30,6 +31,7 @@
     "@pm/tenants": "workspace:*"
   },
   "devDependencies": {
+    "@pm/agent-state-core": "workspace:*",
     "@pm/capability-audit": "workspace:*",
     "@pm/profile-finance-research": "workspace:*",
     "@types/pg": "^8.11.10",

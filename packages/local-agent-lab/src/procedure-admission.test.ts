@@ -5,7 +5,14 @@ import {
   buildProcedureAdmissionRecord,
   buildProcedureDefinition,
   buildProcedureRun,
+  evaluateProcedureAdmission,
+  ProcedureAdmissionRuntime,
   replayProcedureAdmissionHistory,
+  type ProcedureAdmissionRecord,
+  type ProcedureAdmissionReplay,
+  type ProcedureAdmissionStore,
+  type ProcedureDefinition,
+  type ProcedureRunnerPort,
 } from "@pm/procedure-admission";
 import type { TenantId } from "@pm/types";
 
@@ -74,6 +81,66 @@ const buildRun = (runnerValidUntil = "2026-07-02T19:00:00.000Z") =>
     ],
   });
 
+class LocalLabProcedureAdmissionStore implements ProcedureAdmissionStore {
+  readonly definitions = new Map<string, ProcedureDefinition>();
+  readonly records: ProcedureAdmissionRecord[] = [];
+
+  async putDefinition(definition: ProcedureDefinition): Promise<void> {
+    this.definitions.set(this.key(definition), definition);
+  }
+
+  async getDefinition(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+  }): Promise<ProcedureDefinition | null> {
+    return this.definitions.get(this.key(input)) ?? null;
+  }
+
+  async admit(input: {
+    readonly definition: ProcedureDefinition;
+    readonly record: ProcedureAdmissionRecord;
+    readonly evaluatedAt: string;
+  }): Promise<void> {
+    const evaluation = evaluateProcedureAdmission(input);
+    if (!evaluation.admissible) {
+      throw new Error(
+        `local lab procedure admission failed: ${evaluation.issues.map((issue) => issue.code).join(",")}`,
+      );
+    }
+    this.records.push(input.record);
+  }
+
+  async replay(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+    readonly evaluatedAt: string;
+  }): Promise<ProcedureAdmissionReplay> {
+    const definition = await this.getDefinition(input);
+    if (definition === null) throw new Error("definition not found");
+    return replayProcedureAdmissionHistory({
+      definition,
+      records: this.records.filter(
+        (record) =>
+          record.tenantId === input.tenantId &&
+          record.authorityScope === definition.authorityScope,
+      ),
+      evaluatedAt: input.evaluatedAt,
+      tenantId: input.tenantId,
+      authorityScope: definition.authorityScope,
+    });
+  }
+
+  private key(input: {
+    readonly tenantId: TenantId;
+    readonly procedureId: string;
+    readonly version: number;
+  }): string {
+    return `${input.tenantId}/${input.procedureId}/${input.version}`;
+  }
+}
+
 describe("local-agent-lab procedure admission", () => {
   it("admits a Pi Harness run for the PM-governance approval-gate only through replay", () => {
     const record = buildProcedureAdmissionRecord({
@@ -127,5 +194,57 @@ describe("local-agent-lab procedure admission", () => {
     expect(replay.issues.map((issue) => issue.code)).toContain(
       "stale_runner_evidence",
     );
+  });
+
+  it("runs the PM-governance approval-gate through a Pi Harness runtime port before admission", async () => {
+    const store = new LocalLabProcedureAdmissionStore();
+    const runner: ProcedureRunnerPort = {
+      runnerKind: "pi_harness",
+      async run() {
+        const run = buildRun();
+        return {
+          status: run.status,
+          completedAt: run.completedAt,
+          outputHash: run.outputHash,
+          outputEvidence: run.outputEvidence,
+          runnerEvidence: run.runnerEvidence,
+        };
+      },
+    };
+    const runtime = new ProcedureAdmissionRuntime({
+      store,
+      runners: [runner],
+      admittedBy: "local-agent-lab.procedure-runtime",
+    });
+
+    await runtime.registerDefinition(definition);
+    const result = await runtime.execute({
+      tenantId,
+      procedureId: definition.procedureId,
+      version: definition.version,
+      runId: "run_local_lab_pm_governance_pi_harness_runtime",
+      requestedBy: "agent:pm-governance-lab",
+      inputHash: "sha256:approval-gate-input",
+      inputEvidence: [
+        {
+          ref: stateRef(
+            "document",
+            `${pmGovernanceApprovalGateScenario.scenarioId}:prompt`,
+          ),
+          evidenceHash: "sha256:approval-gate-prompt",
+          observedAt: "2026-07-02T18:09:00.000Z",
+          validUntil: "2026-07-02T19:00:00.000Z",
+        },
+      ],
+      startedAt: "2026-07-02T18:10:00.000Z",
+      evaluatedAt,
+    });
+
+    expect(result.record.decision).toBe("admitted");
+    expect(result.replay.valid).toBe(true);
+    expect(result.replay.admittedRuns.map((run) => run.runId)).toEqual([
+      "run_local_lab_pm_governance_pi_harness_runtime",
+    ]);
+    expect(store.records).toHaveLength(1);
   });
 });

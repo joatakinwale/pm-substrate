@@ -31,6 +31,14 @@ per tenant/procedure/version, admission records are sequenced by tenant and
 authority scope, and `admit` refuses any run whose definition is not already
 registered in durable storage with the exact matching definition hash.
 
+`ProcedureAdmissionRuntime` adds the first runtime boundary. It invokes a
+registered runner port by `runnerKind`, builds the run envelope from returned
+evidence, refuses to append onto invalid replay history, and then delegates
+admission to the durable store. Runner output still has no authority until the
+store admits the generated record and replay returns the current projection.
+`substrate-http` exposes that same boundary through optional procedure routes
+when a runtime is injected.
+
 ## Admission Rule
 
 A procedure run may become operational only when:
@@ -84,8 +92,9 @@ the substrate rule against PM-governance state.
 - stale runner evidence authorizing a PM-governance transition;
 - a failed harness run being treated as a usable result;
 - a local file/output hash mismatch being hidden by a valid-looking admission;
-- replay accepting gaps, forked heads, or duplicate runs.
+- replay accepting gaps, forked heads, or duplicate runs;
 - admission against an unstored or substituted procedure definition.
+- runtime appending onto an invalid prior admission history.
 
 ## Minimal Implementation Slice
 
@@ -93,6 +102,7 @@ the substrate rule against PM-governance state.
 - Pure runtime: `packages/procedure-admission/src/index.ts`
 - Postgres store: `packages/procedure-admission/src/postgres.ts`
 - Migration: `db/migrations/0149_procedure_admission.sql`
+- HTTP route: `packages/substrate-http/src/routes/procedures.ts`
 - Focused tests: `packages/procedure-admission/src/index.test.ts` and
   `packages/procedure-admission/src/postgres.test.ts`
 - PM-governance/local-lab validation:
@@ -107,13 +117,16 @@ The current tests falsify the primitive if:
 - a failed run becomes operational;
 - stale input or runner evidence authorizes admission;
 - an unstored or substituted procedure definition can authorize admission;
+- a runner-port result can become operational without durable admission;
 - tampered run hashes or admission hashes are accepted;
 - replay tolerates sequence gaps or previous-head mismatches;
 - explicitly rejected runs appear in admitted projection.
 
 ## Claim Boundary
 
-This slice includes the pure replay kernel plus a Postgres-backed admission
-store. It does not yet add workflow-runtime ports, HTTP endpoints, or a real Pi
-runner invocation. Those are next integration steps after the replay invariant
-remains stable.
+This slice includes the pure replay kernel, a runner-port runtime, a
+Postgres-backed admission store, optional HTTP endpoints, and PM-governance
+local-agent-lab validation through a Pi-Harness-style runner port. It does not
+yet wire procedure admission into `@pm/workflow` invoke nodes or invoke the
+real external Pi process. Those are next integration steps after the runtime
+boundary remains stable.

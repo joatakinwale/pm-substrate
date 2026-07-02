@@ -575,6 +575,9 @@ importers:
       '@pm/graph':
         specifier: workspace:*
         version: link:../graph
+      '@pm/procedure-admission':
+        specifier: workspace:*
+        version: link:../procedure-admission
       '@pm/profile-registry':
         specifier: workspace:*
         version: link:../profile-registry
@@ -597,6 +600,9 @@ importers:
         specifier: ^8.13.0
         version: 8.20.0
     devDependencies:
+      '@pm/agent-state-core':
+        specifier: workspace:*
+        version: link:../agent-state-core
       '@pm/capability-audit':
         specifier: workspace:*
         version: link:../capability-audit

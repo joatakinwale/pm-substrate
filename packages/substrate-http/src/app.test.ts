@@ -23,6 +23,12 @@ import { PostgresRegistry } from "@pm/registry";
 import { PostgresTenantDirectory } from "@pm/tenants";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { auditProjection, AUDIT_CAPABILITY } from "@pm/capability-audit";
+import { stateRef } from "@pm/agent-state-core";
+import {
+  PostgresProcedureAdmissionStore,
+  ProcedureAdmissionRuntime,
+  type ProcedureRunnerPort,
+} from "@pm/procedure-admission";
 import type { TenantId } from "@pm/types";
 import { createSubstrateApp } from "./app.js";
 
@@ -37,6 +43,7 @@ describeIfDb("substrate HTTP", () => {
   let profileRegistry: PostgresProfileRegistry;
   let capRegistry: PostgresRegistry;
   let projections: PostgresProjectionRunner;
+  let procedureAdmissionRuntime: ProcedureAdmissionRuntime;
   let app: Hono;
 
   const tenants: TenantId[] = [];
@@ -58,6 +65,43 @@ describeIfDb("substrate HTTP", () => {
     capRegistry = new PostgresRegistry(pool);
     projections = new PostgresProjectionRunner(pool, events);
     await projections.register(auditProjection);
+    const procedureRunner: ProcedureRunnerPort = {
+      runnerKind: "pi_harness",
+      async run(invocation) {
+        const stale =
+          typeof invocation.input === "object" &&
+          invocation.input !== null &&
+          (invocation.input as { stale?: unknown }).stale === true;
+        return {
+          status: "succeeded",
+          completedAt: "2026-07-02T21:03:00.000Z",
+          outputHash: "sha256:http-procedure-output",
+          outputEvidence: [
+            {
+              ref: stateRef("document", "doc_http_procedure_output"),
+              evidenceHash: "sha256:http-procedure-output-evidence",
+              observedAt: "2026-07-02T21:03:00.000Z",
+              validUntil: "2026-07-02T22:00:00.000Z",
+            },
+          ],
+          runnerEvidence: [
+            {
+              ref: stateRef("event", "evt_http_pi_harness_runner"),
+              evidenceHash: "sha256:http-pi-harness-runner",
+              observedAt: "2026-07-02T21:03:00.000Z",
+              validUntil: stale
+                ? "2026-07-02T21:00:00.000Z"
+                : "2026-07-02T22:00:00.000Z",
+            },
+          ],
+        };
+      },
+    };
+    procedureAdmissionRuntime = new ProcedureAdmissionRuntime({
+      store: new PostgresProcedureAdmissionStore(pool),
+      runners: [procedureRunner],
+      admittedBy: "substrate-http.procedure-admission",
+    });
 
     app = createSubstrateApp({
       tenants: tenantsDirectory,
@@ -66,6 +110,7 @@ describeIfDb("substrate HTTP", () => {
       graph,
       events,
       projections,
+      procedureAdmissionRuntime,
     });
   });
 
@@ -78,6 +123,8 @@ describeIfDb("substrate HTTP", () => {
       await pool.query(`DELETE FROM events.subscriptions WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM projections.state WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM projections.cursors WHERE tenant_id = $1`, [t]);
+      await pool.query(`DELETE FROM procedure_admission.admission_records WHERE tenant_id = $1`, [t]);
+      await pool.query(`DELETE FROM procedure_admission.definitions WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM registry.capabilities WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM profiles.installations WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM substrate.tenants WHERE id = $1`, [t]);
@@ -264,6 +311,114 @@ describeIfDb("substrate HTTP", () => {
     const verify = (await r.json()) as { report: { valid: boolean; checked: number } };
     expect(verify.report.valid).toBe(true);
     expect(verify.report.checked).toBeGreaterThanOrEqual(1);
+  });
+
+  it("registers and executes a procedure through HTTP while replay remains the operational state", async () => {
+    const tenantId = await makeTenant();
+    let r = await call("POST", `/tenants/${tenantId}/procedures/definitions`, {
+      procedureId: "proc_http_pi_harness",
+      version: 1,
+      name: "HTTP Pi Harness procedure",
+      authorityScope: "pmgovernance/http-procedure-admission",
+      runnerKind: "pi_harness",
+      inputContractHash: "sha256:http-procedure-input-contract",
+      outputContractHash: "sha256:http-procedure-output-contract",
+      allowedUse: ["pm.stage_gate.validate"],
+      createdAt: "2026-07-02T21:00:00.000Z",
+    });
+    expect(r.status).toBe(201);
+    const registered = (await r.json()) as {
+      definition: { definitionHash: string };
+    };
+    expect(registered.definition.definitionHash).toMatch(/^[a-f0-9]{64}$/);
+
+    r = await call(
+      "POST",
+      `/tenants/${tenantId}/procedures/proc_http_pi_harness/versions/1/runs`,
+      {
+        runId: "run_http_pi_harness_001",
+        requestedBy: "agent:http-test",
+        inputHash: "sha256:http-procedure-input",
+        inputEvidence: [
+          {
+            ref: stateRef("document", "doc_http_procedure_input"),
+            evidenceHash: "sha256:http-procedure-input-evidence",
+            observedAt: "2026-07-02T21:01:00.000Z",
+            validUntil: "2026-07-02T22:00:00.000Z",
+          },
+        ],
+        startedAt: "2026-07-02T21:02:00.000Z",
+        evaluatedAt: "2026-07-02T21:03:00.000Z",
+      },
+    );
+    expect(r.status).toBe(201);
+    const admitted = (await r.json()) as {
+      record: { sequence: number; admissionHash: string };
+      replay: { admittedRuns: Array<{ runId: string }>; currentHeadHash: string };
+    };
+    expect(admitted.record.sequence).toBe(1);
+    expect(admitted.replay.admittedRuns.map((run) => run.runId)).toEqual([
+      "run_http_pi_harness_001",
+    ]);
+    expect(admitted.replay.currentHeadHash).toBe(
+      admitted.record.admissionHash,
+    );
+
+    r = await call(
+      "GET",
+      `/tenants/${tenantId}/procedures/proc_http_pi_harness/versions/1/replay?evaluatedAt=2026-07-02T21:03:00.000Z`,
+    );
+    expect(r.status).toBe(200);
+    const replayed = (await r.json()) as {
+      replay: { admittedRuns: Array<{ runId: string }> };
+    };
+    expect(replayed.replay.admittedRuns.map((run) => run.runId)).toEqual([
+      "run_http_pi_harness_001",
+    ]);
+  });
+
+  it("refuses stale procedure runner evidence through HTTP before admission", async () => {
+    const tenantId = await makeTenant();
+    let r = await call("POST", `/tenants/${tenantId}/procedures/definitions`, {
+      procedureId: "proc_http_pi_harness_stale",
+      version: 1,
+      name: "HTTP stale Pi Harness procedure",
+      authorityScope: "pmgovernance/http-procedure-admission-stale",
+      runnerKind: "pi_harness",
+      inputContractHash: "sha256:http-procedure-stale-input-contract",
+      outputContractHash: "sha256:http-procedure-stale-output-contract",
+      allowedUse: ["pm.stage_gate.validate"],
+      createdAt: "2026-07-02T21:00:00.000Z",
+    });
+    expect(r.status).toBe(201);
+
+    r = await call(
+      "POST",
+      `/tenants/${tenantId}/procedures/proc_http_pi_harness_stale/versions/1/runs`,
+      {
+        runId: "run_http_pi_harness_stale",
+        requestedBy: "agent:http-test",
+        inputHash: "sha256:http-procedure-stale-input",
+        input: { stale: true },
+        inputEvidence: [
+          {
+            ref: stateRef("document", "doc_http_procedure_stale_input"),
+            evidenceHash: "sha256:http-procedure-stale-input-evidence",
+            observedAt: "2026-07-02T21:01:00.000Z",
+            validUntil: "2026-07-02T22:00:00.000Z",
+          },
+        ],
+        startedAt: "2026-07-02T21:02:00.000Z",
+        evaluatedAt: "2026-07-02T21:03:00.000Z",
+      },
+    );
+    expect(r.status).toBe(422);
+    const body = (await r.json()) as {
+      cause: { issues: Array<{ code: string }> };
+    };
+    expect(body.cause.issues.map((issue) => issue.code)).toContain(
+      "stale_runner_evidence",
+    );
   });
 
   it("projection catch-up + getState end-to-end through HTTP", async () => {

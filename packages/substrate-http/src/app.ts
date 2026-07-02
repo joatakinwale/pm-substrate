@@ -13,6 +13,7 @@ import type { ProfileRegistry } from "@pm/profile-registry";
 import type { ProjectionRunner } from "@pm/projections";
 import type { Registry } from "@pm/registry";
 import type { TenantDirectory } from "@pm/tenants";
+import type { ProcedureAdmissionRuntime } from "@pm/procedure-admission";
 import { toHTTPException } from "./errors.js";
 import { profileRoutes } from "./routes/profiles.js";
 import { tenantRoutes } from "./routes/tenants.js";
@@ -21,6 +22,7 @@ import { graphRoutes } from "./routes/graph.js";
 import { eventRoutes } from "./routes/events.js";
 import type { DomainEventHandler } from "./routes/events.js";
 import { projectionRoutes } from "./routes/projections.js";
+import { procedureRoutes } from "./routes/procedures.js";
 
 export interface SubstrateAppDeps {
   readonly tenants: TenantDirectory;
@@ -30,6 +32,7 @@ export interface SubstrateAppDeps {
   readonly events: EventPublisher & EventReader;
   readonly projections: ProjectionRunner;
   readonly domainEventHandlers?: Readonly<Record<string, DomainEventHandler>>;
+  readonly procedureAdmissionRuntime?: ProcedureAdmissionRuntime;
   /**
    * Optional profile-specific sub-routers, mounted under
    * /tenants/:tenantId/<basePath>. The substrate core stays profile-agnostic:
@@ -51,6 +54,12 @@ export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
   app.route("/tenants/:tenantId", graphRoutes(deps.graph));
   app.route("/tenants/:tenantId/events", eventRoutes(deps.events, deps.domainEventHandlers));
   app.route("/tenants/:tenantId/projections", projectionRoutes(deps.projections));
+  if (deps.procedureAdmissionRuntime) {
+    app.route(
+      "/tenants/:tenantId/procedures",
+      procedureRoutes(deps.procedureAdmissionRuntime),
+    );
+  }
   for (const extra of deps.extraRoutes ?? []) {
     app.route(`/tenants/:tenantId/${extra.basePath}`, extra.router);
   }
