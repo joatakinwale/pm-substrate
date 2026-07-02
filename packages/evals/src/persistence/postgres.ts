@@ -4,7 +4,7 @@ import {
   type ActionOutcomeEnvelope,
   type ProjectionReplayCertificateRef,
   type ProjectionReplayCertificateStoreRootWitnessSettlementRef,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import {
   assertEvalEvent,
   type EvalEvent,

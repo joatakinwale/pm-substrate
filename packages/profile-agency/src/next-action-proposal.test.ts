@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stateRef, verifyActionOutcomeEnvelopeHash } from "@pm/agent-state";
+import { stateRef, verifyActionOutcomeEnvelopeHash } from "@pm/agent-state-core";
 import { tenantId, timestamp } from "@pm/types";
 
 import {

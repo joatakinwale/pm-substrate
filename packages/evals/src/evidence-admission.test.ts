@@ -11,7 +11,7 @@ import {
   type CurrentStateView,
   type ProposedAction,
   type StateReviewArtifact,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 
 import {
   analyzeEvidenceAdmissionFixtureResults,

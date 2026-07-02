@@ -6,7 +6,7 @@ import {
   type StateReviewInvariantClass,
   type StateReviewInvariantPolicyMatrix,
   type StateReviewTemporalMisalignmentPhase,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import {
   COORDINATION_CLASSES,
   EVAL_EVIDENCE_STAGES,

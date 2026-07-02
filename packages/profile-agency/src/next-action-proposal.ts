@@ -6,7 +6,7 @@ import {
   type ActionOutcomeEnvelope,
   type ActionTerminalOutcome,
   type StateRef,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import type { TenantId, Timestamp } from "@pm/types";
 
 export const AGENCY_MARKETING_NEXT_ACTION_PROPOSAL_SCHEMA_VERSION =

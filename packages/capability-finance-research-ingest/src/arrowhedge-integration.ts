@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { stateRef, type StateRef } from "@pm/agent-state";
+import { stateRef, type StateRef } from "@pm/agent-state-core";
 
 export interface ArrowHedgeIntegrationFetchResponse {
   readonly ok: boolean;

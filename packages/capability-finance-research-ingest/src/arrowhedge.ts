@@ -42,7 +42,7 @@ import {
   type StateRef,
   verifyStateReviewArtifactHash,
   verifyActionOutcomeEnvelopeHash,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import {
   checkpointHash,
   findContinuityContradictions,

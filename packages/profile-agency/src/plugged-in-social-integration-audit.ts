@@ -7,7 +7,7 @@ import {
   type ThreeAxisProofPacket,
   type ThreeAxisProofPacketSource,
 } from "@pm/evals";
-import type { StateRef } from "@pm/agent-state";
+import type { StateRef } from "@pm/agent-state-core";
 import type { TenantId, Timestamp } from "@pm/types";
 
 import {

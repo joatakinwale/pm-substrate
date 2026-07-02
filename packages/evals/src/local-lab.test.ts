@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   verifyActionOutcomeEnvelopeHash,
   type ActionOutcomeEnvelope,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import { graphWriteAuthorityResolutionFromWorkflowEnvelope } from "@pm/capability-kit";
 import type { GraphWriteAuthorityPolicy } from "@pm/graph";
 

@@ -1,4 +1,4 @@
-import type { ActionOutcomeEnvelope } from "@pm/agent-state";
+import type { ActionOutcomeEnvelope } from "@pm/agent-state-core";
 import type { Timestamp } from "@pm/types";
 
 import { analyzeEvalEvents, type EvalEventMetrics } from "./metrics.js";

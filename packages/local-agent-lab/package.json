@@ -19,7 +19,7 @@
     "test": "echo \"(tests run from root)\" && true"
   },
   "dependencies": {
-    "@pm/agent-state": "workspace:*",
+    "@pm/agent-state-core": "workspace:*",
     "@pm/events": "workspace:*",
     "@pm/types": "workspace:*"
   },

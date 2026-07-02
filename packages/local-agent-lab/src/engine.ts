@@ -15,7 +15,7 @@ import {
   type ActionOutcomeEnvelope,
   type ActionOutcomeProviderAuthority,
   type ActionTerminalOutcome,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import type { Timestamp } from "@pm/types";
 import { World } from "./world.js";
 import { LabAgent } from "./agent.js";

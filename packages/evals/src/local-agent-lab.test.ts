@@ -5,7 +5,7 @@ import {
   verifyActionOutcomeEnvelopeHash,
   type ActionOutcomeEnvelope,
   type ActionTerminalOutcome,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import type { TenantId, Timestamp } from "@pm/types";
 
 import {

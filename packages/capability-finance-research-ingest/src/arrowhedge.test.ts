@@ -19,7 +19,7 @@ import {
   verifyActionOutcomeEnvelopeHash,
   verifyStateReviewArtifactHash,
   type ActionOutcomeEnvelope,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { tenantId, timestamp } from "@pm/types";
 

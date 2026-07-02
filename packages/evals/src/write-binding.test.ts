@@ -8,7 +8,7 @@ import {
 import {
   verifyActionOutcomeEnvelopeHash,
   type ActionOutcomeEnvelope,
-} from "@pm/agent-state";
+} from "@pm/agent-state-core";
 import { graphWriteAuthorityResolutionFromWorkflowEnvelope } from "@pm/capability-kit";
 import type { Capability } from "@pm/registry";
 import type { CapabilityId } from "@pm/types";
