@@ -50,6 +50,7 @@ const VALID_MSG: VirtualAgencyMessage = {
     project_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     legacy_task_id: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
   },
+  dependency_ids: [],
   context: { draft_type: "post", tone: "friendly" },
 };
 
@@ -172,6 +173,13 @@ describe("validateMessage(virtual_agency.task)", () => {
         },
         "virtual_agency.task"
       )
+    ).toThrow(InvalidMessageError);
+  });
+
+  it("rejects missing dependency ids", () => {
+    const { dependency_ids: _omit, ...rest } = VALID_MSG;
+    expect(() =>
+      validateMessage<VirtualAgencyMessage>(rest, "virtual_agency.task")
     ).toThrow(InvalidMessageError);
   });
 

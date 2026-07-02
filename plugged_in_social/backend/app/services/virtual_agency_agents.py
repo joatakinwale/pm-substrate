@@ -83,6 +83,59 @@ def _ensure_handoff_scope(
         raise ExecutionScopeError("Handoff task_id was provided for task without source")
 
 
+def _ensure_handoff_lineage_scope(
+    task: VirtualAgencyTask,
+    *,
+    lineage: dict[str, Any],
+) -> None:
+    lineage_project_id = _parse_uuid(lineage.get("project_id"), "lineage.project_id")
+    lineage_source_task_id = _parse_uuid(
+        lineage.get("legacy_task_id"),
+        "lineage.legacy_task_id",
+    )
+    lineage_orchestration_task_id = _parse_uuid(
+        lineage.get("orchestration_task_id"),
+        "lineage.orchestration_task_id",
+    )
+
+    if lineage_project_id != task.project_id:
+        raise ExecutionScopeError("Handoff lineage project_id does not match task")
+    if (
+        task.source_task_id is not None
+        and lineage_source_task_id != task.source_task_id
+    ):
+        raise ExecutionScopeError(
+            "Handoff lineage legacy_task_id does not match source task"
+        )
+    if (
+        lineage_orchestration_task_id is not None
+        and lineage_orchestration_task_id != task.id
+    ):
+        raise ExecutionScopeError(
+            "Handoff lineage orchestration_task_id does not match task"
+        )
+
+
+def _ensure_dependency_scope(
+    *,
+    claimed_dependency_ids: list[str] | None,
+    dependencies: list[VirtualAgencyTask],
+) -> None:
+    if claimed_dependency_ids is None:
+        raise ExecutionScopeError("Handoff dependency_ids are required")
+
+    claimed_ids = {
+        parsed
+        for item in claimed_dependency_ids
+        if (parsed := _parse_uuid(item, "dependency_ids")) is not None
+    }
+    actual_ids = {dependency.id for dependency in dependencies}
+    if claimed_ids != actual_ids:
+        raise ExecutionScopeError(
+            "Handoff dependency_ids do not match orchestration dependencies"
+        )
+
+
 async def _dispatch_ready_dependents(
     db: AsyncSession,
     task: VirtualAgencyTask,
@@ -127,7 +180,7 @@ async def route_virtual_agency_task(
     dependency_ids: list[str] | None = None,
 ):
     """Route a durable handoff to the correct department executor."""
-    del lineage, context, emitted_at, type, dependency_ids
+    del context, emitted_at, type
 
     task = await _load_task(db, orchestration_task_id)
     _ensure_handoff_scope(
@@ -136,6 +189,7 @@ async def route_virtual_agency_task(
         project_id=project_id,
         task_id=task_id,
     )
+    _ensure_handoff_lineage_scope(task, lineage=lineage)
 
     existing = await find_event_by_idempotency_key(db, idempotency_key)
     if existing is not None:
@@ -155,6 +209,10 @@ async def route_virtual_agency_task(
         approval_payload_hash=approval_payload_hash,
     )
     dependencies = await list_virtual_task_dependencies(db, task)
+    _ensure_dependency_scope(
+        claimed_dependency_ids=dependency_ids,
+        dependencies=dependencies,
+    )
     ensure_dependencies_completed(dependencies)
     await ensure_task_evidence_ready(db, task)
 

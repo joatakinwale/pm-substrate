@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Any, Literal
 
 from app.db.database import RequestContext, get_db_with_rls
@@ -47,7 +47,7 @@ class VirtualAgencyTaskRequest(BaseModel):
     approval_version: int | None = Field(default=None, ge=1)
     approval_payload_hash: str | None = Field(default=None, pattern=SHA256_RE)
     lineage: dict[str, Any]
-    dependency_ids: list[uuid.UUID] = Field(default_factory=list)
+    dependency_ids: list[uuid.UUID]
     context: dict[str, Any]
 
     @field_validator("lineage")
@@ -66,6 +66,26 @@ class VirtualAgencyTaskRequest(BaseModel):
             except ValueError as exc:
                 raise ValueError(f"lineage.{field} must be a UUID") from exc
         return value
+
+    @model_validator(mode="after")
+    def validate_scope_consistency(self):
+        lineage_project_id = uuid.UUID(str(self.lineage["project_id"]))
+        if lineage_project_id != self.project_id:
+            raise ValueError("lineage.project_id must match project_id")
+
+        if self.task_id is not None:
+            lineage_legacy_task_id = uuid.UUID(str(self.lineage["legacy_task_id"]))
+            if lineage_legacy_task_id != self.task_id:
+                raise ValueError("lineage.legacy_task_id must match task_id")
+
+        lineage_orchestration_task_id = self.lineage.get("orchestration_task_id")
+        if lineage_orchestration_task_id is not None and (
+            uuid.UUID(str(lineage_orchestration_task_id)) != self.orchestration_task_id
+        ):
+            raise ValueError(
+                "lineage.orchestration_task_id must match orchestration_task_id"
+            )
+        return self
 
 
 @router.post("/task")

@@ -855,7 +855,15 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       internalApi.includes("role=\"system\""),
     handoffScopeGuard:
       executor.includes("_ensure_handoff_scope") &&
-      executor.includes("ExecutionScopeError"),
+      executor.includes("_ensure_handoff_lineage_scope") &&
+      executor.includes("_ensure_dependency_scope") &&
+      executor.includes("ExecutionScopeError") &&
+      orchestrationTests.includes(
+        "test_handoff_lineage_project_mismatch_is_rejected",
+      ) &&
+      orchestrationTests.includes(
+        "test_handoff_dependency_claim_mismatch_is_rejected",
+      ),
     approvalHashGate:
       orchestration.includes("approval_payload_hash") &&
       orchestration.includes("ensure_approval_is_current"),
@@ -892,9 +900,15 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       messages.includes("approval_payload_hash") &&
       messages.includes("approval_payload_hash must be a SHA-256 hex digest") &&
       messages.includes("emitted_at must be a parseable timestamp") &&
+      messages.includes("missing or invalid dependency_ids") &&
+      internalApi.includes("lineage.project_id must match project_id") &&
       internalVirtualAgencyTests.includes(
         "test_internal_virtual_agency_payload_matches_worker_contract",
       ) &&
+      internalVirtualAgencyTests.includes(
+        "test_internal_virtual_agency_payload_rejects_lineage_scope_mismatch",
+      ) &&
+      virtualAgencyWorkerTests.includes("rejects missing dependency ids") &&
       virtualAgencyWorkerTests.includes("rejects invalid approval payload hash"),
     deployBinding:
       deploy.includes("stevie-virtual-agency") &&

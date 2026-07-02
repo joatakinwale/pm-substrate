@@ -632,6 +632,48 @@ async def test_handoff_project_mismatch_is_rejected(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_handoff_lineage_project_mismatch_is_rejected(monkeypatch):
+    db = _FakeSession()
+    org_id = uuid.uuid4()
+    sent = await _capture_publish(monkeypatch)
+    db.add(
+        SocialAccount(
+            id=uuid.uuid4(),
+            org_id=org_id,
+            platform="linkedin",
+            account_name="Acme",
+            account_id="acct-1",
+        )
+    )
+    project = await start_campaign_planning(
+        db,
+        org_id=org_id,
+        client_request="Launch a June campaign",
+        client_name="Client",
+        client_email="client@example.com",
+    )
+
+    await trigger_department_agents_for_project(db, org_id, project.id)
+    content_message = next(
+        item["message"] for item in sent if item["message"]["agent_role"] == AGENT_CONTENT
+    )
+
+    with pytest.raises(ExecutionScopeError, match="lineage project_id"):
+        await route_virtual_agency_task(
+            db=db,
+            **{
+                **content_message,
+                "lineage": {
+                    **content_message["lineage"],
+                    "project_id": str(uuid.uuid4()),
+                },
+            },
+        )
+
+    assert list(db._store.get(SocialPost, {}).values()) == []
+
+
+@pytest.mark.asyncio
 async def test_handoff_source_task_mismatch_is_rejected(monkeypatch):
     db = _FakeSession()
     org_id = uuid.uuid4()
@@ -662,6 +704,45 @@ async def test_handoff_source_task_mismatch_is_rejected(monkeypatch):
         await route_virtual_agency_task(
             db=db,
             **{**content_message, "task_id": str(uuid.uuid4())},
+        )
+
+    assert list(db._store.get(SocialPost, {}).values()) == []
+
+
+@pytest.mark.asyncio
+async def test_handoff_dependency_claim_mismatch_is_rejected(monkeypatch):
+    db = _FakeSession()
+    org_id = uuid.uuid4()
+    sent = await _capture_publish(monkeypatch)
+    db.add(
+        SocialAccount(
+            id=uuid.uuid4(),
+            org_id=org_id,
+            platform="linkedin",
+            account_name="Acme",
+            account_id="acct-1",
+        )
+    )
+    project = await start_campaign_planning(
+        db,
+        org_id=org_id,
+        client_request="Launch a June campaign",
+        client_name="Client",
+        client_email="client@example.com",
+    )
+
+    await trigger_department_agents_for_project(db, org_id, project.id)
+    content_message = next(
+        item["message"] for item in sent if item["message"]["agent_role"] == AGENT_CONTENT
+    )
+
+    with pytest.raises(ExecutionScopeError, match="dependency_ids"):
+        await route_virtual_agency_task(
+            db=db,
+            **{
+                **content_message,
+                "dependency_ids": [str(uuid.uuid4())],
+            },
         )
 
     assert list(db._store.get(SocialPost, {}).values()) == []

@@ -114,7 +114,7 @@ export interface VirtualAgencyMessage extends BaseMessage {
   approval_version?: number | null;
   approval_payload_hash?: string | null;
   lineage: VirtualAgencyLineage;
-  dependency_ids?: string[];
+  dependency_ids: string[];
   context: Record<string, unknown>;
 }
 
@@ -302,14 +302,12 @@ function validateVirtualAgencyMessage(msg: Record<string, unknown>): void {
   }
 
   const dependencyIds = msg["dependency_ids"];
-  if (dependencyIds != null) {
-    if (!Array.isArray(dependencyIds)) {
-      throw new InvalidMessageError("dependency_ids must be an array when provided");
-    }
-    for (const dependencyId of dependencyIds) {
-      if (typeof dependencyId !== "string" || !UUID_RE.test(dependencyId)) {
-        throw new InvalidMessageError("dependency_ids must contain only UUIDs");
-      }
+  if (!Array.isArray(dependencyIds)) {
+    throw new InvalidMessageError("missing or invalid dependency_ids");
+  }
+  for (const dependencyId of dependencyIds) {
+    if (typeof dependencyId !== "string" || !UUID_RE.test(dependencyId)) {
+      throw new InvalidMessageError("dependency_ids must contain only UUIDs");
     }
   }
 }
