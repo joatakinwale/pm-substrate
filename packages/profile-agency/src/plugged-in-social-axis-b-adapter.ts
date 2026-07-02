@@ -508,6 +508,8 @@ const REQUIRED_LIVE_CLOSED_LOOP_STAGES = [
 
 const REQUIRED_LIVE_CAPABILITIES = [
   "platform_manifest.read",
+  "external_adapter_manifest.read",
+  "engagement.read",
   "engagement.create",
   "external_adapter_run.read",
   "external_adapter_run.ingest",
@@ -519,6 +521,7 @@ const REQUIRED_LIVE_CAPABILITIES = [
   "event_timeline.read",
   "evidence_summary.read",
   "run_evidence_snapshot.read",
+  "approval.read",
   "access_request.read",
   "social_post.read",
   "report.read",
@@ -563,6 +566,226 @@ const REQUIRED_LIVE_CONFIG_KEYS = [
   "BACKEND_BASE_URL",
   "QUEUE_PRODUCER_URL",
   "QUEUE_VIRTUAL_AGENCY",
+] as const;
+
+const REQUIRED_LIVE_ENDPOINTS = [
+  {
+    method: "GET",
+    path: "/api/integration/v1/capabilities",
+    boundary: "public_rls",
+    capabilityId: "platform_manifest.read",
+    label: "capabilities",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/platform-manifest",
+    boundary: "public_rls",
+    capabilityId: "platform_manifest.read",
+    label: "platform manifest",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/external-adapters",
+    boundary: "public_rls",
+    capabilityId: "external_adapter_manifest.read",
+    label: "external adapter manifest",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/engagements",
+    boundary: "public_rls",
+    capabilityId: "engagement.read",
+    label: "engagement list",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/engagements",
+    boundary: "public_rls",
+    capabilityId: "engagement.create",
+    label: "engagement create",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/engagements/{engagement_id}",
+    boundary: "public_rls",
+    capabilityId: "engagement.read",
+    label: "engagement detail",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/engagements/{engagement_id}/marketing-runs",
+    boundary: "public_rls",
+    capabilityId: "marketing_run.read",
+    label: "engagement marketing-runs",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/engagements/{engagement_id}/marketing-runs",
+    boundary: "public_rls",
+    capabilityId: "marketing_run.create",
+    label: "engagement marketing-run create",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/engagements/{engagement_id}/artifacts",
+    boundary: "public_rls",
+    capabilityId: "artifact.read",
+    label: "engagement artifacts",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/engagements/{engagement_id}/approvals",
+    boundary: "public_rls",
+    capabilityId: "approval.read",
+    label: "engagement approvals",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/engagements/{engagement_id}/access-requests",
+    boundary: "public_rls",
+    capabilityId: "access_request.read",
+    label: "engagement access-requests",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}",
+    boundary: "public_rls",
+    capabilityId: "marketing_run.read",
+    label: "marketing run detail",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/marketing-runs/{run_id}/dispatch",
+    boundary: "public_rls",
+    capabilityId: "marketing_run.dispatch",
+    label: "marketing run dispatch",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/artifacts",
+    boundary: "public_rls",
+    capabilityId: "artifact.read",
+    label: "marketing run artifacts",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+    boundary: "public_rls",
+    capabilityId: "external_adapter_run.read",
+    label: "marketing run external-adapter-runs",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
+    boundary: "public_rls",
+    capabilityId: "external_adapter_run.ingest",
+    label: "marketing run external-adapter-run ingest",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/social-posts",
+    boundary: "public_rls",
+    capabilityId: "social_post.read",
+    label: "marketing run social-posts",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/reports",
+    boundary: "public_rls",
+    capabilityId: "report.read",
+    label: "marketing run reports",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/reports/{report_id}",
+    boundary: "public_rls",
+    capabilityId: "report.read",
+    label: "client report",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/tasks",
+    boundary: "public_rls",
+    capabilityId: "task.read",
+    label: "marketing run tasks",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/events",
+    boundary: "public_rls",
+    capabilityId: "event_timeline.read",
+    label: "marketing run events",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/approvals",
+    boundary: "public_rls",
+    capabilityId: "approval.read",
+    label: "marketing run approvals",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/access-requests",
+    boundary: "public_rls",
+    capabilityId: "access_request.read",
+    label: "marketing run access-requests",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/evidence-summary",
+    boundary: "public_rls",
+    capabilityId: "evidence_summary.read",
+    label: "marketing run evidence-summary",
+  },
+  {
+    method: "GET",
+    path: "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
+    boundary: "public_rls",
+    capabilityId: "run_evidence_snapshot.read",
+    label: "marketing run evidence-snapshot",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/approvals/{approval_id}/decision",
+    boundary: "public_rls",
+    capabilityId: "approval.decide",
+    label: "approval decision",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/access-requests/{access_request_id}/decision",
+    boundary: "public_rls",
+    capabilityId: "access_request.decide",
+    label: "access request decision",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/events",
+    boundary: "public_rls",
+    capabilityId: "event.ingest",
+    label: "event ingest",
+  },
+  {
+    method: "POST",
+    path: "/api/integration/v1/webhooks",
+    boundary: "public_rls",
+    capabilityId: "event.ingest",
+    label: "webhook ingest",
+  },
+  {
+    method: "POST",
+    path: "/api/internal/virtual-agency/task",
+    boundary: "internal_system_rls",
+    capabilityId: "task.execute",
+    label: "internal virtual-agency task",
+  },
+  {
+    method: "POST",
+    path: "/api/internal/social/posts/{post_id}/publish",
+    boundary: "internal_system_rls",
+    capabilityId: "social_post.publish",
+    label: "internal social publish",
+  },
 ] as const;
 
 export function buildPluggedInSocialAxisBNextActionAdapterResult(
@@ -1159,89 +1382,24 @@ function liveRunEvidenceIssues(
   const endpoints = new Map(
     platformManifest.api_endpoints.map((endpoint) => [endpointKey(endpoint), endpoint]),
   );
-  const internalTaskEndpoint = endpoints.get("POST /api/internal/virtual-agency/task");
-  if (internalTaskEndpoint?.boundary !== "internal_system_rls") {
-    issues.add("internal virtual-agency task endpoint is not system-RLS scoped");
-  }
-  const manifestEndpoint = endpoints.get("GET /api/integration/v1/platform-manifest");
-  if (manifestEndpoint?.boundary !== "public_rls") {
-    issues.add("platform manifest endpoint is not public-RLS scoped");
-  }
-  const createEngagementEndpoint = endpoints.get("POST /api/integration/v1/engagements");
-  if (createEngagementEndpoint?.boundary !== "public_rls") {
-    issues.add("engagement create endpoint is not public-RLS scoped");
-  }
-  const engagementRunsEndpoint = endpoints.get(
-    "GET /api/integration/v1/engagements/{engagement_id}/marketing-runs",
-  );
-  if (engagementRunsEndpoint?.boundary !== "public_rls") {
-    issues.add("engagement marketing-runs endpoint is not public-RLS scoped");
-  }
-  const createEngagementRunEndpoint = endpoints.get(
-    "POST /api/integration/v1/engagements/{engagement_id}/marketing-runs",
-  );
-  if (createEngagementRunEndpoint?.boundary !== "public_rls") {
-    issues.add("engagement marketing-run create endpoint is not public-RLS scoped");
-  }
-  const engagementArtifactsEndpoint = endpoints.get(
-    "GET /api/integration/v1/engagements/{engagement_id}/artifacts",
-  );
-  if (engagementArtifactsEndpoint?.boundary !== "public_rls") {
-    issues.add("engagement artifacts endpoint is not public-RLS scoped");
-  }
-  const engagementApprovalsEndpoint = endpoints.get(
-    "GET /api/integration/v1/engagements/{engagement_id}/approvals",
-  );
-  if (engagementApprovalsEndpoint?.boundary !== "public_rls") {
-    issues.add("engagement approvals endpoint is not public-RLS scoped");
-  }
-  const engagementAccessRequestsEndpoint = endpoints.get(
-    "GET /api/integration/v1/engagements/{engagement_id}/access-requests",
-  );
-  if (engagementAccessRequestsEndpoint?.boundary !== "public_rls") {
-    issues.add("engagement access-requests endpoint is not public-RLS scoped");
-  }
-  const dispatchEndpoint = endpoints.get(
-    "POST /api/integration/v1/marketing-runs/{run_id}/dispatch",
-  );
-  if (dispatchEndpoint?.boundary !== "public_rls") {
-    issues.add("marketing run dispatch endpoint is not public-RLS scoped");
-  }
-  const adapterRunsEndpoint = endpoints.get(
-    "GET /api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
-  );
-  if (adapterRunsEndpoint?.boundary !== "public_rls") {
-    issues.add("marketing run external-adapter-runs endpoint is not public-RLS scoped");
-  }
-  const ingestAdapterRunEndpoint = endpoints.get(
-    "POST /api/integration/v1/marketing-runs/{run_id}/external-adapter-runs",
-  );
-  if (ingestAdapterRunEndpoint?.boundary !== "public_rls") {
-    issues.add(
-      "marketing run external-adapter-run ingest endpoint is not public-RLS scoped",
+  for (const requiredEndpoint of REQUIRED_LIVE_ENDPOINTS) {
+    const endpoint = endpoints.get(
+      `${requiredEndpoint.method} ${requiredEndpoint.path}`,
     );
-  }
-  const socialPostsEndpoint = endpoints.get(
-    "GET /api/integration/v1/marketing-runs/{run_id}/social-posts",
-  );
-  if (socialPostsEndpoint?.boundary !== "public_rls") {
-    issues.add("marketing run social-posts endpoint is not public-RLS scoped");
-  }
-  const reportsEndpoint = endpoints.get(
-    "GET /api/integration/v1/marketing-runs/{run_id}/reports",
-  );
-  if (reportsEndpoint?.boundary !== "public_rls") {
-    issues.add("marketing run reports endpoint is not public-RLS scoped");
-  }
-  const reportEndpoint = endpoints.get("GET /api/integration/v1/reports/{report_id}");
-  if (reportEndpoint?.boundary !== "public_rls") {
-    issues.add("client report endpoint is not public-RLS scoped");
-  }
-  const evidenceSnapshotEndpoint = endpoints.get(
-    "GET /api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
-  );
-  if (evidenceSnapshotEndpoint?.boundary !== "public_rls") {
-    issues.add("marketing run evidence-snapshot endpoint is not public-RLS scoped");
+    if (endpoint === undefined) {
+      issues.add(`${requiredEndpoint.label} endpoint is missing`);
+      continue;
+    }
+    if (endpoint.boundary !== requiredEndpoint.boundary) {
+      issues.add(
+        `${requiredEndpoint.label} endpoint boundary is ${endpoint.boundary}`,
+      );
+    }
+    if (!endpoint.capability_ids.includes(requiredEndpoint.capabilityId)) {
+      issues.add(
+        `${requiredEndpoint.label} endpoint missing capability: ${requiredEndpoint.capabilityId}`,
+      );
+    }
   }
 
   const dataTables = new Set(

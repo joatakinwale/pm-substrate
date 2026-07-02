@@ -66,6 +66,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       closed_loop_stages: closedLoopStages,
       capabilities: [
         "platform_manifest.read",
+        "external_adapter_manifest.read",
         "engagement.read",
         "engagement.create",
         "external_adapter_run.read",
@@ -78,6 +79,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         "event_timeline.read",
         "evidence_summary.read",
         "run_evidence_snapshot.read",
+        "approval.read",
         "access_request.read",
         "social_post.read",
         "report.read",
@@ -166,15 +168,39 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       api_endpoints: [
         {
           method: "GET",
+          path: "/api/integration/v1/capabilities",
+          boundary: "public_rls",
+          capability_ids: ["platform_manifest.read"],
+        },
+        {
+          method: "GET",
           path: "/api/integration/v1/platform-manifest",
           boundary: "public_rls",
           capability_ids: ["platform_manifest.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/external-adapters",
+          boundary: "public_rls",
+          capability_ids: ["external_adapter_manifest.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/engagements",
+          boundary: "public_rls",
+          capability_ids: ["engagement.read"],
         },
         {
           method: "POST",
           path: "/api/integration/v1/engagements",
           boundary: "public_rls",
           capability_ids: ["engagement.create"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/engagements/{engagement_id}",
+          boundary: "public_rls",
+          capability_ids: ["engagement.read"],
         },
         {
           method: "GET",
@@ -207,10 +233,22 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["access_request.read"],
         },
         {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}",
+          boundary: "public_rls",
+          capability_ids: ["marketing_run.read"],
+        },
+        {
           method: "POST",
           path: "/api/integration/v1/marketing-runs/{run_id}/dispatch",
           boundary: "public_rls",
           capability_ids: ["marketing_run.dispatch"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/artifacts",
+          boundary: "public_rls",
+          capability_ids: ["artifact.read"],
         },
         {
           method: "GET",
@@ -231,10 +269,40 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["task.execute"],
         },
         {
+          method: "POST",
+          path: "/api/internal/social/posts/{post_id}/publish",
+          boundary: "internal_system_rls",
+          capability_ids: ["social_post.publish"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/tasks",
+          boundary: "public_rls",
+          capability_ids: ["task.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/events",
+          boundary: "public_rls",
+          capability_ids: ["event_timeline.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/approvals",
+          boundary: "public_rls",
+          capability_ids: ["approval.read"],
+        },
+        {
           method: "GET",
           path: "/api/integration/v1/marketing-runs/{run_id}/evidence-snapshot",
           boundary: "public_rls",
           capability_ids: ["run_evidence_snapshot.read"],
+        },
+        {
+          method: "GET",
+          path: "/api/integration/v1/marketing-runs/{run_id}/evidence-summary",
+          boundary: "public_rls",
+          capability_ids: ["evidence_summary.read"],
         },
         {
           method: "GET",
@@ -262,9 +330,27 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
         },
         {
           method: "POST",
+          path: "/api/integration/v1/approvals/{approval_id}/decision",
+          boundary: "public_rls",
+          capability_ids: ["approval.decide"],
+        },
+        {
+          method: "POST",
           path: "/api/integration/v1/access-requests/{access_request_id}/decision",
           boundary: "public_rls",
           capability_ids: ["access_request.decide"],
+        },
+        {
+          method: "POST",
+          path: "/api/integration/v1/events",
+          boundary: "public_rls",
+          capability_ids: ["event.ingest"],
+        },
+        {
+          method: "POST",
+          path: "/api/integration/v1/webhooks",
+          boundary: "public_rls",
+          capability_ids: ["event.ingest"],
         },
       ],
       data_resources: [
