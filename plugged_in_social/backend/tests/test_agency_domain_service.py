@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections import defaultdict
+from datetime import date, datetime, timezone
 
 import pytest
 
@@ -13,6 +14,8 @@ from app.models.agency import (
     MarketingRun,
 )
 from app.models.project import Project
+from app.models.report import ClientReport, ReportStatus
+from app.models.social_media import SocialAccount, SocialPost
 from app.models.virtual_agency import VirtualAgencyEvent, VirtualAgencyTask
 from app.schemas.agency import (
     AgencyAccessRequestCreate,
@@ -55,14 +58,64 @@ class _FakeAgencySession:
             if (task.lineage or {}).get("marketing_run_id") == str(run_id)
         ]
 
+    def list_virtual_tasks_for_project(self, project_id):
+        return [
+            task
+            for task in self._store.get(VirtualAgencyTask, {}).values()
+            if task.project_id == project_id
+        ]
+
     def list_virtual_task_dependencies(self, task):
         return list(task.dependencies)
+
+    def list_virtual_task_dependents(self, task):
+        return [
+            candidate
+            for candidate in self._store.get(VirtualAgencyTask, {}).values()
+            if task in candidate.dependencies
+        ]
 
     def find_event_by_idempotency_key(self, idempotency_key):
         for event in self._store.get(VirtualAgencyEvent, {}).values():
             if event.idempotency_key == idempotency_key:
                 return event
         return None
+
+    def find_virtual_task_by_creation_idempotency_key(self, key):
+        for task in self._store.get(VirtualAgencyTask, {}).values():
+            if task.creation_idempotency_key == key:
+                return task
+        return None
+
+    def first_social_account(self, org_id):
+        for account in self._store.get(SocialAccount, {}).values():
+            if account.org_id == org_id:
+                return account
+        return None
+
+    def list_project_draft_posts(self, project_id):
+        return [
+            post
+            for post in self._store.get(SocialPost, {}).values()
+            if post.project_id == project_id and post.status == "draft"
+        ]
+
+    def list_project_metric_posts(self, project_id):
+        return [
+            post
+            for post in self._store.get(SocialPost, {}).values()
+            if post.project_id == project_id
+            and post.status == "published"
+            and post.published_at is not None
+            and any([
+                post.likes,
+                post.comments,
+                post.shares,
+                post.impressions,
+                post.reach,
+                post.engagement_rate is not None,
+            ])
+        ]
 
 
 async def _capture_publish(monkeypatch):
@@ -355,6 +408,184 @@ async def test_dispatch_marketing_run_approves_tasks_and_dispatches_first_ready_
         [event.event_type for event in events_after_second].count("handoff_dispatched")
         == 1
     )
+
+
+@pytest.mark.asyncio
+async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_action(
+    monkeypatch,
+):
+    from app.models.virtual_agency import VirtualAgencyEventType
+    from app.services.agency_domain import (
+        approve_and_dispatch_marketing_run,
+        create_client_engagement,
+        kickoff_marketing_run,
+        start_marketing_run,
+    )
+    from app.services.report_next_actions import (
+        create_next_action_proposal_task_for_report_async,
+    )
+    from app.services.virtual_agency import dispatch_metrics_ready_analytics_tasks
+    from app.services.virtual_agency_agents import route_virtual_agency_task
+    from app.services.virtual_agency_orchestration import (
+        approve_task,
+        build_handoff_payload,
+        social_post_content_hash,
+    )
+
+    sent = await _capture_publish(monkeypatch)
+    db = _FakeAgencySession()
+    org_id = uuid.uuid4()
+    db.add(
+        SocialAccount(
+            id=uuid.uuid4(),
+            org_id=org_id,
+            platform="linkedin",
+            account_name="Acme LinkedIn",
+            account_id="li-acme",
+        )
+    )
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=ClientEngagementCreate(
+            name="Acme Launch",
+            client_url="https://acme.example",
+            repo_url="https://github.com/acme/app",
+            goals=["increase qualified demo bookings"],
+            constraints=["approval required before publishing"],
+            intake_payload={
+                "source_urls": ["https://acme.example"],
+                "offer": "AI implementation audit",
+            },
+            integration_state={
+                "preferred_social_channels": ["linkedin"],
+                "analytics_provider": "umami",
+            },
+        ),
+        created_by_agent="chief_of_staff",
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective="Autonomously improve launch conversion",
+    )
+    kickoff = await kickoff_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="agent:chief_of_staff",
+    )
+    for access_request in db._store.get(AgencyAccessRequest, {}).values():
+        access_request.status = "granted"
+
+    dispatch = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+
+    assert kickoff.artifact.payload_hash
+    assert dispatch.dispatched_messages[0]["agent_role"] == "chief_of_staff"
+    assert sent[-1]["message"] == dispatch.dispatched_messages[0]
+
+    for role in [
+        "chief_of_staff",
+        "content_creative",
+        "scheduling_distribution",
+        "community_engagement",
+    ]:
+        message = sent[-1]["message"]
+        assert message["agent_role"] == role
+        await route_virtual_agency_task(db=db, **message)
+
+    posts = list(db._store.get(SocialPost, {}).values())
+    assert len(posts) == 1
+    post = posts[0]
+    assert post.status == "scheduled"
+    assert post.scheduled_content_hash == social_post_content_hash(post)
+    post.status = "published"
+    post.published_at = datetime(2026, 7, 1, 16, 30, tzinfo=timezone.utc)
+    post.platform_post_id = "li-post-1"
+    post.platform_url = "https://linkedin.example/li-post-1"
+    post.published_content_hash = post.scheduled_content_hash
+    post.impressions = 600
+    post.reach = 480
+    post.engagement_rate = 0.08
+
+    analytics_messages = await dispatch_metrics_ready_analytics_tasks(
+        db,
+        project_ids={run.project_id},
+        actor_id="system:metrics-refresh",
+    )
+    assert [message["agent_role"] for message in analytics_messages] == [
+        "analytics_reporting"
+    ]
+    await route_virtual_agency_task(db=db, **analytics_messages[0])
+
+    report = next(iter(db._store.get(ClientReport, {}).values()))
+    report.status = ReportStatus.generated.value
+    report.period_start = date(2026, 6, 24)
+    report.period_end = date(2026, 7, 1)
+    report.metrics_snapshot = {
+        "total_reach": post.reach,
+        "avg_engagement_rate": 8.0,
+        "qualified_leads_generated": 18,
+    }
+    report.pdf_url = "https://reports.example/acme-launch.pdf"
+    report.pdf_generated_at = datetime(2026, 7, 1, 17, 45, tzinfo=timezone.utc)
+    next_action_task = await create_next_action_proposal_task_for_report_async(
+        db,
+        report=report,
+        actor_id="system:report-builder",
+    )
+
+    assert next_action_task is not None
+    assert next_action_task.lineage["client_report_id"] == str(report.id)
+    assert next_action_task.context["pm_substrate"]["action_type"] == (
+        "marketing.next_action.propose"
+    )
+    assert next_action_task.context["content_hashes"]["metrics_snapshot_hash"]
+    db.add(
+        approve_task(
+            next_action_task,
+            actor_id="client-1",
+            idempotency_key=f"agency-run:approve-next-action:{next_action_task.id}",
+        )
+    )
+    result = await route_virtual_agency_task(
+        db=db,
+        **{
+            **build_handoff_payload(next_action_task),
+            "idempotency_key": f"agency-run:execute-next-action:{next_action_task.id}",
+            "type": "virtual_agency.task",
+            "emitted_at": None,
+        },
+    )
+
+    assert result["status"] == "done"
+    tasks = list(db._store.get(VirtualAgencyTask, {}).values())
+    assert len(tasks) == 6
+    assert all(task.status == "done" for task in tasks)
+    completed_events = [
+        event
+        for event in db._store.get(VirtualAgencyEvent, {}).values()
+        if event.event_type == VirtualAgencyEventType.execution_completed.value
+    ]
+    assert len(completed_events) == 6
+    assert completed_events[-1].payload["next_action_proposal"] == {
+        "recommended_action": "launch_followup_campaign",
+        "source_report_id": str(report.id),
+        "evidence_ref_count": 3,
+        "content_hashes": next_action_task.context["content_hashes"],
+        "pm_substrate_action_type": "marketing.next_action.propose",
+    }
+    assert all(
+        task.lineage.get("marketing_run_id") == str(run.id)
+        for task in tasks
+        if task is not next_action_task
+    )
+    assert report.metrics_snapshot["qualified_leads_generated"] == 18
 
 
 @pytest.mark.asyncio
