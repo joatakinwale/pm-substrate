@@ -45,6 +45,12 @@ describe("ArrowHedge integration API client", () => {
             "/integration/v1/agents",
             "/integration/v1/graphs/effective",
             "/integration/v1/data/cache/summary",
+            "/integration/v1/flows",
+            "/integration/v1/flows/{id}",
+            "/integration/v1/flows/{id}/runs",
+            "/integration/v1/runs/{id}",
+            "/integration/v1/config/models",
+            "/integration/v1/config/api-keys",
           ],
         },
       ],
@@ -124,6 +130,94 @@ describe("ArrowHedge integration API client", () => {
           ],
         },
       ],
+      [
+        "https://arrow.example/integration/v1/flows",
+        {
+          schemaVersion: "arrowhedgelab.integration.flows.v1",
+          count: 1,
+          flows: [
+            {
+              schemaVersion: "arrowhedgelab.integration.flow.v1",
+              id: 7,
+              name: "AAPL validation flow",
+              hashes: { nodesSha256: "b".repeat(64), edgesSha256: "c".repeat(64) },
+            },
+          ],
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/flows/7",
+        {
+          schemaVersion: "arrowhedgelab.integration.flow.v1",
+          id: 7,
+          name: "AAPL validation flow",
+          nodes: [{ id: "warren_buffett_ab12cd", type: "agent" }],
+          edges: [],
+          data: { tickers: ["AAPL"] },
+          effectiveGraph: {
+            schemaVersion: "arrowhedgelab.integration.effective-graph.v1",
+            nodes: [],
+            edges: [],
+            validation: { issues: [] },
+          },
+          hashes: {
+            nodesSha256: "b".repeat(64),
+            edgesSha256: "c".repeat(64),
+            dataSha256: "d".repeat(64),
+          },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/runs/11",
+        {
+          schemaVersion: "arrowhedgelab.integration.flow-run.v1",
+          id: 11,
+          flow_id: 7,
+          status: "COMPLETE",
+          requestData: {
+            tickers: ["AAPL"],
+            api_keys: { OPENAI_API_KEY: { present: true } },
+          },
+          results: { decisions: { AAPL: { action: "buy" } } },
+          hashes: {
+            requestDataSha256: "e".repeat(64),
+            resultsSha256: "f".repeat(64),
+          },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/config/models",
+        {
+          schemaVersion: "arrowhedgelab.integration.model-config.v1",
+          defaults: { model_name: "gpt-4.1", provider: "OpenAI" },
+          models: [
+            {
+              display_name: "GPT 4.1",
+              model_name: "gpt-4.1",
+              provider: "OpenAI",
+              source: "api_models",
+            },
+          ],
+          providers: [{ name: "OpenAI", models: [] }],
+          hashes: { modelsSha256: "1".repeat(64) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/config/api-keys",
+        {
+          schemaVersion: "arrowhedgelab.integration.api-key-summary.v1",
+          redaction: { apiKeys: "presence_only", rawSecrets: "never" },
+          apiKeys: [
+            {
+              id: 3,
+              provider: "OPENAI_API_KEY",
+              is_active: true,
+              has_key: true,
+            },
+          ],
+          hashes: { apiKeysSha256: "2".repeat(64) },
+        },
+      ],
     ]);
     const fetchFn: ArrowHedgeIntegrationFetch = async (url, init) => {
       calls.push({
@@ -139,6 +233,8 @@ describe("ArrowHedge integration API client", () => {
       integrationBaseUrl: "https://arrow.example",
       bearerToken: "substrate-token",
       fetchFn,
+      flowIds: [7],
+      runIds: [11],
       graph: {
         nodes: [
           { id: "warren_buffett_ab12cd", type: "agent" },
@@ -160,6 +256,11 @@ describe("ArrowHedge integration API client", () => {
       "https://arrow.example/integration/v1/agents",
       "https://arrow.example/integration/v1/graphs/effective",
       "https://arrow.example/integration/v1/data/cache/summary",
+      "https://arrow.example/integration/v1/flows",
+      "https://arrow.example/integration/v1/config/models",
+      "https://arrow.example/integration/v1/config/api-keys",
+      "https://arrow.example/integration/v1/flows/7",
+      "https://arrow.example/integration/v1/runs/11",
     ]);
     expect(calls[2]).toMatchObject({
       method: "POST",
@@ -179,12 +280,22 @@ describe("ArrowHedge integration API client", () => {
       },
     });
     expect(validation).toEqual({ ready: true, issues: [] });
-    expect(snapshot.evidenceRefs.map((ref) => ref.id)).toEqual([
-      "arrowhedgelab:integration_api:capabilities",
-      "arrowhedgelab:integration_api:agents",
-      "arrowhedgelab:integration_api:effective_graph",
-      `arrowhedgelab:cache:prices:AAPL_2024-01-01_2024-01-02:${"a".repeat(64)}`,
-    ]);
+    expect(snapshot.flowDetails).toHaveLength(1);
+    expect(snapshot.runDetails).toHaveLength(1);
+    expect(JSON.stringify(snapshot.apiKeySummary)).not.toContain("sk-");
+    expect(snapshot.evidenceRefs.map((ref) => ref.id)).toEqual(
+      expect.arrayContaining([
+        "arrowhedgelab:integration_api:capabilities",
+        "arrowhedgelab:integration_api:agents",
+        "arrowhedgelab:integration_api:effective_graph",
+        "arrowhedgelab:integration_api:flows",
+        "arrowhedgelab:integration_api:model_config",
+        "arrowhedgelab:integration_api:api_key_summary",
+        "arrowhedgelab:flow:7",
+        "arrowhedgelab:flow-run:11",
+        `arrowhedgelab:cache:prices:AAPL_2024-01-01_2024-01-02:${"a".repeat(64)}`,
+      ]),
+    );
   });
 
   it("reports contract issues instead of accepting a partial adapter surface", () => {
@@ -225,6 +336,33 @@ describe("ArrowHedge integration API client", () => {
           },
         ],
       },
+      flows: {
+        schemaVersion: "arrowhedgelab.integration.flows.v1",
+        count: 1,
+        flows: [
+          {
+            schemaVersion: "arrowhedgelab.integration.flow.v1",
+            id: 7,
+            name: "AAPL validation flow",
+            hashes: { nodesSha256: "" },
+          },
+        ],
+      },
+      flowDetails: [],
+      runDetails: [],
+      modelConfig: {
+        schemaVersion: "arrowhedgelab.integration.model-config.v1",
+        defaults: { model_name: "", provider: "" },
+        models: [],
+        providers: [],
+        hashes: { modelsSha256: "" },
+      },
+      apiKeySummary: {
+        schemaVersion: "arrowhedgelab.integration.api-key-summary.v1",
+        redaction: { apiKeys: "raw" },
+        apiKeys: [{ provider: "OPENAI_API_KEY", has_key: true, key_value: "sk-leak" }],
+        hashes: { apiKeysSha256: "" },
+      },
       evidenceRefs: [],
     });
 
@@ -237,6 +375,11 @@ describe("ArrowHedge integration API client", () => {
         "effectiveGraph.validation.issues must be empty",
         "cacheSummary.records[0].sha256 is required",
         "cacheSummary.records[0] must not include raw rows",
+        "flows.flows[0].hashes.nodesSha256 is required",
+        "modelConfig.defaults.model_name is required",
+        "modelConfig.models must include at least one model",
+        "apiKeySummary.redaction.apiKeys must be presence_only",
+        "apiKeySummary.apiKeys[0] must not expose key_value",
       ]),
     );
   });

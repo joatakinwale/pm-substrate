@@ -34,6 +34,8 @@ export interface ArrowHedgeIntegrationGraphPayload {
 export interface ArrowHedgeIntegrationSnapshotFetchInput
   extends ArrowHedgeIntegrationClientInput {
   readonly graph?: ArrowHedgeIntegrationGraphPayload;
+  readonly flowIds?: readonly number[];
+  readonly runIds?: readonly number[];
 }
 
 export interface ArrowHedgeIntegrationCapabilities {
@@ -112,11 +114,91 @@ export interface ArrowHedgeIntegrationCacheSummary {
   readonly [key: string]: unknown;
 }
 
+export interface ArrowHedgeIntegrationFlowSummary {
+  readonly schemaVersion: string;
+  readonly id: number;
+  readonly name?: string | null;
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationFlows {
+  readonly schemaVersion: string;
+  readonly flows: readonly ArrowHedgeIntegrationFlowSummary[];
+  readonly count: number;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationFlow extends ArrowHedgeIntegrationFlowSummary {
+  readonly nodes?: readonly Record<string, unknown>[];
+  readonly edges?: readonly Record<string, unknown>[];
+  readonly data?: Record<string, unknown>;
+  readonly effectiveGraph?: ArrowHedgeIntegrationEffectiveGraph;
+}
+
+export interface ArrowHedgeIntegrationFlowRunSummary {
+  readonly schemaVersion: string;
+  readonly id: number;
+  readonly flow_id: number;
+  readonly status?: string;
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationFlowRun extends ArrowHedgeIntegrationFlowRunSummary {
+  readonly requestData?: Record<string, unknown>;
+  readonly results?: Record<string, unknown>;
+}
+
+export interface ArrowHedgeIntegrationModelRecord {
+  readonly display_name: string;
+  readonly model_name: string;
+  readonly provider: string;
+  readonly source: string;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationModelConfig {
+  readonly schemaVersion: string;
+  readonly defaults: {
+    readonly model_name: string;
+    readonly provider: string;
+    readonly [key: string]: unknown;
+  };
+  readonly models: readonly ArrowHedgeIntegrationModelRecord[];
+  readonly providers: readonly Record<string, unknown>[];
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationApiKeySummaryRecord {
+  readonly provider: string;
+  readonly has_key: boolean;
+  readonly [key: string]: unknown;
+}
+
+export interface ArrowHedgeIntegrationApiKeySummary {
+  readonly schemaVersion: string;
+  readonly redaction: {
+    readonly apiKeys: string;
+    readonly rawSecrets?: string;
+    readonly [key: string]: unknown;
+  };
+  readonly apiKeys: readonly ArrowHedgeIntegrationApiKeySummaryRecord[];
+  readonly hashes?: Record<string, string | undefined>;
+  readonly [key: string]: unknown;
+}
+
 export interface ArrowHedgeIntegrationSnapshot {
   readonly capabilities: ArrowHedgeIntegrationCapabilities;
   readonly agents: ArrowHedgeIntegrationAgents;
   readonly effectiveGraph: ArrowHedgeIntegrationEffectiveGraph;
   readonly cacheSummary: ArrowHedgeIntegrationCacheSummary;
+  readonly flows: ArrowHedgeIntegrationFlows;
+  readonly flowDetails: readonly ArrowHedgeIntegrationFlow[];
+  readonly runDetails: readonly ArrowHedgeIntegrationFlowRun[];
+  readonly modelConfig: ArrowHedgeIntegrationModelConfig;
+  readonly apiKeySummary: ArrowHedgeIntegrationApiKeySummary;
   readonly evidenceRefs: readonly StateRef[];
 }
 
@@ -143,6 +225,11 @@ const CAPABILITIES_SCHEMA = "arrowhedgelab.integration.capabilities.v1";
 const AGENTS_SCHEMA = "arrowhedgelab.integration.agents.v1";
 const EFFECTIVE_GRAPH_SCHEMA = "arrowhedgelab.integration.effective-graph.v1";
 const CACHE_SUMMARY_SCHEMA = "arrowhedgelab.integration.cache-summary.v1";
+const FLOWS_SCHEMA = "arrowhedgelab.integration.flows.v1";
+const FLOW_SCHEMA = "arrowhedgelab.integration.flow.v1";
+const FLOW_RUN_SCHEMA = "arrowhedgelab.integration.flow-run.v1";
+const MODEL_CONFIG_SCHEMA = "arrowhedgelab.integration.model-config.v1";
+const API_KEY_SUMMARY_SCHEMA = "arrowhedgelab.integration.api-key-summary.v1";
 const ADAPTER_VERSION = "integration.v1";
 
 const REQUIRED_SURFACES = [
@@ -150,6 +237,12 @@ const REQUIRED_SURFACES = [
   "/integration/v1/agents",
   "/integration/v1/graphs/effective",
   "/integration/v1/data/cache/summary",
+  "/integration/v1/flows",
+  "/integration/v1/flows/{id}",
+  "/integration/v1/flows/{id}/runs",
+  "/integration/v1/runs/{id}",
+  "/integration/v1/config/models",
+  "/integration/v1/config/api-keys",
 ] as const;
 
 const REQUIRED_AGENT_KEYS = [
@@ -162,7 +255,15 @@ export async function fetchArrowHedgeIntegrationSnapshot(
 ): Promise<ArrowHedgeIntegrationSnapshot> {
   const client = buildIntegrationClient(input);
   const graph = input.graph ?? { nodes: [], edges: [] };
-  const [capabilities, agents, effectiveGraph, cacheSummary] = await Promise.all([
+  const [
+    capabilities,
+    agents,
+    effectiveGraph,
+    cacheSummary,
+    flows,
+    modelConfig,
+    apiKeySummary,
+  ] = await Promise.all([
     fetchIntegrationJson<ArrowHedgeIntegrationCapabilities>(
       client,
       "/capabilities",
@@ -177,12 +278,44 @@ export async function fetchArrowHedgeIntegrationSnapshot(
       client,
       "/data/cache/summary",
     ),
+    fetchIntegrationJson<ArrowHedgeIntegrationFlows>(client, "/flows"),
+    fetchIntegrationJson<ArrowHedgeIntegrationModelConfig>(
+      client,
+      "/config/models",
+    ),
+    fetchIntegrationJson<ArrowHedgeIntegrationApiKeySummary>(
+      client,
+      "/config/api-keys",
+    ),
+  ]);
+  const [flowDetails, runDetails] = await Promise.all([
+    Promise.all(
+      (input.flowIds ?? []).map((flowId) =>
+        fetchIntegrationJson<ArrowHedgeIntegrationFlow>(
+          client,
+          `/flows/${encodeURIComponent(String(flowId))}`,
+        ),
+      ),
+    ),
+    Promise.all(
+      (input.runIds ?? []).map((runId) =>
+        fetchIntegrationJson<ArrowHedgeIntegrationFlowRun>(
+          client,
+          `/runs/${encodeURIComponent(String(runId))}`,
+        ),
+      ),
+    ),
   ]);
   const snapshot = {
     capabilities,
     agents,
     effectiveGraph,
     cacheSummary,
+    flows,
+    flowDetails,
+    runDetails,
+    modelConfig,
+    apiKeySummary,
     evidenceRefs: [] as readonly StateRef[],
   };
 
@@ -264,6 +397,68 @@ export function validateArrowHedgeIntegrationSnapshot(
     }
   });
 
+  if (snapshot.flows.schemaVersion !== FLOWS_SCHEMA) {
+    issues.push(`flows.schemaVersion must be ${FLOWS_SCHEMA}`);
+  }
+  if (snapshot.flows.count !== snapshot.flows.flows.length) {
+    issues.push("flows.count must match flows.length");
+  }
+  snapshot.flows.flows.forEach((flow, index) => {
+    if (flow.schemaVersion !== FLOW_SCHEMA) {
+      issues.push(`flows.flows[${index}].schemaVersion must be ${FLOW_SCHEMA}`);
+    }
+    if (flow.hashes?.nodesSha256 === undefined || flow.hashes.nodesSha256 === "") {
+      issues.push(`flows.flows[${index}].hashes.nodesSha256 is required`);
+    }
+  });
+  snapshot.flowDetails.forEach((flow, index) => {
+    if (flow.schemaVersion !== FLOW_SCHEMA) {
+      issues.push(`flowDetails[${index}].schemaVersion must be ${FLOW_SCHEMA}`);
+    }
+    if (JSON.stringify(flow).includes("sk-")) {
+      issues.push(`flowDetails[${index}] must not expose raw API keys`);
+    }
+  });
+  snapshot.runDetails.forEach((run, index) => {
+    if (run.schemaVersion !== FLOW_RUN_SCHEMA) {
+      issues.push(`runDetails[${index}].schemaVersion must be ${FLOW_RUN_SCHEMA}`);
+    }
+    if (JSON.stringify(run).includes("sk-")) {
+      issues.push(`runDetails[${index}] must not expose raw API keys`);
+    }
+  });
+
+  if (snapshot.modelConfig.schemaVersion !== MODEL_CONFIG_SCHEMA) {
+    issues.push(`modelConfig.schemaVersion must be ${MODEL_CONFIG_SCHEMA}`);
+  }
+  if (snapshot.modelConfig.defaults.model_name === "") {
+    issues.push("modelConfig.defaults.model_name is required");
+  }
+  if (snapshot.modelConfig.defaults.provider === "") {
+    issues.push("modelConfig.defaults.provider is required");
+  }
+  if (snapshot.modelConfig.models.length === 0) {
+    issues.push("modelConfig.models must include at least one model");
+  }
+  if (snapshot.modelConfig.hashes?.modelsSha256 === "") {
+    issues.push("modelConfig.hashes.modelsSha256 is required");
+  }
+
+  if (snapshot.apiKeySummary.schemaVersion !== API_KEY_SUMMARY_SCHEMA) {
+    issues.push(`apiKeySummary.schemaVersion must be ${API_KEY_SUMMARY_SCHEMA}`);
+  }
+  if (snapshot.apiKeySummary.redaction.apiKeys !== "presence_only") {
+    issues.push("apiKeySummary.redaction.apiKeys must be presence_only");
+  }
+  snapshot.apiKeySummary.apiKeys.forEach((apiKey, index) => {
+    if (Object.prototype.hasOwnProperty.call(apiKey, "key_value")) {
+      issues.push(`apiKeySummary.apiKeys[${index}] must not expose key_value`);
+    }
+    if (JSON.stringify(apiKey).includes("sk-")) {
+      issues.push(`apiKeySummary.apiKeys[${index}] must not expose raw key values`);
+    }
+  });
+
   return {
     ready: issues.length === 0,
     issues,
@@ -288,6 +483,42 @@ export function buildArrowHedgeIntegrationEvidenceRefs(
       "source_record",
       "arrowhedgelab:integration_api:effective_graph",
       "ArrowHedgeLab effective orchestration graph",
+    ),
+    stateRef(
+      "source_record",
+      "arrowhedgelab:integration_api:flows",
+      "ArrowHedgeLab saved flow list",
+    ),
+    stateRef(
+      "source_record",
+      "arrowhedgelab:integration_api:model_config",
+      "ArrowHedgeLab model configuration inventory",
+    ),
+    stateRef(
+      "source_record",
+      "arrowhedgelab:integration_api:api_key_summary",
+      "ArrowHedgeLab redacted API key summary",
+    ),
+    ...snapshot.flows.flows.map((flow) =>
+      stateRef(
+        "source_record",
+        `arrowhedgelab:flow:${flow.id}`,
+        "ArrowHedgeLab saved flow summary",
+      ),
+    ),
+    ...snapshot.flowDetails.map((flow) =>
+      stateRef(
+        "source_record",
+        `arrowhedgelab:flow:${flow.id}`,
+        "ArrowHedgeLab saved flow",
+      ),
+    ),
+    ...snapshot.runDetails.map((run) =>
+      stateRef(
+        "source_record",
+        `arrowhedgelab:flow-run:${run.id}`,
+        "ArrowHedgeLab saved flow run",
+      ),
     ),
     ...snapshot.cacheSummary.records.map((record) =>
       stateRef(
