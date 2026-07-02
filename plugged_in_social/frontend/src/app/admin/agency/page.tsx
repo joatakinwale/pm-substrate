@@ -20,6 +20,7 @@ import {
   type AgencyArtifact,
   type ClientEngagement,
   type IntegrationEvidenceSummary,
+  type IntegrationExternalAdapter,
   type IntegrationRunEvent,
   type IntegrationTask,
   type MarketingRun,
@@ -32,6 +33,7 @@ import {
   decideAgencyApproval,
   dispatchMarketingRun,
   getIntegrationRunEvidenceSnapshot,
+  listIntegrationExternalAdapters,
   listAgencyAccessRequests,
   listAgencyApprovals,
   listAgencyArtifacts,
@@ -199,6 +201,9 @@ export default function AgencyCommandCenterPage() {
   const [runEvents, setRunEvents] = useState<IntegrationRunEvent[]>([]);
   const [evidenceSummary, setEvidenceSummary] =
     useState<IntegrationEvidenceSummary | null>(null);
+  const [externalAdapters, setExternalAdapters] = useState<
+    IntegrationExternalAdapter[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -477,6 +482,15 @@ export default function AgencyCommandCenterPage() {
     }
   }, []);
 
+  const loadExternalAdapters = useCallback(async () => {
+    try {
+      const data = await listIntegrationExternalAdapters();
+      setExternalAdapters(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load adapters.");
+    }
+  }, []);
+
   const loadEngagementDetail = useCallback(async (engagementId: string) => {
     setDetailLoading(true);
     setError(null);
@@ -528,9 +542,10 @@ export default function AgencyCommandCenterPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       void loadEngagements();
+      void loadExternalAdapters();
     }, 0);
     return () => clearTimeout(timer);
-  }, [loadEngagements]);
+  }, [loadEngagements, loadExternalAdapters]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -550,7 +565,7 @@ export default function AgencyCommandCenterPage() {
   }, [selectedId, loadEngagementDetail]);
 
   async function reloadSelected() {
-    await loadEngagements();
+    await Promise.all([loadEngagements(), loadExternalAdapters()]);
     if (selectedId) await loadEngagementDetail(selectedId);
   }
 
@@ -1171,6 +1186,56 @@ export default function AgencyCommandCenterPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                    External Adapter Boundary
+                  </div>
+                  {externalAdapters.length === 0 ? (
+                    <EmptyState>No external adapters registered.</EmptyState>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                      {externalAdapters.map((adapter) => (
+                        <div
+                          key={adapter.id}
+                          className="rounded-lg border border-border px-3 py-3"
+                        >
+                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <p className="text-sm font-medium">{adapter.name}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {adapter.adapter_type.replaceAll("_", " ")}
+                              </p>
+                            </div>
+                            <span className="w-fit rounded-full bg-stevie-green/10 px-2 py-0.5 text-[10px] font-medium uppercase text-stevie-green">
+                              {adapter.boundary.replaceAll("_", " ")}
+                            </span>
+                          </div>
+                          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+                            {adapter.description}
+                          </p>
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                            <span>{adapter.capabilities.length} capabilities</span>
+                            <span>{adapter.output_artifacts.length} artifacts</span>
+                            <span>{adapter.required_gates.length} gates</span>
+                            <span>{adapter.evidence_fields.length} evidence fields</span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {adapter.required_gates.slice(0, 6).map((gate) => (
+                              <span
+                                key={`${adapter.id}:${gate}`}
+                                className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                              >
+                                {gate.replaceAll("_", " ")}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {kickoffSummary && (

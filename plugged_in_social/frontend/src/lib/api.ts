@@ -995,6 +995,24 @@ export interface IntegrationRunEvidenceSnapshot {
   links: Array<{ rel: string; href: string }>;
 }
 
+export interface IntegrationExternalAdapter {
+  id: string;
+  name: string;
+  adapter_type: "browser_qa_harness" | "agent_harness";
+  boundary:
+    | "external_process"
+    | "sandboxed_process"
+    | "containerized_process"
+    | "hosted_service";
+  description: string;
+  capabilities: string[];
+  input_contracts: string[];
+  output_artifacts: string[];
+  required_gates: string[];
+  evidence_fields: string[];
+  notes: Record<string, unknown>;
+}
+
 export interface ClientEngagementCreatePayload {
   name?: string;
   client_url?: string;
@@ -1199,6 +1217,12 @@ export async function getIntegrationRunEvidenceSnapshot(runId: string) {
 export async function getIntegrationEvidenceSummary(runId: string) {
   return apiFetch<IntegrationEvidenceSummary>(
     `/api/integration/v1/marketing-runs/${encodeURIComponent(runId)}/evidence-summary`
+  );
+}
+
+export async function listIntegrationExternalAdapters() {
+  return apiFetch<IntegrationExternalAdapter[]>(
+    "/api/integration/v1/external-adapters"
   );
 }
 

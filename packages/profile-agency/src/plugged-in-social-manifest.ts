@@ -994,22 +994,29 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
     operatorRunMonitorSurface:
       frontendApi.includes("export interface IntegrationTask") &&
       frontendApi.includes("export interface IntegrationRunEvidenceSnapshot") &&
+      frontendApi.includes("export interface IntegrationExternalAdapter") &&
       frontendApi.includes("listIntegrationRunTasks") &&
       frontendApi.includes("getIntegrationRunEvidenceSnapshot") &&
+      frontendApi.includes("listIntegrationExternalAdapters") &&
       frontendApi.includes("/api/integration/v1/marketing-runs/") &&
       frontendApi.includes("/tasks") &&
       frontendApi.includes("/evidence-snapshot") &&
+      frontendApi.includes("/api/integration/v1/external-adapters") &&
       agencyCommandCenter.includes("Closed-loop Progress") &&
       agencyCommandCenter.includes("Governance Gates") &&
+      agencyCommandCenter.includes("External Adapter Boundary") &&
       agencyCommandCenter.includes("Agent Task Queue") &&
       agencyCommandCenter.includes("CLOSED_LOOP_STAGES") &&
+      agencyCommandCenter.includes("externalAdapters") &&
       agencyCommandCenter.includes("getIntegrationRunEvidenceSnapshot") &&
+      agencyCommandCenter.includes("listIntegrationExternalAdapters") &&
       agencyCommandCenter.includes("approval_payload_hash") &&
       agencyCommandCenter.includes("latest_event_hash") &&
       agencyCommandCenter.includes("social_post_content_hashes") &&
       agencyCommandCenterTests.includes(
         "test_agency_command_center_route_exposes_autonomous_run_monitor",
-      ),
+      ) &&
+      agencyCommandCenterTests.includes("External Adapter Boundary"),
   };
 }
 
