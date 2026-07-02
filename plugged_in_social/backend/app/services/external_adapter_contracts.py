@@ -109,6 +109,13 @@ EXTERNAL_ADAPTER_CONTRACTS: tuple[ExternalAdapterContract, ...] = (
             "inspired_by": "canary",
             "coupling": "adapter_contract_only",
             "source": "https://github.com/LopeWale/canary",
+            "source_commit": "36a29a052987aec11815422bd774368412e92b08",
+            "commands": [
+                "canary session start",
+                "canary run",
+                "canary session end",
+                "canary-browser",
+            ],
             "compatible_protocols": [
                 "canary.session-start",
                 "canary.execute",
@@ -206,6 +213,12 @@ EXTERNAL_ADAPTER_CONTRACTS: tuple[ExternalAdapterContract, ...] = (
             "inspired_by": "pi",
             "coupling": "adapter_contract_only",
             "source": "https://github.com/earendil-works/pi",
+            "source_commit": "e285e90fdbf9b05934ce90168156e2aa511d9a7c",
+            "packages": [
+                "@earendil-works/pi-agent-core",
+                "@earendil-works/pi-coding-agent",
+                "@earendil-works/pi-ai",
+            ],
             "compatible_protocols": [
                 "pi.orchestrator.spawn",
                 "pi.orchestrator.rpc",

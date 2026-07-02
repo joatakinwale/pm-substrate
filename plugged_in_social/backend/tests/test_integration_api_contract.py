@@ -1124,6 +1124,10 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert "agent_event_stream" in agent_adapter.output_artifacts
     assert "tool_execution_events" in agent_adapter.output_artifacts
     assert "pi.orchestrator.spawn" in agent_adapter.notes["compatible_protocols"]
+    assert agent_adapter.notes["source_commit"] == (
+        "e285e90fdbf9b05934ce90168156e2aa511d9a7c"
+    )
+    assert "@earendil-works/pi-agent-core" in agent_adapter.notes["packages"]
     assert "tool_execution_start" in agent_adapter.notes["required_event_types"]
     assert "agent_event_hash" in agent_adapter.evidence_fields
     assert "tool_call_hash" in agent_adapter.evidence_fields
@@ -1134,6 +1138,10 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert "network_har" in browser_adapter.output_artifacts
     assert "evidence_hash_gate" in browser_adapter.required_gates
     assert "canary.session-start" in browser_adapter.notes["compatible_protocols"]
+    assert browser_adapter.notes["source_commit"] == (
+        "36a29a052987aec11815422bd774368412e92b08"
+    )
+    assert "canary session start" in browser_adapter.notes["commands"]
     assert browser_adapter.notes["required_result_shape"]["artifacts"] == [
         "kind",
         "path",
