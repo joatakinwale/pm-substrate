@@ -291,10 +291,15 @@ describe("PluggedInSocial source manifest", () => {
     expect(manifest.externalAdapters).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "agent_harness",
+          id: "pi_harness",
           adapterType: "agent_harness",
           boundary: "containerized_process",
           sourcePath: "backend/app/services/external_adapter_contracts.py",
+          capabilities: expect.arrayContaining([
+            "pi_harness_embedding",
+            "pi_orchestrator_spawn",
+            "tool_calling",
+          ]),
           inputContracts: expect.arrayContaining([
             "virtual_agency_task",
             "approval_payload_hash",
@@ -320,6 +325,10 @@ describe("PluggedInSocial source manifest", () => {
           compatibleProtocols: expect.arrayContaining([
             "pi.orchestrator.spawn",
             "pi.agent_event_stream",
+          ]),
+          runnerCommands: expect.arrayContaining([
+            "pi orchestrator spawn",
+            "pi rpc",
           ]),
           providerPackages: expect.arrayContaining([
             "@earendil-works/pi-agent-core",

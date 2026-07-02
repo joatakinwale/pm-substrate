@@ -563,7 +563,7 @@ def _strategy_external_adapter_requirements(
         if requirement is not None:
             requirements.append(requirement)
     if engagement.repo_url:
-        requirement = external_adapter_strategy_requirement("agent_harness")
+        requirement = external_adapter_strategy_requirement("pi_harness")
         if requirement is not None:
             requirements.append(requirement)
     return requirements

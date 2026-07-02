@@ -22,7 +22,10 @@ from app.models.virtual_agency import (
     VirtualAgencyTaskStatus,
     virtual_agency_task_dependencies,
 )
-from app.services.external_adapter_contracts import get_external_adapter_contract
+from app.services.external_adapter_contracts import (
+    canonical_external_adapter_id,
+    get_external_adapter_contract,
+)
 
 
 class VirtualAgencyInvariantError(ValueError):
@@ -574,10 +577,11 @@ async def list_external_adapter_run_artifacts(
                 org_id=task.org_id,
                 run_id=run_id,
             )
+        canonical_id = canonical_external_adapter_id(adapter_id)
         return [
             artifact
             for artifact in artifacts
-            if artifact_adapter_id(artifact) == adapter_id
+            if artifact_adapter_id(artifact) == canonical_id
         ]
     result = await db.execute(
         select(AgencyArtifact).where(
@@ -589,7 +593,7 @@ async def list_external_adapter_run_artifacts(
     return [
         artifact
         for artifact in result.scalars().all()
-        if artifact_adapter_id(artifact) == adapter_id
+        if artifact_adapter_id(artifact) == canonical_external_adapter_id(adapter_id)
     ]
 
 
@@ -637,6 +641,7 @@ def strategy_artifact_required_adapter_requirements(
                 continue
             adapter_id = requirement.get("adapter_id")
             if isinstance(adapter_id, str) and adapter_id.strip():
+                adapter_id = canonical_external_adapter_id(adapter_id)
                 adapter_ids.add(adapter_id)
                 contract = get_external_adapter_contract(adapter_id)
                 if contract is not None:
@@ -675,7 +680,11 @@ def artifact_adapter_id(artifact: AgencyArtifact) -> str | None:
     lineage = artifact.lineage if isinstance(artifact.lineage, dict) else {}
     payload = artifact.payload if isinstance(artifact.payload, dict) else {}
     adapter_id = lineage.get("adapter_id") or payload.get("adapter_id")
-    return adapter_id if isinstance(adapter_id, str) else None
+    return (
+        canonical_external_adapter_id(adapter_id)
+        if isinstance(adapter_id, str)
+        else None
+    )
 
 
 def external_adapter_run_succeeded(artifact: AgencyArtifact) -> bool:

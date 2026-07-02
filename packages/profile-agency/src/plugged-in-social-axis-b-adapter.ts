@@ -930,7 +930,7 @@ export async function runPluggedInSocialNeutralApiSmokeEval(
       "/platform-manifest",
     ),
   ]);
-  const adapterId = input.adapterId ?? "agent_harness";
+  const adapterId = input.adapterId ?? "pi_harness";
   const adapter = (platformManifest.external_adapters ?? []).find(
     (item) => item.id === adapterId,
   );

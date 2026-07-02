@@ -13,6 +13,17 @@ AdapterBoundary = Literal[
     "hosted_service",
 ]
 
+PI_HARNESS_ADAPTER_ID = "pi_harness"
+
+EXTERNAL_ADAPTER_ALIASES = {
+    "agent_harness": PI_HARNESS_ADAPTER_ID,
+}
+
+
+def canonical_external_adapter_id(adapter_id: str) -> str:
+    normalized = adapter_id.strip()
+    return EXTERNAL_ADAPTER_ALIASES.get(normalized, normalized)
+
 
 @dataclass(frozen=True, slots=True)
 class ExternalAdapterContract:
@@ -155,16 +166,19 @@ EXTERNAL_ADAPTER_CONTRACTS: tuple[ExternalAdapterContract, ...] = (
         },
     ),
     ExternalAdapterContract(
-        id="agent_harness",
-        name="External agent harness",
+        id=PI_HARNESS_ADAPTER_ID,
+        name="Pi harness",
         adapter_type="agent_harness",
         boundary="containerized_process",
         description=(
-            "Executes external agent loops against approved task contracts while "
+            "Executes Pi external agent loops against approved task contracts while "
             "PluggedInSocial retains tenant, capability, approval, and evidence gates."
         ),
         purpose="repository_context_review",
         capabilities=(
+            "pi_harness_embedding",
+            "pi_orchestrator_spawn",
+            "pi_rpc_command_execution",
             "multi_provider_llm",
             "tool_calling",
             "agent_event_stream",
@@ -231,6 +245,11 @@ EXTERNAL_ADAPTER_CONTRACTS: tuple[ExternalAdapterContract, ...] = (
             "pi.orchestrator.rpc",
             "pi.agent_event_stream",
         ),
+        runner_commands=(
+            "pi orchestrator spawn",
+            "pi rpc",
+            "pi agent events",
+        ),
         provider_packages=(
             "@earendil-works/pi-agent-core",
             "@earendil-works/pi-coding-agent",
@@ -249,6 +268,7 @@ EXTERNAL_ADAPTER_CONTRACTS: tuple[ExternalAdapterContract, ...] = (
         notes={
             "inspired_by": "pi",
             "coupling": "adapter_contract_only",
+            "aliases": ("agent_harness",),
             "security": (
                 "External harnesses without built-in permission systems must run "
                 "behind PluggedInSocial gates and a containerized boundary."
@@ -265,11 +285,12 @@ def list_external_adapter_contracts() -> list[ExternalAdapterContract]:
 def get_external_adapter_contract(
     adapter_id: str,
 ) -> ExternalAdapterContract | None:
+    canonical_id = canonical_external_adapter_id(adapter_id)
     return next(
         (
             contract
             for contract in EXTERNAL_ADAPTER_CONTRACTS
-            if contract.id == adapter_id
+            if contract.id == canonical_id
         ),
         None,
     )

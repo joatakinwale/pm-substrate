@@ -71,7 +71,10 @@ from app.services.agency_domain import (
     normalize_agency_artifact_evidence_refs,
     start_marketing_run,
 )
-from app.services.external_adapter_contracts import list_external_adapter_contracts
+from app.services.external_adapter_contracts import (
+    canonical_external_adapter_id,
+    list_external_adapter_contracts,
+)
 from app.services.virtual_agency_orchestration import (
     AGENT_CAPABILITIES,
     social_post_content_hash,
@@ -1817,8 +1820,13 @@ def _external_adapter_manifest() -> list[IntegrationExternalAdapterManifest]:
 def _external_adapter_by_id(
     adapter_id: str,
 ) -> IntegrationExternalAdapterManifest | None:
+    canonical_id = canonical_external_adapter_id(adapter_id)
     return next(
-        (adapter for adapter in _external_adapter_manifest() if adapter.id == adapter_id),
+        (
+            adapter
+            for adapter in _external_adapter_manifest()
+            if adapter.id == canonical_id
+        ),
         None,
     )
 
@@ -1897,10 +1905,14 @@ async def _list_external_adapter_run_artifacts(
 
     if adapter_id is None:
         return artifacts
+    canonical_id = canonical_external_adapter_id(adapter_id)
     return [
         artifact
         for artifact in artifacts
-        if dict(artifact.lineage or {}).get("adapter_id") == adapter_id
+        if canonical_external_adapter_id(
+            str(dict(artifact.lineage or {}).get("adapter_id", ""))
+        )
+        == canonical_id
     ]
 
 
@@ -2357,8 +2369,10 @@ async def ingest_run_external_adapter_run(
         engagement_id=run.engagement_id,
     )
     input_refs = [item.model_dump() for item in body.input_refs]
+    client_adapter_id = body.adapter_id
     payload = {
-        "adapter_id": body.adapter_id,
+        "adapter_id": adapter.id,
+        "client_adapter_id": client_adapter_id,
         "adapter_type": adapter.adapter_type,
         "adapter_run_id": body.adapter_run_id,
         "status": body.status,
@@ -2392,6 +2406,7 @@ async def ingest_run_external_adapter_run(
         lineage={
             "source": "external_adapter",
             "adapter_id": adapter.id,
+            "client_adapter_id": client_adapter_id,
             "adapter_type": adapter.adapter_type,
             "adapter_run_id": body.adapter_run_id,
             "boundary": adapter.boundary,

@@ -359,7 +359,7 @@ async def test_kickoff_marketing_run_builds_autonomous_agency_workbreakdown():
     assert {
         item["adapter_id"]
         for item in tasks[0].context["external_adapter_requirements"]
-    } == {"browser_qa_harness", "agent_harness"}
+    } == {"browser_qa_harness", "pi_harness"}
     assert "report_html_hash" in tasks[0].context[
         "external_adapter_requirements"
     ][0]["required_evidence_fields"]
@@ -659,7 +659,7 @@ async def test_content_generation_waits_for_declared_external_adapter_runs(
         org_id=org_id,
         engagement_id=engagement.id,
         run_id=run.id,
-        adapter_id="agent_harness",
+        adapter_id="pi_harness",
         gate_results={"tenant_rls": True},
     )
     missing_agent_gate = await approve_and_dispatch_marketing_run(
@@ -675,7 +675,7 @@ async def test_content_generation_waits_for_declared_external_adapter_runs(
         org_id=org_id,
         engagement_id=engagement.id,
         run_id=run.id,
-        adapter_id="agent_harness",
+        adapter_id="pi_harness",
     )
     resumed = await approve_and_dispatch_marketing_run(
         db,
@@ -775,7 +775,7 @@ async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_act
     )
     assert chief_result["dispatched_dependents"] == 0
 
-    for adapter_id in ["browser_qa_harness", "agent_harness"]:
+    for adapter_id in ["browser_qa_harness", "pi_harness"]:
         _add_external_adapter_run_artifact(
             db,
             org_id=org_id,
@@ -827,7 +827,7 @@ async def test_client_engagement_closed_loop_eval_reaches_report_backed_next_act
     assert {
         item["adapter_id"]
         for item in strategy_artifacts[0].payload["external_adapter_requirements"]
-    } == {"browser_qa_harness", "agent_harness"}
+    } == {"browser_qa_harness", "pi_harness"}
     from app.services.external_adapter_contracts import get_external_adapter_contract
 
     requirements_by_id = {

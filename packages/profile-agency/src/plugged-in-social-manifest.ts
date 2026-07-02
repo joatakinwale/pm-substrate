@@ -219,7 +219,7 @@ const REQUIRED_CONFIGURATION_NAMES = [
 
 const REQUIRED_EXTERNAL_ADAPTER_IDS = [
   "browser_qa_harness",
-  "agent_harness",
+  "pi_harness",
 ] as const;
 
 const DURABLE_EVIDENCE_FIELD_NAMES = [
@@ -537,8 +537,10 @@ function buildExternalAdapters(
 
   if (
     sourceIncludesAll(contractSource, [
-      "agent_harness",
+      "pi_harness",
       "containerized_process",
+      "pi_harness_embedding",
+      "pi_orchestrator_spawn",
       "multi_provider_llm",
       "tool_calling",
       "session_tree",
@@ -555,11 +557,14 @@ function buildExternalAdapters(
     ])
   ) {
     adapters.push({
-      id: "agent_harness",
+      id: "pi_harness",
       adapterType: "agent_harness",
       sourcePath,
       boundary: "containerized_process",
       capabilities: [
+        "pi_harness_embedding",
+        "pi_orchestrator_spawn",
+        "pi_rpc_command_execution",
         "multi_provider_llm",
         "tool_calling",
         "agent_loop_state",
@@ -612,7 +617,11 @@ function buildExternalAdapters(
         "pi.orchestrator.rpc",
         "pi.agent_event_stream",
       ],
-      runnerCommands: [],
+      runnerCommands: [
+        "pi orchestrator spawn",
+        "pi rpc",
+        "pi agent events",
+      ],
       providerPackages: [
         "@earendil-works/pi-agent-core",
         "@earendil-works/pi-coding-agent",
@@ -1116,6 +1125,7 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes("list_external_adapter_contracts") &&
       integrationApi.includes("external_adapter_manifest.read") &&
       externalAdapterContracts.includes("browser_qa_harness") &&
+      externalAdapterContracts.includes("pi_harness") &&
       externalAdapterContracts.includes("agent_harness") &&
       externalAdapterContracts.includes("sandboxed_process") &&
       externalAdapterContracts.includes("containerized_process") &&

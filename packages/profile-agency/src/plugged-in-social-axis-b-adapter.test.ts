@@ -890,12 +890,12 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
   it("runs a neutral API smoke eval from intake through external adapter evidence", async () => {
     const snapshot = liveSnapshotFixture();
     const externalAdapter = {
-      id: "agent_harness",
-      name: "External agent harness",
+      id: "pi_harness",
+      name: "Pi harness",
       adapter_type: "agent_harness" as const,
       boundary: "containerized_process" as const,
-      description: "Executes external agent loops against approved task contracts.",
-      capabilities: ["tool_calling"],
+      description: "Executes Pi external agent loops against approved task contracts.",
+      capabilities: ["pi_harness_embedding", "tool_calling"],
       input_contracts: ["virtual_agency_task", "approval_payload_hash"],
       output_artifacts: ["agent_session_tree", "next_action_proposal"],
       required_gates: [
@@ -914,7 +914,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         "pi.orchestrator.rpc",
         "pi.agent_event_stream",
       ],
-      runner_commands: [],
+      runner_commands: ["pi orchestrator spawn", "pi rpc", "pi agent events"],
       provider_packages: ["@earendil-works/pi-agent-core"],
       required_event_types: [
         "agent_start",
@@ -923,7 +923,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         "agent_end",
       ],
       required_result_shape: null,
-      notes: { inspired_by: "pi" },
+      notes: { inspired_by: "pi", aliases: ["agent_harness"] },
     };
     const platformManifest = {
       ...snapshot.platformManifest,
@@ -954,13 +954,13 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
       marketing_run_id: liveRunId,
       virtual_agency_task_id: null,
       artifact_type: "external_adapter_run",
-      title: "External adapter run: agent_harness",
+      title: "External adapter run: pi_harness",
       payload_hash: liveExternalAdapterRunHash,
       version: 1,
       evidence_refs: [],
       lineage: {
         source: "external_adapter",
-        adapter_id: "agent_harness",
+        adapter_id: "pi_harness",
         boundary: "containerized_process",
       },
       author_role: "external_adapter",
@@ -982,18 +982,18 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
         adapter_readiness: {
           ...snapshot.summary.adapter_readiness,
           ready: true,
-          required_adapter_ids: ["agent_harness"],
-          succeeded_adapter_ids: ["agent_harness"],
+          required_adapter_ids: ["pi_harness"],
+          succeeded_adapter_ids: ["pi_harness"],
           missing_adapter_ids: [],
           blocked_adapter_ids: [],
           adapters: [
             {
-              adapter_id: "agent_harness",
+              adapter_id: "pi_harness",
               status: "ready",
               run_status: "succeeded",
               artifact_id: liveExternalAdapterArtifactId,
               artifact_payload_hash: liveExternalAdapterRunHash,
-              adapter_run_id: `axis-b-smoke:${liveRunId}:agent_harness`,
+              adapter_run_id: `axis-b-smoke:${liveRunId}:pi_harness`,
               required_gates: externalAdapter.required_gates,
               missing_or_failed_gates: [],
               required_evidence_fields: externalAdapter.evidence_fields,
@@ -1104,7 +1104,7 @@ describe("PluggedInSocial Axis B next-action adapter", () => {
     });
     expect(calls[4]).toMatchObject({
       body: {
-        adapter_id: "agent_harness",
+        adapter_id: "pi_harness",
         status: "succeeded",
       },
     });

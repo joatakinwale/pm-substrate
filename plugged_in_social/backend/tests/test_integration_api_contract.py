@@ -588,7 +588,7 @@ def test_external_adapter_run_ingest_requires_retry_identity():
     with pytest.raises(ValidationError):
         IntegrationExternalAdapterRunIngest.model_validate(
             {
-                "adapter_id": "agent_harness",
+                "adapter_id": "pi_harness",
                 "status": "succeeded",
                 "gate_results": {},
             }
@@ -596,7 +596,7 @@ def test_external_adapter_run_ingest_requires_retry_identity():
 
     request = IntegrationExternalAdapterRunIngest.model_validate(
         {
-            "adapter_id": "agent_harness",
+            "adapter_id": "pi_harness",
             "adapter_run_id": "external-session-1",
             "status": "succeeded",
             "gate_results": {},
@@ -703,7 +703,7 @@ def _external_adapter_body(**overrides):
     from app.schemas.integration import IntegrationExternalAdapterRunIngest
 
     values = {
-        "adapter_id": "agent_harness",
+        "adapter_id": "pi_harness",
         "adapter_run_id": "agent-session-1",
         "status": "succeeded",
         "gate_results": {
@@ -966,7 +966,7 @@ async def test_external_adapter_run_ingest_is_idempotent_for_matching_payload(
     ]
     assert second.payload["adapter_contract"]["required_result_shape"] is None
     assert len(dispatch_calls) == 1
-    assert dispatch_calls[0]["actor_id"] == "external_adapter:agent_harness"
+    assert dispatch_calls[0]["actor_id"] == "external_adapter:pi_harness"
     assert dispatch_calls[0]["approve_tasks"] is False
 
 
@@ -1134,7 +1134,7 @@ def test_strategy_adapter_readiness_reports_manifest_evidence_gaps():
                     ],
                 },
                 {
-                    "adapter_id": "agent_harness",
+                    "adapter_id": "pi_harness",
                     "required_evidence_fields": [
                         "session_id",
                         "agent_event_hash",
@@ -1153,7 +1153,7 @@ def test_strategy_adapter_readiness_reports_manifest_evidence_gaps():
     )
     complete_agent_run = _adapter_artifact(
         module,
-        adapter_id="agent_harness",
+        adapter_id="pi_harness",
         evidence=dict(AGENT_HARNESS_EVIDENCE),
     )
 
@@ -1164,8 +1164,8 @@ def test_strategy_adapter_readiness_reports_manifest_evidence_gaps():
     assert readiness.strategy_artifact_present is True
     assert readiness.strategy_artifact_id == strategy_artifact.id
     assert readiness.ready is False
-    assert readiness.required_adapter_ids == ["agent_harness", "browser_qa_harness"]
-    assert readiness.succeeded_adapter_ids == ["agent_harness"]
+    assert readiness.required_adapter_ids == ["browser_qa_harness", "pi_harness"]
+    assert readiness.succeeded_adapter_ids == ["pi_harness"]
     assert readiness.missing_adapter_ids == ["browser_qa_harness"]
     assert readiness.blocked_adapter_ids == ["browser_qa_harness"]
 
@@ -1179,7 +1179,7 @@ def test_strategy_adapter_readiness_reports_manifest_evidence_gaps():
     assert "report_html_hash" in browser.missing_evidence_fields
     assert "console_error_count" in browser.missing_evidence_fields
 
-    agent = next(item for item in readiness.adapters if item.adapter_id == "agent_harness")
+    agent = next(item for item in readiness.adapters if item.adapter_id == "pi_harness")
     assert agent.status == "ready"
     assert agent.missing_evidence_fields == []
 
@@ -1193,7 +1193,7 @@ def test_strategy_adapter_readiness_marks_all_adapters_ready_with_full_evidence(
         payload={
             "external_adapter_requirements": [
                 {"adapter_id": "browser_qa_harness"},
-                {"adapter_id": "agent_harness"},
+                {"adapter_id": "pi_harness"},
             ]
         },
         payload_hash="s" * 64,
@@ -1209,7 +1209,7 @@ def test_strategy_adapter_readiness_marks_all_adapters_ready_with_full_evidence(
             ),
             _adapter_artifact(
                 module,
-                adapter_id="agent_harness",
+                adapter_id="pi_harness",
                 evidence=dict(AGENT_HARNESS_EVIDENCE),
             ),
         ]
@@ -1218,7 +1218,7 @@ def test_strategy_adapter_readiness_marks_all_adapters_ready_with_full_evidence(
     assert readiness.ready is True
     assert readiness.missing_adapter_ids == []
     assert readiness.blocked_adapter_ids == []
-    assert readiness.succeeded_adapter_ids == ["agent_harness", "browser_qa_harness"]
+    assert readiness.succeeded_adapter_ids == ["browser_qa_harness", "pi_harness"]
 
 
 def test_platform_manifest_exposes_agents_config_data_and_gates():
@@ -1417,8 +1417,8 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for capability in module._capabilities()
     )
     assert {adapter.id for adapter in manifest.external_adapters} == {
-        "agent_harness",
         "browser_qa_harness",
+        "pi_harness",
     }
     assert {adapter.id for adapter in manifest.external_adapters} == set(
         contracts_by_id
@@ -1437,7 +1437,7 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         assert adapter.required_event_types == list(contract.required_event_types)
         assert adapter.required_result_shape == contract.required_result_shape
     agent_adapter = next(
-        adapter for adapter in manifest.external_adapters if adapter.id == "agent_harness"
+        adapter for adapter in manifest.external_adapters if adapter.id == "pi_harness"
     )
     browser_adapter = next(
         adapter
@@ -1445,11 +1445,14 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         if adapter.id == "browser_qa_harness"
     )
     assert agent_adapter.boundary == "containerized_process"
+    assert "pi_harness_embedding" in agent_adapter.capabilities
+    assert "pi_orchestrator_spawn" in agent_adapter.capabilities
     assert "sandbox_boundary" in agent_adapter.required_gates
     assert "pi_spawn_request" in agent_adapter.input_contracts
     assert "agent_event_stream" in agent_adapter.output_artifacts
     assert "tool_execution_events" in agent_adapter.output_artifacts
     assert "pi.orchestrator.spawn" in agent_adapter.compatible_protocols
+    assert "pi orchestrator spawn" in agent_adapter.runner_commands
     assert agent_adapter.source_url == "https://github.com/earendil-works/pi"
     assert agent_adapter.source_commit == (
         "e285e90fdbf9b05934ce90168156e2aa511d9a7c"
@@ -1458,6 +1461,7 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert "tool_execution_start" in agent_adapter.required_event_types
     assert "agent_event_hash" in agent_adapter.evidence_fields
     assert "tool_call_hash" in agent_adapter.evidence_fields
+    assert "agent_harness" in agent_adapter.notes["aliases"]
     assert browser_adapter.boundary == "sandboxed_process"
     assert "canary_session_start" in browser_adapter.input_contracts
     assert "session_manifest" in browser_adapter.output_artifacts
@@ -1512,6 +1516,7 @@ def test_external_adapter_run_gate_validation_requires_manifest_gates():
 
     adapter = module._external_adapter_by_id("agent_harness")
     assert adapter is not None
+    assert adapter.id == "pi_harness"
 
     missing = module._missing_external_adapter_gates(
         adapter,
