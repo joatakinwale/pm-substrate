@@ -231,18 +231,22 @@ async def ensure_strategy_research_artifact_ready(
             + ", ".join(missing)
         )
 
-    required_adapter_ids = sorted(
-        {
-            adapter_id
-            for artifacts in strategy_artifacts_by_task.values()
-            for adapter_id in strategy_artifact_required_adapter_ids(artifacts)
-        }
-    )
-    if required_adapter_ids:
+    required_adapter_evidence_fields: dict[str, list[str]] = {}
+    for artifacts in strategy_artifacts_by_task.values():
+        for adapter_id, fields in strategy_artifact_required_adapter_evidence_fields(
+            artifacts
+        ).items():
+            required_adapter_evidence_fields.setdefault(adapter_id, [])
+            required_adapter_evidence_fields[adapter_id].extend(fields)
+    required_adapter_evidence_fields = {
+        adapter_id: sorted(set(fields))
+        for adapter_id, fields in sorted(required_adapter_evidence_fields.items())
+    }
+    if required_adapter_evidence_fields:
         await ensure_external_adapter_run_evidence_ready(
             db,
             task=task,
-            adapter_ids=required_adapter_ids,
+            adapter_evidence_fields=required_adapter_evidence_fields,
         )
 
 
@@ -250,16 +254,22 @@ async def ensure_external_adapter_run_evidence_ready(
     db: AsyncSession,
     *,
     task: VirtualAgencyTask,
-    adapter_ids: list[str],
+    adapter_evidence_fields: dict[str, list[str]],
 ) -> None:
     missing = []
-    for adapter_id in adapter_ids:
+    for adapter_id, required_evidence_fields in adapter_evidence_fields.items():
         artifacts = await list_external_adapter_run_artifacts(
             db,
             task=task,
             adapter_id=adapter_id,
         )
-        if not any(external_adapter_run_succeeded(artifact) for artifact in artifacts):
+        if not any(
+            external_adapter_run_satisfies_requirement(
+                artifact,
+                required_evidence_fields=required_evidence_fields,
+            )
+            for artifact in artifacts
+        ):
             missing.append(adapter_id)
     if missing:
         raise DependencyNotSatisfiedError(
@@ -573,7 +583,14 @@ async def list_external_adapter_run_artifacts(
 def strategy_artifact_required_adapter_ids(
     artifacts: Iterable[AgencyArtifact],
 ) -> list[str]:
+    return sorted(strategy_artifact_required_adapter_evidence_fields(artifacts))
+
+
+def strategy_artifact_required_adapter_evidence_fields(
+    artifacts: Iterable[AgencyArtifact],
+) -> dict[str, list[str]]:
     adapter_ids: set[str] = set()
+    evidence_fields: dict[str, set[str]] = {}
     for artifact in artifacts:
         payload = artifact.payload if isinstance(artifact.payload, dict) else {}
         requirements = payload.get("external_adapter_requirements")
@@ -585,7 +602,18 @@ def strategy_artifact_required_adapter_ids(
             adapter_id = requirement.get("adapter_id")
             if isinstance(adapter_id, str) and adapter_id.strip():
                 adapter_ids.add(adapter_id)
-    return sorted(adapter_ids)
+                required_fields = requirement.get("required_evidence_fields")
+                if not isinstance(required_fields, list):
+                    required_fields = []
+                evidence_fields.setdefault(adapter_id, set()).update(
+                    item
+                    for item in required_fields
+                    if isinstance(item, str) and item.strip()
+                )
+    return {
+        adapter_id: sorted(evidence_fields.get(adapter_id, set()))
+        for adapter_id in sorted(adapter_ids)
+    }
 
 
 def artifact_adapter_id(artifact: AgencyArtifact) -> str | None:
@@ -600,6 +628,44 @@ def external_adapter_run_succeeded(artifact: AgencyArtifact) -> bool:
     payload = artifact.payload if isinstance(artifact.payload, dict) else {}
     status = lineage.get("status") or payload.get("status")
     return status == "succeeded"
+
+
+def external_adapter_run_satisfies_requirement(
+    artifact: AgencyArtifact,
+    *,
+    required_evidence_fields: list[str],
+) -> bool:
+    if not external_adapter_run_succeeded(artifact):
+        return False
+    return not missing_external_adapter_run_evidence_fields(
+        artifact,
+        required_evidence_fields=required_evidence_fields,
+    )
+
+
+def missing_external_adapter_run_evidence_fields(
+    artifact: AgencyArtifact,
+    *,
+    required_evidence_fields: list[str],
+) -> list[str]:
+    payload = artifact.payload if isinstance(artifact.payload, dict) else {}
+    evidence = payload.get("evidence")
+    evidence = evidence if isinstance(evidence, dict) else {}
+    return [
+        field
+        for field in required_evidence_fields
+        if not _has_evidence_value(evidence.get(field))
+    ]
+
+
+def _has_evidence_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return len(value) > 0
+    return True
 
 
 def post_has_metric_evidence(post: SocialPost) -> bool:

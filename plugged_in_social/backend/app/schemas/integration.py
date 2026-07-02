@@ -339,6 +339,32 @@ class IntegrationAccessRequestEnvelope(BaseModel):
     links: list[IntegrationLink]
 
 
+class IntegrationAdapterReadinessItem(BaseModel):
+    adapter_id: str = Field(min_length=1)
+    status: Literal["ready", "missing", "incomplete", "failed"]
+    run_status: str | None = None
+    artifact_id: uuid.UUID | None = None
+    artifact_payload_hash: str | None = None
+    adapter_run_id: str | None = None
+    required_gates: list[str] = Field(default_factory=list)
+    missing_or_failed_gates: list[str] = Field(default_factory=list)
+    required_evidence_fields: list[str] = Field(default_factory=list)
+    present_evidence_fields: list[str] = Field(default_factory=list)
+    missing_evidence_fields: list[str] = Field(default_factory=list)
+
+
+class IntegrationStrategyAdapterReadinessEnvelope(BaseModel):
+    strategy_artifact_present: bool = False
+    strategy_artifact_id: uuid.UUID | None = None
+    strategy_artifact_payload_hash: str | None = None
+    ready: bool = False
+    required_adapter_ids: list[str] = Field(default_factory=list)
+    succeeded_adapter_ids: list[str] = Field(default_factory=list)
+    missing_adapter_ids: list[str] = Field(default_factory=list)
+    blocked_adapter_ids: list[str] = Field(default_factory=list)
+    adapters: list[IntegrationAdapterReadinessItem] = Field(default_factory=list)
+
+
 class IntegrationEvidenceSummaryEnvelope(BaseModel):
     resource_type: Literal["marketing_run_evidence_summary"] = (
         "marketing_run_evidence_summary"
@@ -361,6 +387,7 @@ class IntegrationEvidenceSummaryEnvelope(BaseModel):
     social_post_status_counts: dict[str, int] = Field(default_factory=dict)
     report_count: int = 0
     report_status_counts: dict[str, int] = Field(default_factory=dict)
+    adapter_readiness: IntegrationStrategyAdapterReadinessEnvelope
     evidence_hashes: dict[str, list[str]]
     links: list[IntegrationLink]
 

@@ -150,6 +150,25 @@ async def _capture_publish(monkeypatch):
     return sent
 
 
+def _default_adapter_evidence(adapter_id: str) -> dict[str, object]:
+    if adapter_id == "browser_qa_harness":
+        return {
+            "session_id": "browser-session-1",
+            "report_html_hash": "b" * 64,
+            "network_har_hash": "c" * 64,
+            "screenshot_hashes": ["d" * 64],
+        }
+    if adapter_id == "agent_harness":
+        return {
+            "instance_id": "agent-instance-1",
+            "session_id": "agent-session-1",
+            "agent_event_hash": "e" * 64,
+            "tool_call_hash": "f" * 64,
+            "output_payload_hash": "a" * 64,
+        }
+    return {"session_id": f"{adapter_id}-session"}
+
+
 def _add_external_adapter_run_artifact(
     db: _FakeAgencySession,
     *,
@@ -158,6 +177,7 @@ def _add_external_adapter_run_artifact(
     run_id: uuid.UUID,
     adapter_id: str,
     status: str = "succeeded",
+    evidence: dict[str, object] | None = None,
 ) -> AgencyArtifact:
     artifact = AgencyArtifact(
         id=uuid.uuid4(),
@@ -169,7 +189,9 @@ def _add_external_adapter_run_artifact(
         payload={
             "adapter_id": adapter_id,
             "status": status,
-            "evidence": {"session_id": f"{adapter_id}-session"},
+            "evidence": evidence
+            if evidence is not None
+            else _default_adapter_evidence(adapter_id),
         },
         payload_hash=adapter_id.ljust(64, "0")[:64],
         evidence_refs=[],
@@ -593,6 +615,22 @@ async def test_content_generation_waits_for_declared_external_adapter_runs(
 
     assert chief_result["dispatched_dependents"] == 0
     assert [item["message"]["agent_role"] for item in sent] == ["chief_of_staff"]
+
+    _add_external_adapter_run_artifact(
+        db,
+        org_id=org_id,
+        engagement_id=engagement.id,
+        run_id=run.id,
+        adapter_id="browser_qa_harness",
+        evidence={"session_id": "browser-session-missing-report"},
+    )
+    missing_browser_evidence = await approve_and_dispatch_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id="client-1",
+    )
+    assert missing_browser_evidence.dispatched_messages == []
 
     _add_external_adapter_run_artifact(
         db,

@@ -181,6 +181,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
     from app.schemas.integration import (
         IntegrationAcceptedResponse,
         IntegrationAccessRequestEnvelope,
+        IntegrationAdapterReadinessItem,
         IntegrationArtifactEnvelope,
         IntegrationCapabilityResponse,
         IntegrationClientReportEnvelope,
@@ -196,6 +197,7 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationRunEvidenceSnapshotEnvelope,
         IntegrationMarketingRunEnvelope,
         IntegrationSocialPostEnvelope,
+        IntegrationStrategyAdapterReadinessEnvelope,
         IntegrationTaskEnvelope,
     )
 
@@ -213,6 +215,10 @@ def test_integration_schemas_expose_stable_external_envelopes():
     evidence_snapshot_fields = set(
         IntegrationRunEvidenceSnapshotEnvelope.model_fields
     )
+    adapter_readiness_fields = set(
+        IntegrationStrategyAdapterReadinessEnvelope.model_fields
+    )
+    adapter_readiness_item_fields = set(IntegrationAdapterReadinessItem.model_fields)
     event_fields = set(IntegrationEventIngest.model_fields)
     external_adapter_fields = set(IntegrationExternalAdapterManifest.model_fields)
     external_adapter_run_fields = set(
@@ -372,8 +378,33 @@ def test_integration_schemas_expose_stable_external_envelopes():
         "social_post_status_counts",
         "report_count",
         "report_status_counts",
+        "adapter_readiness",
         "evidence_hashes",
     }.issubset(evidence_summary_fields)
+    assert {
+        "strategy_artifact_present",
+        "strategy_artifact_id",
+        "strategy_artifact_payload_hash",
+        "ready",
+        "required_adapter_ids",
+        "succeeded_adapter_ids",
+        "missing_adapter_ids",
+        "blocked_adapter_ids",
+        "adapters",
+    }.issubset(adapter_readiness_fields)
+    assert {
+        "adapter_id",
+        "status",
+        "run_status",
+        "artifact_id",
+        "artifact_payload_hash",
+        "adapter_run_id",
+        "required_gates",
+        "missing_or_failed_gates",
+        "required_evidence_fields",
+        "present_evidence_fields",
+        "missing_evidence_fields",
+    }.issubset(adapter_readiness_item_fields)
     assert {
         "resource_type",
         "run",
@@ -469,6 +500,47 @@ AGENT_HARNESS_EVIDENCE = {
     "approval_payload_hash": "e" * 64,
     "output_payload_hash": "f" * 64,
 }
+
+
+def _adapter_artifact(
+    module,
+    *,
+    adapter_id: str,
+    evidence: dict[str, object],
+    status: str = "succeeded",
+    created_at: datetime | None = None,
+):
+    adapter = module._external_adapter_by_id(adapter_id)
+    assert adapter is not None
+    run_id = f"{adapter_id}-run-1"
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        artifact_type="external_adapter_run",
+        payload={
+            "adapter_id": adapter_id,
+            "adapter_run_id": run_id,
+            "status": status,
+            "gate_results": {gate: True for gate in adapter.required_gates},
+            "evidence": evidence,
+        },
+        lineage={
+            "adapter_id": adapter_id,
+            "adapter_run_id": run_id,
+            "status": status,
+        },
+        payload_hash=adapter_id.ljust(64, "0")[:64],
+        created_at=created_at or datetime.now(timezone.utc),
+    )
+
+
+def _browser_harness_evidence(module) -> dict[str, object]:
+    adapter = module._external_adapter_by_id("browser_qa_harness")
+    assert adapter is not None
+    evidence = {field: f"{field}-value" for field in adapter.evidence_fields}
+    evidence["run_count"] = 1
+    evidence["console_error_count"] = 0
+    evidence["screenshot_hashes"] = ["d" * 64]
+    return evidence
 
 
 def _external_adapter_body(**overrides):
@@ -724,6 +796,110 @@ async def test_external_adapter_run_ingest_allows_partial_without_full_evidence(
 
     assert result.payload["status"] == "partial"
     assert len(db.artifacts) == 1
+
+
+def test_strategy_adapter_readiness_reports_manifest_evidence_gaps():
+    import app.api.integration as module
+
+    strategy_artifact = SimpleNamespace(
+        id=uuid.uuid4(),
+        artifact_type="strategy_research_brief",
+        payload={
+            "external_adapter_requirements": [
+                {
+                    "adapter_id": "browser_qa_harness",
+                    "required_evidence_fields": [
+                        "session_id",
+                        "report_html_hash",
+                        "network_har_hash",
+                    ],
+                },
+                {
+                    "adapter_id": "agent_harness",
+                    "required_evidence_fields": [
+                        "session_id",
+                        "agent_event_hash",
+                        "output_payload_hash",
+                    ],
+                },
+            ]
+        },
+        payload_hash="s" * 64,
+        created_at=datetime.now(timezone.utc),
+    )
+    partial_browser_run = _adapter_artifact(
+        module,
+        adapter_id="browser_qa_harness",
+        evidence={"session_id": "browser-session-1"},
+    )
+    complete_agent_run = _adapter_artifact(
+        module,
+        adapter_id="agent_harness",
+        evidence=dict(AGENT_HARNESS_EVIDENCE),
+    )
+
+    readiness = module._build_strategy_adapter_readiness(
+        [strategy_artifact, partial_browser_run, complete_agent_run]
+    )
+
+    assert readiness.strategy_artifact_present is True
+    assert readiness.strategy_artifact_id == strategy_artifact.id
+    assert readiness.ready is False
+    assert readiness.required_adapter_ids == ["agent_harness", "browser_qa_harness"]
+    assert readiness.succeeded_adapter_ids == ["agent_harness"]
+    assert readiness.missing_adapter_ids == ["browser_qa_harness"]
+    assert readiness.blocked_adapter_ids == ["browser_qa_harness"]
+
+    browser = next(
+        item for item in readiness.adapters if item.adapter_id == "browser_qa_harness"
+    )
+    assert browser.status == "incomplete"
+    assert browser.run_status == "succeeded"
+    assert browser.missing_or_failed_gates == []
+    assert "session_id" in browser.present_evidence_fields
+    assert "report_html_hash" in browser.missing_evidence_fields
+    assert "console_error_count" in browser.missing_evidence_fields
+
+    agent = next(item for item in readiness.adapters if item.adapter_id == "agent_harness")
+    assert agent.status == "ready"
+    assert agent.missing_evidence_fields == []
+
+
+def test_strategy_adapter_readiness_marks_all_adapters_ready_with_full_evidence():
+    import app.api.integration as module
+
+    strategy_artifact = SimpleNamespace(
+        id=uuid.uuid4(),
+        artifact_type="strategy_research_brief",
+        payload={
+            "external_adapter_requirements": [
+                {"adapter_id": "browser_qa_harness"},
+                {"adapter_id": "agent_harness"},
+            ]
+        },
+        payload_hash="s" * 64,
+        created_at=datetime.now(timezone.utc),
+    )
+    readiness = module._build_strategy_adapter_readiness(
+        [
+            strategy_artifact,
+            _adapter_artifact(
+                module,
+                adapter_id="browser_qa_harness",
+                evidence=_browser_harness_evidence(module),
+            ),
+            _adapter_artifact(
+                module,
+                adapter_id="agent_harness",
+                evidence=dict(AGENT_HARNESS_EVIDENCE),
+            ),
+        ]
+    )
+
+    assert readiness.ready is True
+    assert readiness.missing_adapter_ids == []
+    assert readiness.blocked_adapter_ids == []
+    assert readiness.succeeded_adapter_ids == ["agent_harness", "browser_qa_harness"]
 
 
 def test_platform_manifest_exposes_agents_config_data_and_gates():

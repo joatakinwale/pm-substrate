@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections import Counter
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -26,6 +27,7 @@ from app.schemas.integration import (
     IntegrationAcceptedResponse,
     IntegrationAccessDecision,
     IntegrationAccessRequestEnvelope,
+    IntegrationAdapterReadinessItem,
     IntegrationApprovalDecision,
     IntegrationApprovalEnvelope,
     IntegrationArtifactEnvelope,
@@ -51,6 +53,7 @@ from app.schemas.integration import (
     IntegrationRunEventEnvelope,
     IntegrationRunEvidenceSnapshotEnvelope,
     IntegrationSocialPostEnvelope,
+    IntegrationStrategyAdapterReadinessEnvelope,
     IntegrationTaskEnvelope,
     IntegrationWebhookIngest,
 )
@@ -645,6 +648,241 @@ async def _list_run_reports(
     return list(result.scalars().all())
 
 
+def _artifact_sort_key(item: AgencyArtifact) -> tuple[datetime, str]:
+    created_at = getattr(item, "created_at", None)
+    if not isinstance(created_at, datetime):
+        created_at = datetime.min.replace(tzinfo=timezone.utc)
+    return (created_at, str(getattr(item, "id", "")))
+
+
+def _artifact_payload(item: AgencyArtifact | None) -> dict[str, Any]:
+    payload = getattr(item, "payload", None)
+    return dict(payload) if isinstance(payload, dict) else {}
+
+
+def _artifact_lineage(item: AgencyArtifact | None) -> dict[str, Any]:
+    lineage = getattr(item, "lineage", None)
+    return dict(lineage) if isinstance(lineage, dict) else {}
+
+
+def _string_value(value: Any) -> str | None:
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str) and item.strip()]
+
+
+def _ordered_unique(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    values: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        values.append(item)
+    return values
+
+
+def _latest_artifact_of_type(
+    artifacts: list[AgencyArtifact],
+    artifact_type: str,
+) -> AgencyArtifact | None:
+    matching = [item for item in artifacts if item.artifact_type == artifact_type]
+    if not matching:
+        return None
+    return max(matching, key=_artifact_sort_key)
+
+
+def _strategy_adapter_requirement_fields(
+    strategy_artifact: AgencyArtifact | None,
+) -> dict[str, list[str]]:
+    if strategy_artifact is None:
+        return {}
+    requirements = _artifact_payload(strategy_artifact).get(
+        "external_adapter_requirements"
+    )
+    if not isinstance(requirements, list):
+        return {}
+
+    fields_by_adapter: dict[str, list[str]] = {}
+    for requirement in requirements:
+        if not isinstance(requirement, dict):
+            continue
+        adapter_id = _string_value(requirement.get("adapter_id"))
+        if adapter_id is None:
+            continue
+        fields_by_adapter.setdefault(adapter_id, [])
+        fields_by_adapter[adapter_id].extend(
+            _string_list(requirement.get("required_evidence_fields"))
+        )
+    return {
+        adapter_id: _ordered_unique(fields)
+        for adapter_id, fields in sorted(fields_by_adapter.items())
+    }
+
+
+def _adapter_id_from_artifact(artifact: AgencyArtifact) -> str | None:
+    lineage = _artifact_lineage(artifact)
+    payload = _artifact_payload(artifact)
+    return _string_value(lineage.get("adapter_id")) or _string_value(
+        payload.get("adapter_id")
+    )
+
+
+def _adapter_run_status_from_artifact(artifact: AgencyArtifact) -> str | None:
+    lineage = _artifact_lineage(artifact)
+    payload = _artifact_payload(artifact)
+    return _string_value(lineage.get("status")) or _string_value(payload.get("status"))
+
+
+def _adapter_run_id_from_artifact(artifact: AgencyArtifact) -> str | None:
+    lineage = _artifact_lineage(artifact)
+    payload = _artifact_payload(artifact)
+    return _string_value(lineage.get("adapter_run_id")) or _string_value(
+        payload.get("adapter_run_id")
+    )
+
+
+def _adapter_readiness_item(
+    *,
+    adapter_id: str,
+    artifact: AgencyArtifact | None,
+    required_evidence_fields: list[str],
+    required_gates: list[str],
+) -> IntegrationAdapterReadinessItem:
+    if artifact is None:
+        return IntegrationAdapterReadinessItem(
+            adapter_id=adapter_id,
+            status="missing",
+            required_gates=required_gates,
+            missing_or_failed_gates=required_gates,
+            required_evidence_fields=required_evidence_fields,
+            missing_evidence_fields=required_evidence_fields,
+        )
+
+    payload = _artifact_payload(artifact)
+    evidence = payload.get("evidence")
+    evidence = evidence if isinstance(evidence, dict) else {}
+    gate_results = payload.get("gate_results")
+    gate_results = gate_results if isinstance(gate_results, dict) else {}
+    present_evidence_fields = [
+        field for field in required_evidence_fields if _has_evidence_value(evidence, field)
+    ]
+    missing_evidence_fields = [
+        field
+        for field in required_evidence_fields
+        if field not in present_evidence_fields
+    ]
+    missing_or_failed_gates = [
+        gate for gate in required_gates if gate_results.get(gate) is not True
+    ]
+    run_status = _adapter_run_status_from_artifact(artifact)
+
+    if run_status != "succeeded":
+        readiness_status = "failed" if run_status == "failed" else "incomplete"
+    elif missing_evidence_fields or missing_or_failed_gates:
+        readiness_status = "incomplete"
+    else:
+        readiness_status = "ready"
+
+    return IntegrationAdapterReadinessItem(
+        adapter_id=adapter_id,
+        status=readiness_status,
+        run_status=run_status,
+        artifact_id=artifact.id,
+        artifact_payload_hash=artifact.payload_hash,
+        adapter_run_id=_adapter_run_id_from_artifact(artifact),
+        required_gates=required_gates,
+        missing_or_failed_gates=missing_or_failed_gates,
+        required_evidence_fields=required_evidence_fields,
+        present_evidence_fields=present_evidence_fields,
+        missing_evidence_fields=missing_evidence_fields,
+    )
+
+
+def _build_strategy_adapter_readiness(
+    artifacts: list[AgencyArtifact],
+) -> IntegrationStrategyAdapterReadinessEnvelope:
+    strategy_artifact = _latest_artifact_of_type(artifacts, "strategy_research_brief")
+    requirement_fields = _strategy_adapter_requirement_fields(strategy_artifact)
+    required_adapter_ids = sorted(requirement_fields)
+    adapter_run_artifacts = [
+        item for item in artifacts if item.artifact_type == "external_adapter_run"
+    ]
+
+    readiness_items: list[IntegrationAdapterReadinessItem] = []
+    for adapter_id in required_adapter_ids:
+        manifest = _external_adapter_by_id(adapter_id)
+        required_evidence_fields = _ordered_unique(
+            list(manifest.evidence_fields if manifest is not None else [])
+            + requirement_fields.get(adapter_id, [])
+        )
+        required_gates = list(manifest.required_gates if manifest is not None else [])
+        candidates = [
+            item
+            for item in adapter_run_artifacts
+            if _adapter_id_from_artifact(item) == adapter_id
+        ]
+        candidates = sorted(candidates, key=_artifact_sort_key, reverse=True)
+        candidate_items = [
+            _adapter_readiness_item(
+                adapter_id=adapter_id,
+                artifact=item,
+                required_evidence_fields=required_evidence_fields,
+                required_gates=required_gates,
+            )
+            for item in candidates
+        ]
+        ready_candidate = next(
+            (item for item in candidate_items if item.status == "ready"),
+            None,
+        )
+        readiness_items.append(
+            ready_candidate
+            or (
+                candidate_items[0]
+                if candidate_items
+                else _adapter_readiness_item(
+                    adapter_id=adapter_id,
+                    artifact=None,
+                    required_evidence_fields=required_evidence_fields,
+                    required_gates=required_gates,
+                )
+            )
+        )
+
+    succeeded_adapter_ids = sorted(
+        item.adapter_id for item in readiness_items if item.status == "ready"
+    )
+    missing_adapter_ids = sorted(
+        item.adapter_id for item in readiness_items if item.status != "ready"
+    )
+    blocked_adapter_ids = sorted(
+        item.adapter_id
+        for item in readiness_items
+        if item.status in {"failed", "incomplete"}
+    )
+
+    return IntegrationStrategyAdapterReadinessEnvelope(
+        strategy_artifact_present=strategy_artifact is not None,
+        strategy_artifact_id=getattr(strategy_artifact, "id", None),
+        strategy_artifact_payload_hash=getattr(
+            strategy_artifact,
+            "payload_hash",
+            None,
+        ),
+        ready=strategy_artifact is not None and not missing_adapter_ids,
+        required_adapter_ids=required_adapter_ids,
+        succeeded_adapter_ids=succeeded_adapter_ids,
+        missing_adapter_ids=missing_adapter_ids,
+        blocked_adapter_ids=blocked_adapter_ids,
+        adapters=readiness_items,
+    )
+
+
 async def _build_run_evidence_snapshot_rows(
     db: AsyncSession,
     *,
@@ -702,6 +940,7 @@ async def _build_run_evidence_snapshot_rows(
         social_post_status_counts=_count_by(social_posts, "status"),
         report_count=len(reports),
         report_status_counts=_count_by(reports, "status"),
+        adapter_readiness=_build_strategy_adapter_readiness(artifacts),
         evidence_hashes={
             "artifact_payload_hashes": sorted(
                 {item.payload_hash for item in artifacts if item.payload_hash}

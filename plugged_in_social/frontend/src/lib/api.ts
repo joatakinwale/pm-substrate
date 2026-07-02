@@ -946,8 +946,35 @@ export interface IntegrationEvidenceSummary {
   social_post_status_counts: Record<string, number>;
   report_count: number;
   report_status_counts: Record<string, number>;
+  adapter_readiness: IntegrationStrategyAdapterReadiness;
   evidence_hashes: Record<string, string[]>;
   links: Array<{ rel: string; href: string }>;
+}
+
+export interface IntegrationAdapterReadinessItem {
+  adapter_id: string;
+  status: "ready" | "missing" | "incomplete" | "failed";
+  run_status: string | null;
+  artifact_id: string | null;
+  artifact_payload_hash: string | null;
+  adapter_run_id: string | null;
+  required_gates: string[];
+  missing_or_failed_gates: string[];
+  required_evidence_fields: string[];
+  present_evidence_fields: string[];
+  missing_evidence_fields: string[];
+}
+
+export interface IntegrationStrategyAdapterReadiness {
+  strategy_artifact_present: boolean;
+  strategy_artifact_id: string | null;
+  strategy_artifact_payload_hash: string | null;
+  ready: boolean;
+  required_adapter_ids: string[];
+  succeeded_adapter_ids: string[];
+  missing_adapter_ids: string[];
+  blocked_adapter_ids: string[];
+  adapters: IntegrationAdapterReadinessItem[];
 }
 
 export interface IntegrationSocialPost {

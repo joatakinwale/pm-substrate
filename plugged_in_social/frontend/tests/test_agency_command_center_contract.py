@@ -17,6 +17,8 @@ def test_agency_api_types_and_helpers_are_declared():
     assert "export interface IntegrationTask" in source
     assert "export interface IntegrationClientReport" in source
     assert "export interface IntegrationRunEvidenceSnapshot" in source
+    assert "export interface IntegrationStrategyAdapterReadiness" in source
+    assert "adapter_readiness: IntegrationStrategyAdapterReadiness" in source
     assert "export interface IntegrationExternalAdapter" in source
     assert "export async function listClientEngagements" in source
     assert "export async function createClientEngagement" in source
@@ -69,6 +71,8 @@ def test_agency_command_center_route_exposes_autonomous_run_monitor():
     assert "Adapter Evidence" in source
     assert "External Adapter Boundary" in source
     assert "Strategy Research Evidence" in source
+    assert "adapter_readiness" in source
+    assert "missing_evidence_fields" in source
     assert "Agent Task Queue" in source
     assert "CLOSED_LOOP_STAGES" in source
     assert "next_action" in source

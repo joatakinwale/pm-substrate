@@ -19,6 +19,7 @@ import {
   type AgencyApprovalRequest,
   type AgencyArtifact,
   type ClientEngagement,
+  type IntegrationAdapterReadinessItem,
   type IntegrationClientReport,
   type IntegrationEvidenceSummary,
   type IntegrationExternalAdapter,
@@ -54,6 +55,9 @@ const STATUS_COLORS: Record<string, string> = {
   revoked: "bg-gray-100 text-gray-600",
   requested: "bg-yellow-50 text-yellow-700",
   granted: "bg-stevie-green/10 text-stevie-green",
+  ready: "bg-stevie-green/10 text-stevie-green",
+  missing: "bg-yellow-50 text-yellow-700",
+  incomplete: "bg-stevie-orange/10 text-stevie-orange",
   succeeded: "bg-stevie-green/10 text-stevie-green",
   failed: "bg-red-50 text-red-700",
   partial: "bg-yellow-50 text-yellow-700",
@@ -83,6 +87,14 @@ const STAGE_LABELS: Record<(typeof CLOSED_LOOP_STAGES)[number], string> = {
   metrics: "Metrics",
   report: "Report",
   next_action: "Next Action",
+};
+
+type StrategyAdapterGate = {
+  requiredIds: string[];
+  succeededIds: Set<string>;
+  missingIds: string[];
+  blockedIds: string[];
+  itemsById: Map<string, IntegrationAdapterReadinessItem>;
 };
 
 const MONITOR_STATUS_CLASSES: Record<string, string> = {
@@ -359,7 +371,20 @@ export default function AgencyCommandCenterPage() {
       ),
     };
   }, [artifacts]);
-  const strategyAdapterGate = useMemo(() => {
+  const strategyAdapterGate = useMemo<StrategyAdapterGate>(() => {
+    const readiness = evidenceSummary?.adapter_readiness;
+    if (readiness) {
+      return {
+        requiredIds: readiness.required_adapter_ids,
+        succeededIds: new Set(readiness.succeeded_adapter_ids),
+        missingIds: readiness.missing_adapter_ids,
+        blockedIds: readiness.blocked_adapter_ids,
+        itemsById: new Map(
+          readiness.adapters.map((item) => [item.adapter_id, item])
+        ),
+      };
+    }
+
     const requiredIds = Array.from(
       new Set(
         strategyResearchEvidence.adapterRequirements
@@ -375,8 +400,18 @@ export default function AgencyCommandCenterPage() {
     );
     const missingIds = requiredIds.filter((adapterId) => !succeededIds.has(adapterId));
 
-    return { requiredIds, succeededIds, missingIds };
-  }, [externalAdapterRuns, strategyResearchEvidence.adapterRequirements]);
+    return {
+      requiredIds,
+      succeededIds,
+      missingIds,
+      blockedIds: missingIds,
+      itemsById: new Map<string, IntegrationAdapterReadinessItem>(),
+    };
+  }, [
+    evidenceSummary?.adapter_readiness,
+    externalAdapterRuns,
+    strategyResearchEvidence.adapterRequirements,
+  ]);
   const recentRunEvents = useMemo(
     () => runEvents.slice(-8).reverse(),
     [runEvents]
@@ -1590,16 +1625,26 @@ export default function AgencyCommandCenterPage() {
                                 const adapterId =
                                   stringValue(requirement.adapter_id) ||
                                   `adapter_${index + 1}`;
-                                const evidenceFields = stringArrayValue(
-                                  requirement.required_evidence_fields
-                                );
+                                const readiness =
+                                  strategyAdapterGate.itemsById.get(adapterId);
+                                const evidenceFields =
+                                  readiness?.required_evidence_fields.length
+                                    ? readiness.required_evidence_fields
+                                    : stringArrayValue(
+                                        requirement.required_evidence_fields
+                                      );
                                 const outputArtifacts = stringArrayValue(
                                   requirement.expected_output_artifacts
                                 );
                                 const adapterStatus =
-                                  strategyAdapterGate.succeededIds.has(adapterId)
+                                  readiness?.status === "ready"
                                     ? "succeeded"
-                                    : "missing";
+                                    : readiness?.status ||
+                                      (strategyAdapterGate.succeededIds.has(adapterId)
+                                        ? "succeeded"
+                                        : "missing");
+                                const missingEvidenceFields =
+                                  readiness?.missing_evidence_fields || [];
 
                                 return (
                                   <div
@@ -1623,7 +1668,9 @@ export default function AgencyCommandCenterPage() {
                                           {adapterStatus}
                                         </span>
                                         <span className="text-[11px] text-muted-foreground">
-                                          {outputArtifacts.length} outputs
+                                          {missingEvidenceFields.length > 0
+                                            ? `${missingEvidenceFields.length} missing`
+                                            : `${outputArtifacts.length} outputs`}
                                         </span>
                                       </div>
                                     </div>
