@@ -228,6 +228,82 @@ export async function writeArrowHedgePairedBundleFromIntegration(
   };
 }
 
+export async function writeArrowHedgePairedBundleBatchFromIntegration(
+  input: WriteArrowHedgePairedBundleBatchFromIntegrationInput,
+): Promise<WriteArrowHedgePairedBundleBatchFromIntegrationResult> {
+  const plan = readBatchPlan(input.planPath);
+  const bundles: ArrowHedgePairedExperimentBundle[] = [];
+  const bundleDirs: string[] = [];
+  for (const experiment of plan.experiments) {
+    const outputDir = join(input.outputDir, sanitizePathSegment(experiment.experimentId));
+    const result = await buildArrowHedgePairedExperimentBundleFromIntegrationRuns({
+      experimentId: experiment.experimentId,
+      integrationBaseUrl: plan.integrationBaseUrl,
+      ...(input.bearerToken ?? plan.bearerToken === undefined
+        ? {}
+        : { bearerToken: input.bearerToken ?? plan.bearerToken }),
+      ...(input.fetchFn === undefined ? {} : { fetchFn: input.fetchFn }),
+      ...(experiment.generatedAt ?? plan.generatedAt === undefined
+        ? {}
+        : { generatedAt: experiment.generatedAt ?? plan.generatedAt }),
+      baseline: {
+        runId: experiment.baseline.runId,
+        ...(experiment.baseline.flowId === undefined
+          ? {}
+          : { flowId: experiment.baseline.flowId }),
+        ...(experiment.baseline.backtestRunId === undefined
+          ? {}
+          : { backtestRunId: experiment.baseline.backtestRunId }),
+        ...(experiment.baseline.mode === undefined
+          ? {}
+          : { substrateMode: experiment.baseline.mode }),
+        ...(experiment.baseline.metrics === undefined
+          ? {}
+          : { metrics: experiment.baseline.metrics }),
+      },
+      substrate: {
+        runId: experiment.substrate.runId,
+        ...(experiment.substrate.flowId === undefined
+          ? {}
+          : { flowId: experiment.substrate.flowId }),
+        ...(experiment.substrate.backtestRunId === undefined
+          ? {}
+          : { backtestRunId: experiment.substrate.backtestRunId }),
+        ...(experiment.substrate.mode === undefined
+          ? {}
+          : { substrateMode: experiment.substrate.mode }),
+        ...(experiment.substrate.metrics === undefined
+          ? {}
+          : { metrics: experiment.substrate.metrics }),
+      },
+    });
+    if (!result.bundle || !result.verification?.valid) {
+      throw new Error(
+        `batch experiment ${experiment.experimentId} failed: ${result.issues.join("; ")}`,
+      );
+    }
+    writePairedBundleArtifacts(outputDir, result.bundle);
+    bundles.push(result.bundle);
+    bundleDirs.push(outputDir);
+  }
+
+  const report = buildArrowHedgePairedExperimentBatchReport({
+    bundles,
+    generatedAt: plan.generatedAt,
+  });
+  mkdirSync(input.outputDir, { recursive: true });
+  const batchReport = join(input.outputDir, "batch-report.json");
+  writeJsonFile(batchReport, report);
+  return {
+    report,
+    bundles,
+    outputPaths: {
+      batchReport,
+      bundleDirs,
+    },
+  };
+}
+
 export function verifyArrowHedgePairedBundleDirectory(input: {
   readonly bundleDir: string;
 }): VerifyArrowHedgePairedBundleDirectoryResult {
