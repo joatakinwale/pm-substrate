@@ -10,7 +10,7 @@ the active ArrowHedgeLab tree. Use
 `docs/arrowhedgelab-upstream-integration-review-2026-07-01.md` as the current
 review and adapter contract.
 
-Scope: `arrowhedgelab` after cleanup. The active tree now contains the upstream-style ArrowHedgeLab app, CLI, tests, v2 research modules, and the local `src/substrate` bridge. The separate `ArrowDexter-main` repo was moved to `trash/arrowhedgelab-cleanup-20260701-092540` because it is not part of the latest upstream `virattt/ai-hedge-fund` tree and ArrowHedgeLab source/app/tests/v2 do not reference it.
+Historical scope: the pre-reset `arrowhedgelab` tree after cleanup. The active tree now follows the fresh upstream-style ArrowHedgeLab app plus the neutral `/integration/v1/*` adapter work described in `docs/arrowhedgelab-upstream-integration-review-2026-07-01.md`; the old local `src/substrate` bridge evidence below should be read as historical context only. The separate `ArrowDexter-main` repo was moved to `trash/arrowhedgelab-cleanup-20260701-092540` because it is not part of the latest upstream `virattt/ai-hedge-fund` tree and ArrowHedgeLab source/app/tests/v2 do not reference it.
 
 ## Executive Evaluation
 

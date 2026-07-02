@@ -3,6 +3,7 @@ import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
 import { tenantId, timestamp } from "@pm/types";
 
 import {
+  buildArrowHedgePairedExperimentBundle,
   buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
   compareArrowHedgeIntegrationRunEnvelopePair,
   fetchArrowHedgeIntegrationSnapshot,
@@ -706,6 +707,97 @@ describe("ArrowHedge integration API client", () => {
         sourceDataEqual: true,
       },
     });
+    const pairedBundle = buildArrowHedgePairedExperimentBundle({
+      experimentId: "exp_arrowhedge_aapl_001",
+      generatedAt: "2024-01-02T16:01:00.000Z",
+      baseline: {
+        envelope: baselineEnvelope,
+        metrics: {
+          startingEquity: 100000,
+          endingEquity: 101000,
+          realizedPnl: 1000,
+          returnPct: 0.01,
+          falsePositiveBlockCount: 0,
+          falseNegativeBlockCount: 0,
+        },
+      },
+      substrate: {
+        envelope: envelopeResult.envelope!,
+        metrics: {
+          startingEquity: 100000,
+          endingEquity: 102500,
+          realizedPnl: 2500,
+          returnPct: 0.025,
+          blockedDecisionCount: 1,
+          staleBlockCount: 1,
+          falsePositiveBlockCount: 0,
+          falseNegativeBlockCount: 0,
+          rawDecisionSha256: "ed".repeat(32),
+          blockedEventIds: ["flow-run-11-2-flow_run.results_recorded"],
+        },
+      },
+    });
+    expect(pairedBundle.schemaVersion).toBe(
+      "arrowhedge.paired-experiment-bundle.v1",
+    );
+    expect(pairedBundle.manifest).toMatchObject({
+      schemaVersion: "arrowhedge.paired-experiment-manifest.v1",
+      experimentId: "exp_arrowhedge_aapl_001",
+      generatedAt: "2024-01-02T16:01:00.000Z",
+      ready: true,
+      marketWinClaimAllowed: true,
+      baselineRunId: "11",
+      substrateRunId: "11",
+    });
+    expect(pairedBundle.manifest.baselineEnvelopeSha256).toHaveLength(64);
+    expect(pairedBundle.manifest.substrateEnvelopeSha256).toHaveLength(64);
+    expect(pairedBundle.manifest.reportSha256).toHaveLength(64);
+    expect(pairedBundle.manifest.artifacts).toEqual([
+      {
+        name: "baseline-envelope.json",
+        sha256: pairedBundle.manifest.baselineEnvelopeSha256,
+        mediaType: "application/json",
+      },
+      {
+        name: "substrate-envelope.json",
+        sha256: pairedBundle.manifest.substrateEnvelopeSha256,
+        mediaType: "application/json",
+      },
+      {
+        name: "paired-report.json",
+        sha256: pairedBundle.manifest.reportSha256,
+        mediaType: "application/json",
+      },
+    ]);
+    expect(pairedBundle.report).toMatchObject({
+      schemaVersion: "arrowhedge.paired-experiment-report.v1",
+      ready: true,
+      marketWinClaimAllowed: true,
+      claimIssues: [],
+      market: {
+        metricsAvailable: true,
+        deltas: {
+          endingEquity: 1500,
+          realizedPnl: 1500,
+          returnPct: 0.015,
+        },
+        substrateOutperformed: true,
+      },
+      governance: {
+        deltas: {
+          acceptedDecisionCount: 0,
+          blockedDecisionCount: 1,
+          staleBlockCount: 1,
+          invalidActionBlockCount: 0,
+        },
+        gates: {
+          falsePositiveBlocksZero: true,
+          falseNegativeBlocksZero: true,
+          falsePositiveEvidencePresent: true,
+          falseNegativeEvidencePresent: true,
+        },
+      },
+    });
 
     const mismatchedGate = compareArrowHedgeIntegrationRunEnvelopePair({
       baseline: baselineEnvelope,
@@ -727,6 +819,65 @@ describe("ArrowHedge integration API client", () => {
       expect.arrayContaining([
         "modelConfig hash mismatch",
         "sourceData hash mismatch",
+      ]),
+    );
+    const rejectedBundle = buildArrowHedgePairedExperimentBundle({
+      experimentId: "exp_arrowhedge_aapl_rejected",
+      generatedAt: "2024-01-02T16:02:00.000Z",
+      baseline: {
+        envelope: baselineEnvelope,
+        metrics: {
+          endingEquity: 101000,
+          realizedPnl: 1000,
+          returnPct: 0.01,
+        },
+      },
+      substrate: {
+        envelope: {
+          ...envelopeResult.envelope!,
+          modelConfig: {
+            ...envelopeResult.envelope!.modelConfig,
+            defaults: { model_name: "gpt-4o", provider: "OpenAI" },
+          },
+          evidence: envelopeResult.envelope!.evidence.map((item) =>
+            item.id === "ev_source_prices_AAPL_2024-01-01_2024-01-02"
+              ? { ...item, sha256: "9".repeat(64) }
+              : item,
+          ),
+        },
+        metrics: {
+          endingEquity: 100500,
+          realizedPnl: 500,
+          returnPct: 0.005,
+          falsePositiveBlockCount: 1,
+        },
+      },
+    });
+    expect(rejectedBundle.report.ready).toBe(false);
+    expect(rejectedBundle.report.marketWinClaimAllowed).toBe(false);
+    expect(rejectedBundle.report.market).toMatchObject({
+      metricsAvailable: true,
+      deltas: {
+        endingEquity: -500,
+        realizedPnl: -500,
+        returnPct: -0.005,
+      },
+      substrateOutperformed: false,
+    });
+    expect(rejectedBundle.report.governance.gates).toMatchObject({
+      falsePositiveBlocksZero: false,
+      falseNegativeBlocksZero: false,
+      falsePositiveEvidencePresent: true,
+      falseNegativeEvidencePresent: false,
+    });
+    expect(rejectedBundle.report.claimIssues).toEqual(
+      expect.arrayContaining([
+        "readiness: modelConfig hash mismatch",
+        "readiness: sourceData hash mismatch",
+        "substrate arm did not outperform baseline on supplied market metrics",
+        "substrate false-negative block count is required",
+        "substrate false-positive blocks must be zero",
+        "substrate false-negative blocks must be zero",
       ]),
     );
   });

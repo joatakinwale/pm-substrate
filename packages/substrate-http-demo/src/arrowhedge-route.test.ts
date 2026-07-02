@@ -283,6 +283,131 @@ describe("ArrowHedge run-envelope HTTP route contract", () => {
     });
   });
 
+  it("POST /experiments/paired-bundles returns market and governance gates", async () => {
+    const app = pairedReadinessApp();
+    const baseline = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "observe",
+    };
+    const substrate = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "blocking",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-bundles", {
+        method: "POST",
+        body: JSON.stringify({
+          experimentId: "exp_http_arrowhedge_001",
+          generatedAt: "2026-06-03T14:05:00.000Z",
+          baseline,
+          substrate,
+          baselineMetrics: {
+            endingEquity: 1000000,
+            realizedPnl: 0,
+            returnPct: 0,
+            falsePositiveBlockCount: 0,
+            falseNegativeBlockCount: 0,
+          },
+          substrateMetrics: {
+            endingEquity: 1002500,
+            realizedPnl: 2500,
+            returnPct: 0.0025,
+            blockedDecisionCount: 1,
+            staleBlockCount: 1,
+            falsePositiveBlockCount: 0,
+            falseNegativeBlockCount: 0,
+            blockedEventIds: ["evt_block_stale_decision"],
+          },
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      schemaVersion: string;
+      manifest: {
+        ready: boolean;
+        marketWinClaimAllowed: boolean;
+        baselineEnvelopeSha256: string;
+        substrateEnvelopeSha256: string;
+        reportSha256: string;
+      };
+      report: {
+        marketWinClaimAllowed: boolean;
+        claimIssues: readonly string[];
+        market: {
+          deltas: {
+            endingEquity: number;
+            realizedPnl: number;
+            returnPct: number;
+          };
+        };
+        governance: {
+          gates: {
+            falsePositiveBlocksZero: boolean;
+            falseNegativeBlocksZero: boolean;
+          };
+        };
+      };
+    };
+    expect(body.schemaVersion).toBe("arrowhedge.paired-experiment-bundle.v1");
+    expect(body.manifest.ready).toBe(true);
+    expect(body.manifest.marketWinClaimAllowed).toBe(true);
+    expect(body.manifest.baselineEnvelopeSha256).toHaveLength(64);
+    expect(body.manifest.substrateEnvelopeSha256).toHaveLength(64);
+    expect(body.manifest.reportSha256).toHaveLength(64);
+    expect(body.report.marketWinClaimAllowed).toBe(true);
+    expect(body.report.claimIssues).toEqual([]);
+    expect(body.report.market.deltas).toEqual({
+      endingEquity: 2500,
+      realizedPnl: 2500,
+      returnPct: 0.0025,
+    });
+    expect(body.report.governance.gates).toMatchObject({
+      falsePositiveBlocksZero: true,
+      falseNegativeBlocksZero: true,
+    });
+  });
+
+  it("POST /experiments/paired-bundles rejects malformed metric evidence", async () => {
+    const app = pairedReadinessApp();
+    const baseline = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "observe",
+    };
+    const substrate = {
+      ...cloneJson(runEnvelope),
+      substrateMode: "blocking",
+    };
+
+    const response = await app.fetch(
+      new Request("http://test/tenants/tnt_arrowhedge_http/arrowhedge/experiments/paired-bundles", {
+        method: "POST",
+        body: JSON.stringify({
+          experimentId: "exp_http_arrowhedge_bad_metrics",
+          baseline,
+          substrate,
+          substrateMetrics: {
+            falsePositiveBlockCount: "0",
+          },
+        }),
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    expect(response.status).toBe(422);
+    const body = await response.json() as {
+      error: string;
+      issues: readonly string[];
+    };
+    expect(body.error).toBe("invalid paired experiment bundle input");
+    expect(body.issues).toEqual([
+      "substrateMetrics.falsePositiveBlockCount must be a non-negative integer",
+    ]);
+  });
+
   it("POST /experiments/paired-readiness refuses mismatched experiment arms", async () => {
     const app = pairedReadinessApp();
     const substrate = cloneJson(runEnvelope);

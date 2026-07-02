@@ -16,12 +16,14 @@
 import { Hono } from "hono";
 import type pg from "pg";
 import {
+  buildArrowHedgePairedExperimentBundle,
   buildArrowHedgeIngestionPlan,
   executeArrowHedgeIngestionPlan,
   createArrowHedgeCommonOperatingPictureProjection,
   compareArrowHedgeIntegrationRunEnvelopePair,
   expandArrowHedgeRunEnvelope,
   type ArrowHedgeCommonOperatingPictureState,
+  type ArrowHedgePairedExperimentArmMetrics,
   type ArrowHedgeIntegrationRunEnvelope,
 } from "@pm/capability-finance-research-ingest";
 import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
@@ -36,6 +38,118 @@ const errorResponse = (err: unknown): { status: 500; body: { error: string } } =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const pairedMetricNumberFields = [
+  "startingEquity",
+  "endingEquity",
+  "realizedPnl",
+  "returnPct",
+] as const;
+
+const pairedMetricCountFields = [
+  "decisionCount",
+  "acceptedDecisionCount",
+  "blockedDecisionCount",
+  "staleBlockCount",
+  "invalidActionBlockCount",
+  "falsePositiveBlockCount",
+  "falseNegativeBlockCount",
+] as const;
+
+const pairedMetricStringArrayFields = [
+  "eventIds",
+  "blockedEventIds",
+] as const;
+
+const pairedMetricFieldNames = new Set<string>([
+  ...pairedMetricNumberFields,
+  ...pairedMetricCountFields,
+  ...pairedMetricStringArrayFields,
+  "rawDecisionSha256",
+]);
+
+const validatePairedEnvelope = (
+  value: unknown,
+  path: "baseline" | "substrate",
+  issues: string[],
+): ArrowHedgeIntegrationRunEnvelope | undefined => {
+  const expanded = expandArrowHedgeRunEnvelope(value);
+  if (!expanded.valid) {
+    issues.push(...expanded.issues.map((issue) => `${path}: ${issue.message}`));
+    return undefined;
+  }
+  return value as ArrowHedgeIntegrationRunEnvelope;
+};
+
+const readPairedMetrics = (
+  value: unknown,
+  path: "baselineMetrics" | "substrateMetrics",
+  issues: string[],
+): ArrowHedgePairedExperimentArmMetrics | undefined => {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    issues.push(`${path} must be an object`);
+    return undefined;
+  }
+
+  const metrics: Record<string, unknown> = {};
+  for (const [field, metricValue] of Object.entries(value)) {
+    if (!pairedMetricFieldNames.has(field)) {
+      issues.push(`${path}.${field} is not supported`);
+      continue;
+    }
+    if (
+      pairedMetricNumberFields.includes(
+        field as (typeof pairedMetricNumberFields)[number],
+      )
+    ) {
+      if (typeof metricValue !== "number" || !Number.isFinite(metricValue)) {
+        issues.push(`${path}.${field} must be a finite number`);
+        continue;
+      }
+      metrics[field] = metricValue;
+      continue;
+    }
+    if (
+      pairedMetricCountFields.includes(
+        field as (typeof pairedMetricCountFields)[number],
+      )
+    ) {
+      if (
+        typeof metricValue !== "number" ||
+        !Number.isInteger(metricValue) ||
+        metricValue < 0
+      ) {
+        issues.push(`${path}.${field} must be a non-negative integer`);
+        continue;
+      }
+      metrics[field] = metricValue;
+      continue;
+    }
+    if (
+      pairedMetricStringArrayFields.includes(
+        field as (typeof pairedMetricStringArrayFields)[number],
+      )
+    ) {
+      if (
+        !Array.isArray(metricValue) ||
+        metricValue.some((item) => typeof item !== "string" || item === "")
+      ) {
+        issues.push(`${path}.${field} must be an array of non-empty strings`);
+        continue;
+      }
+      metrics[field] = metricValue;
+      continue;
+    }
+    if (typeof metricValue !== "string" || metricValue === "") {
+      issues.push(`${path}.${field} must be a non-empty string`);
+      continue;
+    }
+    metrics[field] = metricValue;
+  }
+
+  return metrics as ArrowHedgePairedExperimentArmMetrics;
+};
 
 /**
  * Tx-aware graph + events ports (PostgresGraph / PostgresEventStore satisfy
@@ -271,16 +385,9 @@ export const arrowhedgeRoutes = (deps: ArrowHedgeIngestDeps): Hono => {
 
     const baseline = body["baseline"];
     const substrate = body["substrate"];
-    const baselineExpanded = expandArrowHedgeRunEnvelope(baseline);
-    const substrateExpanded = expandArrowHedgeRunEnvelope(substrate);
-    const issues = [
-      ...(!baselineExpanded.valid
-        ? baselineExpanded.issues.map((issue) => `baseline: ${issue.message}`)
-        : []),
-      ...(!substrateExpanded.valid
-        ? substrateExpanded.issues.map((issue) => `substrate: ${issue.message}`)
-        : []),
-    ];
+    const issues: string[] = [];
+    const validBaseline = validatePairedEnvelope(baseline, "baseline", issues);
+    const validSubstrate = validatePairedEnvelope(substrate, "substrate", issues);
     if (issues.length > 0) {
       return c.json(
         {
@@ -294,8 +401,8 @@ export const arrowhedgeRoutes = (deps: ArrowHedgeIngestDeps): Hono => {
     }
 
     const gate = compareArrowHedgeIntegrationRunEnvelopePair({
-      baseline: baseline as ArrowHedgeIntegrationRunEnvelope,
-      substrate: substrate as ArrowHedgeIntegrationRunEnvelope,
+      baseline: validBaseline!,
+      substrate: validSubstrate!,
     });
     const response = {
       schemaVersion: "arrowhedge.paired-readiness.v1",
@@ -304,15 +411,88 @@ export const arrowhedgeRoutes = (deps: ArrowHedgeIngestDeps): Hono => {
       fingerprints: gate.fingerprints,
       admitted: gate.ready
         ? {
-            baselineRunId: (baseline as ArrowHedgeIntegrationRunEnvelope).runId,
-            substrateRunId: (substrate as ArrowHedgeIntegrationRunEnvelope).runId,
-            tickers: (baseline as ArrowHedgeIntegrationRunEnvelope).scope.tickers,
-            startDate: (baseline as ArrowHedgeIntegrationRunEnvelope).scope.startDate,
-            endDate: (baseline as ArrowHedgeIntegrationRunEnvelope).scope.endDate,
+            baselineRunId: validBaseline!.runId,
+            substrateRunId: validSubstrate!.runId,
+            tickers: validBaseline!.scope.tickers,
+            startDate: validBaseline!.scope.startDate,
+            endDate: validBaseline!.scope.endDate,
           }
         : null,
     };
     return c.json(response, gate.ready ? 200 : 409);
+  });
+
+  // POST /tenants/:tenantId/arrowhedge/experiments/paired-bundles
+  // Body: { experimentId, generatedAt?, baseline, substrate, baselineMetrics?,
+  // substrateMetrics? }. Returns an immutable paired experiment bundle with
+  // envelope hashes plus separated market and governance claim gates.
+  app.post("/experiments/paired-bundles", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON body" }, 400);
+    }
+
+    if (!isRecord(body)) {
+      return c.json({ error: "request body must be an object" }, 400);
+    }
+
+    const issues: string[] = [];
+    const experimentId = body["experimentId"];
+    if (typeof experimentId !== "string" || experimentId.trim() === "") {
+      issues.push("experimentId must be a non-empty string");
+    }
+    const generatedAt = body["generatedAt"];
+    if (generatedAt !== undefined && typeof generatedAt !== "string") {
+      issues.push("generatedAt must be a string when provided");
+    }
+    const baseline = validatePairedEnvelope(
+      body["baseline"],
+      "baseline",
+      issues,
+    );
+    const substrate = validatePairedEnvelope(
+      body["substrate"],
+      "substrate",
+      issues,
+    );
+    const baselineMetrics = readPairedMetrics(
+      body["baselineMetrics"],
+      "baselineMetrics",
+      issues,
+    );
+    const substrateMetrics = readPairedMetrics(
+      body["substrateMetrics"],
+      "substrateMetrics",
+      issues,
+    );
+
+    if (issues.length > 0) {
+      return c.json(
+        {
+          schemaVersion: "arrowhedge.paired-experiment-bundle.v1",
+          error: "invalid paired experiment bundle input",
+          issues,
+        },
+        422,
+      );
+    }
+
+    const bundle = buildArrowHedgePairedExperimentBundle({
+      experimentId: experimentId as string,
+      ...(typeof generatedAt === "string" ? { generatedAt } : {}),
+      baseline: {
+        envelope: baseline!,
+        ...(baselineMetrics === undefined ? {} : { metrics: baselineMetrics }),
+      },
+      substrate: {
+        envelope: substrate!,
+        ...(substrateMetrics === undefined ? {} : { metrics: substrateMetrics }),
+      },
+    });
+
+    return c.json(bundle);
   });
 
   // GET /tenants/:tenantId/arrowhedge/cop — read current COP without ingesting.

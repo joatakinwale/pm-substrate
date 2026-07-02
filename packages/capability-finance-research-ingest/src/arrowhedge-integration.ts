@@ -377,6 +377,110 @@ export interface ArrowHedgeIntegrationRunEnvelopePairGate {
   readonly fingerprints: ArrowHedgeIntegrationRunEnvelopePairFingerprints;
 }
 
+export interface ArrowHedgePairedExperimentArmMetrics {
+  readonly startingEquity?: number;
+  readonly endingEquity?: number;
+  readonly realizedPnl?: number;
+  readonly returnPct?: number;
+  readonly decisionCount?: number;
+  readonly acceptedDecisionCount?: number;
+  readonly blockedDecisionCount?: number;
+  readonly staleBlockCount?: number;
+  readonly invalidActionBlockCount?: number;
+  readonly falsePositiveBlockCount?: number;
+  readonly falseNegativeBlockCount?: number;
+  readonly rawDecisionSha256?: string;
+  readonly eventIds?: readonly string[];
+  readonly blockedEventIds?: readonly string[];
+}
+
+export interface ArrowHedgePairedExperimentArmInput {
+  readonly envelope: ArrowHedgeIntegrationRunEnvelope;
+  readonly metrics?: ArrowHedgePairedExperimentArmMetrics;
+  readonly artifactLabel?: string;
+}
+
+export interface ArrowHedgePairedExperimentBundleInput {
+  readonly experimentId: string;
+  readonly generatedAt?: string;
+  readonly baseline: ArrowHedgePairedExperimentArmInput;
+  readonly substrate: ArrowHedgePairedExperimentArmInput;
+}
+
+export interface ArrowHedgePairedExperimentArmSummary {
+  readonly runId: string;
+  readonly substrateMode: string;
+  readonly envelopeSha256: string;
+  readonly metrics: Required<Pick<
+    ArrowHedgePairedExperimentArmMetrics,
+    | "decisionCount"
+    | "acceptedDecisionCount"
+    | "blockedDecisionCount"
+    | "staleBlockCount"
+    | "invalidActionBlockCount"
+  >> & Partial<ArrowHedgePairedExperimentArmMetrics>;
+}
+
+export interface ArrowHedgePairedExperimentReport {
+  readonly schemaVersion: "arrowhedge.paired-experiment-report.v1";
+  readonly experimentId: string;
+  readonly ready: boolean;
+  readonly marketWinClaimAllowed: boolean;
+  readonly claimIssues: readonly string[];
+  readonly readiness: ArrowHedgeIntegrationRunEnvelopePairGate;
+  readonly market: {
+    readonly metricsAvailable: boolean;
+    readonly baseline: ArrowHedgePairedExperimentArmSummary["metrics"];
+    readonly substrate: ArrowHedgePairedExperimentArmSummary["metrics"];
+    readonly deltas: {
+      readonly endingEquity?: number;
+      readonly realizedPnl?: number;
+      readonly returnPct?: number;
+    };
+    readonly substrateOutperformed: boolean;
+  };
+  readonly governance: {
+    readonly baseline: ArrowHedgePairedExperimentArmSummary["metrics"];
+    readonly substrate: ArrowHedgePairedExperimentArmSummary["metrics"];
+    readonly deltas: {
+      readonly acceptedDecisionCount: number;
+      readonly blockedDecisionCount: number;
+      readonly staleBlockCount: number;
+      readonly invalidActionBlockCount: number;
+    };
+    readonly gates: {
+      readonly falsePositiveBlocksZero: boolean;
+      readonly falseNegativeBlocksZero: boolean;
+      readonly falsePositiveEvidencePresent: boolean;
+      readonly falseNegativeEvidencePresent: boolean;
+    };
+  };
+}
+
+export interface ArrowHedgePairedExperimentBundle {
+  readonly schemaVersion: "arrowhedge.paired-experiment-bundle.v1";
+  readonly manifest: {
+    readonly schemaVersion: "arrowhedge.paired-experiment-manifest.v1";
+    readonly experimentId: string;
+    readonly generatedAt: string;
+    readonly ready: boolean;
+    readonly marketWinClaimAllowed: boolean;
+    readonly baselineRunId: string;
+    readonly substrateRunId: string;
+    readonly baselineEnvelopeSha256: string;
+    readonly substrateEnvelopeSha256: string;
+    readonly reportSha256: string;
+    readonly artifacts: readonly {
+      readonly name: string;
+      readonly sha256: string;
+      readonly mediaType: string;
+    }[];
+  };
+  readonly baselineEnvelope: ArrowHedgeIntegrationRunEnvelope;
+  readonly substrateEnvelope: ArrowHedgeIntegrationRunEnvelope;
+  readonly report: ArrowHedgePairedExperimentReport;
+}
+
 export interface ArrowHedgeIntegrationValidationResult {
   readonly ready: boolean;
   readonly issues: readonly string[];
@@ -730,6 +834,133 @@ export function compareArrowHedgeIntegrationRunEnvelopePair(
     ready: issues.length === 0,
     issues,
     fingerprints,
+  };
+}
+
+export function buildArrowHedgePairedExperimentBundle(
+  input: ArrowHedgePairedExperimentBundleInput,
+): ArrowHedgePairedExperimentBundle {
+  const readiness = compareArrowHedgeIntegrationRunEnvelopePair({
+    baseline: input.baseline.envelope,
+    substrate: input.substrate.envelope,
+  });
+  const baseline = summarizePairedExperimentArm(input.baseline);
+  const substrate = summarizePairedExperimentArm(input.substrate);
+  const marketDeltas = marketMetricDeltas(baseline.metrics, substrate.metrics);
+  const marketDeltaValues = Object.values(marketDeltas).filter(
+    (value): value is number => value !== undefined,
+  );
+  const marketMetricsAvailable = marketDeltaValues.length > 0;
+  const substrateOutperformed =
+    marketMetricsAvailable &&
+    marketDeltaValues.some((value) => value > 0) &&
+    marketDeltaValues.every((value) => value >= 0);
+  const falsePositiveEvidencePresent =
+    input.substrate.metrics?.falsePositiveBlockCount !== undefined;
+  const falseNegativeEvidencePresent =
+    input.substrate.metrics?.falseNegativeBlockCount !== undefined;
+  const falsePositiveBlocksZero =
+    falsePositiveEvidencePresent &&
+    input.substrate.metrics?.falsePositiveBlockCount === 0;
+  const falseNegativeBlocksZero =
+    falseNegativeEvidencePresent &&
+    input.substrate.metrics?.falseNegativeBlockCount === 0;
+  const claimIssues = [
+    ...(readiness.ready
+      ? []
+      : readiness.issues.map((issue) => `readiness: ${issue}`)),
+    ...(marketMetricsAvailable
+      ? []
+      : ["market metrics are required before market-win claims"]),
+    ...(marketMetricsAvailable && !substrateOutperformed
+      ? ["substrate arm did not outperform baseline on supplied market metrics"]
+      : []),
+    ...(falsePositiveEvidencePresent
+      ? []
+      : ["substrate false-positive block count is required"]),
+    ...(falseNegativeEvidencePresent
+      ? []
+      : ["substrate false-negative block count is required"]),
+    ...(falsePositiveBlocksZero
+      ? []
+      : ["substrate false-positive blocks must be zero"]),
+    ...(falseNegativeBlocksZero
+      ? []
+      : ["substrate false-negative blocks must be zero"]),
+  ];
+  const report: ArrowHedgePairedExperimentReport = {
+    schemaVersion: "arrowhedge.paired-experiment-report.v1",
+    experimentId: input.experimentId,
+    ready: readiness.ready,
+    marketWinClaimAllowed: claimIssues.length === 0,
+    claimIssues,
+    readiness,
+    market: {
+      metricsAvailable: marketMetricsAvailable,
+      baseline: baseline.metrics,
+      substrate: substrate.metrics,
+      deltas: marketDeltas,
+      substrateOutperformed,
+    },
+    governance: {
+      baseline: baseline.metrics,
+      substrate: substrate.metrics,
+      deltas: {
+        acceptedDecisionCount:
+          substrate.metrics.acceptedDecisionCount -
+          baseline.metrics.acceptedDecisionCount,
+        blockedDecisionCount:
+          substrate.metrics.blockedDecisionCount -
+          baseline.metrics.blockedDecisionCount,
+        staleBlockCount:
+          substrate.metrics.staleBlockCount - baseline.metrics.staleBlockCount,
+        invalidActionBlockCount:
+          substrate.metrics.invalidActionBlockCount -
+          baseline.metrics.invalidActionBlockCount,
+      },
+      gates: {
+        falsePositiveBlocksZero,
+        falseNegativeBlocksZero,
+        falsePositiveEvidencePresent,
+        falseNegativeEvidencePresent,
+      },
+    },
+  };
+
+  return {
+    schemaVersion: "arrowhedge.paired-experiment-bundle.v1",
+    manifest: {
+      schemaVersion: "arrowhedge.paired-experiment-manifest.v1",
+      experimentId: input.experimentId,
+      generatedAt: input.generatedAt ?? new Date().toISOString(),
+      ready: report.ready,
+      marketWinClaimAllowed: report.marketWinClaimAllowed,
+      baselineRunId: input.baseline.envelope.runId,
+      substrateRunId: input.substrate.envelope.runId,
+      baselineEnvelopeSha256: baseline.envelopeSha256,
+      substrateEnvelopeSha256: substrate.envelopeSha256,
+      reportSha256: sha256StableJson(report),
+      artifacts: [
+        {
+          name: input.baseline.artifactLabel ?? "baseline-envelope.json",
+          sha256: baseline.envelopeSha256,
+          mediaType: "application/json",
+        },
+        {
+          name: input.substrate.artifactLabel ?? "substrate-envelope.json",
+          sha256: substrate.envelopeSha256,
+          mediaType: "application/json",
+        },
+        {
+          name: "paired-report.json",
+          sha256: sha256StableJson(report),
+          mediaType: "application/json",
+        },
+      ],
+    },
+    baselineEnvelope: input.baseline.envelope,
+    substrateEnvelope: input.substrate.envelope,
+    report,
   };
 }
 
@@ -1560,6 +1791,76 @@ function modelConfigToEnvelope(
     providers: modelConfig.providers,
     hashes: modelConfig.hashes ?? {},
   };
+}
+
+function summarizePairedExperimentArm(
+  input: ArrowHedgePairedExperimentArmInput,
+): ArrowHedgePairedExperimentArmSummary {
+  const metrics = input.metrics ?? {};
+  return {
+    runId: input.envelope.runId,
+    substrateMode: input.envelope.substrateMode,
+    envelopeSha256: sha256StableJson(input.envelope),
+    metrics: {
+      ...metrics,
+      decisionCount: metrics.decisionCount ?? input.envelope.decisions.length,
+      acceptedDecisionCount:
+        metrics.acceptedDecisionCount ??
+        input.envelope.decisions.filter((decision) =>
+          booleanField(decision, "accepted") === true,
+        ).length,
+      blockedDecisionCount:
+        metrics.blockedDecisionCount ?? metrics.blockedEventIds?.length ?? 0,
+      staleBlockCount: metrics.staleBlockCount ?? 0,
+      invalidActionBlockCount: metrics.invalidActionBlockCount ?? 0,
+    },
+  };
+}
+
+function marketMetricDeltas(
+  baseline: ArrowHedgePairedExperimentArmSummary["metrics"],
+  substrate: ArrowHedgePairedExperimentArmSummary["metrics"],
+): ArrowHedgePairedExperimentReport["market"]["deltas"] {
+  return {
+    ...numberDeltaField("endingEquity", baseline, substrate),
+    ...numberDeltaField("realizedPnl", baseline, substrate),
+    ...numberDeltaField("returnPct", baseline, substrate),
+  };
+}
+
+function numberDeltaField<
+  TField extends keyof ArrowHedgePairedExperimentReport["market"]["deltas"],
+>(
+  field: TField,
+  baseline: ArrowHedgePairedExperimentArmSummary["metrics"],
+  substrate: ArrowHedgePairedExperimentArmSummary["metrics"],
+): Pick<ArrowHedgePairedExperimentReport["market"]["deltas"], TField> | Record<string, never> {
+  const baselineValue = baseline[field];
+  const substrateValue = substrate[field];
+  if (
+    typeof baselineValue !== "number" ||
+    !Number.isFinite(baselineValue) ||
+    typeof substrateValue !== "number" ||
+    !Number.isFinite(substrateValue)
+  ) {
+    return {};
+  }
+  return { [field]: normalizedNumberDelta(baselineValue, substrateValue) } as Pick<
+    ArrowHedgePairedExperimentReport["market"]["deltas"],
+    TField
+  >;
+}
+
+function normalizedNumberDelta(baseline: number, substrate: number): number {
+  return Number((substrate - baseline).toFixed(12));
+}
+
+function booleanField(
+  record: Record<string, unknown> | undefined,
+  field: string,
+): boolean | undefined {
+  const value = record?.[field];
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function integrationEnvelopeFingerprints(

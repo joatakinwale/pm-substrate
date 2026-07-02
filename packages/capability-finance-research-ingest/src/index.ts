@@ -7,11 +7,18 @@ export {
 } from "./capability.js";
 export {
   buildArrowHedgeIntegrationEvidenceRefs,
+  buildArrowHedgePairedExperimentBundle,
   buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
   compareArrowHedgeIntegrationRunEnvelopePair,
   fetchArrowHedgeIntegrationSnapshot,
   validateArrowHedgeIntegrationSnapshot,
   ArrowHedgeIntegrationFetchError,
+  type ArrowHedgePairedExperimentArmInput,
+  type ArrowHedgePairedExperimentArmMetrics,
+  type ArrowHedgePairedExperimentArmSummary,
+  type ArrowHedgePairedExperimentBundle,
+  type ArrowHedgePairedExperimentBundleInput,
+  type ArrowHedgePairedExperimentReport,
   type ArrowHedgeIntegrationAgent,
   type ArrowHedgeIntegrationAgents,
   type ArrowHedgeIntegrationBacktest,
