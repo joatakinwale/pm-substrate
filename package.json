@@ -36,7 +36,8 @@
     "dev:handoff": "tsx scripts/dev-session.ts handoff",
     "dev:cost": "tsx scripts/dev-session.ts cost",
     "dev:status": "tsx scripts/dev-session.ts status",
-    "dev:seed-dogfood": "tsx scripts/dev-session.ts seed-dogfood"
+    "dev:seed-dogfood": "tsx scripts/dev-session.ts seed-dogfood",
+    "mcp:stdio": "node packages/substrate-mcp/dist/stdio.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

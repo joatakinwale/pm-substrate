@@ -24,7 +24,7 @@ pm-substrate exists so that **two agent-run businesses are worth operating**: th
 | Phase | Deliverable | Done when |
 |---|---|---|
 | **D1 ✅ 07-02** | Dev-session loop (`dev:resume/checkpoint/handoff/cost/status`), CLAUDE.md protocol, seeded ledger | Sessions resume from the ledger, chain-verified; control-plane v0 answers the five questions in text |
-| **D2** | **MCP tool surface** over substrate-http (`resume/observe/propose/admit/checkpoint`), with token auth | Any MCP-capable agent mounts the substrate with a config line; this repo's own sessions use it instead of raw scripts |
+| **D2 ✅ 07-03** | **MCP tool surface** (`packages/substrate-mcp`): `substrate_resume/observe/propose/admit/checkpoint`, stdio transport, content-addressed ledger head, warn-first propose + enforced admit, verified stale-basis block | Done for stdio (config-line mount, 4/4 gate tests green). Follow-up work item: streamable-HTTP transport + bearer auth |
 | **D3** | **Unblocked-work projection + dispatcher** (gap #1) | A projection computes "unblocked now" from WorkItems + `depends_on` + gates; the dispatcher hands exactly those to responsible agents; exercised by a lab scenario |
 | **D4** | **Control-plane dashboard** page (extends `substrate-dashboard`) | The five questions rendered live from the event log: open work, governance tallies, `dev.session.cost` totals, metric lanes, chain integrity |
 | **D5** | **Marketing lab wired**: PluggedInSocial's 5 raised anchors (agent_harness, browser_qa_harness, externalAdapterBoundary, metricsReadyAnalyticsDispatch, publicationTerminal) + sync adapter + publish/schedule executor | Live Axis-B conformance green from the external checkout; one real agency action (publish) runs propose→admit→execute in shadow, then gated |

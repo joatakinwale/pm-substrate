@@ -35,6 +35,7 @@ const RUNTIME_CORE = new Set([
   "procedure-admission",
   "capability-kit",
   "substrate-http",
+  "substrate-mcp",
   "agent-state-core",
 ]);
 
@@ -117,9 +118,9 @@ for (const pkg of pkgs) {
     }
 
     // Rule C — plug-ins never import the HTTP surface.
-    if (isPlugin(pkg) && /from ["']@pm\/substrate-http["']/.test(text)) {
+    if (isPlugin(pkg) && /from ["']@pm\/substrate-(http|mcp)["']/.test(text)) {
       failures.push(
-        `${rel}: plug-in imports @pm/substrate-http — the HTTP surface consumes plug-ins, never the reverse.`,
+        `${rel}: plug-in imports a substrate protocol surface (http/mcp) — surfaces consume plug-ins, never the reverse.`,
       );
     }
   }

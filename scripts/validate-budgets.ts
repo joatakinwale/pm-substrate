@@ -58,6 +58,7 @@ const RUNTIME_CORE = [
   "procedure-admission",
   "capability-kit",
   "substrate-http",
+  "substrate-mcp",
 ];
 
 const walk = (dir: string): string[] =>
