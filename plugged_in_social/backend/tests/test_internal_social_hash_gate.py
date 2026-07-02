@@ -14,6 +14,15 @@ from app.api.internal.social import (
     publish_post_from_worker,
 )
 from app.models.social_media import SocialPost
+from app.models.virtual_agency import (
+    VirtualAgencyEvent,
+    VirtualAgencyTask,
+    VirtualAgencyTaskStatus,
+)
+from app.services.virtual_agency import (
+    AGENT_ANALYTICS,
+    agent_task_handoff_idempotency_key,
+)
 
 
 HASH_A = "a" * 64
@@ -166,3 +175,104 @@ def test_publish_sync_rejects_scheduled_content_hash_mismatch(monkeypatch):
     assert post.status == "failed"
     assert "content hash" in post.error_message.lower()
     assert fake_session.commits == 1
+
+
+class _FakeScalarResult:
+    def __init__(self, rows):
+        self._rows = list(rows)
+
+    def all(self):
+        return list(self._rows)
+
+
+class _FakeExecuteResult:
+    def __init__(self, *, rows=None, scalar=None):
+        self._rows = list(rows or [])
+        self._scalar = scalar
+
+    def scalars(self):
+        return _FakeScalarResult(self._rows)
+
+    def scalar_one_or_none(self):
+        return self._scalar
+
+
+class _FakeMetricsDispatchSession:
+    def __init__(self, task: VirtualAgencyTask):
+        self.task = task
+        self.events: list[VirtualAgencyEvent] = []
+        self._task_query_count = 0
+
+    def execute(self, _statement):
+        if self._task_query_count == 0:
+            self._task_query_count += 1
+            return _FakeExecuteResult(rows=[self.task])
+        self._task_query_count += 1
+        handoff_key = f"handoff:{agent_task_handoff_idempotency_key(self.task)}"
+        existing = next(
+            (
+                event
+                for event in self.events
+                if event.idempotency_key == handoff_key
+            ),
+            None,
+        )
+        return _FakeExecuteResult(scalar=existing)
+
+    def add(self, obj):
+        if getattr(obj, "id", None) is None:
+            obj.id = uuid.uuid4()
+        if isinstance(obj, VirtualAgencyEvent):
+            self.events.append(obj)
+
+
+def test_metrics_refresh_dispatch_uses_canonical_handoff_key(monkeypatch):
+    project_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    task = VirtualAgencyTask(
+        id=uuid.uuid4(),
+        org_id=uuid.uuid4(),
+        project_id=project_id,
+        title="Track Campaign Performance",
+        description="Build the report and next-action proposal",
+        reason="Metrics evidence is ready",
+        agent_role=AGENT_ANALYTICS,
+        task_type="analytics_reporting",
+        status=VirtualAgencyTaskStatus.todo.value,
+        task_version=3,
+        approval_active=True,
+        approved_version=3,
+        context={},
+        lineage={
+            "client_request": "Increase qualified demo traffic",
+            "legacy_task_id": str(uuid.uuid4()),
+            "marketing_run_id": str(run_id),
+            "project_id": str(project_id),
+        },
+    )
+    task.dependencies = []
+    db = _FakeMetricsDispatchSession(task)
+    monkeypatch.setattr(
+        internal_social,
+        "_project_has_metric_evidence_sync",
+        lambda _db, _project_id: True,
+    )
+
+    first = internal_social._dispatch_ready_analytics_tasks_sync(
+        db,
+        project_ids={project_id},
+    )
+    db._task_query_count = 0
+    second = internal_social._dispatch_ready_analytics_tasks_sync(
+        db,
+        project_ids={project_id},
+    )
+
+    canonical_key = agent_task_handoff_idempotency_key(task)
+    assert first[0]["idempotency_key"] == canonical_key
+    assert first[0]["idempotency_key"].startswith(
+        f"agency-run:handoff:{run_id}:",
+    )
+    assert db.events[0].idempotency_key == f"handoff:{canonical_key}"
+    assert second == []
+    assert len(db.events) == 1

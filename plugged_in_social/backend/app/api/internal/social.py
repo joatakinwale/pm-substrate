@@ -72,7 +72,11 @@ from app.services.social import (
     get_publisher,
 )
 from app.services.social.token_refresh import RefreshError, refresh_if_needed
-from app.services.virtual_agency import AGENT_ANALYTICS, build_agent_task_dispatch
+from app.services.virtual_agency import (
+    AGENT_ANALYTICS,
+    agent_task_handoff_idempotency_key,
+    build_agent_task_dispatch,
+)
 from app.services.virtual_agency_orchestration import (
     DependencyNotSatisfiedError,
     ensure_dependencies_completed,
@@ -743,9 +747,7 @@ def _dispatch_ready_analytics_tasks_sync(
                 )
         except DependencyNotSatisfiedError:
             continue
-        message_idempotency_key = (
-            f"virtual-agency:metrics-ready:{task.id}:{task.task_version}"
-        )
+        message_idempotency_key = agent_task_handoff_idempotency_key(task)
         existing_event = db.execute(
             select(VirtualAgencyEvent).where(
                 VirtualAgencyEvent.idempotency_key

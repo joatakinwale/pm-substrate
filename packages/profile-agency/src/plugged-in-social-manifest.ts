@@ -1034,6 +1034,10 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       virtualAgency.includes("agent_task_handoff_idempotency_key") &&
       virtualAgency.includes("build_agent_task_dispatch") &&
       internalSocial.includes("_dispatch_ready_analytics_tasks_sync") &&
+      internalSocial.includes("agent_task_handoff_idempotency_key") &&
+      internalSocialTests.includes(
+        "test_metrics_refresh_dispatch_uses_canonical_handoff_key",
+      ) &&
       internalSocial.includes("virtual_agency_tasks") &&
       socialCron.includes("virtual_agency_tasks") &&
       socialCron.includes("/enqueue/stevie-virtual-agency"),
