@@ -135,6 +135,117 @@ def test_integration_router_uses_rls_and_has_no_substrate_imports():
     assert "packages/evals" not in src
 
 
+def test_integration_capability_gate_accepts_neutral_claims_and_revokes():
+    import app.api.integration as module
+
+    assert module._has_integration_capability(
+        {"org_id": str(uuid.uuid4()), "role": "owner"},
+        "marketing_run.dispatch",
+    )
+    assert module._has_integration_capability(
+        {"org_id": str(uuid.uuid4()), "role": "admin"},
+        "access_request.decide",
+    )
+    assert module._has_integration_capability(
+        {
+            "org_id": str(uuid.uuid4()),
+            "role": "viewer",
+            "integration_capabilities": ["marketing_run.dispatch"],
+        },
+        "marketing_run.dispatch",
+    )
+    assert module._has_integration_capability(
+        {
+            "org_id": str(uuid.uuid4()),
+            "role": "viewer",
+            "permissions": {"grants": ["integration:external_adapter_run.ingest"]},
+        },
+        "external_adapter_run.ingest",
+    )
+    assert module._has_integration_capability(
+        {
+            "org_id": str(uuid.uuid4()),
+            "role": "viewer",
+            "scopes": "openid profile plugged_in_social.*",
+        },
+        "event.ingest",
+    )
+    assert not module._has_integration_capability(
+        {
+            "org_id": str(uuid.uuid4()),
+            "role": "viewer",
+            "integration_capabilities": ["marketing_run.read"],
+        },
+        "marketing_run.dispatch",
+    )
+    assert not module._has_integration_capability(
+        {
+            "org_id": str(uuid.uuid4()),
+            "role": "owner",
+            "permissions": {"revokes": ["integration.*"]},
+        },
+        "marketing_run.dispatch",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        module._assert_integration_capability(
+            {
+                "org_id": str(uuid.uuid4()),
+                "role": "viewer",
+                "integration_capabilities": ["marketing_run.read"],
+            },
+            "marketing_run.dispatch",
+        )
+
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail["code"] == "integration_capability_required"
+    assert exc_info.value.detail["capability_id"] == "marketing_run.dispatch"
+
+
+def test_public_integration_routes_are_represented_in_platform_manifest():
+    import app.api.integration as module
+
+    route_surface = {
+        (method, f"/api{route.path}")
+        for route in module.router.routes
+        for method in route.methods or set()
+        if method in {"GET", "POST", "PATCH", "PUT", "DELETE"}
+    }
+    manifest_surface = {
+        (endpoint.method, endpoint.path)
+        for endpoint in module._endpoint_manifest()
+        if endpoint.boundary == "public_rls"
+    }
+    known_capability_ids = {capability.id for capability in module._capabilities()}
+
+    assert route_surface <= manifest_surface
+    for endpoint in module._endpoint_manifest():
+        if endpoint.boundary == "public_rls":
+            assert endpoint.capability_ids
+            assert set(endpoint.capability_ids) <= known_capability_ids
+    assert any(
+        endpoint.path == "/api/integration/v1/capabilities"
+        and endpoint.capability_ids == ["platform_manifest.read"]
+        for endpoint in module._endpoint_manifest()
+    )
+    assert (
+        "GET",
+        "/api/integration/v1/capabilities",
+    ) in manifest_surface
+    assert (
+        "GET",
+        "/api/integration/v1/engagements/{engagement_id}",
+    ) in manifest_surface
+    assert (
+        "GET",
+        "/api/integration/v1/marketing-runs/{run_id}/tasks",
+    ) in manifest_surface
+    assert (
+        "POST",
+        "/api/integration/v1/webhooks",
+    ) in manifest_surface
+
+
 def test_main_registers_neutral_integration_router():
     import app.main as module
 

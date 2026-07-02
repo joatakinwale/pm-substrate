@@ -106,6 +106,87 @@ def _user_id_from_user(current_user: dict) -> uuid.UUID | None:
     return uuid.UUID(str(user_id))
 
 
+def _claim_values(value: Any) -> set[str]:
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        return {
+            item.strip()
+            for item in value.replace(",", " ").split()
+            if item.strip()
+        }
+    if isinstance(value, dict):
+        return set()
+    try:
+        return {str(item) for item in value if item is not None}
+    except TypeError:
+        return {str(value)}
+
+
+def _capability_aliases(capability_id: str) -> set[str]:
+    return {
+        capability_id,
+        f"integration:{capability_id}",
+        f"plugged_in_social:{capability_id}",
+    }
+
+
+def _capability_wildcards() -> set[str]:
+    return {"*", "integration.*", "plugged_in_social.*"}
+
+
+def _capability_claim_set(current_user: dict, *, permission_key: str) -> set[str]:
+    claims: set[str] = set()
+    claim_keys: tuple[str, ...] = ()
+    if permission_key == "grants":
+        claim_keys = ("integration_capabilities", "capabilities", "scopes", "scope")
+    elif permission_key == "revokes":
+        claim_keys = ("revoked_integration_capabilities", "revoked_capabilities")
+    for key in claim_keys:
+        claims.update(_claim_values(current_user.get(key)))
+    permissions = current_user.get("permissions")
+    if isinstance(permissions, dict):
+        claims.update(_claim_values(permissions.get(permission_key)))
+    return claims
+
+
+def _has_integration_capability(current_user: dict, capability_id: str) -> bool:
+    revoked = _capability_claim_set(current_user, permission_key="revokes")
+    if revoked & (_capability_aliases(capability_id) | _capability_wildcards()):
+        return False
+
+    if current_user.get("role") in {"owner", "admin"}:
+        return True
+
+    granted = _capability_claim_set(current_user, permission_key="grants")
+    return bool(
+        granted & (_capability_aliases(capability_id) | _capability_wildcards())
+    )
+
+
+def _assert_integration_capability(current_user: dict, capability_id: str) -> None:
+    if _has_integration_capability(current_user, capability_id):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={
+            "code": "integration_capability_required",
+            "message": "Integration capability is required for this endpoint.",
+            "capability_id": capability_id,
+        },
+    )
+
+
+def require_integration_capability(capability_id: str):
+    async def _check(
+        current_user: dict = Depends(get_current_user),
+    ) -> dict:
+        _assert_integration_capability(current_user, capability_id)
+        return current_user
+
+    return _check
+
+
 def _link(rel: str, href: str) -> IntegrationLink:
     return IntegrationLink(rel=rel, href=href)
 
@@ -1367,7 +1448,7 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             method="GET",
             path="/api/integration/v1/capabilities",
             boundary="public_rls",
-            capability_ids=["marketing_run.read"],
+            capability_ids=["platform_manifest.read"],
         ),
         IntegrationEndpointManifest(
             method="GET",
@@ -1392,6 +1473,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             path="/api/integration/v1/engagements",
             boundary="public_rls",
             capability_ids=["engagement.create"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/engagements/{engagement_id}",
+            boundary="public_rls",
+            capability_ids=["engagement.read"],
         ),
         IntegrationEndpointManifest(
             method="GET",
@@ -1437,6 +1524,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
         ),
         IntegrationEndpointManifest(
             method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/artifacts",
+            boundary="public_rls",
+            capability_ids=["artifact.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
             path="/api/integration/v1/marketing-runs/{run_id}/events",
             boundary="public_rls",
             capability_ids=["event_timeline.read"],
@@ -1458,6 +1551,18 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             path="/api/integration/v1/marketing-runs/{run_id}/access-requests",
             boundary="public_rls",
             capability_ids=["access_request.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/tasks",
+            boundary="public_rls",
+            capability_ids=["task.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="GET",
+            path="/api/integration/v1/marketing-runs/{run_id}/approvals",
+            boundary="public_rls",
+            capability_ids=["approval.read"],
         ),
         IntegrationEndpointManifest(
             method="GET",
@@ -1516,6 +1621,12 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
         IntegrationEndpointManifest(
             method="POST",
             path="/api/integration/v1/events",
+            boundary="public_rls",
+            capability_ids=["event.ingest"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/webhooks",
             boundary="public_rls",
             capability_ids=["event.ingest"],
         ),
@@ -1855,7 +1966,9 @@ def _platform_manifest() -> IntegrationPlatformManifestEnvelope:
 @router.get("/capabilities", response_model=IntegrationCapabilityResponse)
 async def get_capabilities(
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("platform_manifest.read")
+    ),
 ):
     _ = db
     _org_id_from_user(current_user)
@@ -1868,7 +1981,9 @@ async def get_capabilities(
 @router.get("/platform-manifest", response_model=IntegrationPlatformManifestEnvelope)
 async def get_platform_manifest(
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("platform_manifest.read")
+    ),
 ):
     _ = db
     _org_id_from_user(current_user)
@@ -1881,7 +1996,9 @@ async def get_platform_manifest(
 )
 async def get_external_adapters(
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("external_adapter_manifest.read")
+    ),
 ):
     _ = db
     _org_id_from_user(current_user)
@@ -1892,7 +2009,7 @@ async def get_external_adapters(
 async def list_engagements(
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("engagement.read")),
 ):
     org_id = _org_id_from_user(current_user)
     result = await db.execute(
@@ -1912,7 +2029,7 @@ async def list_engagements(
 async def create_engagement(
     body: IntegrationEngagementCreate,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("engagement.create")),
 ):
     org_id = _org_id_from_user(current_user)
     engagement = await create_client_engagement(
@@ -1933,7 +2050,7 @@ async def create_engagement(
 async def get_engagement(
     engagement_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("engagement.read")),
 ):
     org_id = _org_id_from_user(current_user)
     return _to_engagement(
@@ -1948,7 +2065,7 @@ async def get_engagement(
 async def list_engagement_marketing_runs(
     engagement_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("marketing_run.read")),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
@@ -1972,7 +2089,9 @@ async def create_engagement_marketing_run(
     engagement_id: uuid.UUID,
     body: IntegrationMarketingRunCreate,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("marketing_run.create")
+    ),
 ):
     org_id = _org_id_from_user(current_user)
     engagement = await _get_engagement(
@@ -2005,7 +2124,7 @@ async def create_engagement_marketing_run(
 async def list_engagement_artifacts(
     engagement_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("artifact.read")),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
@@ -2027,7 +2146,7 @@ async def list_engagement_artifacts(
 async def list_engagement_approvals(
     engagement_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("approval.read")),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
@@ -2049,7 +2168,7 @@ async def list_engagement_approvals(
 async def list_engagement_access_requests(
     engagement_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("access_request.read")),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_engagement(db, org_id=org_id, engagement_id=engagement_id)
@@ -2071,7 +2190,7 @@ async def list_engagement_access_requests(
 async def get_marketing_run(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("marketing_run.read")),
 ):
     org_id = _org_id_from_user(current_user)
     return _to_run(await _get_run(db, org_id=org_id, run_id=run_id))
@@ -2084,7 +2203,9 @@ async def get_marketing_run(
 async def dispatch_marketing_run(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("marketing_run.dispatch")
+    ),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2138,7 +2259,7 @@ async def dispatch_marketing_run(
 async def list_run_artifacts(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("artifact.read")),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2161,7 +2282,9 @@ async def list_run_external_adapter_runs(
     run_id: uuid.UUID,
     adapter_id: str | None = Query(None, min_length=1, max_length=120),
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("external_adapter_run.read")
+    ),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2184,7 +2307,9 @@ async def ingest_run_external_adapter_run(
     body: IntegrationExternalAdapterRunIngest,
     response: Response,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("external_adapter_run.ingest")
+    ),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2347,7 +2472,7 @@ async def ingest_run_external_adapter_run(
 async def list_run_social_posts(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("social_post.read")),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2362,7 +2487,7 @@ async def list_run_social_posts(
 async def list_run_reports(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("report.read")),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2377,7 +2502,7 @@ async def list_run_reports(
 async def get_report(
     report_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("report.read")),
 ):
     org_id = _org_id_from_user(current_user)
     report = await _get_report(db, org_id=org_id, report_id=report_id)
@@ -2391,7 +2516,7 @@ async def get_report(
 async def list_run_tasks(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("task.read")),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2407,7 +2532,7 @@ async def list_run_events(
     run_id: uuid.UUID,
     limit: int = Query(200, ge=1, le=1000),
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("event_timeline.read")),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2422,7 +2547,7 @@ async def list_run_events(
 async def list_run_approvals(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("approval.read")),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2444,7 +2569,7 @@ async def list_run_approvals(
 async def list_run_access_requests(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("access_request.read")),
 ):
     org_id = _org_id_from_user(current_user)
     await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2466,7 +2591,9 @@ async def list_run_access_requests(
 async def get_run_evidence_summary(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("evidence_summary.read")
+    ),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2485,7 +2612,9 @@ async def get_run_evidence_summary(
 async def get_run_evidence_snapshot(
     run_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("run_evidence_snapshot.read")
+    ),
 ):
     org_id = _org_id_from_user(current_user)
     run = await _get_run(db, org_id=org_id, run_id=run_id)
@@ -2524,7 +2653,7 @@ async def decide_approval(
     approval_id: uuid.UUID,
     body: IntegrationApprovalDecision,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("approval.decide")),
 ):
     org_id = _org_id_from_user(current_user)
     approval = await _get_approval(db, org_id=org_id, approval_id=approval_id)
@@ -2548,7 +2677,9 @@ async def decide_access(
     access_request_id: uuid.UUID,
     body: IntegrationAccessDecision,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_integration_capability("access_request.decide")
+    ),
 ):
     org_id = _org_id_from_user(current_user)
     access_request = await _get_access_request(
@@ -2725,7 +2856,7 @@ async def ingest_event(
     body: IntegrationEventIngest,
     response: Response,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("event.ingest")),
 ):
     org_id = _org_id_from_user(current_user)
     idempotency_key = _integration_artifact_idempotency_key(
@@ -2770,7 +2901,7 @@ async def ingest_webhook(
     body: IntegrationWebhookIngest,
     response: Response,
     db: AsyncSession = Depends(get_db_with_rls_dep),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_integration_capability("event.ingest")),
 ):
     org_id = _org_id_from_user(current_user)
     idempotency_key = _integration_artifact_idempotency_key(
