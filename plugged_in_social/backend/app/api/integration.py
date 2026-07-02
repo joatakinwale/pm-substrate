@@ -36,11 +36,13 @@ from app.schemas.integration import (
     IntegrationConfigurationRequirement,
     IntegrationDataResourceManifest,
     IntegrationEndpointManifest,
+    IntegrationEngagementCreate,
     IntegrationEngagementEnvelope,
     IntegrationEvidenceSummaryEnvelope,
     IntegrationEventIngest,
     IntegrationExternalAdapterManifest,
     IntegrationLink,
+    IntegrationMarketingRunCreate,
     IntegrationMarketingRunEnvelope,
     IntegrationPlatformManifestEnvelope,
     IntegrationQueueManifest,
@@ -55,9 +57,12 @@ from app.services.agency_domain import (
     approve_and_dispatch_marketing_run,
     compute_payload_hash,
     create_agency_artifact,
+    create_client_engagement,
     decide_access_request,
     decide_approval_request,
+    kickoff_marketing_run,
     MarketingRunAccessGateError,
+    start_marketing_run,
 )
 from app.services.virtual_agency_orchestration import (
     AGENT_CAPABILITIES,
@@ -785,11 +790,35 @@ def _capabilities() -> list[IntegrationCapability]:
             resources=["client_engagement"],
         ),
         IntegrationCapability(
+            id="engagement.create",
+            name="Create client engagements",
+            description="Create tenant-scoped client intake records for autonomous marketing work.",
+            methods=["POST"],
+            resources=["client_engagement"],
+            events=["client_engagement.created"],
+        ),
+        IntegrationCapability(
             id="marketing_run.read",
             name="Read marketing runs",
             description="Inspect autonomous agency run lifecycle and blockers.",
             methods=["GET"],
             resources=["marketing_run"],
+        ),
+        IntegrationCapability(
+            id="marketing_run.create",
+            name="Start marketing runs",
+            description=(
+                "Start a marketing run from a client engagement and create kickoff "
+                "evidence, access gates, and initial virtual-agency tasks."
+            ),
+            methods=["POST"],
+            resources=[
+                "marketing_run",
+                "agency_artifact",
+                "agency_access_request",
+                "virtual_agency_task",
+            ],
+            events=["marketing_run.started", "marketing_run.kickoff_created"],
         ),
         IntegrationCapability(
             id="marketing_run.dispatch",
@@ -1038,10 +1067,22 @@ def _endpoint_manifest() -> list[IntegrationEndpointManifest]:
             capability_ids=["engagement.read"],
         ),
         IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/engagements",
+            boundary="public_rls",
+            capability_ids=["engagement.create"],
+        ),
+        IntegrationEndpointManifest(
             method="GET",
             path="/api/integration/v1/engagements/{engagement_id}/marketing-runs",
             boundary="public_rls",
             capability_ids=["marketing_run.read"],
+        ),
+        IntegrationEndpointManifest(
+            method="POST",
+            path="/api/integration/v1/engagements/{engagement_id}/marketing-runs",
+            boundary="public_rls",
+            capability_ids=["marketing_run.create"],
         ),
         IntegrationEndpointManifest(
             method="GET",
@@ -1156,6 +1197,7 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
             resource_type="client_engagement",
             durable_evidence_fields=["intake_payload", "integration_state"],
             read_capability_ids=["engagement.read"],
+            write_capability_ids=["engagement.create"],
         ),
         IntegrationDataResourceManifest(
             id="marketing_run",
@@ -1163,7 +1205,7 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
             resource_type="marketing_run",
             durable_evidence_fields=["strategy_summary", "current_blocker", "stage"],
             read_capability_ids=["marketing_run.read", "evidence_summary.read"],
-            write_capability_ids=["marketing_run.dispatch"],
+            write_capability_ids=["marketing_run.create", "marketing_run.dispatch"],
         ),
         IntegrationDataResourceManifest(
             id="virtual_agency_task",
@@ -1177,7 +1219,7 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
                 "lineage",
             ],
             read_capability_ids=["task.read"],
-            write_capability_ids=["task.execute"],
+            write_capability_ids=["marketing_run.create", "task.execute"],
         ),
         IntegrationDataResourceManifest(
             id="virtual_agency_event",
@@ -1202,7 +1244,7 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
                 "lineage",
             ],
             read_capability_ids=["artifact.read"],
-            write_capability_ids=["event.ingest"],
+            write_capability_ids=["event.ingest", "marketing_run.create"],
         ),
         IntegrationDataResourceManifest(
             id="agency_approval_request",
@@ -1228,7 +1270,7 @@ def _data_resource_manifest() -> list[IntegrationDataResourceManifest]:
                 "resolved_by_user_id",
             ],
             read_capability_ids=["access_request.read"],
-            write_capability_ids=["access_request.decide"],
+            write_capability_ids=["access_request.decide", "marketing_run.create"],
         ),
         IntegrationDataResourceManifest(
             id="social_post",
@@ -1491,6 +1533,28 @@ async def list_engagements(
     return [_to_engagement(item) for item in result.scalars().all()]
 
 
+@router.post(
+    "/engagements",
+    response_model=IntegrationEngagementEnvelope,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_engagement(
+    body: IntegrationEngagementCreate,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    engagement = await create_client_engagement(
+        db,
+        org_id=org_id,
+        body=body,
+        created_by_agent="chief_of_staff",
+    )
+    await db.commit()
+    await db.refresh(engagement)
+    return _to_engagement(engagement)
+
+
 @router.get(
     "/engagements/{engagement_id}",
     response_model=IntegrationEngagementEnvelope,
@@ -1526,6 +1590,41 @@ async def list_engagement_marketing_runs(
         .order_by(MarketingRun.created_at.desc())
     )
     return [_to_run(item) for item in result.scalars().all()]
+
+
+@router.post(
+    "/engagements/{engagement_id}/marketing-runs",
+    response_model=IntegrationMarketingRunEnvelope,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_engagement_marketing_run(
+    engagement_id: uuid.UUID,
+    body: IntegrationMarketingRunCreate,
+    db: AsyncSession = Depends(get_db_with_rls_dep),
+    current_user: dict = Depends(get_current_user),
+):
+    org_id = _org_id_from_user(current_user)
+    engagement = await _get_engagement(
+        db,
+        org_id=org_id,
+        engagement_id=engagement_id,
+    )
+    run = await start_marketing_run(
+        db,
+        engagement=engagement,
+        objective=body.objective,
+        project_id=body.project_id,
+    )
+    actor_id = _user_id_from_user(current_user)
+    await kickoff_marketing_run(
+        db,
+        engagement=engagement,
+        run=run,
+        actor_id=str(actor_id) if actor_id else None,
+    )
+    await db.commit()
+    await db.refresh(run)
+    return _to_run(run)
 
 
 @router.get(

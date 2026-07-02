@@ -949,6 +949,11 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationApi.includes('"/platform-manifest"') &&
       integrationApi.includes('"/external-adapters"') &&
       integrationApi.includes('"/engagements"') &&
+      integrationApi.includes('"engagement.create"') &&
+      integrationApi.includes('"marketing_run.create"') &&
+      integrationApi.includes("create_client_engagement(") &&
+      integrationApi.includes("start_marketing_run(") &&
+      integrationApi.includes("kickoff_marketing_run(") &&
       integrationApi.includes('"/engagements/{engagement_id}/marketing-runs"') &&
       integrationApi.includes('"/engagements/{engagement_id}/artifacts"') &&
       integrationApi.includes('"/engagements/{engagement_id}/approvals"') &&
@@ -977,6 +982,8 @@ function buildGovernance(sourceRoot: string): PluggedInSocialGovernance {
       integrationSchemas.includes("IntegrationRunEvidenceSnapshotEnvelope") &&
       integrationSchemas.includes("IntegrationClientReportEnvelope") &&
       integrationTests.includes("test_integration_router_uses_rls_and_has_no_substrate_imports") &&
+      integrationTests.includes("engagement.create") &&
+      integrationTests.includes("marketing_run.create") &&
       !integrationApi.includes("pm_substrate") &&
       !integrationApi.includes("packages.profile") &&
       !integrationApi.includes("packages/evals"),

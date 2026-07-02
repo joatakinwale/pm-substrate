@@ -409,7 +409,9 @@ const REQUIRED_LIVE_CLOSED_LOOP_STAGES = [
 
 const REQUIRED_LIVE_CAPABILITIES = [
   "platform_manifest.read",
+  "engagement.create",
   "marketing_run.read",
+  "marketing_run.create",
   "marketing_run.dispatch",
   "task.read",
   "artifact.read",
@@ -794,11 +796,21 @@ function liveRunEvidenceIssues(
   if (manifestEndpoint?.boundary !== "public_rls") {
     issues.add("platform manifest endpoint is not public-RLS scoped");
   }
+  const createEngagementEndpoint = endpoints.get("POST /api/integration/v1/engagements");
+  if (createEngagementEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement create endpoint is not public-RLS scoped");
+  }
   const engagementRunsEndpoint = endpoints.get(
     "GET /api/integration/v1/engagements/{engagement_id}/marketing-runs",
   );
   if (engagementRunsEndpoint?.boundary !== "public_rls") {
     issues.add("engagement marketing-runs endpoint is not public-RLS scoped");
+  }
+  const createEngagementRunEndpoint = endpoints.get(
+    "POST /api/integration/v1/engagements/{engagement_id}/marketing-runs",
+  );
+  if (createEngagementRunEndpoint?.boundary !== "public_rls") {
+    issues.add("engagement marketing-run create endpoint is not public-RLS scoped");
   }
   const engagementArtifactsEndpoint = endpoints.get(
     "GET /api/integration/v1/engagements/{engagement_id}/artifacts",
@@ -864,9 +876,24 @@ function liveRunEvidenceIssues(
   ) {
     issues.add("virtual_agency_events resource lacks event_hash evidence field");
   }
+  const engagementResource = platformManifest.data_resources.find(
+    (resource) => resource.table === "client_engagements",
+  );
+  if (
+    engagementResource !== undefined &&
+    !engagementResource.write_capability_ids.includes("engagement.create")
+  ) {
+    issues.add("client_engagements resource lacks engagement.create write capability");
+  }
   const marketingRunResource = platformManifest.data_resources.find(
     (resource) => resource.table === "marketing_runs",
   );
+  if (
+    marketingRunResource !== undefined &&
+    !marketingRunResource.write_capability_ids.includes("marketing_run.create")
+  ) {
+    issues.add("marketing_runs resource lacks marketing_run.create write capability");
+  }
   if (
     marketingRunResource !== undefined &&
     !marketingRunResource.write_capability_ids.includes("marketing_run.dispatch")

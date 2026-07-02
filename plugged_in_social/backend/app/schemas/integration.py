@@ -14,7 +14,9 @@ from pydantic import BaseModel, Field
 from app.schemas.agency import (
     AgencyAccessRequestDecision,
     AgencyApprovalDecision,
+    ClientEngagementCreate,
     EvidenceRef,
+    MarketingRunCreate,
 )
 
 
@@ -408,3 +410,5 @@ class IntegrationAcceptedResponse(BaseModel):
 
 IntegrationAccessDecision = AgencyAccessRequestDecision
 IntegrationApprovalDecision = AgencyApprovalDecision
+IntegrationEngagementCreate = ClientEngagementCreate
+IntegrationMarketingRunCreate = MarketingRunCreate

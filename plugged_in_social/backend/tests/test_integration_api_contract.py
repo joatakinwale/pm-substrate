@@ -19,6 +19,7 @@ def test_integration_router_imports_with_neutral_v1_prefix():
     assert ("/integration/v1/external-adapters", frozenset({"GET"})) in route_methods
     assert ("/integration/v1/events", frozenset({"POST"})) in route_methods
     assert ("/integration/v1/engagements", frozenset({"GET"})) in route_methods
+    assert ("/integration/v1/engagements", frozenset({"POST"})) in route_methods
     assert (
         "/integration/v1/engagements/{engagement_id}",
         frozenset({"GET"}),
@@ -26,6 +27,10 @@ def test_integration_router_imports_with_neutral_v1_prefix():
     assert (
         "/integration/v1/engagements/{engagement_id}/marketing-runs",
         frozenset({"GET"}),
+    ) in route_methods
+    assert (
+        "/integration/v1/engagements/{engagement_id}/marketing-runs",
+        frozenset({"POST"}),
     ) in route_methods
     assert (
         "/integration/v1/engagements/{engagement_id}/artifacts",
@@ -107,6 +112,10 @@ def test_integration_router_uses_rls_and_has_no_substrate_imports():
     assert "get_current_user" in src
     assert "async def get_capabilities(" in src
     assert "async def get_platform_manifest(" in src
+    assert "async def create_engagement(" in src
+    assert "create_client_engagement(" in src
+    assert "async def create_engagement_marketing_run(" in src
+    assert "kickoff_marketing_run(" in src
     assert "_org_id_from_user(current_user)" in src
     assert "pm_substrate" not in src
     assert "packages.profile" not in src
@@ -149,10 +158,12 @@ def test_integration_schemas_expose_stable_external_envelopes():
         IntegrationArtifactEnvelope,
         IntegrationCapabilityResponse,
         IntegrationClientReportEnvelope,
+        IntegrationEngagementCreate,
         IntegrationPlatformManifestEnvelope,
         IntegrationEvidenceSummaryEnvelope,
         IntegrationEventIngest,
         IntegrationExternalAdapterManifest,
+        IntegrationMarketingRunCreate,
         IntegrationRunDispatchEnvelope,
         IntegrationRunEventEnvelope,
         IntegrationRunEvidenceSnapshotEnvelope,
@@ -182,6 +193,8 @@ def test_integration_schemas_expose_stable_external_envelopes():
     assert {"version", "service", "capabilities", "closed_loop_stages"}.issubset(
         capability_fields
     )
+    assert IntegrationEngagementCreate.__name__ == "ClientEngagementCreate"
+    assert IntegrationMarketingRunCreate.__name__ == "MarketingRunCreate"
     assert {
         "resource_type",
         "version",
@@ -389,6 +402,20 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
         for endpoint in manifest.api_endpoints
     )
     assert any(
+        endpoint.path == "/api/integration/v1/engagements"
+        and endpoint.method == "POST"
+        and endpoint.boundary == "public_rls"
+        and "engagement.create" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
+        endpoint.path == "/api/integration/v1/engagements/{engagement_id}/marketing-runs"
+        and endpoint.method == "POST"
+        and endpoint.boundary == "public_rls"
+        and "marketing_run.create" in endpoint.capability_ids
+        for endpoint in manifest.api_endpoints
+    )
+    assert any(
         endpoint.path == "/api/integration/v1/engagements/{engagement_id}/marketing-runs"
         and endpoint.boundary == "public_rls"
         and "marketing_run.read" in endpoint.capability_ids
@@ -414,7 +441,13 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     )
     assert any(
         resource.table == "marketing_runs"
+        and "marketing_run.create" in resource.write_capability_ids
         and "marketing_run.dispatch" in resource.write_capability_ids
+        for resource in manifest.data_resources
+    )
+    assert any(
+        resource.table == "client_engagements"
+        and "engagement.create" in resource.write_capability_ids
         for resource in manifest.data_resources
     )
     assert any(
@@ -466,6 +499,19 @@ def test_platform_manifest_exposes_agents_config_data_and_gates():
     assert any(
         capability.id == "report.read"
         and "client_report" in capability.resources
+        for capability in module._capabilities()
+    )
+    assert any(
+        capability.id == "engagement.create"
+        and "client_engagement" in capability.resources
+        for capability in module._capabilities()
+    )
+    assert any(
+        capability.id == "marketing_run.create"
+        and "marketing_run" in capability.resources
+        and "agency_artifact" in capability.resources
+        and "agency_access_request" in capability.resources
+        and "virtual_agency_task" in capability.resources
         for capability in module._capabilities()
     )
     assert any(

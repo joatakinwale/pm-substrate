@@ -59,7 +59,10 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
       ],
       capabilities: [
         "platform_manifest.read",
+        "engagement.read",
+        "engagement.create",
         "marketing_run.read",
+        "marketing_run.create",
         "marketing_run.dispatch",
         "task.read",
         "artifact.read",
@@ -169,10 +172,22 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           capability_ids: ["platform_manifest.read"],
         },
         {
+          method: "POST",
+          path: "/api/integration/v1/engagements",
+          boundary: "public_rls",
+          capability_ids: ["engagement.create"],
+        },
+        {
           method: "GET",
           path: "/api/integration/v1/engagements/{engagement_id}/marketing-runs",
           boundary: "public_rls",
           capability_ids: ["marketing_run.read"],
+        },
+        {
+          method: "POST",
+          path: "/api/integration/v1/engagements/{engagement_id}/marketing-runs",
+          boundary: "public_rls",
+          capability_ids: ["marketing_run.create"],
         },
         {
           method: "GET",
@@ -249,7 +264,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           org_scoped: true,
           durable_evidence_fields: ["intake_payload"],
           read_capability_ids: ["engagement.read"],
-          write_capability_ids: [],
+          write_capability_ids: ["engagement.create"],
         },
         {
           id: "marketing_run",
@@ -258,7 +273,7 @@ function liveSnapshotFixture(): PluggedInSocialLiveRunEvidenceSnapshot {
           org_scoped: true,
           durable_evidence_fields: ["strategy_summary"],
           read_capability_ids: ["marketing_run.read"],
-          write_capability_ids: ["marketing_run.dispatch"],
+          write_capability_ids: ["marketing_run.create", "marketing_run.dispatch"],
         },
         {
           id: "virtual_agency_task",
