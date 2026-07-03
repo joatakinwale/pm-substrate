@@ -34,6 +34,23 @@ then `pnpm dev:seed-dogfood` (idempotent).
 pnpm dev:handoff -- --summary "what shipped; what the next session must do first; any traps"
 ```
 
+## The loop (autonomous work protocol)
+
+A session IS a loop; do not stop to ask permission between iterations:
+
+1. `pnpm dev:resume` → take the top-priority OPEN work item (the handoff names it).
+2. Review → research → implement → test → fix until green → update docs/ledger.
+3. Close the item (`--status closed`), commit, run the gates.
+4. GOTO 1. Immediately. Completing an item is not a stopping condition.
+
+The only three legal stops:
+- **Budget exhausted** → record a complete `handoff` (what shipped, exact next
+  step, traps) + `cost`, commit everything green, end.
+- **Owner decision required** → record a `decision` checkpoint titled
+  `decision-needed: …` with the options, take the NEXT item that isn't blocked
+  by it, and only stop if everything is blocked.
+- **Red gates you cannot fix** → record a `lesson`, revert to green, handoff.
+
 ## Control plane
 
 `pnpm dev:status` — open work, ledger counts, governance activity (admitted
