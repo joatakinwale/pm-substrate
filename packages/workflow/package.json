@@ -20,11 +20,13 @@
   },
   "dependencies": {
     "@pm/events": "workspace:*",
+    "@pm/procedure-admission": "workspace:*",
     "@pm/registry": "workspace:*",
     "@pm/types": "workspace:*",
     "pg": "^8.13.0"
   },
   "devDependencies": {
+    "@pm/agent-state-core": "workspace:*",
     "@types/pg": "^8.11.10",
     "typescript": "^5.9.0",
     "vitest": "^2.1.0"

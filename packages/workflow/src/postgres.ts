@@ -41,6 +41,12 @@ import {
   matchesPattern,
   verifyTerminalAdmissionProviderCertificate,
 } from "@pm/registry";
+import {
+  ProcedureAdmissionRuntimeError,
+  ProcedureAdmissionStoreError,
+  type ProcedureAdmissionRuntime,
+  type ProcedureEvidenceBinding,
+} from "@pm/procedure-admission";
 import pg from "pg";
 import { WorkflowValidationError } from "./errors.js";
 import { assertWorkflowAcyclic } from "./cycle-detection.js";
@@ -71,6 +77,7 @@ import {
 import type {
   InvocationDispatcher,
   InvocationResult,
+  ProcedureAdmissionInvokeBinding,
   RetryPolicy,
   WorkflowDoc,
   WorkflowNode,
@@ -99,6 +106,28 @@ type ActionOutcomeProviderCertificateDecision =
       readonly certificate?: TerminalAdmissionProviderCertificate;
       readonly statusRef?: InvocationActionOutcomeProviderCertificateStatusRef;
       readonly evidenceDecision: EvidenceBindingRejectionDecision;
+    };
+
+type ResolvedProcedureAdmissionBinding =
+  | {
+      readonly valid: true;
+      readonly procedureId: string;
+      readonly version: number;
+      readonly runId: string;
+      readonly requestedBy: string;
+      readonly inputHash: string;
+      readonly inputEvidence: readonly ProcedureEvidenceBinding[];
+      readonly input?: unknown;
+      readonly startedAt?: string;
+      readonly evaluatedAt?: string;
+      readonly admittedBy?: string;
+    }
+  | {
+      readonly valid: false;
+      readonly issues: readonly {
+        readonly path: string;
+        readonly message: string;
+      }[];
     };
 
 /** G8.3: backoff delay for attempt N (1-based). Caps at 5 minutes. */
@@ -222,6 +251,13 @@ export interface RuntimeDeps {
    * making workflow depend on agent-state.
    */
   readonly actionOutcomeAdmission?: InvocationActionOutcomeAdmissionPort;
+  /**
+   * Optional deterministic procedure admission runtime. Workflows can bind an
+   * invoke node to this runtime when the capability represents a repeatable
+   * procedure/Pi Harness run whose output must be admitted and replayable
+   * before becoming operational workflow state.
+   */
+  readonly procedureAdmissionRuntime?: ProcedureAdmissionRuntime;
 }
 
 export class PostgresWorkflowRuntime implements WorkflowRuntime {
@@ -242,6 +278,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
   readonly #actionOutcomeAdmission:
     | InvocationActionOutcomeAdmissionPort
     | undefined;
+  readonly #procedureAdmissionRuntime: ProcedureAdmissionRuntime | undefined;
 
   constructor(deps: RuntimeDeps) {
     this.#pool = deps.pool;
@@ -297,6 +334,7 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
     this.#requireActionOutcomeProviderCertificate =
       deps.requireActionOutcomeProviderCertificate ?? false;
     this.#actionOutcomeAdmission = deps.actionOutcomeAdmission;
+    this.#procedureAdmissionRuntime = deps.procedureAdmissionRuntime;
   }
 
   // -------------------------------------------------------------------------
@@ -810,6 +848,24 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
           evidenceBinding = providedBinding ?? undefined;
         }
 
+        if (node.procedureAdmission !== undefined) {
+          const procedureStepResult = await this.#executeProcedureAdmissionNode({
+            doc,
+            node,
+            event,
+            runId,
+            inputs,
+            results,
+          });
+          if (procedureStepResult === null) {
+            runStatus = "failed";
+            return;
+          }
+          results.set(node.nodeId, procedureStepResult);
+          await visit(node.nodeId);
+          continue;
+        }
+
         // G8.3: retry loop. Default policy is single attempt (legacy).
         const policy = node.retry;
         const maxAttempts = policy && policy.maxAttempts > 0 ? policy.maxAttempts : 1;
@@ -880,6 +936,293 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
         WHERE id = $1`,
       [runId, runStatus],
     );
+  }
+
+  async #executeProcedureAdmissionNode(input: {
+    readonly doc: WorkflowDoc;
+    readonly node: Extract<WorkflowNode, { kind: "invoke" }>;
+    readonly event: PMEvent;
+    readonly runId: string;
+    readonly inputs: Readonly<Record<string, unknown>>;
+    readonly results: Map<string, Readonly<Record<string, unknown>>>;
+  }): Promise<Readonly<Record<string, unknown>> | null> {
+    const runtime = this.#procedureAdmissionRuntime;
+    if (runtime === undefined) {
+      const errPayload = {
+        error: "procedure_admission_unavailable",
+        reason:
+          "workflow node requires a ProcedureAdmissionRuntime but none is configured",
+      };
+      await this.#recordStep(
+        input.runId,
+        input.node.nodeId,
+        input.node.capability,
+        "failed",
+        errPayload,
+        1,
+      );
+      await this.#writeDeadLetter({
+        tenantId: input.doc.tenantId,
+        runId: input.runId,
+        workflowId: input.doc.id,
+        workflowVersion: input.doc.version,
+        nodeId: input.node.nodeId,
+        capability: input.node.capability,
+        triggeredBy: input.event.id,
+        inputs: input.inputs,
+        attempts: 1,
+        error: errPayload,
+        reason: "procedure_admission_unavailable",
+      });
+      return null;
+    }
+
+    const resolved = this.#resolveProcedureAdmissionBinding(
+      input.node.procedureAdmission!,
+      input.results,
+      input.event,
+    );
+    if (!resolved.valid) {
+      const errPayload = {
+        error: "procedure_admission_binding_invalid",
+        issues: resolved.issues,
+      };
+      await this.#recordStep(
+        input.runId,
+        input.node.nodeId,
+        input.node.capability,
+        "failed",
+        errPayload,
+        1,
+      );
+      await this.#writeDeadLetter({
+        tenantId: input.doc.tenantId,
+        runId: input.runId,
+        workflowId: input.doc.id,
+        workflowVersion: input.doc.version,
+        nodeId: input.node.nodeId,
+        capability: input.node.capability,
+        triggeredBy: input.event.id,
+        inputs: input.inputs,
+        attempts: 1,
+        error: errPayload,
+        reason: "procedure_admission_rejected",
+      });
+      return null;
+    }
+
+    try {
+      const admitted = await runtime.execute({
+        tenantId: input.doc.tenantId,
+        procedureId: resolved.procedureId,
+        version: resolved.version,
+        runId: resolved.runId,
+        requestedBy: resolved.requestedBy,
+        inputHash: resolved.inputHash,
+        inputEvidence: resolved.inputEvidence,
+        ...(resolved.input !== undefined ? { input: resolved.input } : {}),
+        ...(resolved.startedAt !== undefined
+          ? { startedAt: resolved.startedAt }
+          : {}),
+        ...(resolved.evaluatedAt !== undefined
+          ? { evaluatedAt: resolved.evaluatedAt }
+          : {}),
+        ...(resolved.admittedBy !== undefined
+          ? { admittedBy: resolved.admittedBy }
+          : {}),
+      });
+      const result = {
+        procedureAdmission: {
+          procedureId: admitted.definition.procedureId,
+          version: admitted.definition.version,
+          authorityScope: admitted.definition.authorityScope,
+          runnerKind: admitted.definition.runnerKind,
+          runId: admitted.run.runId,
+          runHash: admitted.run.runHash,
+          admissionId: admitted.record.admissionId,
+          admissionHash: admitted.record.admissionHash,
+          decision: admitted.record.decision,
+          sequence: admitted.record.sequence,
+          replayValid: admitted.replay.valid,
+          replayedToSequence: admitted.replay.replayedToSequence,
+          ...(admitted.replay.currentHeadHash !== undefined
+            ? { currentHeadHash: admitted.replay.currentHeadHash }
+            : {}),
+        },
+      };
+      await this.#recordStep(
+        input.runId,
+        input.node.nodeId,
+        input.node.capability,
+        "completed",
+        result,
+        1,
+      );
+      return result;
+    } catch (err) {
+      const errPayload = this.#procedureAdmissionErrorPayload(err);
+      await this.#recordStep(
+        input.runId,
+        input.node.nodeId,
+        input.node.capability,
+        "failed",
+        errPayload,
+        1,
+      );
+      await this.#writeDeadLetter({
+        tenantId: input.doc.tenantId,
+        runId: input.runId,
+        workflowId: input.doc.id,
+        workflowVersion: input.doc.version,
+        nodeId: input.node.nodeId,
+        capability: input.node.capability,
+        triggeredBy: input.event.id,
+        inputs: input.inputs,
+        attempts: 1,
+        error: errPayload,
+        reason: "procedure_admission_rejected",
+      });
+      return null;
+    }
+  }
+
+  #resolveProcedureAdmissionBinding(
+    binding: ProcedureAdmissionInvokeBinding,
+    results: Map<string, Readonly<Record<string, unknown>>>,
+    event: PMEvent,
+  ): ResolvedProcedureAdmissionBinding {
+    const issues: { path: string; message: string }[] = [];
+    const resolve = (value: string | number | undefined): unknown =>
+      typeof value === "string" ? this.#resolve(value, results, event) : value;
+    const resolveString = (path: string, value: unknown): string | undefined => {
+      if (typeof value === "string" && value.length > 0) return value;
+      issues.push({ path, message: "Expected a non-empty string." });
+      return undefined;
+    };
+    const procedureId = resolveString(
+      "procedureAdmission.procedureId",
+      resolve(binding.procedureId),
+    );
+    const runId = resolveString(
+      "procedureAdmission.runId",
+      resolve(binding.runId),
+    );
+    const requestedBy = resolveString(
+      "procedureAdmission.requestedBy",
+      resolve(binding.requestedBy),
+    );
+    const inputHash = resolveString(
+      "procedureAdmission.inputHash",
+      resolve(binding.inputHash),
+    );
+    const rawVersion = resolve(binding.version);
+    const version =
+      typeof rawVersion === "number"
+        ? rawVersion
+        : typeof rawVersion === "string" && /^\d+$/.test(rawVersion)
+          ? Number.parseInt(rawVersion, 10)
+          : undefined;
+    if (version === undefined || !Number.isInteger(version) || version < 1) {
+      issues.push({
+        path: "procedureAdmission.version",
+        message: "Expected a positive integer version.",
+      });
+    }
+
+    const rawInputEvidence = resolve(binding.inputEvidence);
+    const inputEvidence: ProcedureEvidenceBinding[] = [];
+    if (!Array.isArray(rawInputEvidence)) {
+      issues.push({
+        path: "procedureAdmission.inputEvidence",
+        message: "Expected an array of procedure evidence bindings.",
+      });
+    } else {
+      rawInputEvidence.forEach((evidence, index) => {
+        if (this.#isProcedureEvidenceBinding(evidence)) {
+          inputEvidence.push(evidence);
+        } else {
+          issues.push({
+            path: `procedureAdmission.inputEvidence[${index}]`,
+            message:
+              "Expected ref, evidenceHash, observedAt, and optional validUntil.",
+          });
+        }
+      });
+    }
+
+    const inputValue =
+      binding.input !== undefined
+        ? this.#resolve(binding.input, results, event)
+        : undefined;
+    const startedAt =
+      binding.startedAt !== undefined
+        ? resolveString(
+            "procedureAdmission.startedAt",
+            this.#resolve(binding.startedAt, results, event),
+          )
+        : undefined;
+    const evaluatedAt =
+      binding.evaluatedAt !== undefined
+        ? resolveString(
+            "procedureAdmission.evaluatedAt",
+            this.#resolve(binding.evaluatedAt, results, event),
+          )
+        : undefined;
+    const admittedBy =
+      binding.admittedBy !== undefined
+        ? resolveString(
+            "procedureAdmission.admittedBy",
+            this.#resolve(binding.admittedBy, results, event),
+          )
+        : undefined;
+
+    if (issues.length > 0) return { valid: false, issues };
+    return {
+      valid: true,
+      procedureId: procedureId!,
+      version: version!,
+      runId: runId!,
+      requestedBy: requestedBy!,
+      inputHash: inputHash!,
+      inputEvidence,
+      ...(inputValue !== undefined ? { input: inputValue } : {}),
+      ...(startedAt !== undefined ? { startedAt } : {}),
+      ...(evaluatedAt !== undefined ? { evaluatedAt } : {}),
+      ...(admittedBy !== undefined ? { admittedBy } : {}),
+    };
+  }
+
+  #isProcedureEvidenceBinding(value: unknown): value is ProcedureEvidenceBinding {
+    if (value === null || typeof value !== "object") return false;
+    const candidate = value as Record<string, unknown>;
+    const ref = candidate["ref"];
+    if (ref === null || typeof ref !== "object") return false;
+    const refCandidate = ref as Record<string, unknown>;
+    return (
+      typeof refCandidate["kind"] === "string" &&
+      typeof refCandidate["id"] === "string" &&
+      typeof candidate["evidenceHash"] === "string" &&
+      typeof candidate["observedAt"] === "string" &&
+      (candidate["validUntil"] === undefined ||
+        typeof candidate["validUntil"] === "string")
+    );
+  }
+
+  #procedureAdmissionErrorPayload(err: unknown): Record<string, unknown> {
+    if (
+      err instanceof ProcedureAdmissionRuntimeError ||
+      err instanceof ProcedureAdmissionStoreError
+    ) {
+      return {
+        error: err.name,
+        message: err.message,
+        issues: err.issues,
+      };
+    }
+    if (err instanceof Error) {
+      return { error: err.name, message: err.message };
+    }
+    return { error: "procedure_admission_error", message: String(err) };
   }
 
   async #admitActionOutcomeEnvelope(
@@ -1115,7 +1458,9 @@ export class PostgresWorkflowRuntime implements WorkflowRuntime {
       | "evidence_binding_unverified"
       | "provider_certificate_missing"
       | "provider_certificate_invalid"
-      | "action_outcome_admission_rejected";
+      | "action_outcome_admission_rejected"
+      | "procedure_admission_unavailable"
+      | "procedure_admission_rejected";
   }): Promise<void> {
     const id = `dl_${randomUUID()}`;
     await this.#pool.query(

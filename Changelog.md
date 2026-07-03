@@ -4,18 +4,26 @@
 
 - Added `docs/state-validation/verification-baseline-2026-07-02.md` with the
   post-refactor core-only and provenance-enabled baseline: 26 default
-  migrations, 149 provenance-enabled migrations, 873 passed / 7 skipped in both
-  modes, and `pnpm evals:amnesia` at baseline 0/5 vs substrate 5/5 with a valid
-  chain.
+  migrations, 149 provenance-enabled migrations, 875 passed / 7 skipped in both
+  modes with `vitest run --no-file-parallelism`, and `pnpm evals:amnesia` at
+  baseline 0/5 vs substrate 5/5 with a valid chain.
 - Added `@pm/procedure-admission`, the first Procedure Admission Kernel slice
   for deterministic harness/Pi Harness runs: procedure definitions, procedure
   runs, admission records, durable Postgres storage, registered-definition
   admission, runner-port runtime execution, optional substrate HTTP endpoints,
   hash verification, freshness checks, and replayed admitted-run projection.
+- Wired Procedure Admission into `@pm/workflow` invoke nodes: declared
+  procedure nodes execute through `ProcedureAdmissionRuntime`, never through
+  arbitrary dispatcher output, and workflow step output is the replayed
+  admission projection. Stale runner evidence dead-letters the workflow step
+  without admitting a procedure run.
 - Added a local-agent-lab PM-governance validation proving a Pi Harness-style
   run tied to `pm-governance-approval-gate` becomes operational only through
   replayed admission, including through the runtime port, while stale runner
   evidence is refused.
+- Hardened `EventReader.read` replay semantics so occurrence-window reads
+  filter and order by occurrence time, preventing time-travel projections from
+  depending on same-timestamp insertion/id ordering.
 - Hardened `PostgresProjectionRunner` bootstrap with a transaction-scoped
   advisory lock after fresh provenance verification exposed a concurrent
   `projections.state` DDL race.

@@ -36,8 +36,10 @@ registered runner port by `runnerKind`, builds the run envelope from returned
 evidence, refuses to append onto invalid replay history, and then delegates
 admission to the durable store. Runner output still has no authority until the
 store admits the generated record and replay returns the current projection.
-`substrate-http` exposes that same boundary through optional procedure routes
-when a runtime is injected.
+`@pm/workflow` can bind invoke nodes to that runtime through
+`procedureAdmission`, so a workflow-triggered procedure run completes only with
+the replayed admission projection. `substrate-http` exposes the same boundary
+through optional procedure routes when a runtime is injected.
 
 ## Admission Rule
 
@@ -95,6 +97,8 @@ the substrate rule against PM-governance state.
 - replay accepting gaps, forked heads, or duplicate runs;
 - admission against an unstored or substituted procedure definition.
 - runtime appending onto an invalid prior admission history.
+- workflow dispatch bypassing procedure admission for a declared procedure
+  node.
 
 ## Minimal Implementation Slice
 
@@ -102,9 +106,11 @@ the substrate rule against PM-governance state.
 - Pure runtime: `packages/procedure-admission/src/index.ts`
 - Postgres store: `packages/procedure-admission/src/postgres.ts`
 - Migration: `db/migrations/0149_procedure_admission.sql`
+- Workflow integration: `packages/workflow/src/postgres.ts`
 - HTTP route: `packages/substrate-http/src/routes/procedures.ts`
 - Focused tests: `packages/procedure-admission/src/index.test.ts` and
   `packages/procedure-admission/src/postgres.test.ts`
+- Workflow tests: `packages/workflow/src/postgres.test.ts`
 - PM-governance/local-lab validation:
   `packages/local-agent-lab/src/procedure-admission.test.ts`
 
@@ -118,6 +124,9 @@ The current tests falsify the primitive if:
 - stale input or runner evidence authorizes admission;
 - an unstored or substituted procedure definition can authorize admission;
 - a runner-port result can become operational without durable admission;
+- a workflow procedure node calls the arbitrary dispatcher instead of the
+  Procedure Admission Runtime;
+- a workflow procedure node completes when runner evidence is stale;
 - tampered run hashes or admission hashes are accepted;
 - replay tolerates sequence gaps or previous-head mismatches;
 - explicitly rejected runs appear in admitted projection.
@@ -125,8 +134,8 @@ The current tests falsify the primitive if:
 ## Claim Boundary
 
 This slice includes the pure replay kernel, a runner-port runtime, a
-Postgres-backed admission store, optional HTTP endpoints, and PM-governance
-local-agent-lab validation through a Pi-Harness-style runner port. It does not
-yet wire procedure admission into `@pm/workflow` invoke nodes or invoke the
-real external Pi process. Those are next integration steps after the runtime
-boundary remains stable.
+Postgres-backed admission store, workflow invoke-node integration, optional
+HTTP endpoints, and PM-governance local-agent-lab validation through a
+Pi-Harness-style runner port. It does not yet invoke the real external Pi
+process; current validation uses deterministic runner ports with the same
+admission/replay boundary the external process must satisfy.

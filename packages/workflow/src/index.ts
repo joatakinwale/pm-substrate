@@ -9,6 +9,7 @@
 
 export type {
   InvokeNode,
+  ProcedureAdmissionInvokeBinding,
   TriggerNode,
   WorkflowDoc,
   WorkflowEdge,
