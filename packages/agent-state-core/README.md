@@ -16,18 +16,33 @@ The canonical import path for the agent-state primitives consumers actually use:
 | Thin certificate refs | `ProjectionReplayCertificateRef` (+ settlement ref) — *types only* |
 | External-evidence admission | `reviewExternalStateEvidence` + full facet/type surface |
 
-78 exports total (27 runtime, 51 type-only). Derived empirically: the union of every symbol imported from `@pm/agent-state` across the workspace (50 symbols, 13 files) plus the full `external-evidence` module and the plan-named core builders. The witness/authority/quorum/seal tower (the other ~1,530 exports) is **not** here and never will be — it moves to `@pm/agent-state-provenance`.
+97 runtime exports, pinned by `src/index.test.ts`. Derived empirically: the
+dependency closure of every symbol imported from the old `@pm/agent-state`
+across the workspace, plus the plan-named core builders and the full
+`external-evidence` module. The witness/authority/quorum/seal tower is not a
+legal dependency for runtime consumers; it lives in
+`@pm/agent-state-provenance`.
 
-## Current status: interim shim
+## Current status: physical split
 
-Every export currently re-exports from `@pm/agent-state`, so the split lands incrementally with tests green at each step:
+This is no longer an interim shim. The old `@pm/agent-state` package has been
+deleted from the active workspace, all consumers import `@pm/agent-state-core`,
+and the remaining tower is quarantined:
 
-1. **(done)** This package exists; the surface is pinned by `src/index.test.ts`.
-2. Consumers re-point imports `@pm/agent-state` → `@pm/agent-state-core` (mechanical, per package).
-3. Implementations move here (starting with `external-evidence.ts`, which is already a self-contained file); `@pm/agent-state` flips to re-export from this package.
-4. The remaining tower moves to `@pm/agent-state-provenance`; its migrations gate behind `PM_ENABLE_AGENT_STATE_PROVENANCE` (plan §2.2).
+1. `@pm/agent-state-core` contains the active substrate-facing API.
+2. `@pm/agent-state-provenance` contains the frozen provenance tower and
+   re-exports core for its own compatibility tests.
+3. `db/migrations/` applies the 26 core migrations by default.
+4. `db/migrations-provenance/` applies the 123 tower migrations only when
+   `PM_ENABLE_AGENT_STATE_PROVENANCE=1`.
 
 ## Rules
 
 - New code imports `@pm/agent-state-core`, never `@pm/agent-state`.
-- No `export *`. Widening the surface requires updating the pinned count in the facade test **and** shipping a runtime (non-test, non-eval) consumer in the same change.
+- No package other than `@pm/agent-state-provenance` may import
+  `@pm/agent-state-provenance`.
+- No `export *` except the local `external-evidence` module. Widening the
+  surface requires updating the pinned count in the facade test and shipping a
+  runtime, non-test, non-eval consumer in the same change.
+- `scripts/validate-budgets.ts` enforces file budgets, name-depth, provenance
+  isolation, and explicit core surface.

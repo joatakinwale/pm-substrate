@@ -285,13 +285,18 @@ export class PostgresEventStore
     }
     params.push(limit);
 
+    const orderBy =
+      query.since !== undefined || query.until !== undefined
+        ? "occurred_at ASC, recorded_at ASC, id ASC"
+        : "recorded_at ASC, id ASC";
+
     const rows = await this.#pool.query<RowShape>(
       `SELECT id, tenant_id, type, entity_id, emitted_by, payload_schema,
               payload, occurred_at, recorded_at, caused_by, schema_version,
               authority, content_hash, prior_event_hash
          FROM events.events
         WHERE ${where.join(" AND ")}
-        ORDER BY recorded_at ASC, id ASC
+        ORDER BY ${orderBy}
         LIMIT $${params.length}`,
       params,
     );

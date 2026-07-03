@@ -11,6 +11,10 @@ import {
   TenantConflictError,
   TenantNotFoundError,
 } from "@pm/tenants";
+import {
+  ProcedureAdmissionRuntimeError,
+  ProcedureAdmissionStoreError,
+} from "@pm/procedure-admission";
 
 /**
  * Translate substrate domain errors into HTTP status codes. Only documented
@@ -29,10 +33,35 @@ import {
  *   TenantNotFoundError      → 404 Not Found
  *   TenantConflictError      → 409 Conflict
  *   InvalidTenantIdError     → 400 Bad Request
+ *   ProcedureAdmissionStoreError / RuntimeError → 404/409/422 by issue
  *   everything else          → 500 Internal Server Error
  */
 export const toHTTPException = (err: unknown): HTTPException => {
   if (err instanceof HTTPException) return err;
+  if (
+    err instanceof ProcedureAdmissionStoreError ||
+    err instanceof ProcedureAdmissionRuntimeError
+  ) {
+    const codes = err.issues.map((issue) => issue.code);
+    const status = codes.includes("definition_not_registered")
+      ? 404
+      : codes.some(
+            (code) =>
+              code === "sequence_gap" ||
+              code === "previous_hash_mismatch" ||
+              code === "duplicate_run" ||
+              code === "invalid_replay_history",
+          )
+        ? 409
+        : 422;
+    return new HTTPException(status, {
+      message: err.message,
+      cause: {
+        kind: "procedure_admission",
+        issues: err.issues,
+      },
+    });
+  }
   if (err instanceof ProfileValidationError) {
     return new HTTPException(422, {
       message: err.message,

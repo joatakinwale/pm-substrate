@@ -11,6 +11,12 @@
       "path": "./packages/agent-state-core"
     },
     {
+      "path": "./packages/substrate-mcp"
+    },
+    {
+      "path": "./packages/procedure-admission"
+    },
+    {
       "path": "./packages/continuity"
     },
     {

@@ -8,9 +8,7 @@
   "include": ["src/**/*"],
   "exclude": ["**/*.test.ts", "dist"],
   "references": [
-    { "path": "../agent-state-core" },
-    { "path": "../procedure-admission" },
     { "path": "../types" },
-    { "path": "../events" }
+    { "path": "../agent-state-core" }
   ]
 }

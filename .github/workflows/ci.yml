@@ -59,6 +59,9 @@ jobs:
       - name: Zero-edit plug-in gate (anti-fixation)
         run: pnpm validate:zero-edit
 
+      - name: Arrowsmith primitive back-map guard
+        run: pnpm validate:arrowsmith-primitives
+
       - name: Build
         run: pnpm build
 
@@ -73,3 +76,9 @@ jobs:
 
       - name: Amnesia-resume headline number (T4)
         run: pnpm evals:amnesia
+
+      - name: Migrate provenance tier
+        run: PM_ENABLE_AGENT_STATE_PROVENANCE=1 pnpm db:migrate
+
+      - name: Test provenance-enabled DB
+        run: PM_ENABLE_AGENT_STATE_PROVENANCE=1 pnpm test

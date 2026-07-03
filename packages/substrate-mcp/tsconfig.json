@@ -3,14 +3,15 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "tsBuildInfoFile": ".tsbuildinfo"
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["**/*.test.ts", "dist"],
   "references": [
-    { "path": "../agent-state-core" },
-    { "path": "../procedure-admission" },
     { "path": "../types" },
+    { "path": "../agent-state-core" },
+    { "path": "../continuity" },
     { "path": "../events" }
   ]
 }

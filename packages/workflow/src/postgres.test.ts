@@ -17,7 +17,13 @@ import {
   type WriteDecl,
   type WorkflowId,
 } from "@pm/types";
+import { stateRef } from "@pm/agent-state-core";
 import { PostgresEventStore } from "@pm/events";
+import {
+  PostgresProcedureAdmissionStore,
+  ProcedureAdmissionRuntime,
+  type ProcedureRunnerPort,
+} from "@pm/procedure-admission";
 import {
   issueTerminalAdmissionProviderCertificates,
   PostgresRegistry,
@@ -179,6 +185,8 @@ describeIfDb("PostgresWorkflowRuntime", () => {
       await pool.query(`DELETE FROM workflow.run_steps WHERE run_id IN (SELECT id FROM workflow.runs WHERE tenant_id = $1)`, [t]);
       await pool.query(`DELETE FROM workflow.runs WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM workflow.workflows WHERE tenant_id = $1`, [t]);
+      await pool.query(`DELETE FROM procedure_admission.admission_records WHERE tenant_id = $1`, [t]);
+      await pool.query(`DELETE FROM procedure_admission.definitions WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM registry.capabilities WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM events.events WHERE tenant_id = $1`, [t]);
       await pool.query(`DELETE FROM substrate.tenants WHERE id = $1`, [t]);
@@ -1762,6 +1770,289 @@ describeIfDb("PostgresWorkflowRuntime", () => {
     expect(dl.rows[0]!.reason).toBe("input_invalid");
     const issues = dl.rows[0]!.error["issues"] as Array<{ path: string }> | undefined;
     expect(issues?.some((i) => i.path === "/amount")).toBe(true);
+  });
+
+  it("runs procedure-admission invoke nodes through replayable admission instead of dispatcher", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const procedureRunner: ProcedureRunnerPort = {
+      runnerKind: "pi_harness",
+      async run() {
+        return {
+          status: "succeeded",
+          completedAt: "2026-07-02T23:03:00.000Z",
+          outputHash: "sha256:workflow-procedure-output",
+          outputEvidence: [
+            {
+              ref: stateRef("document", "doc_workflow_procedure_output"),
+              evidenceHash: "sha256:workflow-procedure-output-evidence",
+              observedAt: "2026-07-02T23:03:00.000Z",
+              validUntil: "2026-07-03T00:00:00.000Z",
+            },
+          ],
+          runnerEvidence: [
+            {
+              ref: stateRef("event", "evt_workflow_pi_harness_runner"),
+              evidenceHash: "sha256:workflow-pi-harness-runner",
+              observedAt: "2026-07-02T23:03:00.000Z",
+              validUntil: "2026-07-03T00:00:00.000Z",
+            },
+          ],
+        };
+      },
+    };
+    const procedureAdmissionRuntime = new ProcedureAdmissionRuntime({
+      store: new PostgresProcedureAdmissionStore(pool),
+      runners: [procedureRunner],
+      admittedBy: "workflow.procedure-admission-test",
+    });
+    await procedureAdmissionRuntime.registerDefinition({
+      tenantId,
+      procedureId: "proc_workflow_pi_harness",
+      version: 1,
+      name: "Workflow Pi Harness procedure",
+      authorityScope: "pmgovernance/workflow-procedure-admission",
+      runnerKind: "pi_harness",
+      inputContractHash: "sha256:workflow-procedure-input-contract",
+      outputContractHash: "sha256:workflow-procedure-output-contract",
+      allowedUse: ["pm.stage_gate.validate", "workflow.invoke"],
+      createdAt: "2026-07-02T23:00:00.000Z",
+    });
+    const runtime = new PostgresWorkflowRuntime({
+      pool,
+      registry,
+      events,
+      dispatcher,
+      procedureAdmissionRuntime,
+    });
+    await registerCap(tenantId, "pm/procedure-runner");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "procedure-admission-flow",
+      version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "procedure.requested" },
+        {
+          nodeId: "run-procedure",
+          kind: "invoke",
+          capability: "pm/procedure-runner",
+          inputs: { intent: "$trigger.payload.intent" },
+          procedureAdmission: {
+            procedureId: "proc_workflow_pi_harness",
+            version: 1,
+            runId: "$trigger.payload.runId",
+            requestedBy: "agent:workflow-test",
+            inputHash: "$trigger.payload.inputHash",
+            inputEvidence: "$trigger.payload.inputEvidence",
+            input: "$trigger.payload.input",
+            startedAt: "$trigger.payload.startedAt",
+            evaluatedAt: "$trigger.payload.evaluatedAt",
+          },
+        },
+      ],
+      edges: [{ from: "trig", to: "run-procedure" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId,
+      type: "procedure.requested",
+      entityId: "procedure-request",
+      emittedBy: "test/workflow",
+      payloadSchema: "procedure.requested/v1",
+      payload: {
+        intent: "validate approval gate",
+        runId: "run_workflow_pi_harness_001",
+        inputHash: "sha256:workflow-procedure-input",
+        input: { scenario: "pm-governance-approval-gate" },
+        inputEvidence: [
+          {
+            ref: stateRef("document", "doc_workflow_procedure_input"),
+            evidenceHash: "sha256:workflow-procedure-input-evidence",
+            observedAt: "2026-07-02T23:01:00.000Z",
+            validUntil: "2026-07-03T00:00:00.000Z",
+          },
+        ],
+        startedAt: "2026-07-02T23:02:00.000Z",
+        evaluatedAt: "2026-07-02T23:03:00.000Z",
+      },
+    });
+    await runtime.onEvent(tenantId, ev.id);
+
+    expect(dispatcher.calls.length).toBe(0);
+    const run = await pool.query<{ status: string }>(
+      `SELECT status FROM workflow.runs WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    expect(run.rows[0]!.status).toBe("completed");
+    const step = await pool.query<{
+      status: string;
+      result: {
+        procedureAdmission: {
+          decision: string;
+          admissionHash: string;
+          currentHeadHash: string;
+          replayValid: boolean;
+          replayedToSequence: number;
+        };
+      };
+    }>(
+      `SELECT status, result FROM workflow.run_steps
+        WHERE node_id = 'run-procedure'
+          AND run_id IN (SELECT id FROM workflow.runs WHERE tenant_id = $1)`,
+      [tenantId],
+    );
+    expect(step.rows[0]!.status).toBe("completed");
+    expect(step.rows[0]!.result.procedureAdmission.decision).toBe("admitted");
+    expect(step.rows[0]!.result.procedureAdmission.replayValid).toBe(true);
+    expect(step.rows[0]!.result.procedureAdmission.replayedToSequence).toBe(1);
+    expect(step.rows[0]!.result.procedureAdmission.currentHeadHash).toBe(
+      step.rows[0]!.result.procedureAdmission.admissionHash,
+    );
+    const replay = await procedureAdmissionRuntime.replay({
+      tenantId,
+      procedureId: "proc_workflow_pi_harness",
+      version: 1,
+      evaluatedAt: "2026-07-02T23:03:00.000Z",
+    });
+    expect(replay.valid).toBe(true);
+    expect(replay.admittedRuns.map((admittedRun) => admittedRun.runId)).toEqual([
+      "run_workflow_pi_harness_001",
+    ]);
+  });
+
+  it("dead-letters procedure-admission invoke nodes when runner evidence is stale", async () => {
+    const tenantId = await makeTenant();
+    const dispatcher = new RecordingDispatcher();
+    const procedureRunner: ProcedureRunnerPort = {
+      runnerKind: "pi_harness",
+      async run() {
+        return {
+          status: "succeeded",
+          completedAt: "2026-07-02T23:03:00.000Z",
+          outputHash: "sha256:workflow-stale-procedure-output",
+          outputEvidence: [
+            {
+              ref: stateRef("document", "doc_workflow_stale_procedure_output"),
+              evidenceHash: "sha256:workflow-stale-procedure-output-evidence",
+              observedAt: "2026-07-02T23:03:00.000Z",
+              validUntil: "2026-07-03T00:00:00.000Z",
+            },
+          ],
+          runnerEvidence: [
+            {
+              ref: stateRef("event", "evt_workflow_stale_pi_harness_runner"),
+              evidenceHash: "sha256:workflow-stale-pi-harness-runner",
+              observedAt: "2026-07-02T23:03:00.000Z",
+              validUntil: "2026-07-02T23:00:00.000Z",
+            },
+          ],
+        };
+      },
+    };
+    const procedureAdmissionRuntime = new ProcedureAdmissionRuntime({
+      store: new PostgresProcedureAdmissionStore(pool),
+      runners: [procedureRunner],
+      admittedBy: "workflow.procedure-admission-test",
+    });
+    await procedureAdmissionRuntime.registerDefinition({
+      tenantId,
+      procedureId: "proc_workflow_pi_harness_stale",
+      version: 1,
+      name: "Workflow stale Pi Harness procedure",
+      authorityScope: "pmgovernance/workflow-procedure-admission-stale",
+      runnerKind: "pi_harness",
+      inputContractHash: "sha256:workflow-stale-procedure-input-contract",
+      outputContractHash: "sha256:workflow-stale-procedure-output-contract",
+      allowedUse: ["pm.stage_gate.validate", "workflow.invoke"],
+      createdAt: "2026-07-02T23:00:00.000Z",
+    });
+    const runtime = new PostgresWorkflowRuntime({
+      pool,
+      registry,
+      events,
+      dispatcher,
+      procedureAdmissionRuntime,
+    });
+    await registerCap(tenantId, "pm/procedure-runner");
+    const doc: WorkflowDoc = {
+      id: `wf_${randomUUID()}` as WorkflowId,
+      tenantId,
+      name: "procedure-admission-stale-flow",
+      version: 1,
+      nodes: [
+        { nodeId: "trig", kind: "trigger", on: "procedure.stale" },
+        {
+          nodeId: "run-procedure",
+          kind: "invoke",
+          capability: "pm/procedure-runner",
+          inputs: {},
+          procedureAdmission: {
+            procedureId: "proc_workflow_pi_harness_stale",
+            version: 1,
+            runId: "$trigger.payload.runId",
+            requestedBy: "agent:workflow-test",
+            inputHash: "$trigger.payload.inputHash",
+            inputEvidence: "$trigger.payload.inputEvidence",
+            startedAt: "$trigger.payload.startedAt",
+            evaluatedAt: "$trigger.payload.evaluatedAt",
+          },
+        },
+      ],
+      edges: [{ from: "trig", to: "run-procedure" }],
+    };
+    await runtime.install(doc);
+    const ev = await events.publish({
+      tenantId,
+      type: "procedure.stale",
+      entityId: "procedure-stale-request",
+      emittedBy: "test/workflow",
+      payloadSchema: "procedure.stale/v1",
+      payload: {
+        runId: "run_workflow_pi_harness_stale_001",
+        inputHash: "sha256:workflow-stale-procedure-input",
+        inputEvidence: [
+          {
+            ref: stateRef("document", "doc_workflow_stale_procedure_input"),
+            evidenceHash: "sha256:workflow-stale-procedure-input-evidence",
+            observedAt: "2026-07-02T23:01:00.000Z",
+            validUntil: "2026-07-03T00:00:00.000Z",
+          },
+        ],
+        startedAt: "2026-07-02T23:02:00.000Z",
+        evaluatedAt: "2026-07-02T23:03:00.000Z",
+      },
+    });
+    await runtime.onEvent(tenantId, ev.id);
+
+    expect(dispatcher.calls.length).toBe(0);
+    const run = await pool.query<{ status: string }>(
+      `SELECT status FROM workflow.runs WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    expect(run.rows[0]!.status).toBe("failed");
+    const dl = await pool.query<{
+      reason: string;
+      attempts: number;
+      error: { issues?: Array<{ code: string }> };
+    }>(
+      `SELECT reason, attempts, error FROM workflow.dead_letter WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    expect(dl.rowCount).toBe(1);
+    expect(dl.rows[0]!.reason).toBe("procedure_admission_rejected");
+    expect(dl.rows[0]!.attempts).toBe(1);
+    expect(dl.rows[0]!.error.issues?.map((issue) => issue.code)).toContain(
+      "stale_runner_evidence",
+    );
+    const replay = await procedureAdmissionRuntime.replay({
+      tenantId,
+      procedureId: "proc_workflow_pi_harness_stale",
+      version: 1,
+      evaluatedAt: "2026-07-02T23:03:00.000Z",
+    });
+    expect(replay.valid).toBe(true);
+    expect(replay.admittedRuns).toEqual([]);
   });
 
   it("acceptAll validator is the default and preserves legacy dispatch (G12 / ADR-0026)", async () => {

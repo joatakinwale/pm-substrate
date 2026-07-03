@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-07-02 - Verification baseline recorded
+
+- Added `docs/state-validation/verification-baseline-2026-07-02.md` with the
+  post-refactor core-only and provenance-enabled baseline: 26 default
+  migrations, 149 provenance-enabled migrations, 875 passed / 7 skipped in both
+  modes with `vitest run --no-file-parallelism`, and `pnpm evals:amnesia` at
+  baseline 0/5 vs substrate 5/5 with a valid chain.
+- Added `@pm/procedure-admission`, the first Procedure Admission Kernel slice
+  for deterministic harness/Pi Harness runs: procedure definitions, procedure
+  runs, admission records, durable Postgres storage, registered-definition
+  admission, runner-port runtime execution, optional substrate HTTP endpoints,
+  hash verification, freshness checks, and replayed admitted-run projection.
+- Wired Procedure Admission into `@pm/workflow` invoke nodes: declared
+  procedure nodes execute through `ProcedureAdmissionRuntime`, never through
+  arbitrary dispatcher output, and workflow step output is the replayed
+  admission projection. Stale runner evidence dead-letters the workflow step
+  without admitting a procedure run.
+- Added a local-agent-lab PM-governance validation proving a Pi Harness-style
+  run tied to `pm-governance-approval-gate` becomes operational only through
+  replayed admission, including through the runtime port, while stale runner
+  evidence is refused.
+- Hardened `EventReader.read` replay semantics so occurrence-window reads
+  filter and order by occurrence time, preventing time-travel projections from
+  depending on same-timestamp insertion/id ordering.
+- Hardened `PostgresProjectionRunner` bootstrap with a transaction-scoped
+  advisory lock after fresh provenance verification exposed a concurrent
+  `projections.state` DDL race.
+- Updated `README.md` and `packages/agent-state-core/README.md` so the docs now
+  describe the physical `@pm/agent-state-core` / `@pm/agent-state-provenance`
+  split instead of the old interim shim.
+- Updated `docs/validation.md` to mark T4 as measured at the continuity-ledger
+  level while keeping live model/Ollama delete-context behavior outside the
+  claim boundary.
+
 ## 2026-07-02 - Refactor plan executed: lean core, quarantined tower, PM-governance profile
 
 - Phase 0.1: re-pointed all 27 consumer files (13 source consumers + tests) from `@pm/agent-state` to `@pm/agent-state-core`; repaired two pre-existing HEAD test failures (stale `capability.test.ts` emit-type expectation; `arrowhedge.integration.test.ts` missing the ActionOutcomeEnvelope the canonical terminal-outcome-partition scenario requires — the fixture now builds a real envelope through the core surface).
