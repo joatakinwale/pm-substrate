@@ -28,7 +28,8 @@
     "@pm/types": "workspace:*",
     "hono": "^4.6.0",
     "pg": "^8.13.0",
-    "@pm/tenants": "workspace:*"
+    "@pm/tenants": "workspace:*",
+    "@pm/continuity": "workspace:*"
   },
   "devDependencies": {
     "@pm/agent-state-core": "workspace:*",

@@ -569,6 +569,9 @@ importers:
 
   packages/substrate-http:
     dependencies:
+      '@pm/continuity':
+        specifier: workspace:*
+        version: link:../continuity
       '@pm/events':
         specifier: workspace:*
         version: link:../events
