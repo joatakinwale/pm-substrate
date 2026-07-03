@@ -23,6 +23,8 @@ import { eventRoutes } from "./routes/events.js";
 import type { DomainEventHandler } from "./routes/events.js";
 import { projectionRoutes } from "./routes/projections.js";
 import { procedureRoutes } from "./routes/procedures.js";
+import { controlPlaneRoutes } from "./routes/control-plane.js";
+import type pg from "pg";
 
 export interface SubstrateAppDeps {
   readonly tenants: TenantDirectory;
@@ -41,6 +43,14 @@ export interface SubstrateAppDeps {
    * substrate library itself.
    */
   readonly extraRoutes?: ReadonlyArray<{ readonly basePath: string; readonly router: Hono }>;
+
+  /**
+   * Optional control-plane pool (ROADMAP D4). When provided, mounts
+   * GET /tenants/:tenantId/control-plane — the five questions answered from
+   * the admitted log (open work, governance tallies, costs, results,
+   * optimizations, chain integrity).
+   */
+  readonly controlPlanePool?: pg.Pool;
 }
 
 export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
@@ -58,6 +68,12 @@ export const createSubstrateApp = (deps: SubstrateAppDeps): Hono => {
     app.route(
       "/tenants/:tenantId/procedures",
       procedureRoutes(deps.procedureAdmissionRuntime),
+    );
+  }
+  if (deps.controlPlanePool) {
+    app.route(
+      "/tenants/:tenantId/control-plane",
+      controlPlaneRoutes(deps.controlPlanePool),
     );
   }
   for (const extra of deps.extraRoutes ?? []) {
