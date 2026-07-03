@@ -650,6 +650,27 @@ export const server = createServer(async (req, res) => {
     req.on("close", () => streams.delete(res));
     return;
   }
+  if (pathname === "/api/control-plane") {
+    if (method !== "GET") return sendMethodNotAllowed(res);
+    // D4: proxy the substrate control-plane endpoint (five questions from the
+    // admitted log). Tenant/scope come from env; substrate from SUBSTRATE_BASE_URL.
+    const base = process.env.SUBSTRATE_BASE_URL ?? "http://127.0.0.1:4100";
+    const tenant = process.env.PM_DEV_TENANT_ID ?? "tenant_dev";
+    const scope = process.env.PM_DEV_SCOPE ?? "pm-substrate-dev";
+    const agent = process.env.PM_DEV_AGENT_ID ?? "joat-dev";
+    try {
+      const upstream = await fetch(
+        `${base}/tenants/${encodeURIComponent(tenant)}/control-plane?scope=${encodeURIComponent(scope)}&agentId=${encodeURIComponent(agent)}`,
+      );
+      const body = await upstream.text();
+      res.writeHead(upstream.status, { "content-type": "application/json" });
+      return res.end(body);
+    } catch (err) {
+      return sendJson(res, 502, {
+        error: `substrate control-plane unreachable at ${base}: ${String(err)}`,
+      });
+    }
+  }
   if (pathname === "/api/health") {
     if (method !== "GET") return sendMethodNotAllowed(res);
     try {
