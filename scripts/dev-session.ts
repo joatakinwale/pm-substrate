@@ -149,7 +149,17 @@ const main = async (): Promise<void> => {
         );
         exit(1);
       }
-      if (argv.includes("--governed")) {
+      // Ramp step (decided 2026-07-06 after first clean governed sessions):
+      // GOVERNED IS THE DEFAULT. Every checkpoint/handoff goes through
+      // observe → propose → admit; `--direct` is the explicit escape hatch
+      // (emergencies only — it bypasses the gate and says so out loud).
+      const governed = !argv.includes("--direct");
+      if (!governed) {
+        console.error(
+          "NOTICE: --direct write — bypassing the gate (no proposal, no admission).",
+        );
+      }
+      if (governed) {
         // Dogfood the gate (shadow-first ramp, hard req 5 → live traffic):
         // the SAME write, but through observe → propose → admit. A stale or
         // conflicted basis BLOCKS this checkpoint — that is the point.
