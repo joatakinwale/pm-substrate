@@ -343,7 +343,68 @@ const main = async (): Promise<void> => {
       return;
     }
 
-    console.error(`unknown command: ${cmd} (resume|checkpoint|handoff|cost|status|seed-dogfood)`);
+    if (cmd === "metrics") {
+      // D7 evidence: loop-health numbers derived from the admitted log alone.
+      const all = await ledger.list({ tenantId: TENANT, agentId: AGENT, scope: SCOPE, limit: 2000 });
+      const chain = verifyContinuityCheckpointChain({ tenantId: TENANT, agentId: AGENT, checkpoints: all });
+      const handoffs = all.filter((c) => c.kind === "handoff");
+      const work = all.filter((c) => c.kind === "work");
+      const closedTitles = new Set(work.filter((c) => c.status === "closed").map((c) => c.title));
+      const openWork = work.filter((c) => c.status === "open" && !closedTitles.has(c.title));
+      const decisions = all.filter((c) => c.kind === "decision");
+      const superseded = all.filter((c) => c.status === "superseded");
+      const mcp = await pool.query<{ outcome: string; c: string }>(
+        `SELECT payload->>'terminalOutcome' AS outcome, count(*)::text AS c
+           FROM events.events WHERE tenant_id = $1 AND type = 'pm.mcp.action'
+          GROUP BY 1`,
+        [TENANT],
+      );
+      const dispatched = await pool.query<{ c: string }>(
+        `SELECT count(*)::text AS c FROM events.events
+          WHERE tenant_id = $1 AND type = 'pm.work.dispatched'`,
+        [TENANT],
+      );
+      const cost = await pool.query<{ total: string | null; sessions: string }>(
+        `SELECT sum((payload->>'totalTokens')::bigint)::text AS total,
+                count(distinct entity_id)::text AS sessions
+           FROM events.events WHERE tenant_id = $1 AND type = $2`,
+        [TENANT, COST_EVENT_TYPE],
+      );
+      const blocked = Number(mcp.rows.find((r) => r.outcome === "blocked")?.c ?? 0);
+      const accepted = Number(mcp.rows.find((r) => r.outcome === "accepted")?.c ?? 0);
+      const totalTokens = Number(cost.rows[0]?.total ?? 0);
+      const sessions = Math.max(handoffs.length, 1);
+      const closed = closedTitles.size;
+      const report = {
+        generatedAt: new Date().toISOString(),
+        scope: SCOPE,
+        // Resume fidelity: every session that ended left a handoff; chain intact.
+        sessions: handoffs.length,
+        handoffCoverage: handoffs.length > 0,
+        chainValid: chain.valid,
+        // Throughput: work opened vs closed, per session.
+        workOpened: work.filter((c) => c.status !== "closed").length + closed,
+        workClosed: closed,
+        workStillOpen: openWork.length,
+        closedPerSession: Number((closed / sessions).toFixed(2)),
+        // Governance: the gate did real work.
+        mcpAdmitted: accepted,
+        mcpBlocked: blocked,
+        blockRate: accepted + blocked > 0 ? Number((blocked / (accepted + blocked)).toFixed(3)) : null,
+        workDispatched: Number(dispatched.rows[0]?.c ?? 0),
+        // Decisions: standing vs superseded (re-decision avoidance).
+        decisionsStanding: decisions.filter((d) => d.status !== "superseded").length,
+        decisionsSuperseded: superseded.length,
+        // Cost: tokens per closed work item.
+        totalTokens,
+        costSessions: Number(cost.rows[0]?.sessions ?? 0),
+        tokensPerClosedItem: closed > 0 ? Math.round(totalTokens / closed) : null,
+      };
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+
+    console.error(`unknown command: ${cmd} (resume|checkpoint|handoff|cost|status|metrics|seed-dogfood)`);
     exit(1);
   } finally {
     await events.close().catch(() => {});
