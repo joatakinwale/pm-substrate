@@ -14,7 +14,11 @@ import {
   type LiquidFetchOptions,
   type LiquidMcpClient,
 } from "./liquid-source.js";
-import { requireApprovedEntityMapping } from "./mapping-approval.js";
+import {
+  entityMappingHash,
+  getMappingApprovalState,
+  requireApprovedEntityMapping,
+} from "./mapping-approval.js";
 import {
   runEntityMappingSync,
   type EntityMappingSyncResult,
@@ -32,10 +36,18 @@ export interface LiquidSyncInput extends LiquidFetchOptions {
   readonly mapping: EntityMapping;
   readonly syncedBy: string;
   readonly authority?: string;
+  /**
+   * Shadow mode: zero writes, zero events, AND the approval gate reports
+   * its verdict instead of enforcing it — so a dry run previews both the
+   * data effects and whether the real run would be refused.
+   */
+  readonly dryRun?: boolean;
 }
 
 export interface LiquidSyncResult extends EntityMappingSyncResult {
   readonly mappingHash: string;
+  /** Real runs are only ever true (unapproved throws); dry runs report it. */
+  readonly mappingApproved: boolean;
   readonly adapterId: string;
   readonly skippedMissingId: number;
 }
@@ -50,12 +62,25 @@ export async function syncFromLiquid(
   client: LiquidMcpClient,
   input: LiquidSyncInput,
 ): Promise<LiquidSyncResult> {
-  const mappingHash = await requireApprovedEntityMapping(
-    deps.events,
-    input.tenantId,
-    input.appName,
-    input.mapping,
-  );
+  let mappingHash: string;
+  let mappingApproved: boolean;
+  if (input.dryRun) {
+    mappingHash = entityMappingHash(input.mapping);
+    const state = await getMappingApprovalState(
+      deps.events,
+      input.tenantId,
+      input.appName,
+    );
+    mappingApproved = state.approvedHash === mappingHash;
+  } else {
+    mappingHash = await requireApprovedEntityMapping(
+      deps.events,
+      input.tenantId,
+      input.appName,
+      input.mapping,
+    );
+    mappingApproved = true;
+  }
   const fetched = await fetchLiquidRecords(client, input);
   const result = await runEntityMappingSync(deps, {
     tenantId: input.tenantId,
@@ -64,10 +89,12 @@ export async function syncFromLiquid(
     records: fetched.records,
     syncedBy: input.syncedBy,
     ...(input.authority !== undefined ? { authority: input.authority } : {}),
+    ...(input.dryRun !== undefined ? { dryRun: input.dryRun } : {}),
   });
   return {
     ...result,
     mappingHash,
+    mappingApproved,
     adapterId: fetched.adapterId,
     skippedMissingId: fetched.skippedMissingId,
   };

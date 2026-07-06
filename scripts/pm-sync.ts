@@ -55,6 +55,7 @@ async function main(): Promise<void> {
     JSON.parse(readFileSync(mappingPath, "utf8")),
   );
 
+  const dryRun = process.argv.includes("--dry-run");
   const pool = new pg.Pool({ connectionString: databaseUrl });
   const deps = {
     graph: new PostgresGraph(pool),
@@ -98,10 +99,16 @@ async function main(): Promise<void> {
           externalIdField,
           ...(endpoint ? { endpoint } : {}),
           syncedBy: AGENT,
+          ...(dryRun ? { dryRun } : {}),
         });
         console.log(
-          `liquid adapter=${result.adapterId} mapping=${result.mappingHash} skippedMissingId=${result.skippedMissingId}`,
+          `liquid adapter=${result.adapterId} mapping=${result.mappingHash} approved=${result.mappingApproved} skippedMissingId=${result.skippedMissingId}`,
         );
+        if (dryRun && !result.mappingApproved) {
+          console.error(
+            "DRY RUN verdict: a real run would be REFUSED — mapping not approved (pnpm pm:mappings).",
+          );
+        }
       } finally {
         await client.close();
       }
@@ -120,10 +127,11 @@ async function main(): Promise<void> {
         mapping,
         records,
         syncedBy: AGENT,
+        ...(dryRun ? { dryRun } : {}),
       });
     }
     console.log(
-      `sync ${appName}: created=${result.created} updated=${result.updated} unchanged=${result.unchanged} edges+${result.edgesCreated}/=${result.edgesUnchanged} rejected=${result.rejected.length}`,
+      `${result.dryRun ? "DRY RUN (nothing written) " : ""}sync ${appName}: created=${result.created} updated=${result.updated} unchanged=${result.unchanged} edges+${result.edgesCreated}/=${result.edgesUnchanged} rejected=${result.rejected.length}`,
     );
     for (const r of result.rejected) {
       console.error(`  rejected ${r.sourceName}:${r.externalId} — ${r.reason}`);

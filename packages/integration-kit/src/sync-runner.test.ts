@@ -303,6 +303,71 @@ describeIfDb("entity-mapping sync-runner (fixture app, zero rewrites)", () => {
     expect(result.rejected[0]?.reason).toMatch(/edge "ghost_relation"/);
   });
 
+  it("dry run computes the full verdict with zero writes and zero events", async () => {
+    const before = await pool.query<{ n: string; e: string }>(
+      `SELECT (SELECT count(*) FROM graph.nodes  WHERE tenant_id = $1)::text AS n,
+              (SELECT count(*) FROM events.events WHERE tenant_id = $1)::text AS e`,
+      [tenantId],
+    );
+    const preview = await runEntityMappingSync(
+      { graph, events },
+      {
+        tenantId,
+        appName: "orbit_crm",
+        mapping: FIXTURE_MAPPING,
+        records: [
+          // one brand-new record, one existing-unchanged, one bad
+          {
+            sourceName: "Customer",
+            externalId: "dry-1",
+            row: { name: "Dry Run Co", email: "dry@orbit.example" },
+          },
+          {
+            sourceName: "Customer",
+            externalId: "cust-1",
+            row: { name: "Ada Lovelace", email: "ada@orbit.example" },
+          },
+          { sourceName: "Nope", externalId: "x", row: {} },
+        ],
+        syncedBy: "sync-runner-test",
+        dryRun: true,
+      },
+    );
+    expect(preview).toMatchObject({
+      dryRun: true,
+      created: 1,
+      updated: 0,
+      unchanged: 1,
+    });
+    expect(preview.rejected).toHaveLength(1);
+
+    const after = await pool.query<{ n: string; e: string }>(
+      `SELECT (SELECT count(*) FROM graph.nodes  WHERE tenant_id = $1)::text AS n,
+              (SELECT count(*) FROM events.events WHERE tenant_id = $1)::text AS e`,
+      [tenantId],
+    );
+    expect(after.rows[0]).toEqual(before.rows[0]); // nothing landed
+
+    // The real run then does exactly what the preview said.
+    const real = await runEntityMappingSync(
+      { graph, events },
+      {
+        tenantId,
+        appName: "orbit_crm",
+        mapping: FIXTURE_MAPPING,
+        records: [
+          {
+            sourceName: "Customer",
+            externalId: "dry-1",
+            row: { name: "Dry Run Co", email: "dry@orbit.example" },
+          },
+        ],
+        syncedBy: "sync-runner-test",
+      },
+    );
+    expect(real).toMatchObject({ dryRun: false, created: 1 });
+  });
+
   it("rejects a malformed mapping document outright", async () => {
     await expect(
       runEntityMappingSync(
