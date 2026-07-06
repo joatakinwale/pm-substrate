@@ -18,6 +18,7 @@ export {
 export {
   CANARY_ADAPTER,
   KNOWN_EXTERNAL_ADAPTERS,
+  LIQUID_ADAPTER,
   PI_HARNESS_ADAPTER,
 } from "./known-adapters.js";
 export {

@@ -127,7 +127,77 @@ export const CANARY_ADAPTER: ExternalAdapterContract = {
   },
 };
 
+/**
+ * Liquid (ertad-family/liquid): universal adapter runtime — fetch/query/
+ * write/sense over web APIs, databases, MCP servers, email, IoT/OT. An LLM
+ * learns each interface at setup and RE-MAPS ON DRIFT; the data path is
+ * deterministic. Under the substrate it is a mapping PROPOSER and a sync
+ * source, never an autonomous writer: its self-heal (`repair_adapter`) and
+ * `write` verbs are exactly what the gate must hold — a re-map is a
+ * proposal, and writes ride admitted envelopes only (decision chk_e21b8d6b
+ * lineage). Agents never mount Liquid directly.
+ */
+export const LIQUID_ADAPTER: ExternalAdapterContract = {
+  id: "liquid",
+  name: "Liquid universal adapter runtime",
+  adapterType: "mapping_proposer",
+  boundary: "remote_service",
+  purpose:
+    "Discover an external system's interface, propose entity mappings, and serve typed records for sync — with drift re-maps surfaced as proposals, not autonomous changes.",
+  capabilities: [
+    "interface_discovery",
+    "typed_record_fetch",
+    "server_side_query",
+    "aggregate",
+    "event_sense",
+    "governed_write",
+    "drift_detection",
+    "mapping_repair_proposal",
+    "cost_estimation",
+    "cross_source_normalization",
+    "canonical_intents",
+    "mcp_stdio_server",
+  ],
+  inputContracts: [
+    "endpoint_or_dsn",
+    "target_model",
+    "mapping_approval",
+    "write_approval",
+  ],
+  outputArtifacts: [
+    "adapter_record",
+    "typed_records",
+    "mapping_proposal",
+    "drift_report",
+    "fetch_estimate",
+  ],
+  requiredGates: [
+    "tenant_rls",
+    "mapping_approval_gate",
+    "write_gate",
+    "sandbox_boundary",
+  ],
+  evidenceFields: [
+    "adapter_id",
+    "source_ref",
+    "mapping_hash",
+    "record_count",
+    "drift_reason",
+  ],
+  source: {
+    url: "https://github.com/ertad-family/liquid",
+    commit: "c904bd8205da09ae028cdd5ae516bb273748fdaf",
+  },
+  notes: {
+    license: "AGPL-3.0 — keep as separate sidecar process, never linked in",
+    runtime: "python>=3.12; PyPI liquid-api; MCP server: uvx liquid-mcp (stdio)",
+    role: "mapping proposer + sync source for pm:sync; drift re-map = proposal through the gate",
+    reviewedAt: "2026-07-06",
+  },
+};
+
 export const KNOWN_EXTERNAL_ADAPTERS: readonly ExternalAdapterContract[] = [
   PI_HARNESS_ADAPTER,
   CANARY_ADAPTER,
+  LIQUID_ADAPTER,
 ];
