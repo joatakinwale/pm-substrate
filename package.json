@@ -38,7 +38,8 @@
     "dev:status": "tsx scripts/dev-session.ts status",
     "dev:seed-dogfood": "tsx scripts/dev-session.ts seed-dogfood",
     "mcp:stdio": "node packages/substrate-mcp/dist/stdio.js",
-    "pm:dispatch": "tsx scripts/dispatch-unblocked-work.ts"
+    "pm:dispatch": "tsx scripts/dispatch-unblocked-work.ts",
+    "mcp:http": "tsx packages/substrate-mcp/src/http-entry.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -6,3 +6,7 @@ export {
   buildSubstrateMcpServer,
   type SubstrateMcpDeps,
 } from "./server.js";
+export {
+  startSubstrateMcpHttpServer,
+  type SubstrateMcpHttpOptions,
+} from "./http.js";
