@@ -82,12 +82,33 @@ async function main(): Promise<void> {
       const { Client } = await import(
         "@modelcontextprotocol/sdk/client/index.js"
       );
-      const { StdioClientTransport } = await import(
+      const { StdioClientTransport, getDefaultEnvironment } = await import(
         "@modelcontextprotocol/sdk/client/stdio.js"
       );
+      // The SDK spawns stdio servers with a SAFELIST env, not the parent env
+      // (found live 2026-07-06: the sidecar never saw its LLM config).
+      // Forward exactly the variables the Liquid sidecar documents.
+      const sidecarEnv: Record<string, string> = { ...getDefaultEnvironment() };
+      for (const key of [
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "GEMINI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "LIQUID_LLM_PROVIDER",
+        "LIQUID_LLM_MODEL",
+        "LIQUID_LLM_BASE_URL",
+        "LIQUID_ALLOW_WRITES",
+      ]) {
+        const value = process.env[key];
+        if (value !== undefined) sidecarEnv[key] = value;
+      }
       const client = new Client({ name: "pm-sync-liquid", version: "0.1.0" });
       await client.connect(
-        new StdioClientTransport({ command: command!, args: cmdArgs }),
+        new StdioClientTransport({
+          command: command!,
+          args: cmdArgs,
+          env: sidecarEnv,
+        }),
       );
       try {
         result = await syncFromLiquid(deps, client, {
