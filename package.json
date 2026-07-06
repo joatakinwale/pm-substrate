@@ -40,7 +40,8 @@
     "mcp:stdio": "node packages/substrate-mcp/dist/stdio.js",
     "pm:dispatch": "tsx scripts/dispatch-unblocked-work.ts",
     "mcp:http": "tsx packages/substrate-mcp/src/http-entry.ts",
-    "dev:metrics": "tsx scripts/dev-session.ts metrics"
+    "dev:metrics": "tsx scripts/dev-session.ts metrics",
+    "pm:adapters": "tsx scripts/pm-adapters.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

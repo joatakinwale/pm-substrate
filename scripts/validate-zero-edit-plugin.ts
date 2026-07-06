@@ -37,6 +37,7 @@ const RUNTIME_CORE = new Set([
   "substrate-http",
   "substrate-mcp",
   "agent-state-core",
+  "integration-kit",
 ]);
 
 const isPlugin = (pkg: string) =>
