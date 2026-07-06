@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "@pm/agent-state-core": "workspace:*",
+    "@pm/entity-mapping": "workspace:*",
     "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
     "@pm/types": "workspace:*",
     "zod": "^3.23.8"
   },

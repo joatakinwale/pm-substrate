@@ -41,7 +41,8 @@
     "pm:dispatch": "tsx scripts/dispatch-unblocked-work.ts",
     "mcp:http": "tsx packages/substrate-mcp/src/http-entry.ts",
     "dev:metrics": "tsx scripts/dev-session.ts metrics",
-    "pm:adapters": "tsx scripts/pm-adapters.ts"
+    "pm:adapters": "tsx scripts/pm-adapters.ts",
+    "pm:sync": "tsx scripts/pm-sync.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

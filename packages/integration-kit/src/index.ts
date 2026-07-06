@@ -20,3 +20,17 @@ export {
   KNOWN_EXTERNAL_ADAPTERS,
   PI_HARNESS_ADAPTER,
 } from "./known-adapters.js";
+export {
+  SYNC_ID_NAMESPACE,
+  SYNC_REJECTED_EVENT_TYPE,
+  SYNC_UPSERTED_EVENT_TYPE,
+  runEntityMappingSync,
+  syncNodeId,
+  uuidV5,
+  type EntityMappingSyncDeps,
+  type EntityMappingSyncInput,
+  type EntityMappingSyncResult,
+  type SourceRecord,
+  type SyncGraph,
+  type SyncRejection,
+} from "./sync-runner.js";
