@@ -85,6 +85,31 @@ export const controlPlaneRoutes = (pool: pg.Pool): Hono => {
         WHERE tenant_id = $1 AND type = 'pm.work.dispatched'`,
       [tenantId],
     );
+    // Integration-kit lanes (D5): adapter registry + sync + executor bridge.
+    // String literals by this file's precedent — counts come from the log,
+    // never from the kit's own code path.
+    const kitLanes = await pool.query<{ type: string; c: string }>(
+      `SELECT type, count(*)::text AS c FROM events.events
+        WHERE tenant_id = $1 AND type = ANY($2::text[]) GROUP BY type`,
+      [
+        tenantId,
+        [
+          "pm.sync.upserted",
+          "pm.sync.rejected",
+          "pm.executor.dispatched",
+          "pm.executor.refused",
+          "pm.executor.failed",
+        ],
+      ],
+    );
+    const kitLane = (type: string): number =>
+      Number(kitLanes.rows.find((r) => r.type === type)?.c ?? 0);
+    const adapters = await pool.query<{ c: string }>(
+      `SELECT count(distinct payload->>'adapterId')::text AS c
+         FROM events.events
+        WHERE tenant_id = $1 AND type = 'pm.adapter.registered'`,
+      [tenantId],
+    );
     const closedWork = all
       .filter((k) => k.kind === "work" && k.status === "closed")
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -117,6 +142,14 @@ export const controlPlaneRoutes = (pool: pg.Pool): Hono => {
       costs: {
         totalTokens: Number(costs.rows[0]?.total ?? 0),
         labeledSessions: Number(costs.rows[0]?.sessions ?? 0),
+      },
+      integration: {
+        adaptersRegistered: Number(adapters.rows[0]?.c ?? 0),
+        syncUpserted: kitLane("pm.sync.upserted"),
+        syncRejected: kitLane("pm.sync.rejected"),
+        executorDispatched: kitLane("pm.executor.dispatched"),
+        executorRefused: kitLane("pm.executor.refused"),
+        executorFailed: kitLane("pm.executor.failed"),
       },
       results: {
         decisions: brief(ctx.decisions, 10),

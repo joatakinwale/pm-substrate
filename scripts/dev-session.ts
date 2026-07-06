@@ -370,6 +370,28 @@ const main = async (): Promise<void> => {
            FROM events.events WHERE tenant_id = $1 AND type = $2`,
         [TENANT, COST_EVENT_TYPE],
       );
+      const kit = await pool.query<{ type: string; c: string }>(
+        `SELECT type, count(*)::text AS c FROM events.events
+          WHERE tenant_id = $1 AND type = ANY($2::text[]) GROUP BY type`,
+        [
+          TENANT,
+          [
+            "pm.sync.upserted",
+            "pm.sync.rejected",
+            "pm.executor.dispatched",
+            "pm.executor.refused",
+            "pm.executor.failed",
+          ],
+        ],
+      );
+      const kitLane = (type: string): number =>
+        Number(kit.rows.find((r) => r.type === type)?.c ?? 0);
+      const adapters = await pool.query<{ c: string }>(
+        `SELECT count(distinct payload->>'adapterId')::text AS c
+           FROM events.events
+          WHERE tenant_id = $1 AND type = 'pm.adapter.registered'`,
+        [TENANT],
+      );
       const blocked = Number(mcp.rows.find((r) => r.outcome === "blocked")?.c ?? 0);
       const accepted = Number(mcp.rows.find((r) => r.outcome === "accepted")?.c ?? 0);
       const totalTokens = Number(cost.rows[0]?.total ?? 0);
@@ -392,6 +414,13 @@ const main = async (): Promise<void> => {
         mcpBlocked: blocked,
         blockRate: accepted + blocked > 0 ? Number((blocked / (accepted + blocked)).toFixed(3)) : null,
         workDispatched: Number(dispatched.rows[0]?.c ?? 0),
+        // Integration kit (D5): the zero-rewrite attach path in real use.
+        adaptersRegistered: Number(adapters.rows[0]?.c ?? 0),
+        syncUpserted: kitLane("pm.sync.upserted"),
+        syncRejected: kitLane("pm.sync.rejected"),
+        executorDispatched: kitLane("pm.executor.dispatched"),
+        executorRefused: kitLane("pm.executor.refused"),
+        executorFailed: kitLane("pm.executor.failed"),
         // Decisions: standing vs superseded (re-decision avoidance).
         decisionsStanding: decisions.filter((d) => d.status !== "superseded").length,
         decisionsSuperseded: superseded.length,

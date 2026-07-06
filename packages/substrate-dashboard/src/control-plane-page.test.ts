@@ -21,6 +21,14 @@ const fixture: ControlPlanePayload = {
     workDispatched: 2,
   },
   costs: { totalTokens: 349500, labeledSessions: 4 },
+  integration: {
+    adaptersRegistered: 2,
+    syncUpserted: 5,
+    syncRejected: 1,
+    executorDispatched: 3,
+    executorRefused: 1,
+    executorFailed: 0,
+  },
   results: {
     decisions: [{ title: "Loop protocol", summary: "Never stop between items." }],
     claimsUnderTest: [{ title: "Governance is API", summary: "Test via labs." }],
@@ -39,6 +47,7 @@ describe("control-plane page renderer (D4)", () => {
       "being-done",
       "governance",
       "costs",
+      "integration",
       "results",
       "optimized",
       "integrity",
@@ -47,6 +56,10 @@ describe("control-plane page renderer (D4)", () => {
     }
     expect(html).toContain("D5 anchors");
     expect(html).toContain("MCP actions blocked: <strong>1</strong>");
+    expect(html).toContain("adapters registered: <strong>2</strong>");
+    expect(html).toContain(
+      "executor dispatched: <strong>3</strong> · refused: <strong>1</strong> · failed: <strong>0</strong>",
+    );
     expect(html).toContain("349,500");
     expect(html).toContain("Loop protocol");
     expect(html).toContain("Unconsumed formalism spirals");
