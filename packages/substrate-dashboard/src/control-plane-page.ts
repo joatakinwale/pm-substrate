@@ -21,6 +21,14 @@ export interface ControlPlanePayload {
     readonly workDispatched: number;
   };
   readonly costs: { readonly totalTokens: number; readonly labeledSessions: number };
+  readonly integration: {
+    readonly adaptersRegistered: number;
+    readonly syncUpserted: number;
+    readonly syncRejected: number;
+    readonly executorDispatched: number;
+    readonly executorRefused: number;
+    readonly executorFailed: number;
+  };
   readonly results: {
     readonly decisions: readonly { title: string; summary: string }[];
     readonly claimsUnderTest: readonly { title: string; summary: string }[];
@@ -87,6 +95,14 @@ export function renderControlPlaneHtml(d: ControlPlanePayload): string {
     <h2>3 · What it cost</h2>
     <p><strong>${d.costs.totalTokens.toLocaleString()}</strong> tokens across
     <strong>${d.costs.labeledSessions}</strong> labeled sessions</p>
+  </article>
+  <article class="cp-card" data-q="integration">
+    <h2>Attached apps (integration kit)</h2>
+    <ul class="cp-tallies">
+      <li>adapters registered: <strong>${d.integration.adaptersRegistered}</strong></li>
+      <li>sync upserted: <strong>${d.integration.syncUpserted}</strong> · rejected: <strong>${d.integration.syncRejected}</strong></li>
+      <li>executor dispatched: <strong>${d.integration.executorDispatched}</strong> · refused: <strong>${d.integration.executorRefused}</strong> · failed: <strong>${d.integration.executorFailed}</strong></li>
+    </ul>
   </article>
   <article class="cp-card" data-q="results">
     <h2>4 · Results (decisions &amp; claims)</h2>

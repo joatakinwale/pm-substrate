@@ -33,6 +33,7 @@ import {
 } from "../packages/continuity/src/index.js";
 import { PostgresEventStore } from "../packages/events/src/index.js";
 import type { EntityId, TenantId } from "../packages/types/src/index.js";
+import { computeLoopMetrics } from "./loop-metrics.js";
 
 const databaseUrl = env["PM_DATABASE_URL"];
 if (!databaseUrl) {
@@ -343,7 +344,21 @@ const main = async (): Promise<void> => {
       return;
     }
 
-    console.error(`unknown command: ${cmd} (resume|checkpoint|handoff|cost|status|seed-dogfood)`);
+    if (cmd === "metrics") {
+      // D7 evidence: loop-health numbers from the shared fold (scripts/
+      // loop-metrics.ts) — the SAME implementation pm:memo renders, so the
+      // keep/kill memo can never disagree with the loop's own numbers.
+      const report = await computeLoopMetrics(pool, {
+        tenantId: TENANT,
+        agentId: AGENT,
+        scope: SCOPE,
+        costEventType: COST_EVENT_TYPE,
+      });
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+
+    console.error(`unknown command: ${cmd} (resume|checkpoint|handoff|cost|status|metrics|seed-dogfood)`);
     exit(1);
   } finally {
     await events.close().catch(() => {});

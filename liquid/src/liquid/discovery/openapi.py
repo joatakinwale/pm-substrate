@@ -1,0 +1,328 @@
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import httpx  # noqa: TC002
+import yaml
+
+from liquid.exceptions import DiscoveryError
+from liquid.models.schema import (
+    APISchema,
+    AuthRequirement,
+    Endpoint,
+    EndpointKind,
+    PaginationType,
+    Parameter,
+    ParameterLocation,
+    RateLimits,
+)
+
+logger = logging.getLogger(__name__)
+
+_SPEC_PATHS = [
+    "/openapi.json",
+    "/openapi.yaml",
+    "/swagger.json",
+    "/swagger/v1/swagger.json",
+    "/api-docs",
+    "/api/swagger.json",
+    "/.well-known/openapi.yaml",
+    "/.well-known/openapi.json",
+    "/v3/api-docs",
+]
+
+
+class OpenAPIDiscovery:
+    """Discovers APIs by finding and parsing OpenAPI/Swagger specifications."""
+
+    def __init__(self, http_client: httpx.AsyncClient | None = None) -> None:
+        self._external_client = http_client
+
+    async def discover(self, url: str) -> APISchema | None:
+        from liquid.discovery.utils import managed_http_client
+
+        async with managed_http_client(self._external_client) as client:
+            spec = await self._find_spec(client, url)
+            if spec is None:
+                return None
+
+            try:
+                return self._parse_spec(spec, url)
+            except Exception as e:
+                raise DiscoveryError(f"Failed to parse OpenAPI spec from {url}: {e}") from e
+
+    async def _find_spec(self, client: httpx.AsyncClient, base_url: str) -> dict[str, Any] | None:
+        base = base_url.rstrip("/")
+        # Try the URL exactly as given first (caller may already point at the
+        # spec — e.g. a plugin manifest's ``api.url``), then conventional paths.
+        candidates = ["", *_SPEC_PATHS]
+        for path in candidates:
+            target = f"{base}{path}" if path else base
+            try:
+                resp = await client.get(target, follow_redirects=True, timeout=10.0)
+                if resp.is_success:
+                    content_type = resp.headers.get("content-type", "")
+                    text = resp.text
+                    is_yaml = "yaml" in content_type or target.endswith(".yaml")
+                    spec = yaml.safe_load(text) if is_yaml else resp.json()
+                    if isinstance(spec, dict) and ("openapi" in spec or "swagger" in spec):
+                        logger.info("Found OpenAPI spec at %s%s", base, path)
+                        return spec
+            except Exception:
+                continue
+        return None
+
+    def _parse_spec(self, spec: dict[str, Any], source_url: str) -> APISchema:
+        version = spec.get("openapi", spec.get("swagger", ""))
+        is_v3 = str(version).startswith("3")
+
+        info = spec.get("info", {})
+        service_name = info.get("title", "Unknown")
+
+        endpoints = self._extract_endpoints(spec, is_v3)
+        auth = self._extract_auth(spec, is_v3)
+        rate_limits = self._extract_rate_limits(spec)
+
+        return APISchema(
+            source_url=source_url,
+            service_name=service_name,
+            discovery_method="openapi",
+            endpoints=endpoints,
+            auth=auth,
+            rate_limits=rate_limits,
+        )
+
+    def _extract_endpoints(self, spec: dict[str, Any], is_v3: bool) -> list[Endpoint]:
+        endpoints: list[Endpoint] = []
+        paths = spec.get("paths", {})
+
+        for path, path_item in paths.items():
+            if not isinstance(path_item, dict):
+                continue
+            for method in ("get", "post", "put", "patch", "delete"):
+                operation = path_item.get(method)
+                if not isinstance(operation, dict):
+                    continue
+                if operation.get("deprecated", False):
+                    continue
+
+                params = self._extract_parameters(path_item.get("parameters", []) + operation.get("parameters", []))
+                response_schema = _resolve_refs(self._extract_response_schema(operation, is_v3), spec)
+                request_schema = _resolve_refs(self._extract_request_schema(operation, is_v3), spec)
+                description = operation.get("summary", operation.get("description", ""))
+                pagination = self._infer_pagination(params, operation)
+                kind = self._method_to_kind(method)
+                idempotency_header = self._detect_idempotency(operation)
+
+                endpoints.append(
+                    Endpoint(
+                        path=path,
+                        method=method.upper(),
+                        description=str(description)[:500] if description else "",
+                        kind=kind,
+                        parameters=params,
+                        request_schema=request_schema,
+                        response_schema=response_schema,
+                        pagination=pagination,
+                        idempotency_header=idempotency_header,
+                    )
+                )
+
+        return endpoints
+
+    def _extract_parameters(self, raw_params: list[dict[str, Any]]) -> list[Parameter]:
+        params: list[Parameter] = []
+        for p in raw_params:
+            if not isinstance(p, dict):
+                continue
+            name = p.get("name", "")
+            if not name:
+                continue
+
+            location_str = p.get("in", "query")
+            try:
+                location = ParameterLocation(location_str)
+            except ValueError:
+                location = ParameterLocation.QUERY
+
+            raw_schema = p.get("schema")
+            if raw_schema is None:
+                type_str = p.get("type")
+                raw_schema = {"type": type_str} if type_str else None
+
+            params.append(
+                Parameter(
+                    name=name,
+                    location=location,
+                    required=bool(p.get("required", False)),
+                    schema=raw_schema,
+                    description=p.get("description"),
+                )
+            )
+        return params
+
+    @staticmethod
+    def _method_to_kind(method: str) -> EndpointKind:
+        match method:
+            case "post" | "put" | "patch":
+                return EndpointKind.WRITE
+            case "delete":
+                return EndpointKind.DELETE
+            case _:
+                return EndpointKind.READ
+
+    def _extract_request_schema(self, operation: dict[str, Any], is_v3: bool) -> dict[str, Any] | None:
+        if is_v3:
+            request_body = operation.get("requestBody")
+            if not request_body or not isinstance(request_body, dict):
+                return None
+            content = request_body.get("content", {})
+            json_content = content.get("application/json", {})
+            return json_content.get("schema") or None
+        else:
+            for param in operation.get("parameters", []):
+                if isinstance(param, dict) and param.get("in") == "body":
+                    return param.get("schema")
+            return None
+
+    @staticmethod
+    def _detect_idempotency(operation: dict[str, Any]) -> str | None:
+        known_headers = {"idempotency-key", "x-idempotency-key", "x-shopify-idempotency-token"}
+        for param in operation.get("parameters", []):
+            if isinstance(param, dict) and param.get("in") == "header":
+                name = param.get("name", "")
+                if name.lower() in known_headers:
+                    return name
+        return None
+
+    def _extract_response_schema(self, operation: dict[str, Any], is_v3: bool) -> dict[str, Any]:
+        responses = operation.get("responses", {})
+        success_resp = responses.get("200", responses.get("201", {}))
+        if not isinstance(success_resp, dict):
+            return {}
+
+        if is_v3:
+            content = success_resp.get("content", {})
+            json_content = content.get("application/json", {})
+            return json_content.get("schema", {})
+        else:
+            return success_resp.get("schema", {})
+
+    def _extract_auth(self, spec: dict[str, Any], is_v3: bool) -> AuthRequirement:
+        if is_v3:
+            components = spec.get("components", {})
+            security_schemes = components.get("securitySchemes", {})
+        else:
+            security_schemes = spec.get("securityDefinitions", {})
+
+        if not security_schemes:
+            return AuthRequirement(type="custom", tier="C")
+
+        for _name, scheme in security_schemes.items():
+            if not isinstance(scheme, dict):
+                continue
+            scheme_type = scheme.get("type", "").lower()
+
+            if scheme_type == "oauth2":
+                return AuthRequirement(type="oauth2", tier="A")
+            if scheme_type == "apikey":
+                return AuthRequirement(type="api_key", tier="C")
+            if scheme_type == "http":
+                bearer_scheme = scheme.get("scheme", "").lower()
+                if bearer_scheme == "bearer":
+                    return AuthRequirement(type="bearer", tier="A")
+                if bearer_scheme == "basic":
+                    return AuthRequirement(type="basic", tier="C")
+
+        return AuthRequirement(type="custom", tier="C")
+
+    def _extract_rate_limits(self, spec: dict[str, Any]) -> RateLimits | None:
+        extensions = {k: v for k, v in spec.items() if k.startswith("x-")}
+        rate_limit = extensions.get("x-rateLimit-limit") or extensions.get("x-rate-limit")
+        if rate_limit:
+            return RateLimits(requests_per_minute=float(rate_limit) if isinstance(rate_limit, int | float) else None)
+        return None
+
+    def _infer_pagination(
+        self, params: list[Parameter], operation: dict[str, Any] | None = None
+    ) -> PaginationType | None:
+        # A declared vendor extension wins over heuristic param-name inference.
+        if operation:
+            declared = _pagination_from_extension(operation.get("x-pagination") or operation.get("x-paginated"))
+            if declared is not None:
+                return declared
+        param_names = {p.name.lower() for p in params}
+        if "cursor" in param_names or "after" in param_names or "before" in param_names:
+            return PaginationType.CURSOR
+        if "offset" in param_names:
+            return PaginationType.OFFSET
+        if "page" in param_names or "page_number" in param_names:
+            return PaginationType.PAGE_NUMBER
+        return None
+
+
+def _pagination_from_extension(ext: Any) -> PaginationType | None:
+    """Map an OpenAPI ``x-pagination`` / ``x-paginated`` vendor extension to a type.
+
+    Accepts a style string (``"cursor"`` / ``"offset"`` / ``"page"`` / ``"link"``) or
+    an object carrying one under ``type`` / ``style`` / ``strategy``. A bare
+    ``x-paginated: true`` (no style) returns ``None`` so param-name inference still
+    runs.
+    """
+    style: Any = ext.get("type") or ext.get("style") or ext.get("strategy") if isinstance(ext, dict) else ext
+    if not isinstance(style, str):
+        return None
+    return {
+        "cursor": PaginationType.CURSOR,
+        "keyset": PaginationType.CURSOR,
+        "offset": PaginationType.OFFSET,
+        "page": PaginationType.PAGE_NUMBER,
+        "page_number": PaginationType.PAGE_NUMBER,
+        "pagenumber": PaginationType.PAGE_NUMBER,
+        "link": PaginationType.LINK_HEADER,
+        "link_header": PaginationType.LINK_HEADER,
+        "none": PaginationType.NONE,
+    }.get(style.strip().lower())
+
+
+def _resolve_refs(schema: dict[str, Any] | None, spec: dict[str, Any], depth: int = 10) -> dict[str, Any] | None:
+    """Recursively resolve $ref pointers in a JSON Schema against the OpenAPI spec.
+
+    Handles both OpenAPI 3.x (#/components/schemas/...) and Swagger 2.0 (#/definitions/...).
+    Stops at *depth* to avoid infinite recursion on circular references.
+    """
+    if schema is None or not isinstance(schema, dict) or depth <= 0:
+        return schema
+
+    ref = schema.get("$ref")
+    if ref and isinstance(ref, str):
+        resolved = _lookup_ref(ref, spec)
+        if resolved is not None:
+            return _resolve_refs(resolved, spec, depth - 1)
+        return {}
+
+    result: dict[str, Any] = {}
+    for key, value in schema.items():
+        if isinstance(value, dict):
+            result[key] = _resolve_refs(value, spec, depth - 1)
+        elif isinstance(value, list):
+            result[key] = [_resolve_refs(item, spec, depth - 1) if isinstance(item, dict) else item for item in value]
+        else:
+            result[key] = value
+    return result
+
+
+def _lookup_ref(ref: str, spec: dict[str, Any]) -> dict[str, Any] | None:
+    """Follow a JSON pointer like '#/components/schemas/User' inside the spec."""
+    if not ref.startswith("#/"):
+        return None
+    parts = ref[2:].split("/")
+    current: Any = spec
+    for part in parts:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+        if current is None:
+            return None
+    return current if isinstance(current, dict) else None

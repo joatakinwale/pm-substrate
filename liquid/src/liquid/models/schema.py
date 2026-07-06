@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class PaginationType(StrEnum):
+    CURSOR = "cursor"
+    OFFSET = "offset"
+    PAGE_NUMBER = "page_number"
+    LINK_HEADER = "link_header"
+    NONE = "none"
+
+
+class ParameterLocation(StrEnum):
+    QUERY = "query"
+    PATH = "path"
+    HEADER = "header"
+    BODY = "body"
+
+
+class Parameter(BaseModel):
+    name: str
+    location: ParameterLocation
+    required: bool = False
+    schema_: dict[str, Any] | None = Field(default=None, alias="schema")
+    description: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class OAuthConfig(BaseModel):
+    authorize_url: str
+    token_url: str
+    scopes: list[str] = Field(default_factory=list)
+    client_registration_url: str | None = None
+
+
+class RateLimits(BaseModel):
+    requests_per_second: float | None = None
+    requests_per_minute: float | None = None
+    requests_per_hour: float | None = None
+    requests_per_day: float | None = None
+    burst: int | None = None
+    retry_after_header: str | None = None
+
+
+class EndpointKind(StrEnum):
+    READ = "read"
+    WRITE = "write"
+    DELETE = "delete"
+
+
+class Endpoint(BaseModel):
+    path: str
+    method: str = "GET"
+    description: str = ""
+    protocol: str = "http"
+    """Wire protocol used to reach this endpoint. Selects the transport driver
+    at fetch time (``http`` for REST/JSON, ``graphql``, ``soap``, ``grpc``,
+    ``ws`` …). Defaults to ``http`` so existing adapters keep REST behaviour."""
+    kind: EndpointKind = EndpointKind.READ
+    parameters: list[Parameter] = Field(default_factory=list)
+    request_schema: dict[str, Any] | None = None
+    response_schema: dict[str, Any] = Field(default_factory=dict)
+    pagination: PaginationType | None = None
+    idempotency_header: str | None = None
+    record_path: str | None = None
+    """Dot-path to the record array inside the response envelope (e.g.
+    ``"instances"`` for ``{"instances": [...]}``). ``None`` means the response
+    is a bare list or single object. Discovery infers this; fetch uses it to
+    unwrap enveloped payloads before mapping."""
+    transport_meta: dict[str, Any] = Field(default_factory=dict)
+    """Protocol-specific data the transport driver needs that doesn't fit the
+    generic fields — e.g. a GraphQL operation/selection-set, a SOAP action and
+    namespace, a gRPC service/method. Empty for plain REST."""
+
+    def __repr__(self) -> str:
+        return f"Endpoint({self.method} {self.path}, protocol={self.protocol!r}, kind={self.kind.value})"
+
+    def __eq__(self, other: object) -> bool:
+        # A route's identity is (path, method): two descriptions of the same route
+        # are the same endpoint regardless of param/schema detail. Lets endpoints
+        # be used in sets and de-duplicated (see diff_schemas).
+        if not isinstance(other, Endpoint):
+            return NotImplemented
+        return (self.path, self.method) == (other.path, other.method)
+
+    def __hash__(self) -> int:
+        return hash((self.path, self.method))
+
+
+class AuthRequirement(BaseModel):
+    type: Literal["oauth2", "api_key", "basic", "bearer", "custom"]
+    tier: Literal["A", "B", "C"]
+    oauth_config: OAuthConfig | None = None
+    docs_url: str | None = None
+
+
+class APISchema(BaseModel):
+    source_url: str
+    service_name: str
+    discovery_method: Literal[
+        "mcp",
+        "openapi",
+        "graphql",
+        "rest_heuristic",
+        "browser",
+        "html_scrape",
+        "soap",
+        "grpc",
+        "websocket",
+        "sse",
+        "a2a",
+        "plugin",
+        "postgres",
+        "mysql",
+        "sqlite",
+        "neo4j",
+        "duckdb",
+        "mssql",
+        "mongodb",
+        "redis",
+        "mqtt",
+        "modbus",
+        "opcua",
+        "adb",
+        "bacnet",
+        "email",
+        "manifest",
+    ]
+    endpoints: list[Endpoint] = Field(default_factory=list)
+    auth: AuthRequirement
+    rate_limits: RateLimits | None = None
+    discovered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    api_version: str | None = None
+    """Provider-reported API version at discovery time. When set, every
+    subsequent response is compared against it — mismatch surfaces as an
+    :class:`~liquid.evolution.EvolutionKind.VERSION_DRIFT` signal."""
+
+    def __repr__(self) -> str:
+        return (
+            f"APISchema(service={self.service_name!r}, method={self.discovery_method}, "
+            f"endpoints={len(self.endpoints)}, auth={self.auth.type})"
+        )
+
+
+class SchemaDiff(BaseModel):
+    """Structured diff between two APISchema versions."""
+
+    added_endpoints: list[Endpoint] = Field(default_factory=list)
+    removed_endpoints: list[Endpoint] = Field(default_factory=list)
+    unchanged_endpoints: list[Endpoint] = Field(default_factory=list)
+    added_fields: list[str] = Field(default_factory=list)
+    removed_fields: list[str] = Field(default_factory=list)
+    unchanged_fields: list[str] = Field(default_factory=list)
+    modified_request_schemas: list[str] = Field(default_factory=list)
+    removed_write_endpoints: list[str] = Field(default_factory=list)
+    has_breaking_changes: bool = False

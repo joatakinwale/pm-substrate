@@ -101,6 +101,50 @@ describeIfDb("GET /tenants/:tenantId/control-plane (five questions)", () => {
       basisHash: "abc",
     });
 
+    // Integration-kit lane seeds (D5): registry + sync + executor bridge.
+    await publish("pm.adapter.registered", {
+      adapterId: "pi_harness",
+      contentHash: "h1",
+      version: 1,
+      registeredBy: agentId,
+      contract: {},
+    });
+    await publish("pm.adapter.registered", {
+      adapterId: "pi_harness", // version bump — must still count ONE adapter
+      contentHash: "h2",
+      version: 2,
+      registeredBy: agentId,
+      contract: {},
+    });
+    await publish("pm.sync.upserted", {
+      appName: "fixture",
+      sourceName: "Customer",
+      externalId: "c1",
+      nodeId: randomUUID(),
+      op: "created",
+      identityHash: "ih1",
+    });
+    await publish("pm.sync.rejected", {
+      appName: "fixture",
+      sourceName: "Ghost",
+      externalId: "g1",
+      reason: "not declared in mapping",
+    });
+    await publish("pm.executor.refused", {
+      outcomeHash: "oh1",
+      actionId: "act1",
+      target: "fixture_api",
+      terminalOutcome: "blocked",
+      blockingCauseCodes: ["stale_basis"],
+    });
+    await publish("pm.executor.dispatched", {
+      outcomeHash: "oh2",
+      actionId: "act2",
+      target: "fixture_api",
+      endpoint: "http://app.example/api",
+      httpStatus: 200,
+    });
+
     app = createSubstrateApp({
       tenants: new PostgresTenantDirectory(pool),
       profileRegistry: new PostgresProfileRegistry(pool),
@@ -138,6 +182,14 @@ describeIfDb("GET /tenants/:tenantId/control-plane (five questions)", () => {
         workDispatched: number;
       };
       costs: { totalTokens: number; labeledSessions: number };
+      integration: {
+        adaptersRegistered: number;
+        syncUpserted: number;
+        syncRejected: number;
+        executorDispatched: number;
+        executorRefused: number;
+        executorFailed: number;
+      };
       results: {
         decisions: { title: string }[];
         claimsUnderTest: { title: string }[];
@@ -166,6 +218,17 @@ describeIfDb("GET /tenants/:tenantId/control-plane (five questions)", () => {
     // 3. What did it cost?
     expect(body.costs.totalTokens).toBe(1500);
     expect(body.costs.labeledSessions).toBeGreaterThanOrEqual(1);
+
+    // 3b. What is attached (integration kit)? Distinct adapters — a version
+    // bump is still one adapter; sync + executor lanes from the log alone.
+    expect(body.integration).toEqual({
+      adaptersRegistered: 1,
+      syncUpserted: 1,
+      syncRejected: 1,
+      executorDispatched: 1,
+      executorRefused: 1,
+      executorFailed: 0,
+    });
 
     // 4. What are the results?
     expect(body.results.decisions.map((d) => d.title)).toContain(

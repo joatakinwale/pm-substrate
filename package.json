@@ -38,9 +38,17 @@
     "dev:status": "tsx scripts/dev-session.ts status",
     "dev:seed-dogfood": "tsx scripts/dev-session.ts seed-dogfood",
     "mcp:stdio": "node packages/substrate-mcp/dist/stdio.js",
-    "pm:dispatch": "tsx scripts/dispatch-unblocked-work.ts"
+    "pm:dispatch": "tsx scripts/dispatch-unblocked-work.ts",
+    "mcp:http": "tsx packages/substrate-mcp/src/http-entry.ts",
+    "dev:metrics": "tsx scripts/dev-session.ts metrics",
+    "pm:adapters": "tsx scripts/pm-adapters.ts",
+    "pm:sync": "tsx scripts/pm-sync.ts",
+    "pm:mappings": "tsx scripts/pm-mappings.ts",
+    "pm:shadow": "tsx scripts/pm-shadow-report.ts",
+    "pm:memo": "tsx scripts/build-d7-memo.ts"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.10",
     "pg": "^8.13.0",

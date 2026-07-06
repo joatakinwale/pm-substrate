@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@3.25.76)
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
@@ -346,6 +349,37 @@ importers:
         version: link:../profile-finance-research
       '@types/pg':
         specifier: ^8.11.10
+        version: 8.20.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)
+
+  packages/integration-kit:
+    dependencies:
+      '@pm/agent-state-core':
+        specifier: workspace:*
+        version: link:../agent-state-core
+      '@pm/entity-mapping':
+        specifier: workspace:*
+        version: link:../entity-mapping
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/types':
+        specifier: workspace:*
+        version: link:../types
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      pg:
+        specifier: ^8.13.0
         version: 8.20.0
       typescript:
         specifier: ^5.9.0

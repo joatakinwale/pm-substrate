@@ -1,0 +1,458 @@
+"""Pluggable auth schemes.
+
+Declarative Pydantic models describe how to sign outgoing requests. Each
+scheme produces an ``httpx.Auth`` at fetch time via
+:meth:`AuthScheme.build_httpx_auth`, so signing integrates with the standard
+httpx request lifecycle (body-aware, redirects, retries).
+
+The schemes are a pure superset of the legacy ``AuthRequirement.type`` dispatch
+in :class:`~liquid.auth.manager.AuthManager`; adapters without ``auth_scheme``
+keep the old Bearer-only behaviour.
+"""
+
+from __future__ import annotations
+
+import base64
+import datetime as _dt
+import hashlib
+import hmac
+import time
+from typing import TYPE_CHECKING, Literal
+from urllib.parse import quote
+
+import httpx
+from pydantic import BaseModel, Field, ValidationError
+
+from liquid.auth.oauth2 import OAuth2TokenProvider
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
+
+    from liquid.protocols import Vault
+
+
+class _BaseScheme(BaseModel):
+    """Shared config. Schemes are immutable at runtime once built."""
+
+    model_config = {"frozen": True}
+
+
+def scheme_from_directive(directive: dict):
+    """Build an explicit auth scheme from a credentials ``auth`` directive.
+
+    The directive names a ``scheme`` (or ``kind``) and supplies that scheme's
+    fields verbatim — the escape hatch for anything inference can't guess
+    (query-param keys, HMAC signing templates, AWS SigV4 region/service,
+    OAuth2 refresh). Example::
+
+        {"scheme": "hmac", "signing_key_field": "secret",
+         "header_name": "X-Signature", "signing_template": "{timestamp}{body}"}
+
+    Returns ``None`` for an unknown scheme or invalid field set.
+    """
+    if not isinstance(directive, dict):
+        return None
+    kind = directive.get("scheme") or directive.get("kind")
+    registry = {
+        "bearer": BearerAuth,
+        "api_key": ApiKeyAuth,
+        "basic": BasicAuth,
+        "hmac": HMACAuth,
+        "aws_sigv4": AwsSigV4Auth,
+        "oauth2": OAuth2Auth,
+        "path_token": PathTokenAuth,
+    }
+    cls = registry.get(kind)
+    if cls is None:
+        return None
+    params = {k: v for k, v in directive.items() if k not in ("scheme", "kind")}
+    try:
+        return cls(**params)
+    except (ValidationError, TypeError):
+        return None
+
+
+def scheme_from_credentials(auth_type: str, credentials: dict | None):
+    """Pick a concrete auth scheme matching how credentials were stored.
+
+    :meth:`AuthManager.store_credentials` writes each credential under
+    ``{auth_ref}/{field}``. The returned scheme reads back the same field, so
+    fetch-time auth lines up with what ``connect`` stored. Returns ``None`` when
+    no usable credential field is present (caller falls back to flat lookup).
+    """
+    if not credentials:
+        return None
+    directive = credentials.get("auth")
+    if isinstance(directive, dict):
+        explicit = scheme_from_directive(directive)
+        if explicit is not None:
+            return explicit
+    creds = {k: v for k, v in credentials.items() if k != "auth"}
+    if creds.get("username") and creds.get("password"):
+        return BasicAuth()
+    for field in ("token", "access_token", "bearer"):
+        if creds.get(field):
+            return BearerAuth(token_field=field)
+    # A header-shaped field name (e.g. ``xi-api-key``) → send it as that header.
+    for field in creds:
+        if "-" in field or field.lower().startswith(("x-", "xi-")):
+            return ApiKeyAuth(header_name=field, key_field=field)
+    for field in ("api_key", "key", "apikey"):
+        if creds.get(field):
+            return ApiKeyAuth(key_field=field)
+    # Unknown shape but auth is bearer/oauth2 — assume a single token-ish value.
+    if auth_type in ("bearer", "oauth2") and len(creds) == 1:
+        only = next(iter(creds))
+        return BearerAuth(token_field=only)
+    return None
+
+
+class BearerAuth(_BaseScheme):
+    """Static bearer token from vault (``{vault_key}/access_token``)."""
+
+    kind: Literal["bearer"] = "bearer"
+    token_field: str = "access_token"
+    header_name: str = "Authorization"
+    header_prefix: str = "Bearer "
+
+    async def build_httpx_auth(self, vault: Vault, vault_key: str) -> httpx.Auth:
+        token = await vault.get(f"{vault_key}/{self.token_field}")
+        return _StaticHeaderAuth({self.header_name: f"{self.header_prefix}{token}"})
+
+
+class ApiKeyAuth(_BaseScheme):
+    """API key in a named header (or query string)."""
+
+    kind: Literal["api_key"] = "api_key"
+    header_name: str = "X-API-Key"
+    query_param: str | None = None
+    key_field: str = "api_key"
+    prefix: str = ""
+
+    async def build_httpx_auth(self, vault: Vault, vault_key: str) -> httpx.Auth:
+        key = await vault.get(f"{vault_key}/{self.key_field}")
+        value = f"{self.prefix}{key}"
+        if self.query_param:
+            return _QueryParamAuth(self.query_param, value)
+        return _StaticHeaderAuth({self.header_name: value})
+
+
+class BasicAuth(_BaseScheme):
+    """HTTP Basic auth (``username:password`` → base64)."""
+
+    kind: Literal["basic"] = "basic"
+    username_field: str = "username"
+    password_field: str = "password"
+
+    async def build_httpx_auth(self, vault: Vault, vault_key: str) -> httpx.Auth:
+        user = await vault.get(f"{vault_key}/{self.username_field}")
+        pw = await vault.get(f"{vault_key}/{self.password_field}")
+        encoded = base64.b64encode(f"{user}:{pw}".encode()).decode()
+        return _StaticHeaderAuth({"Authorization": f"Basic {encoded}"})
+
+
+class HMACAuth(_BaseScheme):
+    """Generic HMAC request signing.
+
+    The signing string is built by substituting ``{method}``, ``{path}``,
+    ``{query}``, ``{body}``, ``{timestamp}`` placeholders inside
+    :attr:`signing_template`. Common patterns:
+
+    - Stripe-style webhooks verify: ``"{timestamp}.{body}"``
+    - GitHub-style: ``"{body}"``
+    - Shopify-style: ``"{body}"`` over raw body with base64 hex
+    - Custom header signing: ``"{method}\\n{path}\\n{timestamp}\\n{body}"``
+    """
+
+    kind: Literal["hmac"] = "hmac"
+    algorithm: Literal["sha256", "sha1", "sha512"] = "sha256"
+    header_name: str = "X-Signature"
+    header_prefix: str = ""
+    signing_template: str = "{method}\n{path}\n{body}"
+    timestamp_header: str | None = None
+    timestamp_field: str = "timestamp"
+    signing_key_field: str = "signing_key"
+    output_encoding: Literal["hex", "base64"] = "hex"
+    timestamp_unit: Literal["s", "ms"] = "s"
+    # Exchange-style signing (e.g. Bybit/Binance) folds the API key and a
+    # recv-window into the signed string and sends them as their own headers.
+    # ``{api_key}`` / ``{recv_window}`` are available in ``signing_template``.
+    api_key_field: str | None = None
+    api_key_header: str | None = None
+    recv_window: str | None = None
+    recv_window_header: str | None = None
+
+    async def build_httpx_auth(self, vault: Vault, vault_key: str) -> httpx.Auth:
+        secret = await vault.get(f"{vault_key}/{self.signing_key_field}")
+        api_key = None
+        if self.api_key_field:
+            api_key = await vault.get(f"{vault_key}/{self.api_key_field}")
+        return _HMACRequestAuth(secret.encode("utf-8"), self, api_key)
+
+
+class AwsSigV4Auth(_BaseScheme):
+    """AWS Signature Version 4 signer.
+
+    Signs the request body and headers according to the SigV4 spec. Supports
+    S3/DynamoDB/SQS/etc. via the ``service`` and ``region`` fields. For S3 the
+    canonical URI must not be URL-encoded twice — pass the path exactly as the
+    service expects.
+    """
+
+    kind: Literal["aws_sigv4"] = "aws_sigv4"
+    region: str
+    service: str
+    access_key_field: str = "access_key_id"
+    secret_key_field: str = "secret_access_key"
+    session_token_field: str = "session_token"
+    payload_hash_override: str | None = None
+
+    async def build_httpx_auth(self, vault: Vault, vault_key: str) -> httpx.Auth:
+        access = await vault.get(f"{vault_key}/{self.access_key_field}")
+        secret = await vault.get(f"{vault_key}/{self.secret_key_field}")
+        session = None
+        try:
+            session = await vault.get(f"{vault_key}/{self.session_token_field}")
+        except Exception:
+            session = None
+        return _AwsSigV4RequestAuth(access, secret, session, self)
+
+
+class OAuth2Auth(_BaseScheme):
+    """OAuth2 bearer with automatic refresh on 401.
+
+    On first use, sends ``Bearer {access_token}`` from vault. If the server
+    returns 401 **and** :attr:`token_url` is set, attempts a
+    ``refresh_token``-grant call, stores the new access token, and retries the
+    original request. ``scope`` and ``audience`` are forwarded to the token
+    endpoint when provided (audience required by e.g. Auth0).
+    """
+
+    kind: Literal["oauth2"] = "oauth2"
+    token_url: str | None = None
+    grant_type: Literal["refresh_token", "client_credentials"] = "refresh_token"
+    scope: str | None = None
+    audience: str | None = None
+    client_auth_method: Literal["client_secret_post", "client_secret_basic"] = "client_secret_post"
+    access_token_field: str = "access_token"
+    refresh_token_field: str = "refresh_token"
+    client_id_field: str = "client_id"
+    client_secret_field: str = "client_secret"
+
+    async def build_httpx_auth(self, vault: Vault, vault_key: str) -> httpx.Auth:
+        access = await vault.get(f"{vault_key}/{self.access_token_field}")
+        return _OAuth2RequestAuth(vault, vault_key, access, self)
+
+
+class PathTokenAuth(_BaseScheme):
+    """Secret embedded in the URL path (e.g. Telegram ``/bot{token}/getMe``).
+
+    The token is rendered into :attr:`template` and inserted into the request
+    path (prefix by default), so callers never bake the secret into the stored
+    base URL — it stays in the vault and is applied at request time.
+    """
+
+    kind: Literal["path_token"] = "path_token"
+    token_field: str = "token"
+    template: str = "/bot{token}"
+
+    async def build_httpx_auth(self, vault: Vault, vault_key: str) -> httpx.Auth:
+        token = await vault.get(f"{vault_key}/{self.token_field}")
+        return _PathTokenRequestAuth(self.template.format(token=token))
+
+
+AuthScheme = BearerAuth | ApiKeyAuth | BasicAuth | HMACAuth | AwsSigV4Auth | OAuth2Auth | PathTokenAuth
+AuthSchemeField = Field(discriminator="kind")
+
+
+class _StaticHeaderAuth(httpx.Auth):
+    requires_request_body = False
+
+    def __init__(self, headers: dict[str, str]) -> None:
+        self._headers = headers
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        for name, value in self._headers.items():
+            request.headers[name] = value
+        yield request
+
+
+class _QueryParamAuth(httpx.Auth):
+    requires_request_body = False
+
+    def __init__(self, param: str, value: str) -> None:
+        self._param = param
+        self._value = value
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        params = dict(request.url.params)
+        params[self._param] = self._value
+        request.url = request.url.copy_with(params=params)
+        yield request
+
+
+class _PathTokenRequestAuth(httpx.Auth):
+    requires_request_body = False
+
+    def __init__(self, segment: str) -> None:
+        self._segment = segment.rstrip("/")
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        path = request.url.path  # decoded path, no query
+        # Idempotent: don't double-insert if the segment is already present.
+        if not path.startswith(self._segment + "/") and path != self._segment:
+            sep = "" if path.startswith("/") else "/"
+            request.url = request.url.copy_with(path=f"{self._segment}{sep}{path}")
+        yield request
+
+
+class _HMACRequestAuth(httpx.Auth):
+    requires_request_body = True
+
+    def __init__(self, secret: bytes, cfg: HMACAuth, api_key: str | None = None) -> None:
+        self._secret = secret
+        self._cfg = cfg
+        self._api_key = api_key
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        body_bytes: bytes = request.content or b""
+        body = body_bytes.decode("utf-8", errors="replace")
+        timestamp = str(int(time.time() * 1000)) if self._cfg.timestamp_unit == "ms" else str(int(time.time()))
+        recv_window = self._cfg.recv_window or ""
+
+        if self._cfg.timestamp_header:
+            request.headers[self._cfg.timestamp_header] = timestamp
+        if self._cfg.api_key_header and self._api_key:
+            request.headers[self._cfg.api_key_header] = self._api_key
+        if self._cfg.recv_window_header and recv_window:
+            request.headers[self._cfg.recv_window_header] = recv_window
+
+        signing_string = self._cfg.signing_template.format(
+            method=request.method.upper(),
+            path=request.url.raw_path.decode("ascii"),
+            query=request.url.query.decode("ascii") if request.url.query else "",
+            body=body,
+            timestamp=timestamp,
+            api_key=self._api_key or "",
+            recv_window=recv_window,
+        )
+        digest = hmac.new(self._secret, signing_string.encode("utf-8"), getattr(hashlib, self._cfg.algorithm))
+        if self._cfg.output_encoding == "hex":
+            sig = digest.hexdigest()
+        else:
+            sig = base64.b64encode(digest.digest()).decode("ascii")
+        request.headers[self._cfg.header_name] = f"{self._cfg.header_prefix}{sig}"
+        yield request
+
+
+class _AwsSigV4RequestAuth(httpx.Auth):
+    requires_request_body = True
+
+    def __init__(
+        self,
+        access_key: str,
+        secret_key: str,
+        session_token: str | None,
+        cfg: AwsSigV4Auth,
+    ) -> None:
+        self._access = access_key
+        self._secret = secret_key
+        self._session = session_token
+        self._cfg = cfg
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        now = _dt.datetime.now(_dt.UTC)
+        amz_date = now.strftime("%Y%m%dT%H%M%SZ")
+        date_stamp = now.strftime("%Y%m%d")
+
+        body: bytes = request.content or b""
+        payload_hash = self._cfg.payload_hash_override or hashlib.sha256(body).hexdigest()
+
+        request.headers["x-amz-date"] = amz_date
+        request.headers["x-amz-content-sha256"] = payload_hash
+        request.headers.setdefault("host", request.url.host)
+        if self._session:
+            request.headers["x-amz-security-token"] = self._session
+
+        canonical_uri = quote(request.url.path or "/", safe="/-_.~")
+        canonical_querystring = _canonical_query(request.url.query.decode("ascii") if request.url.query else "")
+        signed_headers_list = ["host", "x-amz-content-sha256", "x-amz-date"]
+        if self._session:
+            signed_headers_list.append("x-amz-security-token")
+        signed_headers_list.sort()
+        canonical_headers = "".join(f"{h}:{request.headers[h].strip()}\n" for h in signed_headers_list)
+        signed_headers = ";".join(signed_headers_list)
+
+        canonical_request = (
+            f"{request.method.upper()}\n"
+            f"{canonical_uri}\n"
+            f"{canonical_querystring}\n"
+            f"{canonical_headers}\n"
+            f"{signed_headers}\n"
+            f"{payload_hash}"
+        )
+
+        credential_scope = f"{date_stamp}/{self._cfg.region}/{self._cfg.service}/aws4_request"
+        string_to_sign = (
+            f"AWS4-HMAC-SHA256\n{amz_date}\n{credential_scope}\n"
+            f"{hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()}"
+        )
+
+        signing_key = _derive_sigv4_key(self._secret, date_stamp, self._cfg.region, self._cfg.service)
+        signature = hmac.new(signing_key, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+
+        request.headers["authorization"] = (
+            f"AWS4-HMAC-SHA256 Credential={self._access}/{credential_scope}, "
+            f"SignedHeaders={signed_headers}, Signature={signature}"
+        )
+        yield request
+
+
+def _canonical_query(raw: str) -> str:
+    if not raw:
+        return ""
+    pairs: list[tuple[str, str]] = []
+    for part in raw.split("&"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+        else:
+            k, v = part, ""
+        pairs.append((quote(k, safe="-_.~"), quote(v, safe="-_.~")))
+    pairs.sort()
+    return "&".join(f"{k}={v}" for k, v in pairs)
+
+
+def _derive_sigv4_key(secret: str, date_stamp: str, region: str, service: str) -> bytes:
+    k_date = hmac.new(f"AWS4{secret}".encode(), date_stamp.encode(), hashlib.sha256).digest()
+    k_region = hmac.new(k_date, region.encode(), hashlib.sha256).digest()
+    k_service = hmac.new(k_region, service.encode(), hashlib.sha256).digest()
+    return hmac.new(k_service, b"aws4_request", hashlib.sha256).digest()
+
+
+class _OAuth2RequestAuth(httpx.Auth):
+    """Attach Bearer token; on 401, try one refresh then retry the original."""
+
+    requires_response_body = True
+
+    def __init__(self, vault: Vault, vault_key: str, access_token: str, cfg: OAuth2Auth) -> None:
+        self._access = access_token
+        self._cfg = cfg
+        self._provider = OAuth2TokenProvider(vault, vault_key, cfg)
+
+    async def async_auth_flow(self, request: httpx.Request) -> AsyncGenerator[httpx.Request, httpx.Response]:
+        request.headers["Authorization"] = f"Bearer {self._access}"
+        response = yield request
+        if response.status_code != 401 or not self._cfg.token_url:
+            return
+
+        new_access = await self._refresh()
+        if new_access is None:
+            return
+        self._access = new_access
+        request.headers["Authorization"] = f"Bearer {new_access}"
+        yield request
+
+    async def _refresh(self) -> str | None:
+        # Delegates to the shared provider; kept as a method so it stays the
+        # seam tests stub and the XOAUTH2 transports reuse the same semantics.
+        return await self._provider.refresh()
