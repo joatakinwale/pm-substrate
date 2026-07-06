@@ -43,7 +43,8 @@
     "dev:metrics": "tsx scripts/dev-session.ts metrics",
     "pm:adapters": "tsx scripts/pm-adapters.ts",
     "pm:sync": "tsx scripts/pm-sync.ts",
-    "pm:mappings": "tsx scripts/pm-mappings.ts"
+    "pm:mappings": "tsx scripts/pm-mappings.ts",
+    "pm:shadow": "tsx scripts/pm-shadow-report.ts"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

@@ -70,6 +70,11 @@ export {
   type ProposeMappingResult,
 } from "./mapping-approval.js";
 export {
+  buildShadowReport,
+  type ShadowReport,
+  type ShadowReportWindow,
+} from "./shadow-report.js";
+export {
   SYNC_ID_NAMESPACE,
   SYNC_REJECTED_EVENT_TYPE,
   SYNC_UPSERTED_EVENT_TYPE,
