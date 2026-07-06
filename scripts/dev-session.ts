@@ -149,6 +149,102 @@ const main = async (): Promise<void> => {
         );
         exit(1);
       }
+      if (argv.includes("--governed")) {
+        // Dogfood the gate (shadow-first ramp, hard req 5 → live traffic):
+        // the SAME write, but through observe → propose → admit. A stale or
+        // conflicted basis BLOCKS this checkpoint — that is the point.
+        const { buildSubstrateMcpServer } = await import(
+          "../packages/substrate-mcp/src/index.js"
+        );
+        const { Client } = await import(
+          "@modelcontextprotocol/sdk/client/index.js"
+        );
+        const { InMemoryTransport } = await import(
+          "@modelcontextprotocol/sdk/inMemory.js"
+        );
+        const server = buildSubstrateMcpServer({
+          pool,
+          tenantId: TENANT,
+          agentId: AGENT,
+          scope: SCOPE,
+        });
+        const [clientTransport, serverTransport] =
+          InMemoryTransport.createLinkedPair();
+        const client = new Client({
+          name: "dev-session-governed",
+          version: "0.1.0",
+        });
+        await Promise.all([
+          server.connect(serverTransport),
+          client.connect(clientTransport),
+        ]);
+        try {
+          const obs = (await client.callTool({
+            name: "substrate_observe",
+            arguments: { scope: SCOPE },
+          })) as {
+            structuredContent?: {
+              view: { subject: unknown; readSet: unknown[] };
+              contract: Record<string, unknown>;
+            };
+          };
+          const basis = obs.structuredContent;
+          if (!basis) throw new Error("substrate_observe returned no basis");
+          const prop = (await client.callTool({
+            name: "substrate_propose",
+            arguments: {
+              actionType: "record_checkpoint",
+              subject: basis.view.subject,
+              payload: {
+                kind,
+                title,
+                summary,
+                ...(arg("status") ? { status: arg("status") } : {}),
+              },
+              contract: basis.contract,
+              readSet: basis.view.readSet,
+              scope: SCOPE,
+            },
+          })) as {
+            structuredContent?: { proposalId: string; warningCount: number };
+          };
+          const proposal = prop.structuredContent;
+          if (!proposal) throw new Error("substrate_propose returned no review");
+          if (proposal.warningCount > 0) {
+            console.error(
+              `propose warned (${proposal.warningCount}) — continuing to admit, which will decide`,
+            );
+          }
+          const adm = (await client.callTool({
+            name: "substrate_admit",
+            arguments: { proposalId: proposal.proposalId, decidedBy: AGENT },
+          })) as {
+            structuredContent?: {
+              terminalOutcome: string;
+              executed: boolean;
+              envelopeHash: string;
+              blockingCauses: readonly { code: string; message: string }[];
+            };
+          };
+          const outcome = adm.structuredContent;
+          if (!outcome) throw new Error("substrate_admit returned no envelope");
+          if (outcome.terminalOutcome === "accepted" && outcome.executed) {
+            console.log(
+              `ADMITTED ${kind} "${title}" via the gate (proposal ${proposal.proposalId}, envelope ${outcome.envelopeHash})`,
+            );
+            return;
+          }
+          console.error(
+            `BLOCKED ${kind} "${title}" (proposal ${proposal.proposalId}): ${outcome.blockingCauses
+              .map((c) => c.code)
+              .join(", ")} — re-observe and re-propose from the fresh basis`,
+          );
+          exit(3);
+        } finally {
+          await client.close().catch(() => {});
+          await server.close().catch(() => {});
+        }
+      }
       const recorded = await ledger.record({
         tenantId: TENANT,
         agentId: AGENT,

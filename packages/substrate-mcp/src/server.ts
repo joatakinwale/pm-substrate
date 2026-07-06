@@ -113,9 +113,15 @@ async function buildScopeView(
     scope,
     limit: 200,
   });
+  // The gate's own bookkeeping (pm.mcp.*) is NOT world-state: a basis must
+  // never be invalidated by the act of proposing against it. Without this
+  // exclusion, every pm.mcp.proposal event crowds the 25-event window and —
+  // once a tenant has ≥25 events — back-to-back governed writes self-block
+  // (found live on 2026-07-06, first day of dogfooding the gate).
   const events = await pool.query<{ id: string; type: string; recorded_at: Date }>(
     `SELECT id, type, recorded_at FROM events.events
-      WHERE tenant_id = $1 ORDER BY recorded_at DESC, id DESC LIMIT 25`,
+      WHERE tenant_id = $1 AND type NOT LIKE 'pm.mcp.%'
+      ORDER BY recorded_at DESC, id DESC LIMIT 25`,
     [tenantId],
   );
   // Git-style HEAD: the basis cites the ledger head by CONTENT HASH. When the
