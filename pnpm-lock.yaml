@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@3.25.76)
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
@@ -359,9 +362,15 @@ importers:
       '@pm/agent-state-core':
         specifier: workspace:*
         version: link:../agent-state-core
+      '@pm/entity-mapping':
+        specifier: workspace:*
+        version: link:../entity-mapping
       '@pm/events':
         specifier: workspace:*
         version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
       '@pm/types':
         specifier: workspace:*
         version: link:../types

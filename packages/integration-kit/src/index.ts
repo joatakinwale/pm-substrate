@@ -30,7 +30,45 @@ export {
   type ExecuteAdmittedActionInput,
   type ExecuteAdmittedActionReason,
   type ExecuteAdmittedActionResult,
+  type ExecutorTransport,
+  type ExecutorTransportResult,
 } from "./executor-bridge.js";
+export {
+  buildLiquidWriteTransport,
+  type LiquidWriteTransportOptions,
+} from "./liquid-executor.js";
+export {
+  LiquidSourceError,
+  deriveTargetModel,
+  fetchLiquidRecords,
+  type LiquidFetchOptions,
+  type LiquidFetchResult,
+  type LiquidMcpClient,
+} from "./liquid-source.js";
+export {
+  syncFromLiquid,
+  type LiquidSyncDeps,
+  type LiquidSyncInput,
+  type LiquidSyncResult,
+} from "./liquid-sync.js";
+export {
+  MAPPING_APPROVED_EVENT_TYPE,
+  MAPPING_PROPOSED_EVENT_TYPE,
+  MAPPING_REJECTED_EVENT_TYPE,
+  MappingNotApprovedError,
+  approveEntityMapping,
+  entityMappingHash,
+  getMappingApprovalState,
+  proposeEntityMapping,
+  rejectEntityMapping,
+  requireApprovedEntityMapping,
+  type DecideMappingInput,
+  type MappingApprovalState,
+  type MappingProposal,
+  type MappingProposalOrigin,
+  type ProposeMappingInput,
+  type ProposeMappingResult,
+} from "./mapping-approval.js";
 export {
   SYNC_ID_NAMESPACE,
   SYNC_REJECTED_EVENT_TYPE,

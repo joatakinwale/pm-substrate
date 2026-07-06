@@ -51,6 +51,8 @@ export interface ExecuteAdmittedActionInput {
   readonly body?: Readonly<Record<string, unknown>>;
   /** Injectable for tests; defaults to global fetch. */
   readonly fetchImpl?: typeof fetch;
+  /** Delivery leg override (e.g. Liquid). Default: HTTP to target.endpoint. */
+  readonly transport?: ExecutorTransport;
 }
 
 export type ExecuteAdmittedActionReason =
@@ -64,6 +66,38 @@ export interface ExecuteAdmittedActionResult {
   readonly reason: ExecuteAdmittedActionReason;
   readonly httpStatus?: number;
 }
+
+/** What a delivery attempt reports back to the bridge. */
+export interface ExecutorTransportResult {
+  readonly ok: boolean;
+  /** HTTP-ish status when the transport has one (absent for e.g. Liquid). */
+  readonly status?: number;
+  readonly detail?: string;
+}
+
+/**
+ * Pluggable delivery leg (Liquid lane L4): the bridge's governance —
+ * accepted-only, outcomeHash dedupe, failure lanes — is transport-agnostic;
+ * only the last hop varies (HTTP default, `liquid_execute`, …).
+ */
+export type ExecutorTransport = (
+  payload: Readonly<Record<string, unknown>>,
+) => Promise<ExecutorTransportResult>;
+
+const buildHttpTransport =
+  (target: ActionExecutorTarget, fetchImpl: typeof fetch): ExecutorTransport =>
+  async (payload) => {
+    const response = await fetchImpl(target.endpoint, {
+      method: target.method ?? "POST",
+      headers: { "content-type": "application/json", ...target.headers },
+      body: JSON.stringify(payload),
+    });
+    return {
+      ok: response.ok,
+      status: response.status,
+      ...(response.ok ? {} : { detail: `endpoint returned ${response.status}` }),
+    };
+  };
 
 const dispatchEntityId = (targetName: string, outcomeHash: string): EntityId =>
   `executor:${targetName}:${outcomeHash}` as unknown as EntityId;
@@ -111,25 +145,28 @@ export async function executeAdmittedAction(
     return { executed: false, reason: "already_dispatched" };
   }
 
-  const doFetch = input.fetchImpl ?? fetch;
+  const transport =
+    input.transport ?? buildHttpTransport(target, input.fetchImpl ?? fetch);
   let httpStatus: number | undefined;
   let failure: string | undefined;
   try {
-    const response = await doFetch(target.endpoint, {
-      method: target.method ?? "POST",
-      headers: { "content-type": "application/json", ...target.headers },
-      body: JSON.stringify({
-        tenantId: input.tenantId,
-        actionId: envelope.actionId,
-        subject: envelope.subject,
-        outcomeHash: envelope.outcomeHash,
-        decidedBy: envelope.decidedBy,
-        decidedAt: envelope.decidedAt,
-        body: input.body ?? {},
-      }),
+    const delivered = await transport({
+      tenantId: input.tenantId,
+      actionId: envelope.actionId,
+      subject: envelope.subject,
+      outcomeHash: envelope.outcomeHash,
+      decidedBy: envelope.decidedBy,
+      decidedAt: envelope.decidedAt,
+      body: input.body ?? {},
     });
-    httpStatus = response.status;
-    if (!response.ok) failure = `endpoint returned ${response.status}`;
+    httpStatus = delivered.status;
+    if (!delivered.ok) {
+      failure =
+        delivered.detail ??
+        (delivered.status !== undefined
+          ? `endpoint returned ${delivered.status}`
+          : "transport reported failure");
+    }
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
   }
@@ -164,8 +201,12 @@ export async function executeAdmittedAction(
       actionId: envelope.actionId,
       target: target.name,
       endpoint: target.endpoint,
-      httpStatus,
+      ...(httpStatus !== undefined ? { httpStatus } : {}),
     },
   });
-  return { executed: true, reason: "dispatched", httpStatus: httpStatus! };
+  return {
+    executed: true,
+    reason: "dispatched",
+    ...(httpStatus !== undefined ? { httpStatus } : {}),
+  };
 }

@@ -42,9 +42,11 @@
     "mcp:http": "tsx packages/substrate-mcp/src/http-entry.ts",
     "dev:metrics": "tsx scripts/dev-session.ts metrics",
     "pm:adapters": "tsx scripts/pm-adapters.ts",
-    "pm:sync": "tsx scripts/pm-sync.ts"
+    "pm:sync": "tsx scripts/pm-sync.ts",
+    "pm:mappings": "tsx scripts/pm-mappings.ts"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.10",
     "pg": "^8.13.0",
