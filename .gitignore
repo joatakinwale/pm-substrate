@@ -19,3 +19,6 @@ trash/
 # Joat workspace context (session continuity files for the AI dev — not project artifacts)
 .joat/
 tmp/
+liquid/examples
+liquid/tests
+*.mcpb
