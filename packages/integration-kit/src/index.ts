@@ -21,6 +21,16 @@ export {
   PI_HARNESS_ADAPTER,
 } from "./known-adapters.js";
 export {
+  EXECUTOR_DISPATCHED_EVENT_TYPE,
+  EXECUTOR_FAILED_EVENT_TYPE,
+  EXECUTOR_REFUSED_EVENT_TYPE,
+  executeAdmittedAction,
+  type ActionExecutorTarget,
+  type ExecuteAdmittedActionInput,
+  type ExecuteAdmittedActionReason,
+  type ExecuteAdmittedActionResult,
+} from "./executor-bridge.js";
+export {
   SYNC_ID_NAMESPACE,
   SYNC_REJECTED_EVENT_TYPE,
   SYNC_UPSERTED_EVENT_TYPE,
