@@ -97,7 +97,8 @@ describe("liquid source driver (pure, real tool vocabulary)", () => {
       name: "liquid_connect",
       arguments: {
         url: "https://api.fixture.example/customers",
-        target_model: { name: "str", email: "str", city: "str" },
+        // externalIdField rides along: records must be identifiable.
+        target_model: { name: "str", email: "str", city: "str", id: "str" },
       },
     });
     expect(calls[1]?.name).toBe("liquid_fetch");

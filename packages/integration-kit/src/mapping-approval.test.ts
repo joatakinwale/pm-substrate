@@ -228,6 +228,29 @@ describeIfDb("mapping approvals — drift is an obstruction (L3)", () => {
     ).rejects.toThrow(/no pending proposal/);
   });
 
+  it("dry run previews the gate's verdict instead of enforcing it", async () => {
+    const unapproved: EntityMapping = {
+      ...MAPPING_A,
+      description: "never-approved variant for the dry-run preview",
+    };
+    const preview = await syncFromLiquid({ graph, events }, sidecar, {
+      tenantId,
+      appName: APP,
+      mapping: unapproved,
+      url: "https://api.x.example",
+      sourceName: "Customer",
+      externalIdField: "id",
+      syncedBy: "map-test",
+      dryRun: true,
+    });
+    expect(preview).toMatchObject({
+      dryRun: true,
+      mappingApproved: false, // a real run would be REFUSED
+      created: 0,
+      unchanged: 1, // the record already landed via the approved-A sync above
+    });
+  });
+
   it("fetchLiquidRecords stays gate-free (transport), syncFromLiquid is the governed door", async () => {
     // Direct transport fetch works without approval — by design the gate
     // lives at the composition, so nothing can 'forget' it on the sync path.

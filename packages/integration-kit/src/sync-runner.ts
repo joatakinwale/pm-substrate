@@ -71,6 +71,12 @@ export interface EntityMappingSyncInput {
   readonly syncedBy: string;
   /** Chain-of-custody grant; defaults to syncedBy. */
   readonly authority?: string;
+  /**
+   * Shadow mode (hard req 5): compute the full verdict — created/updated/
+   * unchanged/edges/rejections — with ZERO writes and ZERO events. Reads
+   * still hit the graph so the counts are what a real run would do.
+   */
+  readonly dryRun?: boolean;
 }
 
 export interface SyncRejection {
@@ -88,6 +94,8 @@ export interface EntityMappingSyncResult {
   readonly rejected: readonly SyncRejection[];
   /** `${sourceName}:${externalId}` → node id. */
   readonly nodeIds: Readonly<Record<string, string>>;
+  /** true = shadow verdict: nothing was written, no events were emitted. */
+  readonly dryRun: boolean;
 }
 
 const uuidBytes = (uuid: string): Buffer =>
@@ -149,11 +157,14 @@ export async function runEntityMappingSync(
   }
 
   const authority = input.authority ?? input.syncedBy;
+  const dryRun = input.dryRun ?? false;
   let created = 0;
   let updated = 0;
   let unchanged = 0;
   const rejected: SyncRejection[] = [];
   const nodeIds: Record<string, string> = {};
+  /** Keys whose node already existed before this run (edge dry-run needs it). */
+  const existedBefore = new Set<string>();
 
   for (const record of input.records) {
     const nodeId = syncNodeId(
@@ -176,7 +187,15 @@ export async function runEntityMappingSync(
         input.tenantId,
         nodeId as unknown as EntityId,
       );
+      if (existing !== null) {
+        existedBefore.add(`${record.sourceName}:${record.externalId}`);
+      }
       if (existing === null) {
+        if (dryRun) {
+          created += 1;
+          nodeIds[`${record.sourceName}:${record.externalId}`] = nodeId;
+          continue;
+        }
         const result: CreateNodeResult = await deps.graph.createNode(nodeInput);
         if (!result.created) {
           // Deterministic id already present from a previous partial run.
@@ -191,6 +210,11 @@ export async function runEntityMappingSync(
         nodeIds[`${record.sourceName}:${record.externalId}`] = nodeId;
         continue;
       } else {
+        if (dryRun) {
+          updated += 1;
+          nodeIds[`${record.sourceName}:${record.externalId}`] = nodeId;
+          continue;
+        }
         await deps.graph.updateNode({
           tenantId: input.tenantId,
           id: nodeId as unknown as EntityId,
@@ -208,20 +232,22 @@ export async function runEntityMappingSync(
         externalId: record.externalId,
         reason,
       });
-      await deps.events.publish({
-        tenantId: input.tenantId,
-        type: SYNC_REJECTED_EVENT_TYPE,
-        entityId: `sync_reject:${record.sourceName}:${record.externalId}` as unknown as EntityId,
-        emittedBy: input.syncedBy,
-        authority,
-        payloadSchema: `${SYNC_REJECTED_EVENT_TYPE}.v1`,
-        payload: {
-          appName: input.appName,
-          sourceName: record.sourceName,
-          externalId: record.externalId,
-          reason,
-        },
-      });
+      if (!dryRun) {
+        await deps.events.publish({
+          tenantId: input.tenantId,
+          type: SYNC_REJECTED_EVENT_TYPE,
+          entityId: `sync_reject:${record.sourceName}:${record.externalId}` as unknown as EntityId,
+          emittedBy: input.syncedBy,
+          authority,
+          payloadSchema: `${SYNC_REJECTED_EVENT_TYPE}.v1`,
+          payload: {
+            appName: input.appName,
+            sourceName: record.sourceName,
+            externalId: record.externalId,
+            reason,
+          },
+        });
+      }
       continue;
     }
     nodeIds[`${record.sourceName}:${record.externalId}`] = nodeId;
@@ -269,6 +295,12 @@ export async function runEntityMappingSync(
           { fromId, toId },
           { tenantId: input.tenantId },
         );
+        const fromKey = `${record.sourceName}:${record.externalId}`;
+        if (dryRun && !existedBefore.has(fromKey)) {
+          // Node itself is only simulated — its edges would all be new.
+          edgesCreated += 1;
+          continue;
+        }
         const existing = await deps.graph.outgoingEdges(
           input.tenantId,
           fromId as unknown as EntityId,
@@ -276,6 +308,10 @@ export async function runEntityMappingSync(
         );
         if (existing.some((e) => (e.toId as string) === toId)) {
           edgesUnchanged += 1;
+          continue;
+        }
+        if (dryRun) {
+          edgesCreated += 1;
           continue;
         }
         await deps.graph.createEdge({
@@ -311,22 +347,24 @@ export async function runEntityMappingSync(
           externalId: record.externalId,
           reason: `edge "${edge.edgeKey}": ${reason}`,
         });
-        await deps.events.publish({
-          tenantId: input.tenantId,
-          type: SYNC_REJECTED_EVENT_TYPE,
-          entityId:
-            `sync_reject:${record.sourceName}:${record.externalId}:${edge.edgeKey}` as unknown as EntityId,
-          emittedBy: input.syncedBy,
-          authority,
-          payloadSchema: `${SYNC_REJECTED_EVENT_TYPE}.v1`,
-          payload: {
-            appName: input.appName,
-            sourceName: record.sourceName,
-            externalId: record.externalId,
-            edgeKey: edge.edgeKey,
-            reason,
-          },
-        });
+        if (!dryRun) {
+          await deps.events.publish({
+            tenantId: input.tenantId,
+            type: SYNC_REJECTED_EVENT_TYPE,
+            entityId:
+              `sync_reject:${record.sourceName}:${record.externalId}:${edge.edgeKey}` as unknown as EntityId,
+            emittedBy: input.syncedBy,
+            authority,
+            payloadSchema: `${SYNC_REJECTED_EVENT_TYPE}.v1`,
+            payload: {
+              appName: input.appName,
+              sourceName: record.sourceName,
+              externalId: record.externalId,
+              edgeKey: edge.edgeKey,
+              reason,
+            },
+          });
+        }
       }
     }
   }
@@ -339,5 +377,6 @@ export async function runEntityMappingSync(
     edgesUnchanged,
     rejected,
     nodeIds,
+    dryRun,
   };
 }

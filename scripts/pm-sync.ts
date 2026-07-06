@@ -55,6 +55,7 @@ async function main(): Promise<void> {
     JSON.parse(readFileSync(mappingPath, "utf8")),
   );
 
+  const dryRun = process.argv.includes("--dry-run");
   const pool = new pg.Pool({ connectionString: databaseUrl });
   const deps = {
     graph: new PostgresGraph(pool),
@@ -81,12 +82,33 @@ async function main(): Promise<void> {
       const { Client } = await import(
         "@modelcontextprotocol/sdk/client/index.js"
       );
-      const { StdioClientTransport } = await import(
+      const { StdioClientTransport, getDefaultEnvironment } = await import(
         "@modelcontextprotocol/sdk/client/stdio.js"
       );
+      // The SDK spawns stdio servers with a SAFELIST env, not the parent env
+      // (found live 2026-07-06: the sidecar never saw its LLM config).
+      // Forward exactly the variables the Liquid sidecar documents.
+      const sidecarEnv: Record<string, string> = { ...getDefaultEnvironment() };
+      for (const key of [
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "GEMINI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "LIQUID_LLM_PROVIDER",
+        "LIQUID_LLM_MODEL",
+        "LIQUID_LLM_BASE_URL",
+        "LIQUID_ALLOW_WRITES",
+      ]) {
+        const value = process.env[key];
+        if (value !== undefined) sidecarEnv[key] = value;
+      }
       const client = new Client({ name: "pm-sync-liquid", version: "0.1.0" });
       await client.connect(
-        new StdioClientTransport({ command: command!, args: cmdArgs }),
+        new StdioClientTransport({
+          command: command!,
+          args: cmdArgs,
+          env: sidecarEnv,
+        }),
       );
       try {
         result = await syncFromLiquid(deps, client, {
@@ -98,10 +120,16 @@ async function main(): Promise<void> {
           externalIdField,
           ...(endpoint ? { endpoint } : {}),
           syncedBy: AGENT,
+          ...(dryRun ? { dryRun } : {}),
         });
         console.log(
-          `liquid adapter=${result.adapterId} mapping=${result.mappingHash} skippedMissingId=${result.skippedMissingId}`,
+          `liquid adapter=${result.adapterId} mapping=${result.mappingHash} approved=${result.mappingApproved} skippedMissingId=${result.skippedMissingId}`,
         );
+        if (dryRun && !result.mappingApproved) {
+          console.error(
+            "DRY RUN verdict: a real run would be REFUSED — mapping not approved (pnpm pm:mappings).",
+          );
+        }
       } finally {
         await client.close();
       }
@@ -120,10 +148,11 @@ async function main(): Promise<void> {
         mapping,
         records,
         syncedBy: AGENT,
+        ...(dryRun ? { dryRun } : {}),
       });
     }
     console.log(
-      `sync ${appName}: created=${result.created} updated=${result.updated} unchanged=${result.unchanged} edges+${result.edgesCreated}/=${result.edgesUnchanged} rejected=${result.rejected.length}`,
+      `${result.dryRun ? "DRY RUN (nothing written) " : ""}sync ${appName}: created=${result.created} updated=${result.updated} unchanged=${result.unchanged} edges+${result.edgesCreated}/=${result.edgesUnchanged} rejected=${result.rejected.length}`,
     );
     for (const r of result.rejected) {
       console.error(`  rejected ${r.sourceName}:${r.externalId} — ${r.reason}`);

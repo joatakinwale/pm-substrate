@@ -108,6 +108,18 @@ function unwrap(raw: unknown, tool: string): Record<string, unknown> {
       "tool_error",
     );
   }
+  // Real-sidecar behavior (found live 2026-07-06): failures can come back as
+  // isError:false with an `error` string in structuredContent. Treat that as
+  // the tool error it is — never let an error payload flow into a parser.
+  if (
+    result.structuredContent &&
+    typeof result.structuredContent["error"] === "string"
+  ) {
+    throw new LiquidSourceError(
+      `${tool} failed: ${result.structuredContent["error"]}`,
+      "tool_error",
+    );
+  }
   if (result.structuredContent) return result.structuredContent;
   if (text !== undefined) {
     try {
@@ -152,7 +164,13 @@ export async function fetchLiquidRecords(
   client: LiquidMcpClient,
   options: LiquidFetchOptions,
 ): Promise<LiquidFetchResult> {
-  const targetModel = deriveTargetModel(options.mapping, options.sourceName);
+  // The external id MUST be part of the requested model — Liquid returns
+  // exactly the target_model fields, and a record we cannot identify cannot
+  // sync (found live 2026-07-06: all rows skipped for missing ids).
+  const targetModel = {
+    ...deriveTargetModel(options.mapping, options.sourceName),
+    [options.externalIdField]: "str",
+  };
   const connected = connectResultSchema.parse(
     unwrap(
       await client.callTool({

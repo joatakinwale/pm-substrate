@@ -208,4 +208,65 @@ describeIfDb("substrate-mcp: the five tools over a real substrate", () => {
       "Should never execute",
     );
   });
+
+  it("gate bookkeeping never invalidates a fresh basis (self-crowding regression)", async () => {
+    // Found live 2026-07-06, first day of dogfooding: once a tenant crossed
+    // 25 events, every pm.mcp.proposal event pushed an observed event out of
+    // the basis window and back-to-back governed writes self-blocked — the
+    // gate locked itself out. Fix: pm.mcp.* is meta-state, excluded from the
+    // observed event tail. This test floods the window, then requires TWO
+    // consecutive full observe→propose→admit cycles to both be accepted.
+    for (let i = 0; i < 30; i += 1) {
+      await pool.query(
+        `INSERT INTO events.events
+           (id, tenant_id, type, entity_id, emitted_by, authority,
+            payload_schema, payload, occurred_at, recorded_at, schema_version)
+         VALUES (gen_random_uuid(), $1, 'fixture.filler', $2, 'test', 'test',
+                 'fixture.filler.v1', '{}', now(), now(), 1)`,
+        [tenantId, `filler:${i}`],
+      ).catch(async () => {
+        // Fallback for stricter event-table shapes: publish through the store.
+        const { PostgresEventStore } = await import("@pm/events");
+        await new PostgresEventStore(pool).publish({
+          tenantId,
+          type: "fixture.filler",
+          entityId: `filler:${i}` as never,
+          emittedBy: "test",
+          payloadSchema: "fixture.filler.v1",
+          payload: {},
+        });
+      });
+    }
+    for (let round = 1; round <= 2; round += 1) {
+      const obs = (await call("substrate_observe", { scope }))
+        .structuredContent as {
+        view: { readSet: unknown[]; subject: unknown };
+        contract: Record<string, unknown>;
+      };
+      const proposal = (
+        await call("substrate_propose", {
+          actionType: "record_checkpoint",
+          subject: { kind: "projection", id: `dev_scope:${scope}` },
+          payload: {
+            kind: "work",
+            title: `Back-to-back governed write ${round}`,
+            summary: "Must admit: the gate's own events are not world-state.",
+            status: "closed",
+          },
+          contract: obs.contract,
+          readSet: obs.view.readSet,
+          scope,
+        })
+      ).structuredContent as { proposalId: string; warningCount: number };
+      expect(proposal.warningCount).toBe(0);
+      const admit = (
+        await call("substrate_admit", {
+          proposalId: proposal.proposalId,
+          decidedBy: "human:test",
+        })
+      ).structuredContent as { terminalOutcome: string; executed: boolean };
+      expect(admit.terminalOutcome).toBe("accepted");
+      expect(admit.executed).toBe(true);
+    }
+  });
 });

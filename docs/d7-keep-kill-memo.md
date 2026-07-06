@@ -1,22 +1,22 @@
 # D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
 
-*Generated 2026-07-06T16:51:06.477Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
+*Generated 2026-07-06T20:14:57.459Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
 
 ## 1 · Resume fidelity (the original problem)
 
-- Sessions resumed from the ledger: **16**, handoff coverage: **100%**, hash chain: **VALID**
-- Standing decisions: **14** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
+- Sessions resumed from the ledger: **19**, handoff coverage: **100%**, hash chain: **VALID**
+- Standing decisions: **16** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
 
 ## 2 · Throughput and cost
 
-- Work closed: **16** of 24 opened (3 open) — **1/session**
-- Tokens: **867,000** across 17 costed sessions → **54,188 per closed item** (trend across the loop: 88,750 → 72,944 → 60,917 → 55,833 → this)
+- Work closed: **21** of 29 opened (3 open) — **1.11/session**
+- Tokens: **963,000** across 20 costed sessions → **45,857 per closed item** (trend across the loop: 88,750 → 72,944 → 60,917 → 55,833 → this)
 
 ## 3 · Governance did real work?
 
-- MCP gate: **0** admitted · **0** blocked (block rate n/a) — ❌ **GAP** — live propose→admit traffic outside tests
+- MCP gate: **10** admitted · **4** blocked (block rate 0.286) — ✅ live propose→admit traffic outside tests
 - Executor bridge: **0** dispatched · **0** refused · **0** failed
-- Shadow verdict: advisory would-have-blocked **0** · enforced blocks **0** · data rejections **0** · pending drift obstructions **0**
+- Shadow verdict: advisory would-have-blocked **0** · enforced blocks **4** · data rejections **0** · pending drift obstructions **0**
 - Work dispatched to roles: **0**
 
 ## 4 · Zero-rewrite integration held?
