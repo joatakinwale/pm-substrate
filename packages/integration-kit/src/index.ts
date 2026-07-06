@@ -40,6 +40,7 @@ export {
   type EntityMappingSyncDeps,
   type EntityMappingSyncInput,
   type EntityMappingSyncResult,
+  type SourceEdge,
   type SourceRecord,
   type SyncGraph,
   type SyncRejection,

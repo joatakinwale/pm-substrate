@@ -28,6 +28,7 @@ import { createHash } from "node:crypto";
 
 import { canonicalStringify, fingerprint64 } from "@pm/agent-state-core";
 import {
+  applyEdgeMapping,
   applyMapping,
   validateEntityMapping,
   type EntityMapping,
@@ -42,6 +43,14 @@ export const SYNC_REJECTED_EVENT_TYPE = "pm.sync.rejected";
 /** Fixed namespace for substrate sync identity (RFC 4122 v5). Never change. */
 export const SYNC_ID_NAMESPACE = "3c1a2f60-9e4b-5d78-8a2c-f0b1d4e6c9a7";
 
+/** A relationship the source record participates in, by external ids. */
+export interface SourceEdge {
+  /** Edge key as declared under the entity's `edges` in the mapping. */
+  readonly edgeKey: string;
+  readonly targetSourceName: string;
+  readonly targetExternalId: string;
+}
+
 /** One record from the app's existing read surface. */
 export interface SourceRecord {
   /** Entity name as declared under `mapping.entities`. */
@@ -49,6 +58,8 @@ export interface SourceRecord {
   /** The app's own stable id for this record (PK, slug, …). */
   readonly externalId: string;
   readonly row: Readonly<Record<string, unknown>>;
+  /** Relationships (FKs) as the app already expresses them. */
+  readonly edges?: readonly SourceEdge[];
 }
 
 export interface EntityMappingSyncInput {
@@ -72,8 +83,10 @@ export interface EntityMappingSyncResult {
   readonly created: number;
   readonly updated: number;
   readonly unchanged: number;
+  readonly edgesCreated: number;
+  readonly edgesUnchanged: number;
   readonly rejected: readonly SyncRejection[];
-  /** `${sourceName}:${externalId}` → node id (input for a later edge pass). */
+  /** `${sourceName}:${externalId}` → node id. */
   readonly nodeIds: Readonly<Record<string, string>>;
 }
 
@@ -106,8 +119,8 @@ export function syncNodeId(
   );
 }
 
-export type SyncGraph = Pick<GraphReader, "getNode"> &
-  Pick<GraphWriter, "createNode" | "updateNode">;
+export type SyncGraph = Pick<GraphReader, "getNode" | "outgoingEdges"> &
+  Pick<GraphWriter, "createNode" | "updateNode" | "createEdge">;
 
 export interface EntityMappingSyncDeps {
   readonly graph: SyncGraph;
@@ -230,5 +243,101 @@ export async function runEntityMappingSync(
     });
   }
 
-  return { created, updated, unchanged, rejected, nodeIds };
+  // Edge pass — after the node pass, so both endpoints of an intra-batch
+  // edge already exist. Targets from PREVIOUS syncs also resolve, because
+  // identity is deterministic: syncNodeId recomputes the target's node id
+  // from its external coordinates without needing it in this batch.
+  let edgesCreated = 0;
+  let edgesUnchanged = 0;
+  for (const record of input.records) {
+    if (!record.edges || record.edges.length === 0) continue;
+    const fromKey = `${record.sourceName}:${record.externalId}`;
+    const fromId = nodeIds[fromKey];
+    if (fromId === undefined) continue; // the node itself was rejected
+    for (const edge of record.edges) {
+      const toId = syncNodeId(
+        input.tenantId,
+        input.appName,
+        edge.targetSourceName,
+        edge.targetExternalId,
+      );
+      try {
+        const edgeInput = applyEdgeMapping(
+          input.mapping,
+          record.sourceName,
+          edge.edgeKey,
+          { fromId, toId },
+          { tenantId: input.tenantId },
+        );
+        const existing = await deps.graph.outgoingEdges(
+          input.tenantId,
+          fromId as unknown as EntityId,
+          edgeInput.type,
+        );
+        if (existing.some((e) => (e.toId as string) === toId)) {
+          edgesUnchanged += 1;
+          continue;
+        }
+        await deps.graph.createEdge({
+          tenantId: input.tenantId,
+          type: edgeInput.type,
+          fromId: fromId as unknown as EntityId,
+          toId: toId as unknown as EntityId,
+          attrs: edgeInput.attrs,
+        });
+        edgesCreated += 1;
+        await deps.events.publish({
+          tenantId: input.tenantId,
+          type: SYNC_UPSERTED_EVENT_TYPE,
+          entityId: fromId as unknown as EntityId,
+          emittedBy: input.syncedBy,
+          authority,
+          payloadSchema: `${SYNC_UPSERTED_EVENT_TYPE}.v1`,
+          payload: {
+            appName: input.appName,
+            sourceName: record.sourceName,
+            externalId: record.externalId,
+            nodeId: fromId,
+            op: "edge_created",
+            edgeKey: edge.edgeKey,
+            edgeType: edgeInput.type,
+            toId,
+          },
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        rejected.push({
+          sourceName: record.sourceName,
+          externalId: record.externalId,
+          reason: `edge "${edge.edgeKey}": ${reason}`,
+        });
+        await deps.events.publish({
+          tenantId: input.tenantId,
+          type: SYNC_REJECTED_EVENT_TYPE,
+          entityId:
+            `sync_reject:${record.sourceName}:${record.externalId}:${edge.edgeKey}` as unknown as EntityId,
+          emittedBy: input.syncedBy,
+          authority,
+          payloadSchema: `${SYNC_REJECTED_EVENT_TYPE}.v1`,
+          payload: {
+            appName: input.appName,
+            sourceName: record.sourceName,
+            externalId: record.externalId,
+            edgeKey: edge.edgeKey,
+            reason,
+          },
+        });
+      }
+    }
+  }
+
+  return {
+    created,
+    updated,
+    unchanged,
+    edgesCreated,
+    edgesUnchanged,
+    rejected,
+    nodeIds,
+  };
 }
