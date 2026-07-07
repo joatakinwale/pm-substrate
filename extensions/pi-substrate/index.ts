@@ -22,12 +22,22 @@
  * (required), PM_DEV_TENANT_ID / PM_DEV_AGENT_ID / PM_DEV_SCOPE optional —
  * set PM_DEV_AGENT_ID per agent so each Pi agent extends its own chain.
  *
- * Follow-up lane (registered contract's before_tool_call_gate): Pi's
- * blockable `tool_call` event can require an admitted proposal per tool
- * call. Shadow-first doctrine says tools-only ships first.
+ * Tool-call governance (the contract's before_tool_call_gate /
+ * after_tool_call_audit), shadow-first per hard req 5:
+ *
+ *   - SHADOW (default): every tool call is audited in memory and flushed
+ *     at agent_end as ONE governed checkpoint — the "what the agent did"
+ *     evidence trail with per-tool counts and a content hash per call.
+ *     Zero behavior change, zero per-call latency.
+ *   - BLOCK (PM_PI_GATE=block): additionally refuses denylisted tool
+ *     calls at the seam (`{ block: true, reason }`) and records the
+ *     refusal in the same trail. Deny rules: PM_PI_DENY as
+ *     comma-separated `tool` or `tool:substring` entries
+ *     (e.g. "write,bash:rm -rf").
  */
 
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
@@ -59,10 +69,106 @@ const text = (value: string) => ({
   content: [{ type: "text" as const, text: value }],
 });
 
+interface ToolCallAudit {
+  readonly toolName: string;
+  readonly toolCallId: string;
+  readonly inputHash: string;
+  readonly at: string;
+  readonly blocked?: string;
+}
+
+function parseDenyRules(): readonly { tool: string; substring?: string }[] {
+  return (process.env["PM_PI_DENY"] ?? "")
+    .split(",")
+    .map((raw) => raw.trim())
+    .filter((raw) => raw.length > 0)
+    .map((raw) => {
+      const i = raw.indexOf(":");
+      return i === -1
+        ? { tool: raw }
+        : { tool: raw.slice(0, i), substring: raw.slice(i + 1) };
+    });
+}
+
 export default function (pi: ExtensionAPI) {
+  const gateMode = process.env["PM_PI_GATE"] === "block" ? "block" : "shadow";
+  const denyRules = parseDenyRules();
+  const audits: ToolCallAudit[] = [];
+  let flushed = false;
+
   console.error(
-    `[pi-substrate] loaded — substrate at ${SUBSTRATE_DIR} (governed writes default)`,
+    `[pi-substrate] loaded — substrate at ${SUBSTRATE_DIR} (governed writes default, tool gate: ${gateMode})`,
   );
+
+  // before_tool_call_gate / after_tool_call_audit — shadow-first.
+  pi.on(
+    "tool_call",
+    async (event: { toolName: string; toolCallId: string; input: unknown }) => {
+      const inputHash = createHash("sha256")
+        .update(JSON.stringify(event.input ?? null))
+        .digest("hex")
+        .slice(0, 16);
+      const entry: ToolCallAudit = {
+        toolName: event.toolName,
+        toolCallId: event.toolCallId,
+        inputHash,
+        at: new Date().toISOString(),
+      };
+      if (gateMode === "block") {
+        const inputText = JSON.stringify(event.input ?? "");
+        const hit = denyRules.find(
+          (r) =>
+            r.tool === event.toolName &&
+            (r.substring === undefined || inputText.includes(r.substring)),
+        );
+        if (hit) {
+          const reason = `pm-substrate gate: tool "${event.toolName}" denied${hit.substring ? ` (matched "${hit.substring}")` : ""}`;
+          audits.push({ ...entry, blocked: reason });
+          return { block: true, reason };
+        }
+      }
+      audits.push(entry);
+      return undefined;
+    },
+  );
+
+  // after_tool_call_audit: flush ONE governed checkpoint per agent run.
+  pi.on("agent_end", async () => {
+    if (flushed || audits.length === 0) return;
+    flushed = true;
+    const counts = new Map<string, number>();
+    for (const a of audits) {
+      counts.set(a.toolName, (counts.get(a.toolName) ?? 0) + 1);
+    }
+    const blocked = audits.filter((a) => a.blocked !== undefined);
+    const summary =
+      `Pi tool-call audit (${gateMode} mode): ${audits.length} calls — ` +
+      [...counts.entries()].map(([t, n]) => `${t}:${n}`).join(", ") +
+      (blocked.length > 0
+        ? `; BLOCKED ${blocked.length}: ${blocked
+            .map((b) => `${b.toolName}#${b.inputHash}`)
+            .join(", ")}`
+        : "; none blocked") +
+      `. Call hashes: ${audits
+        .slice(0, 20)
+        .map((a) => `${a.toolName}#${a.inputHash}`)
+        .join(" ")}${audits.length > 20 ? " …" : ""}`;
+    const { output, code } = await runDevSession([
+      "checkpoint",
+      "--",
+      "--kind",
+      "research",
+      "--title",
+      `Pi session tool-call audit (${audits.length} calls)`,
+      "--summary",
+      summary,
+    ]);
+    console.error(
+      code === 0
+        ? `[pi-substrate] audit flushed: ${output.split("\n").pop() ?? ""}`
+        : `[pi-substrate] audit flush failed (${code}): ${output.slice(0, 200)}`,
+    );
+  });
 
   pi.registerTool({
     name: "substrate_resume",
