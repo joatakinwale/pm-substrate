@@ -26,6 +26,16 @@ const TENANT = (process.env["PM_DEV_TENANT_ID"] ?? "tenant_dev") as TenantId;
 const AGENT = process.env["PM_DEV_AGENT_ID"] ?? "joat-dev";
 const SCOPE = process.env["PM_DEV_SCOPE"] ?? "pm-substrate-dev";
 
+/** Evidence coordinates with the password redacted — every snapshot self-describes. */
+function describeDatabase(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.username ? `${u.username}@` : ""}${u.host}${u.pathname}`;
+  } catch {
+    return "(unparseable PM_DATABASE_URL)";
+  }
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env["PM_DATABASE_URL"];
   if (!databaseUrl) {
@@ -41,12 +51,30 @@ async function main(): Promise<void> {
       listExternalAdapters(events, TENANT),
     ]);
 
+    // Owner-found bug (2026-07-07): pointed at the wrong database/tenant/
+    // scope, the memo regenerated a zeroed snapshot that LOOKED authoritative.
+    // Evidence-never-authority applies to the generator too: an empty fold
+    // almost certainly means wrong coordinates, so refuse unless --force.
+    const evidenceEmpty =
+      m.sessions === 0 && m.workClosed === 0 && m.totalTokens === 0;
+    const coordinates = `db ${describeDatabase(databaseUrl)} · tenant ${TENANT} · agent ${AGENT} · scope ${SCOPE}`;
+    if (evidenceEmpty && !process.argv.includes("--force")) {
+      console.error(
+        `pm:memo: REFUSING to write — the evidence fold is EMPTY at ${coordinates}.\n` +
+          "This usually means PM_DATABASE_URL or PM_DEV_TENANT_ID/PM_DEV_AGENT_ID/PM_DEV_SCOPE point at the wrong ledger.\n" +
+          "Re-run with the coordinates that hold your admitted log, or pass --force if a zeroed memo is truly intended.",
+      );
+      process.exit(2);
+    }
+
     const gap = (met: boolean, note: string): string =>
       met ? `✅ ${note}` : `❌ **GAP** — ${note}`;
 
     const memo = `# D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
 
 *Generated ${m.generatedAt} by \`pnpm pm:memo\` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
+
+**Evidence coordinates:** ${coordinates}${evidenceEmpty ? " — ⚠️ EMPTY FOLD (written under --force)" : ""}
 
 ## 1 · Resume fidelity (the original problem)
 
