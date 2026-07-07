@@ -87,7 +87,7 @@ const callToolResultSchema = z
 const connectResultSchema = z
   .object({
     status: z.string(),
-    adapter_id: z.string().min(1),
+    adapter_id: z.string().min(1).optional(),
   })
   .passthrough();
 
@@ -188,6 +188,12 @@ export async function fetchLiquidRecords(
     throw new LiquidSourceError(
       `liquid_connect returned status "${connected.status}" for ${options.url} — the proposed interface map needs review before sync (lane L3).`,
       "review_needed",
+    );
+  }
+  if (connected.adapter_id === undefined) {
+    throw new LiquidSourceError(
+      `liquid_connect returned status "connected" without adapter_id for ${options.url}`,
+      "bad_response",
     );
   }
 
