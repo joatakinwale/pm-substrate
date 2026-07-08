@@ -48,6 +48,18 @@ pnpm pm:sync -- --dry-run --source liquid --app <appName> \
 
 `--url` takes anything Liquid can reach: `https://…` API, `postgresql://…`/`mysql://…` DSN, GraphQL, gRPC. For HTTP APIs pass `credentials` at connect time (stored in Liquid's vault, never by the substrate).
 
+## Dashboard workbench (the human-friendly route)
+
+The Integration Workbench wraps the same governed calls — the CLI commands above stay the deterministic fallback.
+
+```bash
+PM_DATABASE_URL=… PORT=4179 node packages/substrate-dashboard/server/server.mjs
+```
+
+Open `http://127.0.0.1:4179/#integrations`.
+
+Use the **Config path** when the adopting app already has a `mapping.json`/`mapping.yaml`: paste it, Validate, Propose, then Approve the hash from the pending list. Use the **Liquid-assisted path** when you want a no-config start: Liquid discovery supplies the field list, you choose the Tier-1 primitive and external-id field, and the result lands as a pending `pm.mapping.proposed` with origin `liquid_discovery`. Both paths stop at `pm.mapping.proposed` until a human approves the hash; the dashboard's sync button is dry-run only (it reports the gate verdict and data effects, writes nothing). Real syncs stay on `pm:sync`.
+
 ## Traps (all found live)
 
 - **DB fetch auth**: Liquid stores adapters without the DSN password — pass `credentials` to `liquid_connect` (vaulted) or use trust/peer auth for local smokes. A missing password surfaces as `503 … 'NoneType' object has no attribute 'encode'`.

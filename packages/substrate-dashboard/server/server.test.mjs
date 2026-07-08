@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -5,6 +6,12 @@ import {
   server,
   setLocalAgentLabLoaderForTests,
 } from "./server.mjs";
+import {
+  resetIntegrationWorkbenchForTests,
+  setLiquidClientFactoryForTests,
+} from "./integration-workbench.mjs";
+
+const REAL_DATABASE_URL = process.env.PM_DATABASE_URL;
 
 const scenario = {
   scenarioId: "stale-observation",
@@ -368,5 +375,272 @@ describe.sequential("substrate dashboard live session API", () => {
       expect(packageJson.scripts[script]).toContain("@pm/local-agent-lab");
       expect(packageJson.scripts[script]).toContain("build");
     }
+  });
+});
+
+const validMapping = () => ({
+  profile: null,
+  mappingVersion: 1,
+  entities: {
+    Customer: {
+      tier1: "Counterparty",
+      concrete: "Counterparty",
+      identityFields: ["name"],
+      optionalFields: ["email"],
+      schemaVersion: 1,
+    },
+  },
+});
+
+function makeFakeLiquidClient(rows) {
+  const calls = [];
+  return {
+    calls,
+    async callTool({ name, arguments: args }) {
+      calls.push({ name, args });
+      if (name === "liquid_connect") {
+        return {
+          structuredContent: { status: "connected", adapter_id: "fake_adapter" },
+        };
+      }
+      if (name === "liquid_fetch") {
+        return { structuredContent: { records: rows.length, data: rows } };
+      }
+      throw new Error(`unexpected liquid tool: ${name}`);
+    },
+    async close() {},
+  };
+}
+
+describe.sequential("dashboard integration workbench API (no DB required)", () => {
+  const originalDatabaseUrl = process.env.PM_DATABASE_URL;
+
+  afterEach(async () => {
+    await closeServer();
+    resetIntegrationWorkbenchForTests();
+    if (originalDatabaseUrl === undefined) {
+      delete process.env.PM_DATABASE_URL;
+    } else {
+      process.env.PM_DATABASE_URL = originalDatabaseUrl;
+    }
+  });
+
+  it("validates a mapping without publishing events", async () => {
+    const base = await listen();
+    const response = await postJson(base, "/api/integrations/orbit/mappings/validate", {
+      mapping: validMapping(),
+    });
+
+    expect(response.res.status).toBe(200);
+    expect(response.body).toMatchObject({
+      ok: true,
+      validation: { valid: true, issues: [] },
+    });
+    expect(response.body.mappingHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("reports validation issues for an invalid mapping", async () => {
+    const base = await listen();
+    const response = await postJson(base, "/api/integrations/orbit/mappings/validate", {
+      mapping: { profile: null, mappingVersion: 1, entities: {} },
+    });
+
+    expect(response.res.status).toBe(200);
+    expect(response.body.ok).toBe(false);
+    expect(response.body.validation.valid).toBe(false);
+    expect(
+      response.body.validation.issues.map((issue) => issue.message).join("; "),
+    ).toMatch(/expected at least one entity entry/);
+  });
+
+  it("refuses invalid mapping proposals before they reach the event log", async () => {
+    const base = await listen();
+    const response = await postJson(base, "/api/integrations/orbit/mappings/propose", {
+      mapping: { profile: null, mappingVersion: 1, entities: {} },
+      origin: "manual",
+      reason: "empty map should be rejected",
+    });
+
+    expect(response.res.status).toBe(400);
+    expect(response.body.error).toMatch(/expected at least one entity entry/);
+  });
+
+  it("returns JSON 503, never index.html, when the database is not configured", async () => {
+    delete process.env.PM_DATABASE_URL;
+    const base = await listen();
+    const response = await getJson(base, "/api/integrations/orbit/mappings");
+
+    expect(response.res.status).toBe(503);
+    expect(response.res.headers.get("content-type")).toContain("application/json");
+    expect(response.body.ok).toBe(false);
+    expect(response.body.error).toMatch(/PM_DATABASE_URL/);
+  });
+
+  it("rejects wrong methods on integration routes", async () => {
+    const base = await listen();
+    const response = await getJson(base, "/api/integrations/orbit/mappings/validate");
+    expect(response.res.status).toBe(405);
+  });
+});
+
+const describeIfDb = REAL_DATABASE_URL ? describe.sequential : describe.sequential.skip;
+
+describeIfDb("dashboard integration workbench API (admitted-log backed)", () => {
+  beforeEach(() => {
+    process.env.PM_DATABASE_URL = REAL_DATABASE_URL;
+  });
+
+  afterEach(async () => {
+    await closeServer();
+    resetIntegrationWorkbenchForTests();
+    process.env.PM_DATABASE_URL = REAL_DATABASE_URL;
+  });
+
+  it("propose -> approve lifecycle folds from the admitted log", async () => {
+    const base = await listen();
+    const appName = `wb_app_${randomUUID().slice(0, 8)}`;
+
+    const proposed = await postJson(base, `/api/integrations/${appName}/mappings/propose`, {
+      mapping: validMapping(),
+      reason: "workbench test",
+    });
+    expect(proposed.res.status).toBe(200);
+    expect(proposed.body.proposed).toBe(true);
+    const hash = proposed.body.mappingHash;
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
+
+    const pendingState = await getJson(base, `/api/integrations/${appName}/mappings`);
+    expect(pendingState.res.status).toBe(200);
+    expect(pendingState.body.approvedHash).toBeNull();
+    expect(pendingState.body.pending).toContainEqual(
+      expect.objectContaining({ mappingHash: hash, origin: "manual" }),
+    );
+
+    const approved = await postJson(
+      base,
+      `/api/integrations/${appName}/mappings/${hash}/approve`,
+      { reason: "looks right" },
+    );
+    expect(approved.res.status).toBe(200);
+    expect(approved.body.approvedHash).toBe(hash);
+    expect(approved.body.pending).toHaveLength(0);
+  });
+
+  it("reject closes a pending proposal without approving anything", async () => {
+    const base = await listen();
+    const appName = `wb_app_${randomUUID().slice(0, 8)}`;
+
+    const proposed = await postJson(base, `/api/integrations/${appName}/mappings/propose`, {
+      mapping: validMapping(),
+    });
+    const hash = proposed.body.mappingHash;
+
+    const rejected = await postJson(
+      base,
+      `/api/integrations/${appName}/mappings/${hash}/reject`,
+      { reason: "not yet" },
+    );
+    expect(rejected.res.status).toBe(200);
+    expect(rejected.body.approvedHash).toBeNull();
+    expect(rejected.body.pending).toHaveLength(0);
+  });
+
+  it("refuses decisions on hashes that are not pending", async () => {
+    const base = await listen();
+    const appName = `wb_app_${randomUUID().slice(0, 8)}`;
+    const response = await postJson(
+      base,
+      `/api/integrations/${appName}/mappings/deadbeefdeadbeef/approve`,
+      {},
+    );
+    expect(response.res.status).toBe(409);
+    expect(response.body.error).toMatch(/no pending proposal/);
+  });
+
+  it("sync preview is always a dry run and reports the approval verdict honestly", async () => {
+    const base = await listen();
+    const appName = `wb_app_${randomUUID().slice(0, 8)}`;
+    const rows = [
+      { id: "1", name: "Ada", email: "ada@example.test" },
+      { id: "2", name: "Grace", email: "grace@example.test" },
+    ];
+    setLiquidClientFactoryForTests(async () => makeFakeLiquidClient(rows));
+
+    // Unapproved mapping: the preview must report the refusal verdict, write
+    // nothing, and still show the data effects — even if the caller lies
+    // about dryRun.
+    const unapproved = await postJson(base, `/api/integrations/${appName}/sync/preview`, {
+      mapping: validMapping(),
+      url: "https://example.invalid/customers",
+      sourceName: "Customer",
+      externalIdField: "id",
+      dryRun: false,
+    });
+    expect(unapproved.res.status).toBe(200);
+    expect(unapproved.body.dryRun).toBe(true);
+    expect(unapproved.body.mappingApproved).toBe(false);
+    expect(unapproved.body.created).toBe(2);
+
+    // Approve, then preview again: verdict flips, still a dry run.
+    const proposed = await postJson(base, `/api/integrations/${appName}/mappings/propose`, {
+      mapping: validMapping(),
+    });
+    await postJson(
+      base,
+      `/api/integrations/${appName}/mappings/${proposed.body.mappingHash}/approve`,
+      {},
+    );
+    const approvedPreview = await postJson(base, `/api/integrations/${appName}/sync/preview`, {
+      mapping: validMapping(),
+      url: "https://example.invalid/customers",
+      sourceName: "Customer",
+      externalIdField: "id",
+    });
+    expect(approvedPreview.res.status).toBe(200);
+    expect(approvedPreview.body.dryRun).toBe(true);
+    expect(approvedPreview.body.mappingApproved).toBe(true);
+    expect(approvedPreview.body.created).toBe(2);
+  });
+
+  it("records Liquid discovery as a pending proposal, not an approved mapping", async () => {
+    const base = await listen();
+    const appName = `wb_app_${randomUUID().slice(0, 8)}`;
+
+    const discovered = await postJson(base, "/api/integrations/liquid/discover", {
+      appName,
+      url: "https://example.invalid/customers",
+      sourceName: "Customer",
+      tier1: "Counterparty",
+      concrete: "Counterparty",
+      externalIdField: "id",
+      fields: ["id", "name"],
+    });
+
+    expect(discovered.res.status).toBe(200);
+    expect(discovered.body.mappingHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(discovered.body.approved).toBe(false);
+    expect(discovered.body.origin).toBe("liquid_discovery");
+
+    const state = await getJson(base, `/api/integrations/${appName}/mappings`);
+    expect(state.body.approvedHash).toBeNull();
+    expect(state.body.pending).toContainEqual(
+      expect.objectContaining({
+        mappingHash: discovered.body.mappingHash,
+        origin: "liquid_discovery",
+      }),
+    );
+  });
+
+  it("refuses liquid discovery with an unknown tier1 primitive", async () => {
+    const base = await listen();
+    const response = await postJson(base, "/api/integrations/liquid/discover", {
+      appName: `wb_app_${randomUUID().slice(0, 8)}`,
+      sourceName: "Customer",
+      tier1: "NotAPrimitive",
+      externalIdField: "id",
+      fields: ["id"],
+    });
+    expect(response.res.status).toBe(400);
+    expect(response.body.error).toMatch(/tier1 must be one of/);
   });
 });

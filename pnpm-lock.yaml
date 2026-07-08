@@ -587,9 +587,27 @@ importers:
 
   packages/substrate-dashboard:
     dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@3.25.76)
+      '@pm/entity-mapping':
+        specifier: workspace:*
+        version: link:../entity-mapping
+      '@pm/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pm/graph':
+        specifier: workspace:*
+        version: link:../graph
+      '@pm/integration-kit':
+        specifier: workspace:*
+        version: link:../integration-kit
       '@pm/local-agent-lab':
         specifier: workspace:*
         version: link:../local-agent-lab
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
     devDependencies:
       typescript:
         specifier: ^5.9.0

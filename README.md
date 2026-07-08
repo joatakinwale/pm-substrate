@@ -2,7 +2,7 @@
 
 **A governed operational-state sidecar for agent-run work: agents resume from it, observe through it, and act only through its admission gates.**
 
-A JOATLABS.dev primitive. **The plan is [`ROADMAP.md`](./ROADMAP.md). The session protocol is [`CLAUDE.md`](./CLAUDE.md). The live truth is the ledger: `pnpm dev:resume`.**
+A JOATLABS.dev primitive. **The plan is [`ROADMAP.md`](./ROADMAP.md). The task index is [`TASKS.md`](./TASKS.md). The session protocol is [`CLAUDE.md`](./CLAUDE.md). The live truth is the ledger: `pnpm dev:resume`.**
 
 ---
 
@@ -11,6 +11,7 @@ A JOATLABS.dev primitive. **The plan is [`ROADMAP.md`](./ROADMAP.md). The sessio
 1. Read [`CLAUDE.md`](./CLAUDE.md) — the session protocol. Sessions resume from the substrate, not from chat history.
 2. Run `pnpm dev:resume` — last handoff, open work, standing decisions, lessons, claims under test (hash-chain verified).
 3. Read [`ROADMAP.md`](./ROADMAP.md) — north star, hard requirements, current phase. If the ledger and any document disagree, the ledger wins; record a superseding decision, then fix the document.
+4. Use [`TASKS.md`](./TASKS.md) only as a human-readable implementation index. Every task must point back to the roadmap or ledger; it never supersedes either.
 
 Do not start work from this README alone — it is reference, not state.
 
@@ -85,8 +86,9 @@ Verification baseline 2026-07-02: build + typecheck clean; **875 passed / 7 env-
 ## Repository layout
 
 ```
-ROADMAP.md                   the plan (forward)          CLAUDE.md   session protocol
-refactor-plan.md             executed 2026-07-02         Changelog.md research/build ledger
+ROADMAP.md                   the plan (forward)          TASKS.md    human task index
+CLAUDE.md                    session protocol            Changelog.md research/build ledger
+refactor-plan.md             executed 2026-07-02
 packages/                    runtime core · agent-state-core · quarantined tower ·
                              profiles · capabilities · entity-mapping · evals · lab · dashboard
 db/migrations[-provenance]/  two-tier SQL                scripts/     migrate, seeds, gates, dev-session

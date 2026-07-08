@@ -18,7 +18,13 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "@pm/local-agent-lab": "workspace:*"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@pm/entity-mapping": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/integration-kit": "workspace:*",
+    "@pm/local-agent-lab": "workspace:*",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

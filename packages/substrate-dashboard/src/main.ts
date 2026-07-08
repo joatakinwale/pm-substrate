@@ -1,5 +1,9 @@
 import "./styles.css";
 
+import { mountControlPlane } from "./control-plane-page.js";
+import { mountIntegrationWorkbench } from "./integration-workbench-page.js";
+import { fetchSnapshot, renderLive } from "./live.js";
+
 type Mode = "substrate" | "no_substrate" | "ab_pair";
 type SessionStatus = "running" | "completed" | "stopped" | "failed";
 type Arm = "substrate" | "no_substrate";
@@ -79,6 +83,48 @@ interface SessionDetail {
 
 const appRoot = document.querySelector<HTMLDivElement>("#app")!;
 if (!appRoot) throw new Error("missing #app root");
+
+type DashboardView = "lab" | "live" | "control-plane" | "integrations";
+
+function currentView(): DashboardView {
+  const raw = window.location.hash.replace(/^#\/?/, "");
+  if (raw === "live" || raw === "control-plane" || raw === "integrations") return raw;
+  return "lab";
+}
+
+let mountedShellView: DashboardView | null = null;
+
+/**
+ * Persistent shell: a nav rail plus a single `.dashboard-view` container the
+ * active view renders into. The Local Agent Lab remains the default view and
+ * keeps its existing render path — it just targets the view container now.
+ */
+function renderShell(active: DashboardView): void {
+  if (mountedShellView === active && appRoot.querySelector(".dashboard-view")) return;
+  mountedShellView = active;
+  const link = (view: DashboardView, label: string): string =>
+    `<a href="#${view}" class="${active === view ? "active" : ""}">${label}</a>`;
+  appRoot.innerHTML = `
+    <main class="substrate-dashboard-shell">
+      <aside class="dashboard-rail">
+        <strong>pm-substrate</strong>
+        ${link("lab", "Lab")}
+        ${link("live", "Live Metrics")}
+        ${link("control-plane", "Control Plane")}
+        ${link("integrations", "Integrations")}
+      </aside>
+      <section class="dashboard-view"></section>
+    </main>`;
+}
+
+function viewRoot(): HTMLElement {
+  let root = appRoot.querySelector<HTMLElement>(".dashboard-view");
+  if (!root) {
+    renderShell(currentView());
+    root = appRoot.querySelector<HTMLElement>(".dashboard-view")!;
+  }
+  return root;
+}
 
 let scenarios: ScenarioMeta[] = [];
 let sessions: SessionSummary[] = [];
@@ -205,6 +251,7 @@ void boot();
 
 async function boot(): Promise<void> {
   window.addEventListener("popstate", () => void route());
+  window.addEventListener("hashchange", () => void route());
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && startModalOpen) {
       startModalOpen = false;
@@ -214,11 +261,35 @@ async function boot(): Promise<void> {
   await Promise.all([loadScenarios(), loadSessions()]);
   await route();
   window.setInterval(() => {
-    if (!currentSessionId()) void loadSessions().then(renderMain);
+    if (currentView() === "lab" && !currentSessionId()) {
+      void loadSessions().then(renderMain);
+    }
   }, 4000);
 }
 
 async function route(): Promise<void> {
+  const view = currentView();
+  renderShell(view);
+  if (view === "live") {
+    disconnectStream();
+    viewRoot().innerHTML = `<div id="live-root"><p class="view-loading">Loading live metrics…</p></div>`;
+    renderLive(viewRoot().querySelector<HTMLElement>("#live-root")!, await fetchSnapshot());
+    return;
+  }
+  if (view === "control-plane") {
+    disconnectStream();
+    viewRoot().innerHTML = `<div id="control-plane-root"></div>`;
+    await mountControlPlane(viewRoot().querySelector<HTMLElement>("#control-plane-root")!);
+    return;
+  }
+  if (view === "integrations") {
+    disconnectStream();
+    viewRoot().innerHTML = `<div id="integration-workbench-root"></div>`;
+    await mountIntegrationWorkbench(
+      viewRoot().querySelector<HTMLElement>("#integration-workbench-root")!,
+    );
+    return;
+  }
   const id = currentSessionId();
   if (id) {
     await loadDetail(id);
@@ -291,7 +362,7 @@ function renderMain(): void {
     selectedSessionId = latest[0]?.id ?? null;
   }
   const selectedSession = latest.find((session) => session.id === selectedSessionId) ?? latest[0] ?? null;
-  appRoot.innerHTML = `
+  viewRoot().innerHTML = `
     <main class="codex-shell">
       <aside class="codex-sidebar">
         <div class="sidebar-brand">
@@ -706,11 +777,11 @@ function sessionCardEvents(session: SessionSummary): readonly { label: string; m
 
 function renderDetail(): void {
   if (!detail) {
-    appRoot.innerHTML = `<main class="control-room"><div class="empty">Session not found.</div></main>`;
+    viewRoot().innerHTML = `<main class="control-room"><div class="empty">Session not found.</div></main>`;
     return;
   }
   const { session, events, agents } = detail;
-  appRoot.innerHTML = `
+  viewRoot().innerHTML = `
     <main class="session-page">
       <header class="session-topbar">
         <button class="ghost" data-action="back">Back</button>

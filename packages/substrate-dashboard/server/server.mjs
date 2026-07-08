@@ -698,6 +698,88 @@ export const server = createServer(async (req, res) => {
     }
   }
 
+  // --- integration workbench (D5-D) ---
+  // JSON only; no integration route may fall through to index.html. All
+  // writes go through the admitted log via @pm/integration-kit; sync is
+  // exposed as dry-run preview only.
+  const mappingStateMatch = pathname.match(/^\/api\/integrations\/([^/]+)\/mappings$/);
+  const mappingValidateMatch = pathname.match(/^\/api\/integrations\/([^/]+)\/mappings\/validate$/);
+  const mappingProposeMatch = pathname.match(/^\/api\/integrations\/([^/]+)\/mappings\/propose$/);
+  const mappingDecisionMatch = pathname.match(
+    /^\/api\/integrations\/([^/]+)\/mappings\/([^/]+)\/(approve|reject)$/,
+  );
+  const syncPreviewMatch = pathname.match(/^\/api\/integrations\/([^/]+)\/sync\/preview$/);
+  const liquidDiscoverMatch = pathname.match(/^\/api\/integrations\/liquid\/discover$/);
+
+  if (
+    mappingStateMatch ||
+    mappingValidateMatch ||
+    mappingProposeMatch ||
+    mappingDecisionMatch ||
+    syncPreviewMatch ||
+    liquidDiscoverMatch
+  ) {
+    let workbench;
+    try {
+      workbench = await import("./integration-workbench.mjs");
+    } catch (err) {
+      return sendJson(res, 503, {
+        ok: false,
+        error: `integration workbench unavailable: ${err?.message ?? String(err)}`,
+      });
+    }
+    try {
+      if (mappingValidateMatch) {
+        if (method !== "POST") return sendMethodNotAllowed(res);
+        const result = await workbench.validateMapping(await readJsonBody(req));
+        return sendJson(res, result.status, result.body);
+      }
+      const deps = workbench.createIntegrationWorkbench();
+      if (!deps.available) return sendJson(res, 503, { ok: false, error: deps.error });
+      if (liquidDiscoverMatch) {
+        if (method !== "POST") return sendMethodNotAllowed(res);
+        const result = await workbench.liquidDiscoverProposal(deps, await readJsonBody(req));
+        return sendJson(res, result.status, result.body);
+      }
+      if (mappingStateMatch) {
+        if (method !== "GET") return sendMethodNotAllowed(res);
+        const result = await workbench.getMappingState(deps, mappingStateMatch[1]);
+        return sendJson(res, result.status, result.body);
+      }
+      if (mappingProposeMatch) {
+        if (method !== "POST") return sendMethodNotAllowed(res);
+        const result = await workbench.proposeMapping(
+          deps,
+          mappingProposeMatch[1],
+          await readJsonBody(req),
+        );
+        return sendJson(res, result.status, result.body);
+      }
+      if (mappingDecisionMatch) {
+        if (method !== "POST") return sendMethodNotAllowed(res);
+        const result = await workbench.decideMapping(
+          deps,
+          mappingDecisionMatch[1],
+          mappingDecisionMatch[2],
+          mappingDecisionMatch[3],
+          await readJsonBody(req),
+        );
+        return sendJson(res, result.status, result.body);
+      }
+      if (syncPreviewMatch) {
+        if (method !== "POST") return sendMethodNotAllowed(res);
+        const result = await workbench.previewLiquidSync(
+          deps,
+          syncPreviewMatch[1],
+          await readJsonBody(req),
+        );
+        return sendJson(res, result.status, result.body);
+      }
+    } catch (err) {
+      return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
+    }
+  }
+
   // --- static ---
   try {
     let filePath = normalize(join(DIST, pathname));

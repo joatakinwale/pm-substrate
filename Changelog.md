@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-08 - Dashboard integration workbench shipped (D5-D)
+
+- `packages/substrate-dashboard` is now a navigable shell: `#lab` (default, unchanged Local Agent Lab), `#live`, `#control-plane`, and `#integrations`.
+- New Integration Workbench API (`server/integration-workbench.mjs` + routes in `server.mjs`): mapping state/validate/propose/approve/reject over the admitted log (`pm.mapping.*` via `@pm/integration-kit`), dry-run-only Liquid sync preview (`dryRun` hard-coded server-side; the dashboard can never perform a live sync), and `/api/integrations/liquid/discover` which records operator-shaped starter mappings as pending proposals with origin `liquid_discovery` — never approvals, never writes.
+- New workbench UI (`src/integration-workbench-page.ts`): config-first mapping editor with validation issues, pending/approved hashes with approve/reject, dry-run preview with the gate verdict, and the Liquid-assisted no-config lane. Pure renderer + 6 unit tests; 8 server API tests (JSON-only routes, 503 without DB, approval lifecycle, dry-run verdict honesty, discovery-as-pending).
+- `docs/liquid-runbook.md` documents the dashboard path with the CLI as deterministic fallback.
+- Also fixed this session: the continuity open-work projection now honors latest-status-per-title (`resolveOpenWork` in `@pm/continuity`) so closed work items actually disappear from `dev:resume`/`dev:status`/MCP resume.
+
+## 2026-07-08 - Dashboard integration workbench planning
+
+- Added `TASKS.md` as a ledger-subordinate human task index and recorded D5-D dashboard integration workbench as the current open roadmap-backed task.
+- Updated `README.md` and `ROADMAP.md` so the D5-D implementation plan is connected through the documented governance path instead of standing alone.
+- Added `docs/superpowers/plans/2026-07-08-dashboard-integration-workbench.md` with implementation steps for mounting dashboard views and adding mapping/Liquid workbench routes.
+- Recorded the decision checkpoint `D5-D dashboard integration workbench task index` and the open work checkpoint `D5-D dashboard integration workbench` through the governed continuity gate.
+- Claim boundary: documentation/planning only; no runtime dashboard code changed.
+
 ## 2026-07-02 - Verification baseline recorded
 
 - Added `docs/state-validation/verification-baseline-2026-07-02.md` with the
