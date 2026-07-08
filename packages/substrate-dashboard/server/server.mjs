@@ -703,6 +703,24 @@ export const server = createServer(async (req, res) => {
         const result = await workbench.validateMapping(await readJsonBody(req));
         return sendJson(res, result.status, result.body);
       }
+      if (mappingProposeMatch) {
+        if (method !== "POST") return sendMethodNotAllowed(res);
+        const body = await readJsonBody(req);
+        const validationResult = await workbench.validateMapping(body);
+        if (!validationResult.body.ok) {
+          return sendJson(res, 400, {
+            ok: false,
+            error: validationResult.body.validation.issues
+              .map((issue) => issue.message)
+              .join("; "),
+            validation: validationResult.body.validation,
+          });
+        }
+        const deps = workbench.createIntegrationWorkbench();
+        if (!deps.available) return sendJson(res, 503, { ok: false, error: deps.error });
+        const result = await workbench.proposeMapping(deps, mappingProposeMatch[1], body);
+        return sendJson(res, result.status, result.body);
+      }
       const deps = workbench.createIntegrationWorkbench();
       if (!deps.available) return sendJson(res, 503, { ok: false, error: deps.error });
       if (liquidDiscoverMatch) {
@@ -713,15 +731,6 @@ export const server = createServer(async (req, res) => {
       if (mappingStateMatch) {
         if (method !== "GET") return sendMethodNotAllowed(res);
         const result = await workbench.getMappingState(deps, mappingStateMatch[1]);
-        return sendJson(res, result.status, result.body);
-      }
-      if (mappingProposeMatch) {
-        if (method !== "POST") return sendMethodNotAllowed(res);
-        const result = await workbench.proposeMapping(
-          deps,
-          mappingProposeMatch[1],
-          await readJsonBody(req),
-        );
         return sendJson(res, result.status, result.body);
       }
       if (mappingDecisionMatch) {

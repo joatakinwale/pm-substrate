@@ -55,15 +55,17 @@ describe("control-plane page renderer (D4)", () => {
       expect(html).toContain(`data-q="${q}"`);
     }
     expect(html).toContain("D5 anchors");
-    expect(html).toContain("MCP actions blocked: <strong>1</strong>");
-    expect(html).toContain("adapters registered: <strong>2</strong>");
-    expect(html).toContain(
-      "executor dispatched: <strong>3</strong> · refused: <strong>1</strong> · failed: <strong>0</strong>",
-    );
-    expect(html).toContain("349,500");
+    expect(html).toContain("Last handoff · handoff x");
+    expect(html).toContain("<dt>MCP actions blocked</dt><dd>1</dd>");
+    expect(html).toContain("<dt>Adapters registered</dt><dd>2</dd>");
+    expect(html).toContain("<dt>Executor dispatched</dt><dd>3</dd>");
+    expect(html).toContain("<dt>Executor refused</dt><dd>1</dd>");
+    expect(html).toContain("<dt>Executor failed</dt><dd>0</dd>");
+    expect(html).toContain("349.5K");
+    expect(html).toContain("cp-bar-row");
     expect(html).toContain("Loop protocol");
     expect(html).toContain("Unconsumed formalism spirals");
-    expect(html).toContain("VALID");
+    expect(html).toContain("✓ Valid");
   });
 
   it("escapes untrusted text and handles empty sections", () => {
@@ -79,6 +81,7 @@ describe("control-plane page renderer (D4)", () => {
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("nothing closed yet");
-    expect(html).toContain("BROKEN");
+    expect(html).toContain("✕ Broken");
+    expect(html).toContain("Chain integrity errors");
   });
 });

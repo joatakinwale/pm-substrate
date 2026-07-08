@@ -84,6 +84,7 @@ const appRoot = document.querySelector<HTMLDivElement>("#app")!;
 if (!appRoot) throw new Error("missing #app root");
 
 type DashboardView = "lab" | "control-plane" | "integrations";
+type LabTab = "run" | "sessions" | "evidence" | "settings";
 
 function currentView(): DashboardView {
   const raw = window.location.hash.replace(/^#\/?/, "");
@@ -92,6 +93,7 @@ function currentView(): DashboardView {
 }
 
 let mountedShellView: DashboardView | null = null;
+let dashboardRailCollapsed = window.localStorage.getItem("pm.dashboard.railCollapsed") === "1";
 
 /**
  * Persistent shell: a nav rail plus a single `.dashboard-view` container the
@@ -101,18 +103,45 @@ let mountedShellView: DashboardView | null = null;
 function renderShell(active: DashboardView): void {
   if (mountedShellView === active && appRoot.querySelector(".dashboard-view")) return;
   mountedShellView = active;
-  const link = (view: DashboardView, label: string): string =>
-    `<a href="#${view}" class="${active === view ? "active" : ""}">${label}</a>`;
+  const link = (view: DashboardView, label: string, icon: string): string =>
+    `<a href="/#${view}" class="dashboard-nav-item ${active === view ? "active" : ""}" aria-label="${label}" title="${label}">
+      <span class="rail-icon rail-icon-${icon}" aria-hidden="true"></span>
+      <span class="rail-label">${label}</span>
+    </a>`;
   appRoot.innerHTML = `
-    <main class="substrate-dashboard-shell">
-      <aside class="dashboard-rail">
-        <strong>pm-substrate</strong>
-        ${link("lab", "Lab")}
-        ${link("control-plane", "Control Plane")}
-        ${link("integrations", "Integrations")}
+    <main class="substrate-dashboard-shell ${dashboardRailCollapsed ? "rail-collapsed" : ""}">
+      <aside class="dashboard-rail" aria-label="Dashboard">
+        <div class="dashboard-rail-top">
+          <button class="rail-toggle" type="button" data-action="toggle-dashboard-rail" aria-label="${dashboardRailCollapsed ? "Expand sidebar" : "Collapse sidebar"}" aria-pressed="${dashboardRailCollapsed ? "true" : "false"}" title="${dashboardRailCollapsed ? "Expand sidebar" : "Collapse sidebar"}">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+          </button>
+          <strong class="rail-brand">pm-substrate</strong>
+        </div>
+        <nav class="dashboard-nav" aria-label="Primary dashboard views">
+          ${link("lab", "Lab", "lab")}
+          ${link("control-plane", "Control Plane", "control")}
+          ${link("integrations", "Integrations", "integrations")}
+        </nav>
       </aside>
       <section class="dashboard-view"></section>
     </main>`;
+  bindShell();
+}
+
+function bindShell(): void {
+  appRoot.querySelector<HTMLButtonElement>("[data-action='toggle-dashboard-rail']")?.addEventListener("click", () => {
+    dashboardRailCollapsed = !dashboardRailCollapsed;
+    window.localStorage.setItem("pm.dashboard.railCollapsed", dashboardRailCollapsed ? "1" : "0");
+    const shell = appRoot.querySelector<HTMLElement>(".substrate-dashboard-shell");
+    shell?.classList.toggle("rail-collapsed", dashboardRailCollapsed);
+    const toggle = appRoot.querySelector<HTMLButtonElement>("[data-action='toggle-dashboard-rail']");
+    const label = dashboardRailCollapsed ? "Expand sidebar" : "Collapse sidebar";
+    toggle?.setAttribute("aria-label", label);
+    toggle?.setAttribute("aria-pressed", dashboardRailCollapsed ? "true" : "false");
+    toggle?.setAttribute("title", label);
+  });
 }
 
 function viewRoot(): HTMLElement {
@@ -130,20 +159,21 @@ let detail: SessionDetail | null = null;
 let stream: EventSource | null = null;
 let selectedSessionId: string | null = null;
 let startModalOpen = false;
+let activeLabTab: LabTab = "run";
 
 const previewSession: SessionDetail = {
   session: {
     id: "preview-session",
-    title: "stale-observation control preview",
-    objective: "Test whether stale private representation can become operational state.",
-    scenarioId: "stale-observation",
-    failureClass: "stale_observation",
+    title: "task handoff orchestration preview",
+    objective: "Test whether agents coordinate a task handoff after new dependency evidence changes the plan.",
+    scenarioId: "partial-observation",
+    failureClass: "partial_observation",
     mode: "ab_pair",
     status: "running",
     agentCount: 2,
     createdAt: "2026-06-29T02:00:00.000Z",
     updatedAt: "2026-06-29T02:04:20.000Z",
-    latestActivity: "Substrate arm refused stale basis; no-substrate arm admitted the unsafe action.",
+    latestActivity: "Substrate arm held the handoff until dependency evidence was observed.",
     error: null,
     summaryMetrics: {
       activeAgents: 2,
@@ -167,7 +197,7 @@ const previewSession: SessionDetail = {
         no_substrate: {
           arm: "no_substrate",
           result: "fail",
-          actedValue: 100,
+          actedValue: "handoff TASK-17 without REVIEW_GATE",
           admitted: true,
           tokens: 42,
           admittedTransitions: 3,
@@ -176,9 +206,9 @@ const previewSession: SessionDetail = {
         substrate: {
           arm: "substrate",
           result: "blocked",
-          actedValue: 100,
+          actedValue: "handoff TASK-17 without REVIEW_GATE",
           admitted: false,
-          refusedReason: "stale_basis position=1 < head=2",
+          refusedReason: "missing_required_dependency REVIEW_GATE was not observed",
           tokens: 42,
           admittedTransitions: 2,
           chainValid: true,
@@ -212,15 +242,16 @@ const previewSession: SessionDetail = {
     },
   ],
   events: [
-    previewEvent("session_created", "Local agent lab session created for stale-observation."),
+    previewEvent("session_created", "Local agent lab session created for task handoff orchestration."),
     previewEvent("agent_started", "Agent 1 started.", "preview-session:agent:1"),
-    previewEvent("world_seeded", "Seeded AAPL = 100 as admitted lab state.", "preview-session:agent:1", "no_substrate"),
-    previewEvent("agent_observed", "Agent observed AAPL at basis position 1.", "preview-session:agent:1", "no_substrate"),
-    previewEvent("injection_applied", "Injected file-context request into the session.", "preview-session:agent:1"),
-    previewEvent("mutation_applied", "Lab mutation moved AAPL from 100 to 130 after observation.", "preview-session:agent:1", "no_substrate"),
-    previewEvent("action_admitted", "No-substrate action admitted stale AAPL=100.", "preview-session:agent:1", "no_substrate"),
-    previewEvent("action_refused", "Substrate refused stale AAPL=100 at admission boundary.", "preview-session:agent:1", "substrate"),
-    previewEvent("arm_diverged", "A/B arms diverged after the same lab mutation.", "preview-session:agent:1"),
+    previewEvent("agent_started", "Agent 2 started.", "preview-session:agent:2"),
+    previewEvent("world_seeded", "Seeded TASK-17 as ready in admitted lab state.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("agent_observed", "Agent 1 observed TASK_READY before dependency review was attached.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("injection_applied", "Injected task handoff request and file context into the session.", "preview-session:agent:1"),
+    previewEvent("mutation_applied", "Lab mutation added REVIEW_GATE after Agent 1's first observation.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("action_admitted", "Unguarded arm admitted the handoff without the required dependency.", "preview-session:agent:1", "no_substrate"),
+    previewEvent("action_refused", "Substrate arm refused the handoff until REVIEW_GATE is observed.", "preview-session:agent:1", "substrate"),
+    previewEvent("arm_diverged", "A/B arms diverged on the same task handoff.", "preview-session:agent:1"),
   ],
 };
 
@@ -236,8 +267,8 @@ function previewEvent(
     id: `preview-${type}-${agentId ?? "session"}-${arm ?? "all"}`,
     type,
     sessionId: "preview-session",
-    scenarioId: "stale-observation",
-    failureClass: "stale_observation",
+    scenarioId: "partial-observation",
+    failureClass: "partial_observation",
     occurredAt: "2026-06-29T02:04:20.000Z",
     message,
     ...(agentId ? { agentId } : {}),
@@ -355,42 +386,109 @@ function renderMain(): void {
   }
   const selectedSession = latest.find((session) => session.id === selectedSessionId) ?? latest[0] ?? null;
   viewRoot().innerHTML = `
-    <main class="codex-shell">
-      <aside class="codex-sidebar">
-        <div class="sidebar-brand">
-          <div>
-            <strong>Local Agent Lab</strong>
-            <span>PM substrate testbed</span>
-          </div>
-          <button class="new-chat" data-action="open-start-modal">New</button>
-        </div>
-        <nav class="chat-list" aria-label="Sessions">
-          ${latest.map((session) => renderSessionRow(session, selectedSession?.id ?? "")).join("")}
-        </nav>
-        <div class="sidebar-footer">
-          <button class="sidebar-button" data-action="refresh">Refresh</button>
-          <button class="sidebar-button" data-action="focus-settings">Lab settings</button>
-        </div>
-      </aside>
+    <main class="codex-shell lab-shell">
       <section class="codex-workspace">
         ${renderWorkspaceHeader(selectedSession)}
-        <div class="workspace-body">
-          <section class="conversation-panel">
-            ${renderSessionConversation(selectedSession)}
-            ${renderMainComposer(selectedSession)}
-          </section>
-          <aside class="codex-inspector">
-            <details class="settings-panel" data-panel="monitor" open>
-              <summary>Substrate test evidence</summary>
-              ${renderCompactSignals(latest, selectedSession)}
-            </details>
-          </aside>
-        </div>
+        ${renderLabTabContent(latest, selectedSession)}
       </section>
       ${startModalOpen ? renderStartModal() : ""}
     </main>
   `;
   bindMain();
+}
+
+function renderLabTabContent(
+  latest: readonly SessionSummary[],
+  selectedSession: SessionSummary | null,
+): string {
+  if (activeLabTab === "sessions") return renderSessionsTab(latest, selectedSession);
+  if (activeLabTab === "evidence") return renderEvidenceTab(latest, selectedSession);
+  if (activeLabTab === "settings") return renderSettingsTab();
+  return `
+    <div class="workspace-body">
+      <section class="conversation-panel">
+        ${renderSessionConversation(selectedSession)}
+        ${renderMainComposer(selectedSession)}
+      </section>
+      <aside class="codex-inspector">
+        <details class="settings-panel" data-panel="monitor" open>
+          <summary>Orchestration evidence</summary>
+          ${renderCompactSignals(latest, selectedSession)}
+        </details>
+      </aside>
+    </div>
+  `;
+}
+
+function renderSessionsTab(
+  latest: readonly SessionSummary[],
+  selectedSession: SessionSummary | null,
+): string {
+  return `
+    <section class="lab-tab-page lab-sessions-tab">
+      <div class="section-head">
+        <div>
+          <p class="kicker">Local Agent Lab</p>
+          <h2>Sessions</h2>
+          <p>Task-based orchestration runs over the substrate testbed.</p>
+        </div>
+        <div class="tab-actions">
+          <button class="secondary" type="button" data-action="refresh">Refresh</button>
+          <button class="primary" type="button" data-action="open-start-modal">New</button>
+        </div>
+      </div>
+      ${renderActivitySnapshot(latest)}
+      <div class="session-grid lab-session-grid">
+        ${latest.map((session) => renderSessionCard(session, selectedSession?.id ?? "")).join("") || `<div class="empty">No lab sessions yet.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderEvidenceTab(
+  latest: readonly SessionSummary[],
+  selectedSession: SessionSummary | null,
+): string {
+  return `
+    <section class="lab-tab-page lab-evidence-tab">
+      <div class="section-head">
+        <div>
+          <p class="kicker">Selected Run</p>
+          <h2>Evidence</h2>
+          <p>${selectedSession ? esc(selectedSession.title) : "No session selected"}</p>
+        </div>
+        <button class="secondary" type="button" data-action="refresh">Refresh</button>
+      </div>
+      <div class="lab-evidence-grid">
+        <section class="settings-panel lab-evidence-card">
+          <header>
+            <h3>Orchestration evidence</h3>
+          </header>
+          ${renderCompactSignals(latest, selectedSession)}
+        </section>
+        <section class="snapshot-feed">
+          ${renderSnapshotFeed(latest)}
+        </section>
+      </div>
+    </section>
+  `;
+}
+
+function renderSettingsTab(): string {
+  return `
+    <section class="lab-tab-page lab-settings-tab">
+      <div class="section-head">
+        <div>
+          <p class="kicker">Lab Setup</p>
+          <h2>Settings</h2>
+          <p>Start a task orchestration run without leaving the Lab surface.</p>
+        </div>
+      </div>
+      <div class="lab-settings-layout">
+        ${renderStartForm()}
+      </div>
+    </section>
+  `;
 }
 
 function visibleSessions(): readonly SessionSummary[] {
@@ -414,43 +512,53 @@ function renderActivitySnapshot(latest: readonly SessionSummary[]): string {
   `;
 }
 
-function renderSessionRow(session: SessionSummary, selectedId: string): string {
-  const selected = session.id === selectedId;
-  return `
-    <button class="chat-row ${selected ? "selected" : ""}" data-action="select-session" data-session-id="${esc(session.id)}">
-      <span class="chat-dot status-dot-${esc(session.status)}"></span>
-      <span class="chat-row-main">
-        <strong>${esc(session.title)}</strong>
-        <span>${esc(session.latestActivity || session.objective)}</span>
-      </span>
-      <span class="chat-count">${session.summaryMetrics.divergenceCount || session.summaryMetrics.unsafeBlockedCount || ""}</span>
-    </button>
-  `;
-}
-
 function renderWorkspaceHeader(session: SessionSummary | null): string {
   if (!session) {
     return `
-      <header class="workspace-header">
-        <div>
-          <h1>Start a lab session</h1>
-          <p>Create an objective, choose agent count, then compare substrate behavior.</p>
+      <header class="workspace-header lab-workspace-header">
+        <div class="workspace-header-row">
+          <div>
+            <p class="kicker">Local Agent Lab</p>
+            <h1>Start a lab session</h1>
+          </div>
+          <div class="header-actions">
+            <button class="primary" type="button" data-action="open-start-modal">New</button>
+          </div>
         </div>
+        ${renderLabTabs()}
       </header>
     `;
   }
   return `
-    <header class="workspace-header">
-      <div>
-        <h1>${esc(session.title)}</h1>
-        <p>${esc(session.objective)}</p>
+    <header class="workspace-header lab-workspace-header">
+      <div class="workspace-header-row">
+        <div>
+          <p class="kicker">Local Agent Lab</p>
+          <h1>${esc(session.title)}</h1>
+          <p>${esc(session.objective)}</p>
+        </div>
+        <div class="header-actions">
+          <button class="primary" type="button" data-action="open-start-modal">New</button>
+          <span class="status status-${esc(session.status)}">${esc(session.status)}</span>
+          <button class="secondary" data-action="open" data-session-id="${esc(session.id)}">Open</button>
+          <button class="danger" data-action="stop" data-session-id="${esc(session.id)}" ${session.status === "running" ? "" : "disabled"}>Stop</button>
+        </div>
       </div>
-      <div class="header-actions">
-        <span class="status status-${esc(session.status)}">${esc(session.status)}</span>
-        <button class="secondary" data-action="open" data-session-id="${esc(session.id)}">Open</button>
-        <button class="danger" data-action="stop" data-session-id="${esc(session.id)}" ${session.status === "running" ? "" : "disabled"}>Stop</button>
-      </div>
+      ${renderLabTabs()}
     </header>
+  `;
+}
+
+function renderLabTabs(): string {
+  const tab = (value: LabTab, label: string): string =>
+    `<button class="lab-tab ${activeLabTab === value ? "active" : ""}" type="button" data-action="switch-lab-tab" data-tab="${value}" aria-selected="${activeLabTab === value ? "true" : "false"}">${label}</button>`;
+  return `
+    <nav class="lab-tabs" aria-label="Local Agent Lab sections">
+      ${tab("run", "Run")}
+      ${tab("sessions", "Sessions")}
+      ${tab("evidence", "Evidence")}
+      ${tab("settings", "Settings")}
+    </nav>
   `;
 }
 
@@ -459,7 +567,7 @@ function renderSessionConversation(session: SessionSummary | null): string {
     return `
       <div class="empty-conversation">
         <h2>No session selected</h2>
-        <p>Use the settings panel to start a Local Agent Lab run.</p>
+        <p>Use New or Lab settings to start a Local Agent Lab run.</p>
       </div>
     `;
   }
@@ -487,9 +595,7 @@ function renderSessionConversation(session: SessionSummary | null): string {
 
 function renderChatEvent(event: SessionEvent): string {
   const speaker = event.arm
-    ? event.arm === "substrate"
-      ? "Substrate"
-      : "No substrate"
+    ? armLabel(event.arm)
     : event.agentId
       ? agentLabel(event.agentId)
       : "Lab";
@@ -523,12 +629,12 @@ function renderMainComposer(session: SessionSummary | null): string {
         <button class="primary" type="submit">Send</button>
       </div>
       <details class="composer-options">
-        <summary>Target, files, mutation</summary>
+        <summary>Target, files, dependency mutation</summary>
         <div>
           <select name="targetArm" aria-label="A/B target">
             <option value="both">both arms</option>
-            <option value="substrate">substrate</option>
-            <option value="no_substrate">no substrate</option>
+            <option value="substrate">substrate arm</option>
+            <option value="no_substrate">unguarded arm</option>
           </select>
           <input name="fileRefs" aria-label="File refs" placeholder="optional files" />
           <input name="mutationDescription" aria-label="Mutation" placeholder="optional mutation" />
@@ -548,18 +654,18 @@ function renderCompactSignals(
   const m = session.summaryMetrics;
   return `
     <div class="evidence-summary">
-      <strong>${esc(session.mode)} substrate test</strong>
+      <strong>${esc(modeLabel(session.mode))} orchestration run</strong>
       <p>${esc(session.latestActivity || "Waiting for lab events.")}</p>
     </div>
     <div class="signal-list">
       ${metric("Active agents", String(m.activeAgents))}
-      ${metric("Blocked at substrate", String(m.unsafeBlockedCount))}
+      ${metric("Blocked by substrate", String(m.unsafeBlockedCount))}
       ${metric("Admitted without guard", String(m.unsafeAdmittedCount))}
       ${metric("Pending injections", String(m.pendingInjections))}
-      ${metric("A/B divergence", String(m.divergenceCount))}
-      ${metric("Protected comparisons", String(m.substrateProtectedCount))}
+      ${metric("Diverged arms", String(m.divergenceCount))}
+      ${metric("Protected handoffs", String(m.substrateProtectedCount))}
     </div>
-    <p class="settings-note">These signals are derived from the selected local-agent-lab session events: injection, mutation, action admitted/refused, oracle verdict, and A/B divergence. Open the session for full agent panels.</p>
+    <p class="settings-note">These signals are derived from selected local-agent-lab orchestration events: agent start, task/context injection, dependency mutation, action admitted/refused, oracle verdict, and arm divergence.</p>
   `;
 }
 
@@ -570,7 +676,7 @@ function renderStartModal(): string {
         <header>
           <div>
             <h2 id="start-modal-title">Start Local Agent Lab</h2>
-            <p>Set the objective, agent count, and substrate mode for a new test session.</p>
+            <p>Set the task objective, agent count, and substrate mode for a new orchestration run.</p>
           </div>
           <button class="ghost icon-button" type="button" data-action="close-start-modal" aria-label="Close start modal">Close</button>
         </header>
@@ -591,15 +697,15 @@ function renderStartForm(): string {
       </div>
       <label>
         <span>Objective</span>
-        <textarea name="objective" rows="5" required>Test whether stale private representation can become operational state.</textarea>
+        <textarea name="objective" rows="5" required>Coordinate a task handoff after new dependency evidence changes the plan.</textarea>
       </label>
       <div class="form-grid">
         <label>
           <span>Mode</span>
           <select name="mode">
             <option value="ab_pair">A/B pair</option>
-            <option value="substrate">substrate</option>
-            <option value="no_substrate">no substrate</option>
+            <option value="substrate">substrate arm</option>
+            <option value="no_substrate">unguarded arm</option>
           </select>
         </label>
         <label>
@@ -718,11 +824,12 @@ function sessionToSnapshotEvent(session: SessionSummary): SessionSummary {
   return session;
 }
 
-function renderSessionCard(session: SessionSummary): string {
+function renderSessionCard(session: SessionSummary, selectedId = ""): string {
   const m = session.summaryMetrics;
   const events = sessionCardEvents(session);
+  const selected = session.id === selectedId;
   return `
-    <article class="session-card" data-session-id="${esc(session.id)}">
+    <article class="session-card ${selected ? "selected" : ""}" data-session-id="${esc(session.id)}">
       <header>
         <div>
           <p class="kicker">${esc(session.mode)} · ${esc(session.failureClass)}</p>
@@ -742,6 +849,7 @@ function renderSessionCard(session: SessionSummary): string {
       </div>
       <p class="activity">${esc(session.latestActivity)}</p>
       <footer>
+        <button class="secondary" data-action="select-session" data-session-id="${esc(session.id)}">${selected ? "Selected" : "Use in run"}</button>
         <button class="secondary" data-action="open" data-session-id="${esc(session.id)}">Open</button>
         <button class="secondary" data-action="prepare-injection" data-session-id="${esc(session.id)}">Inject</button>
         <button class="secondary" data-action="prepare-mutation" data-session-id="${esc(session.id)}">Mutate</button>
@@ -907,11 +1015,11 @@ function renderArm(
   return `
     <section class="arm-panel arm-${arm}">
       <header>
-        <span>${arm === "no_substrate" ? "No substrate" : "Substrate"}</span>
+        <span>${esc(armLabel(arm))}</span>
         <strong>${esc(run?.result ?? "running")}</strong>
       </header>
-      <p class="current-task">${arm === "substrate" ? "Current task: resolve against admitted head before action." : "Current task: act from private representation without admission gate."}</p>
-      <p class="drift-state">${run?.result === "blocked" ? "Drift state: blocked at admission boundary" : run?.result === "fail" ? "Drift state: stale action became operational" : "Drift state: observing"}</p>
+      <p class="current-task">${arm === "substrate" ? "Current task: resolve against admitted task state before action." : "Current task: act from private task context without admission gate."}</p>
+      <p class="drift-state">${run?.result === "blocked" ? "Task state: blocked at admission boundary" : run?.result === "fail" ? "Task state: unverified action became operational" : "Task state: observing"}</p>
       <div class="arm-facts">
         ${metric("Admitted", run ? String(run.admitted) : "pending")}
         ${metric("Transitions", run ? String(run.admittedTransitions) : "-")}
@@ -940,9 +1048,11 @@ function metric(label: string, value: string): string {
 }
 
 function bindMain(): void {
-  appRoot.querySelector<HTMLFormElement>("[data-role='start-form']")?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    void startSession(new FormData(event.currentTarget as HTMLFormElement));
+  appRoot.querySelectorAll<HTMLFormElement>("[data-role='start-form']").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void startSession(new FormData(event.currentTarget as HTMLFormElement));
+    });
   });
   appRoot.querySelector<HTMLFormElement>("[data-role='operator-form']")?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -955,9 +1065,19 @@ function bindMain(): void {
   appRoot.querySelector("[data-action='refresh']")?.addEventListener("click", () => {
     void loadSessions().then(renderMain);
   });
+  appRoot.querySelectorAll<HTMLButtonElement>("[data-action='switch-lab-tab']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.tab;
+      if (tab === "run" || tab === "sessions" || tab === "evidence" || tab === "settings") {
+        activeLabTab = tab;
+        renderMain();
+      }
+    });
+  });
   appRoot.querySelectorAll<HTMLButtonElement>("[data-action='select-session']").forEach((button) => {
     button.addEventListener("click", () => {
       selectedSessionId = button.dataset.sessionId ?? selectedSessionId;
+      activeLabTab = "run";
       renderMain();
     });
   });
@@ -976,8 +1096,18 @@ function bindMain(): void {
     });
   });
   appRoot.querySelector("[data-action='focus-settings']")?.addEventListener("click", () => {
-    appRoot.querySelector<HTMLDetailsElement>("[data-panel='monitor']")?.setAttribute("open", "");
-    appRoot.querySelector<HTMLElement>("[data-panel='monitor']")?.scrollIntoView({ block: "nearest" });
+    activeLabTab = "settings";
+    renderMain();
+    window.requestAnimationFrame(() => {
+      appRoot.querySelector<HTMLElement>(".lab-settings-tab")?.scrollIntoView({ block: "nearest" });
+    });
+  });
+  appRoot.querySelector("[data-action='focus-evidence']")?.addEventListener("click", () => {
+    activeLabTab = "evidence";
+    renderMain();
+    window.requestAnimationFrame(() => {
+      appRoot.querySelector<HTMLElement>(".lab-evidence-tab")?.scrollIntoView({ block: "nearest" });
+    });
   });
   appRoot.querySelectorAll<HTMLButtonElement>("[data-action='open']").forEach((button) => {
     button.addEventListener("click", () => openSession(button.dataset.sessionId ?? ""));
@@ -985,9 +1115,10 @@ function bindMain(): void {
   appRoot.querySelectorAll<HTMLButtonElement>("[data-action='prepare-injection'], [data-action='prepare-mutation']").forEach((button) => {
     button.addEventListener("click", () => {
       selectedSessionId = button.dataset.sessionId ?? selectedSessionId;
+      activeLabTab = "run";
       renderMain();
       window.requestAnimationFrame(() => {
-        appRoot.querySelector<HTMLElement>(".operator-console textarea, .operator-console input")?.focus();
+        appRoot.querySelector<HTMLElement>(".chat-composer textarea, .operator-console textarea, .operator-console input")?.focus();
       });
     });
   });
@@ -1293,6 +1424,15 @@ function time(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function armLabel(arm: Arm): string {
+  return arm === "substrate" ? "Substrate arm" : "Unguarded arm";
+}
+
+function modeLabel(mode: Mode): string {
+  if (mode === "ab_pair") return "A/B pair";
+  return armLabel(mode);
 }
 
 function esc(value: unknown): string {
