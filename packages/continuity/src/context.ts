@@ -24,6 +24,29 @@ export interface ContradictionFinding {
 const normTitle = (s: string): string => s.trim().toLowerCase();
 
 /**
+ * The ledger is append-only: a work item is closed (or reopened) by recording
+ * a LATER checkpoint with the same title. The open-work view must therefore
+ * resolve the latest status per title — a row-level `status = 'open'` filter
+ * would keep showing an item forever after its closing checkpoint.
+ *
+ * Input may be truncated to the newest N checkpoints (list is newest-first),
+ * which stays correct: the newest row per title in a newest-first prefix is
+ * the global newest for that title.
+ */
+export function resolveOpenWork(
+  checkpoints: readonly ContinuityCheckpoint[],
+): readonly ContinuityCheckpoint[] {
+  const latest = new Map<string, ContinuityCheckpoint>();
+  const chronological = [...checkpoints]
+    .filter((c) => c.kind === "work")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+  for (const cp of chronological) latest.set(normTitle(cp.title), cp);
+  return [...latest.values()]
+    .filter((c) => c.status === "open")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+}
+
+/**
  * Reconstructs the minimum useful working context for an amnesiac agent.
  * This is the continuity primitive: prior conclusions become queryable state,
  * not chat recall.
@@ -43,13 +66,14 @@ export async function buildContinuityContext(
     scope: input.scope,
     limit: input.limit ?? 50,
   };
-  const [decisions, openWork, lessons, research, claims] = await Promise.all([
+  const [decisions, workRows, lessons, research, claims] = await Promise.all([
     ledger.list({ ...base, kind: "decision" }),
-    ledger.list({ ...base, kind: "work", status: "open" }),
+    ledger.list({ ...base, kind: "work" }),
     ledger.list({ ...base, kind: "lesson" }),
     ledger.list({ ...base, kind: "research" }),
     ledger.list({ ...base, kind: "claim" }),
   ]);
+  const openWork = resolveOpenWork(workRows);
   return { tenantId: input.tenantId, agentId: input.agentId, scope: input.scope, decisions, openWork, lessons, research, claims };
 }
 

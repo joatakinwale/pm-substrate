@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import type { TenantId } from "@pm/types";
-import { PostgresContinuityLedger } from "./index.js";
+import { PostgresContinuityLedger, buildContinuityContext } from "./index.js";
 
 const DATABASE_URL = process.env["PM_DATABASE_URL"];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
@@ -69,6 +69,41 @@ describeIfDb("PostgresContinuityLedger", () => {
     const report = await ledger.verify(tenantId, "joat");
     expect(report.valid).toBe(true);
     expect(report.checked).toBe(2);
+  });
+
+  it("closes a work item by recording the same title with status closed", async () => {
+    const tenantId = await makeTenant();
+    const base = { tenantId, agentId: "joat", scope: "substrate" } as const;
+    await ledger.record({
+      ...base,
+      kind: "work",
+      title: "Wire the projection",
+      summary: "Open work item.",
+    });
+
+    const before = await buildContinuityContext(ledger, base);
+    expect(before.openWork.map((c) => c.title)).toContain("Wire the projection");
+
+    await ledger.record({
+      ...base,
+      kind: "work",
+      title: "Wire the projection",
+      summary: "Shipped and verified.",
+      status: "closed",
+    });
+
+    const after = await buildContinuityContext(ledger, base);
+    expect(after.openWork.map((c) => c.title)).not.toContain("Wire the projection");
+
+    await ledger.record({
+      ...base,
+      kind: "work",
+      title: "Wire the projection",
+      summary: "Regression found; reopened.",
+    });
+
+    const reopened = await buildContinuityContext(ledger, base);
+    expect(reopened.openWork.map((c) => c.title)).toContain("Wire the projection");
   });
 
   it("detects checkpoint tampering", async () => {

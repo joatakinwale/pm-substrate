@@ -17,6 +17,7 @@ export {
 export {
   buildContinuityContext,
   findContinuityContradictions,
+  resolveOpenWork,
   type ContinuityContext,
   type ContradictionFinding,
 } from "./context.js";

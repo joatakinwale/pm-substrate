@@ -27,6 +27,7 @@ import {
   PostgresContinuityLedger,
   buildContinuityContext,
   findContinuityContradictions,
+  resolveOpenWork,
   verifyContinuityCheckpointChain,
   type CheckpointKind,
   type ContinuityCheckpoint,
@@ -312,7 +313,7 @@ const main = async (): Promise<void> => {
       });
       const byKind = new Map<string, number>();
       for (const c of all) byKind.set(c.kind, (byKind.get(c.kind) ?? 0) + 1);
-      const openWork = all.filter((c) => c.kind === "work" && c.status === "open");
+      const openWork = resolveOpenWork(all);
 
       const evAgg = await pool.query<{ type: string; c: string }>(
         `SELECT type, count(*)::text AS c FROM events.events
