@@ -1,26 +1,25 @@
 #!/usr/bin/env node
 /**
- * Dependency-free static + live-API server for the ArrowHedgeLab / Substrate
- * dashboard.
+ * Dependency-free static + API server for the pm-substrate dashboard:
+ * Local Agent Lab sessions, control-plane proxy, and the integration
+ * workbench (D5-D).
  *
  * Routes:
- *   GET /api/health     -> aggregator + substrate reachability
- *   GET /api/dashboard  -> live two-domain snapshot (arrowhedge + substrate)
- *   GET /*              -> built dist/ static files (SPA fallback to index.html)
- *
- * Live data comes from the running substrate HTTP server (SUBSTRATE_BASE_URL,
- * default :4100) via ./aggregator.mjs. When substrate is unreachable the
- * snapshot returns { live:false, error } and the frontend shows the offline
- * banner + falls back to its bundled fixture corpus.
+ *   GET  /api/health              -> server + lab reachability
+ *   GET  /api/lab/scenarios       -> registered lab scenarios
+ *   /api/sessions...              -> lab session lifecycle + SSE streams
+ *   GET  /api/control-plane       -> proxy to substrate-http (D4)
+ *   /api/integrations/...         -> governed mapping workbench (D5-D)
+ *   GET  /*                       -> built dist/ static files (SPA fallback)
  *
  * Binds 0.0.0.0 (no host allowlist) so the Tailscale MagicDNS name is reachable
- * from Emmanuel's phone. Read-only: serves files + GETs; never mutates.
+ * from Emmanuel's phone.
  *
  * Env:
  *   SUBSTRATE_DASHBOARD_DIST  dist dir
  *   SUBSTRATE_BASE_URL        substrate server (default http://127.0.0.1:4100)
+ *   PM_DATABASE_URL           required for lab sessions + workbench writes
  *   PORT                      listen port (default 4178)
- *   SNAPSHOT_CACHE_MS         min ms between live polls (default 4000)
  */
 
 import { createServer } from "node:http";
@@ -29,14 +28,11 @@ import { extname, join, normalize, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 
-import { buildSnapshot } from "./aggregator.mjs";
-
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST =
   process.env.SUBSTRATE_DASHBOARD_DIST ?? join(HERE, "..", "dist");
 const LOCAL_AGENT_LAB_PACKAGE = "@pm/local-agent-lab";
 const PORT = parseInt(process.env.PORT ?? "4178", 10);
-const CACHE_MS = Number(process.env.SNAPSHOT_CACHE_MS ?? "4000");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -49,7 +45,6 @@ const MIME = {
   ".map": "application/json",
 };
 
-let cache = { at: 0, snapshot: null };
 const labSessions = new Map();
 const sessionStreams = new Map();
 const activeRunners = new Map();
@@ -74,7 +69,6 @@ export function resetDashboardServerStateForTests() {
   for (const runner of activeRunners.values()) {
     runner.stop?.("test reset");
   }
-  cache = { at: 0, snapshot: null };
   labSessions.clear();
   sessionStreams.clear();
   activeRunners.clear();
@@ -83,14 +77,6 @@ export function resetDashboardServerStateForTests() {
 
 async function loadLocalAgentLab() {
   return loadLocalAgentLabImpl();
-}
-
-async function getSnapshot() {
-  const now = Date.now();
-  if (cache.snapshot && now - cache.at < CACHE_MS) return cache.snapshot;
-  const snapshot = await buildSnapshot();
-  cache = { at: now, snapshot };
-  return snapshot;
 }
 
 function sendJson(res, status, body) {
@@ -673,29 +659,12 @@ export const server = createServer(async (req, res) => {
   }
   if (pathname === "/api/health") {
     if (method !== "GET") return sendMethodNotAllowed(res);
-    try {
-      const snap = await getSnapshot();
-      return sendJson(res, 200, {
-        ok: true,
-        live: snap.live,
-        substrateBase: snap.substrateBase,
-        tenants: snap.tenants.length,
-        labSessions: labSessions.size,
-        generatedAt: snap.generatedAt,
-        error: snap.error ?? null,
-      });
-    } catch (err) {
-      return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
-    }
-  }
-  if (pathname === "/api/dashboard") {
-    if (method !== "GET") return sendMethodNotAllowed(res);
-    try {
-      const snap = await getSnapshot();
-      return sendJson(res, 200, snap);
-    } catch (err) {
-      return sendJson(res, 500, { ok: false, error: err?.message ?? String(err) });
-    }
+    return sendJson(res, 200, {
+      ok: true,
+      substrateBase: process.env.SUBSTRATE_BASE_URL ?? "http://127.0.0.1:4100",
+      databaseConfigured: Boolean(process.env.PM_DATABASE_URL),
+      labSessions: labSessions.size,
+    });
   }
 
   // --- integration workbench (D5-D) ---
@@ -817,7 +786,7 @@ export function startDashboardServer(port = PORT, host = "0.0.0.0") {
     const actualPort =
       typeof address === "object" && address !== null ? address.port : port;
     console.log(
-      `dashboard: static=${DIST} api=/api/dashboard substrate=${process.env.SUBSTRATE_BASE_URL ?? "http://127.0.0.1:4100"} on http://${host}:${actualPort}`,
+      `dashboard: static=${DIST} substrate=${process.env.SUBSTRATE_BASE_URL ?? "http://127.0.0.1:4100"} on http://${host}:${actualPort}`,
     );
   });
 }

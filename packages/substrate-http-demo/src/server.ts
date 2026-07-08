@@ -76,6 +76,9 @@ const app = createSubstrateApp({
   graph,
   events,
   projections,
+  // D4 control plane: five questions from the admitted log, consumed by the
+  // dashboard's /api/control-plane proxy.
+  controlPlanePool: pool,
   // Capability-specific domain event handlers register here per deployment.
   // The demo ships none: the substrate surface itself is the demonstration.
   //

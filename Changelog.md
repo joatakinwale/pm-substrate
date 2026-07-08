@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-07-08 - ArrowHedge viewer removed from the substrate dashboard
+
+- Owner decision "No lab-app content in the substrate dashboard": the legacy ArrowHedge validation-metrics view (`live.ts` two-domain story page), its replay fixture corpus (`data.ts`, `story.ts`), and the `/api/dashboard` aggregator are deleted. ArrowHedge and PluggedInSocial are separate external systems; their metrics belong in their own surfaces and attach later through the integration kit (D6).
+- The dashboard shell is now `#lab` (default) / `#control-plane` / `#integrations`.
+- `substrate-http-demo` now passes `controlPlanePool`, so the D4 control-plane route actually mounts in the demo server (the dashboard's Control Plane view was 404ing against it).
+
 ## 2026-07-08 - Dashboard integration workbench shipped (D5-D)
 
 - `packages/substrate-dashboard` is now a navigable shell: `#lab` (default, unchanged Local Agent Lab), `#live`, `#control-plane`, and `#integrations`.

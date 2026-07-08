@@ -2,7 +2,6 @@ import "./styles.css";
 
 import { mountControlPlane } from "./control-plane-page.js";
 import { mountIntegrationWorkbench } from "./integration-workbench-page.js";
-import { fetchSnapshot, renderLive } from "./live.js";
 
 type Mode = "substrate" | "no_substrate" | "ab_pair";
 type SessionStatus = "running" | "completed" | "stopped" | "failed";
@@ -84,11 +83,11 @@ interface SessionDetail {
 const appRoot = document.querySelector<HTMLDivElement>("#app")!;
 if (!appRoot) throw new Error("missing #app root");
 
-type DashboardView = "lab" | "live" | "control-plane" | "integrations";
+type DashboardView = "lab" | "control-plane" | "integrations";
 
 function currentView(): DashboardView {
   const raw = window.location.hash.replace(/^#\/?/, "");
-  if (raw === "live" || raw === "control-plane" || raw === "integrations") return raw;
+  if (raw === "control-plane" || raw === "integrations") return raw;
   return "lab";
 }
 
@@ -109,7 +108,6 @@ function renderShell(active: DashboardView): void {
       <aside class="dashboard-rail">
         <strong>pm-substrate</strong>
         ${link("lab", "Lab")}
-        ${link("live", "Validation Metrics")}
         ${link("control-plane", "Control Plane")}
         ${link("integrations", "Integrations")}
       </aside>
@@ -270,14 +268,6 @@ async function boot(): Promise<void> {
 async function route(): Promise<void> {
   const view = currentView();
   renderShell(view);
-  if (view === "live") {
-    disconnectStream();
-    viewRoot().innerHTML = `
-      <p class="view-note">External-app validation viewer (ArrowHedge attaches through the integration kit; it is a separate system, not part of the Local Agent Lab).</p>
-      <div id="live-root"><p class="view-loading">Loading validation metrics…</p></div>`;
-    renderLive(viewRoot().querySelector<HTMLElement>("#live-root")!, await fetchSnapshot());
-    return;
-  }
   if (view === "control-plane") {
     disconnectStream();
     viewRoot().innerHTML = `<div id="control-plane-root"></div>`;
