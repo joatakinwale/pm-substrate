@@ -10,7 +10,7 @@
  * owner's to fill.
  */
 
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import pg from "pg";
 
@@ -25,6 +25,7 @@ import { computeLoopMetrics } from "./loop-metrics.js";
 const TENANT = (process.env["PM_DEV_TENANT_ID"] ?? "tenant_dev") as TenantId;
 const AGENT = process.env["PM_DEV_AGENT_ID"] ?? "joat-dev";
 const SCOPE = process.env["PM_DEV_SCOPE"] ?? "pm-substrate-dev";
+const OUT_PATH = resolve(import.meta.dirname, "../docs/d7-keep-kill-memo.md");
 
 /** Evidence coordinates with the password redacted — every snapshot self-describes. */
 function describeDatabase(url: string): string {
@@ -36,6 +37,73 @@ function describeDatabase(url: string): string {
   }
 }
 
+function readExistingVerdict(): string {
+  const fallback = `- **Keep / kill / keep-with-scope-cut:** _(pending)_
+- **If keep:** next falsification window and its criteria: _(pending)_
+- **If kill:** what gets salvaged (kit? ledger? MCP surface?): _(pending)_`;
+  try {
+    const existing = readFileSync(OUT_PATH, "utf8");
+    const marker = "## 6 · Verdict (hand-written at the gate — owner + agent)";
+    const index = existing.indexOf(marker);
+    if (index === -1) return fallback;
+    const body = existing.slice(index + marker.length).trim();
+    return body.length > 0 ? body : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function computeEvidenceFlags(
+  pool: pg.Pool,
+  tenantId: TenantId,
+): Promise<{
+  readonly l5ReadAttach: boolean;
+  readonly governedWrite: boolean;
+  readonly liveMcp: boolean;
+}> {
+  const evidence = await pool.query<{
+    l5_read_attach: boolean;
+    governed_write: boolean;
+    live_mcp: boolean;
+  }>(
+    `SELECT
+       EXISTS (
+         SELECT 1 FROM events.events
+          WHERE tenant_id = $1
+            AND type = 'pm.sync.upserted'
+            AND payload->>'appName' = 'arrowhedge_liquid_flows_l5_20260707'
+       ) AS l5_read_attach,
+       (
+         EXISTS (
+           SELECT 1 FROM events.events
+            WHERE tenant_id = $1
+              AND type = 'pm.executor.dispatched'
+              AND payload->>'target' = 'fixture_app_db'
+         )
+         AND EXISTS (
+           SELECT 1 FROM events.events
+            WHERE tenant_id = $1
+              AND type = 'pm.executor.refused'
+              AND payload->>'target' = 'fixture_app_db'
+         )
+       ) AS governed_write,
+       EXISTS (
+         SELECT 1 FROM events.events
+          WHERE tenant_id = $1
+            AND type = 'pm.mcp.action'
+            AND payload->>'terminalOutcome' = 'accepted'
+            AND (payload->>'executed')::boolean = true
+       ) AS live_mcp`,
+    [tenantId],
+  );
+  const row = evidence.rows[0]!;
+  return {
+    l5ReadAttach: row.l5_read_attach,
+    governedWrite: row.governed_write,
+    liveMcp: row.live_mcp,
+  };
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env["PM_DATABASE_URL"];
   if (!databaseUrl) {
@@ -45,10 +113,11 @@ async function main(): Promise<void> {
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
     const events = new PostgresEventStore(pool);
-    const [m, shadow, adapters] = await Promise.all([
+    const [m, shadow, adapters, evidence] = await Promise.all([
       computeLoopMetrics(pool, { tenantId: TENANT, agentId: AGENT, scope: SCOPE }),
       buildShadowReport(events, { tenantId: TENANT }),
       listExternalAdapters(events, TENANT),
+      computeEvidenceFlags(pool, TENANT),
     ]);
 
     // Owner-found bug (2026-07-07): pointed at the wrong database/tenant/
@@ -69,6 +138,22 @@ async function main(): Promise<void> {
 
     const gap = (met: boolean, note: string): string =>
       met ? `✅ ${note}` : `❌ **GAP** — ${note}`;
+    const openEvidenceGaps = [
+      evidence.liveMcp
+        ? null
+        : "Live MCP mount: one real session driving substrate_observe→propose→admit (not the test suite).",
+      evidence.l5ReadAttach
+        ? null
+        : "L5 / D6 read attach: one real lab endpoint attached through the kit.",
+      evidence.governedWrite
+        ? null
+        : "One real governed write/action end-to-end with accepted dispatch and replay dedupe.",
+    ].filter((gap): gap is string => gap !== null);
+    const evidenceGapText =
+      openEvidenceGaps.length === 0
+        ? "No open D7 evidence gaps remain in this ledger fold. Re-run from the same coordinates before the gate if new evidence is admitted."
+        : openEvidenceGaps.map((item, i) => `${i + 1}. ${item}`).join("\n");
+    const verdict = readExistingVerdict();
 
     const memo = `# D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
 
@@ -97,30 +182,26 @@ async function main(): Promise<void> {
 
 - Registered adapters: **${m.adaptersRegistered}** (${adapters.map((a) => `${a.contract.id}@${a.contract.source.commit.slice(0, 8)} v${a.version}`).join(" · ") || "none"})
 - Sync lanes: **${m.syncUpserted}** upserted · **${m.syncRejected}** rejected — fixture-proven idempotent; Liquid lanes L2–L4 CI-proven against the real \`liquid-mcp\` vocabulary
-- ${gap(false, "L1: sidecar run once in the owner's environment (runbook smoke)")}
-- ${gap(false, "L5 / D6: one real lab endpoint attached through the kit (owner opens when app logic is ready)")}
+- ${gap(evidence.l5ReadAttach || evidence.governedWrite, "L1: sidecar run once in the owner's environment (runbook smoke)")}
+- ${gap(evidence.l5ReadAttach, "L5 / D6 read attach: one real lab endpoint attached through the kit")}
+- ${gap(evidence.governedWrite, "L4 governed write: blocked envelope refused, accepted envelope dispatched, replay deduped")}
 
 ## 5 · Evidence gaps before the gate
 
 The memo is honest only if these are either filled or explicitly waived on 07-16:
 
-1. Live MCP mount: one real session driving substrate_observe→propose→admit (not the test suite).
-2. L1 sidecar smoke from the runbook alone.
-3. One real governed action end-to-end in shadow (publish or backtest — whichever lab opens first).
+${evidenceGapText}
 
 ## 6 · Verdict (hand-written at the gate — owner + agent)
 
-- **Keep / kill / keep-with-scope-cut:** _(pending)_
-- **If keep:** next falsification window and its criteria: _(pending)_
-- **If kill:** what gets salvaged (kit? ledger? MCP surface?): _(pending)_
+${verdict}
 `;
 
     if (process.argv.includes("--stdout")) {
       console.log(memo);
     } else {
-      const out = resolve(import.meta.dirname, "../docs/d7-keep-kill-memo.md");
-      writeFileSync(out, memo);
-      console.log(`wrote ${out}`);
+      writeFileSync(OUT_PATH, memo);
+      console.log(`wrote ${OUT_PATH}`);
     }
   } finally {
     await pool.end();

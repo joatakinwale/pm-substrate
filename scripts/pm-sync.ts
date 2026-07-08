@@ -98,6 +98,7 @@ async function main(): Promise<void> {
         "LIQUID_LLM_MODEL",
         "LIQUID_LLM_BASE_URL",
         "LIQUID_ALLOW_WRITES",
+        "LIQUID_HOME",
       ]) {
         const value = process.env[key];
         if (value !== undefined) sidecarEnv[key] = value;

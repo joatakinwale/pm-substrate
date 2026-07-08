@@ -12,6 +12,7 @@ import type { TenantId, Timestamp } from "@pm/types";
 
 import {
   EXECUTOR_DISPATCHED_EVENT_TYPE,
+  EXECUTOR_FAILED_EVENT_TYPE,
   executeAdmittedAction,
 } from "./executor-bridge.js";
 import { buildLiquidWriteTransport } from "./liquid-executor.js";
@@ -50,7 +51,12 @@ function envelope(
   });
 }
 
-function fakeSidecar(opts?: { failExecute?: boolean }): {
+function fakeSidecar(opts?: {
+  failExecute?: boolean;
+  connectStatus?: string;
+  omitAdapterId?: boolean;
+  executeErrorPayload?: string;
+}): {
   client: LiquidMcpClient;
   calls: { name: string; arguments: Record<string, unknown> }[];
 } {
@@ -62,10 +68,18 @@ function fakeSidecar(opts?: { failExecute?: boolean }): {
         calls.push(params);
         if (params.name === "liquid_connect") {
           return {
-            structuredContent: { status: "connected", adapter_id: "adp_db" },
+            structuredContent: {
+              status: opts?.connectStatus ?? "connected",
+              ...(opts?.omitAdapterId ? {} : { adapter_id: "adp_db" }),
+            },
           };
         }
         if (params.name === "liquid_execute") {
+          if (opts?.executeErrorPayload) {
+            return {
+              structuredContent: { error: opts.executeErrorPayload },
+            };
+          }
           return opts?.failExecute
             ? { isError: true, content: [{ type: "text", text: "write refused" }] }
             : {
@@ -200,5 +214,89 @@ describeIfDb("liquid executor target (lane L4)", () => {
       }),
     });
     expect(retried).toMatchObject({ executed: true, reason: "dispatched" });
+  });
+
+  it("review-needed connect without adapter_id records a transport obstruction", async () => {
+    const sidecar = fakeSidecar({ connectStatus: "review_needed", omitAdapterId: true });
+    const result = await executeAdmittedAction(events, {
+      tenantId,
+      envelope: envelope(tenantId, "accepted"),
+      target,
+      executedBy: "liquid-exec-test",
+      body: { values: { email: "needs-review@example.test" } },
+      transport: buildLiquidWriteTransport(sidecar.client, {
+        url: target.endpoint,
+        targetModel: { email: "str" },
+        op: "insert",
+      }),
+    });
+    expect(result).toMatchObject({ executed: false, reason: "endpoint_error" });
+    expect(sidecar.calls.map((c) => c.name)).toEqual(["liquid_connect"]);
+    const failures = await events.read({
+      tenantId,
+      typePattern: EXECUTOR_FAILED_EVENT_TYPE,
+    });
+    expect(
+      failures.some((event) =>
+        JSON.stringify(event.payload).includes("review_needed"),
+      ),
+    ).toBe(true);
+  });
+
+  it("connected without adapter_id records a bad sidecar response", async () => {
+    const sidecar = fakeSidecar({ omitAdapterId: true });
+    const result = await executeAdmittedAction(events, {
+      tenantId,
+      envelope: envelope(tenantId, "accepted"),
+      target,
+      executedBy: "liquid-exec-test",
+      body: { values: { email: "no-adapter@example.test" } },
+      transport: buildLiquidWriteTransport(sidecar.client, {
+        url: target.endpoint,
+        targetModel: { email: "str" },
+        op: "insert",
+      }),
+    });
+    expect(result).toMatchObject({ executed: false, reason: "endpoint_error" });
+    expect(sidecar.calls.map((c) => c.name)).toEqual(["liquid_connect"]);
+    const failures = await events.read({
+      tenantId,
+      typePattern: EXECUTOR_FAILED_EVENT_TYPE,
+    });
+    expect(
+      failures.some((event) =>
+        JSON.stringify(event.payload).includes('without adapter_id'),
+      ),
+    ).toBe(true);
+  });
+
+  it("structured error payloads from liquid_execute record clean failures", async () => {
+    const sidecar = fakeSidecar({ executeErrorPayload: "writes are disabled" });
+    const result = await executeAdmittedAction(events, {
+      tenantId,
+      envelope: envelope(tenantId, "accepted"),
+      target,
+      executedBy: "liquid-exec-test",
+      body: { values: { email: "write-error@example.test" } },
+      transport: buildLiquidWriteTransport(sidecar.client, {
+        url: target.endpoint,
+        targetModel: { email: "str" },
+        op: "insert",
+      }),
+    });
+    expect(result).toMatchObject({ executed: false, reason: "endpoint_error" });
+    expect(sidecar.calls.map((c) => c.name)).toEqual([
+      "liquid_connect",
+      "liquid_execute",
+    ]);
+    const failures = await events.read({
+      tenantId,
+      typePattern: EXECUTOR_FAILED_EVENT_TYPE,
+    });
+    expect(
+      failures.some((event) =>
+        JSON.stringify(event.payload).includes("writes are disabled"),
+      ),
+    ).toBe(true);
   });
 });

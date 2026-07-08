@@ -24,7 +24,7 @@ export OPENAI_API_KEY=…                      # or GEMINI_API_KEY / ANTHROPIC_A
 export OPENAI_BASE_URL=http://127.0.0.1:11434/v1   # LIQUID_LLM_MODEL to pick a model
 ```
 
-`pm:sync` forwards exactly these to the spawned sidecar (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `LIQUID_LLM_PROVIDER`, `LIQUID_LLM_MODEL`, `LIQUID_LLM_BASE_URL`, `LIQUID_ALLOW_WRITES`) — the MCP stdio transport does NOT inherit your shell env (safelist only), so anything else won't reach it.
+`pm:sync` and `pm:rehearse-write` forward exactly these to the spawned sidecar (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `LIQUID_LLM_PROVIDER`, `LIQUID_LLM_MODEL`, `LIQUID_LLM_BASE_URL`, `LIQUID_ALLOW_WRITES`, `LIQUID_HOME`) — the MCP stdio transport does NOT inherit your shell env (safelist only), so anything else won't reach it.
 
 ## 3 · Approve the mapping (the L3 gate)
 
@@ -84,4 +84,5 @@ pnpm pm:sync -- --dry-run --source liquid --app arrowhedge_liquid_flows_l5_20260
 - **Returned external id must be verified**: on ArrowHedge `/flows/`, Liquid omitted numeric `id` even when requested, so the rehearsal used `name` as the approved external id. Treat missing external-id fields as an obstruction unless an approved alternate id is deliberately chosen.
 - **Sidecar errors** can arrive as `isError: false` with an `error` string payload — the driver treats those as failures (never parsed as data).
 - **Review-needed payloads may omit `adapter_id`**: `liquid_connect` can return `status: "review_needed"` without an adapter id. The driver must surface that as a review obstruction, not a parser crash.
+- **Adapter registry cross-talk**: Liquid persists adapters under `LIQUID_HOME`/`~/.liquid`. Reusing a home across unrelated targets can make `liquid_connect` remap from the wrong prior service template. For proof runs, set a fresh `LIQUID_HOME=$(mktemp -d /tmp/pm-substrate-liquid.XXXXXX)` and make sure the spawned sidecar receives it.
 - **Writes** need `LIQUID_ALLOW_WRITES=1` on the sidecar *and* an accepted envelope through the executor bridge — both gates, always.

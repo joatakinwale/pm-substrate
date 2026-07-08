@@ -30,7 +30,7 @@ const callToolResultSchema = z
   .passthrough();
 
 const connectSchema = z
-  .object({ status: z.string(), adapter_id: z.string().min(1) })
+  .object({ status: z.string(), adapter_id: z.string().min(1).optional() })
   .passthrough();
 
 const executeSchema = z
@@ -50,7 +50,26 @@ function unwrap(raw: unknown, tool: string): Record<string, unknown> {
       "tool_error",
     );
   }
+  // Real sidecar errors can arrive as a successful MCP call carrying an error
+  // payload. Keep those out of Zod parsers so the bridge records an ordinary
+  // transport obstruction instead of surfacing a parser crash.
+  if (
+    result.structuredContent &&
+    typeof result.structuredContent["error"] === "string"
+  ) {
+    throw new LiquidSourceError(
+      `${tool} failed: ${result.structuredContent["error"]}`,
+      "tool_error",
+    );
+  }
   if (result.structuredContent) return result.structuredContent;
+  if (text !== undefined) {
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      /* fall through */
+    }
+  }
   throw new LiquidSourceError(`${tool} returned no structured payload`, "bad_response");
 }
 
@@ -92,6 +111,12 @@ export function buildLiquidWriteTransport(
       return {
         ok: false,
         detail: `liquid_connect status "${connected.status}" — interface map needs review (lane L3)`,
+      };
+    }
+    if (connected.adapter_id === undefined) {
+      return {
+        ok: false,
+        detail: `liquid_connect returned status "connected" without adapter_id for ${options.url}`,
       };
     }
     const body = (payload["body"] ?? {}) as {

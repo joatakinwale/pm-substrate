@@ -12,7 +12,7 @@
  *      substrate observes the effect of its own admitted action
  *
  *   pnpm pm:rehearse-write -- --url postgresql://user@host/db \
- *     --endpoint /public/customers --liquid-cmd "uv run --directory ./liquid liquid-mcp"
+ *     --endpoint /public/customers --liquid-cmd "uvx --from liquid-api[pg] liquid-mcp"
  */
 
 import { randomUUID } from "node:crypto";
@@ -66,6 +66,7 @@ async function main(): Promise<void> {
     "LIQUID_LLM_PROVIDER",
     "LIQUID_LLM_MODEL",
     "LIQUID_LLM_BASE_URL",
+    "LIQUID_HOME",
   ]) {
     const value = process.env[key];
     if (value !== undefined) sidecarEnv[key] = value;
