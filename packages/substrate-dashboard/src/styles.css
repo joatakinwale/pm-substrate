@@ -1522,3 +1522,13 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+.view-note {
+  margin: 14px 24px 0;
+  padding: 8px 12px;
+  border: 1px solid #e8dcc0;
+  background: #fbf6e9;
+  border-radius: 8px;
+  color: #6d5a1d;
+  font-size: 13px;
+}

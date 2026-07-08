@@ -109,7 +109,7 @@ function renderShell(active: DashboardView): void {
       <aside class="dashboard-rail">
         <strong>pm-substrate</strong>
         ${link("lab", "Lab")}
-        ${link("live", "Live Metrics")}
+        ${link("live", "Validation Metrics")}
         ${link("control-plane", "Control Plane")}
         ${link("integrations", "Integrations")}
       </aside>
@@ -272,7 +272,9 @@ async function route(): Promise<void> {
   renderShell(view);
   if (view === "live") {
     disconnectStream();
-    viewRoot().innerHTML = `<div id="live-root"><p class="view-loading">Loading live metrics…</p></div>`;
+    viewRoot().innerHTML = `
+      <p class="view-note">External-app validation viewer (ArrowHedge attaches through the integration kit; it is a separate system, not part of the Local Agent Lab).</p>
+      <div id="live-root"><p class="view-loading">Loading validation metrics…</p></div>`;
     renderLive(viewRoot().querySelector<HTMLElement>("#live-root")!, await fetchSnapshot());
     return;
   }
