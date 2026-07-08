@@ -36,6 +36,7 @@ const MAPPING: EntityMapping = {
 /** Scripted sidecar speaking the REAL liquid-mcp result shapes. */
 function fakeLiquid(overrides?: {
   connectStatus?: string;
+  omitAdapterId?: boolean;
   rows?: readonly Record<string, unknown>[];
   errorOn?: "liquid_connect" | "liquid_fetch";
 }): { client: LiquidMcpClient; calls: { name: string; arguments: Record<string, unknown> }[] } {
@@ -50,13 +51,18 @@ function fakeLiquid(overrides?: {
         };
       }
       if (params.name === "liquid_connect") {
+        const status = overrides?.connectStatus ?? "connected";
         return {
           structuredContent: {
-            status: overrides?.connectStatus ?? "connected",
-            adapter_id: "adp_fixture",
-            service: "fixture",
-            mapped_fields: ["name", "email"],
-            endpoints: ["/customers"],
+            status,
+            ...(status === "connected" && !overrides?.omitAdapterId
+              ? {
+                  adapter_id: "adp_fixture",
+                  service: "fixture",
+                  mapped_fields: ["name", "email"],
+                  endpoints: ["/customers"],
+                }
+              : { detail: "mapping review required" }),
           },
         };
       }
@@ -122,6 +128,18 @@ describe("liquid source driver (pure, real tool vocabulary)", () => {
         externalIdField: "id",
       }),
     ).rejects.toMatchObject({ code: "review_needed" });
+  });
+
+  it("connected without adapter_id is a bad sidecar response", async () => {
+    const { client } = fakeLiquid({ omitAdapterId: true });
+    await expect(
+      fetchLiquidRecords(client, {
+        url: "https://api.fixture.example",
+        sourceName: "Customer",
+        mapping: MAPPING,
+        externalIdField: "id",
+      }),
+    ).rejects.toMatchObject({ code: "bad_response" });
   });
 
   it("tool errors surface with the sidecar's text; rows without ids are counted out", async () => {
