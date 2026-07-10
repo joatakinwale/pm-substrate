@@ -178,7 +178,10 @@ describeIfDb("Projection-lag under demo-scale load (G5.6)", () => {
         `catchUp=${catchUpMs.toFixed(0)}ms`,
     );
     expect(catchUpMs).toBeLessThan(BUDGET_INITIAL_MS);
-  });
+    // Harness timeout is wider than the budget: the serial publish fixture
+    // is deliberately un-budgeted and can dominate wall-clock on a loaded
+    // runner; only catchUpMs is the assertion.
+  }, 30_000);
 
   it("incremental catch-up is proportional to the new batch, not the full log", async () => {
     const tenantId = await makeTenant();
@@ -213,7 +216,9 @@ describeIfDb("Projection-lag under demo-scale load (G5.6)", () => {
       `[G5.6] incremental N=${BATCH_SIZE} catchUp=${incrementalMs.toFixed(0)}ms`,
     );
     expect(incrementalMs).toBeLessThan(BUDGET_INCREMENTAL_MS);
-  });
+    // Same as above: two un-budgeted publish batches precede the budgeted
+    // incremental catchUp, so the harness timeout must not be the budget.
+  }, 30_000);
 
   it("after catchUp returns, no events remain unapplied (no silent backlog drift)", async () => {
     const tenantId = await makeTenant();

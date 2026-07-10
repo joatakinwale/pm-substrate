@@ -26,6 +26,62 @@ const TENANT = (process.env["PM_DEV_TENANT_ID"] ?? "tenant_dev") as TenantId;
 const AGENT = process.env["PM_DEV_AGENT_ID"] ?? "joat-dev";
 const SCOPE = process.env["PM_DEV_SCOPE"] ?? "pm-substrate-dev";
 
+interface LiveLabEvidence {
+  readonly runDate: string;
+  readonly model: string;
+  readonly scenarios: number;
+  readonly baselineFailed: number;
+  readonly baselinePassed: number;
+  readonly substrateBlocked: number;
+  readonly substratePassed: number;
+}
+
+/**
+ * Latest live local-agent-lab run (Axis C), paired baseline vs substrate.
+ * Lab runs use throwaway per-world tenants, so this folds by axis + the most
+ * recent run date rather than by the dev tenant.
+ */
+async function summarizeLiveLabEvidence(
+  pool: pg.Pool,
+): Promise<LiveLabEvidence | null> {
+  const { rows } = await pool.query<{
+    run_arm: string;
+    result: string;
+    n: string;
+    scenarios: string;
+    source: string;
+    run_date: string;
+  }>(
+    `WITH latest AS (
+       SELECT max(observed_at)::date AS d FROM evals.eval_events WHERE axis = 'local_lab'
+     )
+     SELECT e.run_arm, e.result, count(*)::text AS n,
+            count(DISTINCT e.scenario_id)::text AS scenarios,
+            min(e.source) AS source, latest.d::text AS run_date
+     FROM evals.eval_events e, latest
+     WHERE e.axis = 'local_lab' AND e.observed_at::date = latest.d
+     GROUP BY e.run_arm, e.result, latest.d`,
+  );
+  if (rows.length === 0) return null;
+  const count = (arm: string, result: string): number =>
+    rows
+      .filter((r) => r.run_arm === arm && r.result === result)
+      .reduce((sum, r) => sum + Number(r.n), 0);
+  const first = rows[0];
+  if (!first) return null;
+  return {
+    runDate: first.run_date,
+    model: first.source.split("/")[1] ?? "unknown",
+    scenarios: rows
+      .filter((r) => r.run_arm === "baseline")
+      .reduce((sum, r) => sum + Number(r.scenarios), 0),
+    baselineFailed: count("baseline", "fail"),
+    baselinePassed: count("baseline", "pass"),
+    substrateBlocked: count("substrate", "blocked"),
+    substratePassed: count("substrate", "pass"),
+  };
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env["PM_DATABASE_URL"];
   if (!databaseUrl) {
@@ -35,10 +91,11 @@ async function main(): Promise<void> {
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
     const events = new PostgresEventStore(pool);
-    const [m, shadow, adapters] = await Promise.all([
+    const [m, shadow, adapters, lab] = await Promise.all([
       computeLoopMetrics(pool, { tenantId: TENANT, agentId: AGENT, scope: SCOPE }),
       buildShadowReport(events, { tenantId: TENANT }),
       listExternalAdapters(events, TENANT),
+      summarizeLiveLabEvidence(pool),
     ]);
 
     const gap = (met: boolean, note: string): string =>
@@ -56,7 +113,7 @@ async function main(): Promise<void> {
 ## 2 · Throughput and cost
 
 - Work closed: **${m.workClosed}** of ${m.workOpened} opened (${m.workStillOpen} open) — **${m.closedPerSession}/session**
-- Tokens: **${m.totalTokens.toLocaleString()}** across ${m.costSessions} costed sessions → **${m.tokensPerClosedItem?.toLocaleString() ?? "n/a"} per closed item** (trend across the loop: 88,750 → 72,944 → 60,917 → 55,833 → this)
+- Tokens: **${m.totalTokens.toLocaleString()}** across ${m.costSessions} costed sessions → **${m.tokensPerClosedItem?.toLocaleString() ?? "n/a"} per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
 
 ## 3 · Governance did real work?
 
@@ -72,7 +129,17 @@ async function main(): Promise<void> {
 - ${gap(false, "L1: sidecar run once in the owner's environment (runbook smoke)")}
 - ${gap(false, "L5 / D6: one real lab endpoint attached through the kit (owner opens when app logic is ready)")}
 
-## 5 · Evidence gaps before the gate
+## 5 · Live lab evidence (Axis C — local-agent-lab, paired arms)
+
+${
+  lab
+    ? `- Latest live run **${lab.runDate}** on **${lab.model}**: **${lab.scenarios}** scenarios, paired baseline-vs-substrate
+- Baseline arm: **${lab.baselineFailed}** failed · ${lab.baselinePassed} passed — every seeded failure class reproduced without the substrate
+- Substrate arm: **${lab.substrateBlocked}** blocked at the gate · ${lab.substratePassed} passed — ${lab.baselineFailed > 0 && lab.substrateBlocked >= lab.baselineFailed ? "**every baseline failure was caught before it landed**" : "coverage incomplete; rerun `pnpm evals:local-agent-lab:live`"}`
+    : "- ❌ **GAP** — no live lab events persisted; run `pnpm evals:local-agent-lab:live`"
+}
+
+## 6 · Evidence gaps before the gate
 
 The memo is honest only if these are either filled or explicitly waived on 07-16:
 
@@ -80,7 +147,7 @@ The memo is honest only if these are either filled or explicitly waived on 07-16
 2. L1 sidecar smoke from the runbook alone.
 3. One real governed action end-to-end in shadow (publish or backtest — whichever lab opens first).
 
-## 6 · Verdict (hand-written at the gate — owner + agent)
+## 7 · Verdict (hand-written at the gate — owner + agent)
 
 - **Keep / kill / keep-with-scope-cut:** _(pending)_
 - **If keep:** next falsification window and its criteria: _(pending)_
