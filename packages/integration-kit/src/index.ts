@@ -22,6 +22,13 @@ export {
   PI_HARNESS_ADAPTER,
 } from "./known-adapters.js";
 export {
+  BOUNDARY_CONFORMANCE_SCHEMA_VERSION,
+  buildBoundaryConformanceArtifact,
+  type BoundaryConformanceArtifact,
+  type BoundaryConformanceArtifactInput,
+  type BoundaryConformanceCheckObservation,
+} from "./boundary-conformance.js";
+export {
   parseIntegrationEvidenceContext,
   type IntegrationEvidenceContext,
 } from "./evidence-context.js";
