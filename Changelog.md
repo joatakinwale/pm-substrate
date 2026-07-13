@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-13 - Business-operability objective made executable
+
+- Separated technical substrate viability from the stronger claim that the two
+  labs are operationally worth running. A green ledger, fixture sync, or blocked
+  seeded failure can no longer produce a full keep verdict by itself.
+- Added `pm.objective.lab-measured.v1` validation and a six-dimension evaluator
+  for technical baseline, adoption, correct end-to-end outcomes, governance
+  quality, cost/owner effort, and external validity. Measurements bind a run
+  manifest plus app/substrate revisions and reject placeholders or impossible
+  counts.
+- Added `pnpm pm:objective` template/record/list commands and wired the scorecard
+  into `pnpm pm:memo`. The memo independently derives live attachment/dispatch
+  evidence and refuses to preserve a human verdict above the admitted-evidence
+  ceiling.
+- Corrected roadmap truth drift: authenticated HTTP MCP, D5, and Liquid L1–L5
+  were already shipped. D6 is now the next evidence phase with explicit paired,
+  held-out, write-coverage, cost, owner-effort, and acceptance thresholds.
+- Rechecked current external boundaries. PluggedInSocial is blocked by missing
+  `browser_qa_harness` and `operatorRunMonitorSurface`; ArrowHedge current main
+  no longer mounts the `/integration/v1` contract used by the 2026-07-07 live
+  rehearsal. Historical evidence remains valid only for its recorded revision.
+
+
 ## 2026-07-08 - ArrowHedge viewer removed from the substrate dashboard
 
 - Owner decision "No lab-app content in the substrate dashboard": the legacy ArrowHedge validation-metrics view (`live.ts` two-domain story page), its replay fixture corpus (`data.ts`, `story.ts`), and the `/api/dashboard` aggregator are deleted. ArrowHedge and PluggedInSocial are separate external systems; their metrics belong in their own surfaces and attach later through the integration kit (D6).

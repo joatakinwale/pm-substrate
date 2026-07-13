@@ -14,6 +14,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import pg from "pg";
 
+import {
+  DEFAULT_BUSINESS_OPERABILITY_THRESHOLDS,
+  evaluateBusinessOperabilityObjective,
+  foldObjectiveLabMeasurements,
+  isObjectiveFinalVerdictPermitted,
+  type ObjectiveFinalVerdict,
+  type ObjectiveLabEvidence,
+} from "../packages/evals/src/index.js";
 import { PostgresEventStore } from "../packages/events/src/index.js";
 import {
   buildShadowReport,
@@ -26,6 +34,7 @@ const TENANT = (process.env["PM_DEV_TENANT_ID"] ?? "tenant_dev") as TenantId;
 const AGENT = process.env["PM_DEV_AGENT_ID"] ?? "joat-dev";
 const SCOPE = process.env["PM_DEV_SCOPE"] ?? "pm-substrate-dev";
 const OUT_PATH = resolve(import.meta.dirname, "../docs/d7-keep-kill-memo.md");
+const REQUIRED_LAB_IDS = ["plugged_in_social", "arrowhedge"] as const;
 
 /** Evidence coordinates with the password redacted — every snapshot self-describes. */
 function describeDatabase(url: string): string {
@@ -55,6 +64,13 @@ function readExistingVerdict(): string {
   }
 }
 
+function parseFinalVerdict(text: string): ObjectiveFinalVerdict | null {
+  const match = text.match(
+    /\*\*Keep \/ kill \/ keep-with-scope-cut:\*\*\s*(keep-with-scope-cut|keep|kill)\b/,
+  );
+  return (match?.[1] as ObjectiveFinalVerdict | undefined) ?? null;
+}
+
 async function computeEvidenceFlags(
   pool: pg.Pool,
   tenantId: TenantId,
@@ -62,11 +78,19 @@ async function computeEvidenceFlags(
   readonly l5ReadAttach: boolean;
   readonly governedWrite: boolean;
   readonly liveMcp: boolean;
+  readonly arrowHedgeReadAttach: boolean;
+  readonly pluggedInSocialReadAttach: boolean;
+  readonly arrowHedgeGovernedAction: boolean;
+  readonly pluggedInSocialGovernedAction: boolean;
 }> {
   const evidence = await pool.query<{
     l5_read_attach: boolean;
     governed_write: boolean;
     live_mcp: boolean;
+    arrowhedge_read_attach: boolean;
+    plugged_in_social_read_attach: boolean;
+    arrowhedge_governed_action: boolean;
+    plugged_in_social_governed_action: boolean;
   }>(
     `SELECT
        EXISTS (
@@ -95,7 +119,31 @@ async function computeEvidenceFlags(
             AND type = 'pm.mcp.action'
             AND payload->>'terminalOutcome' = 'accepted'
             AND (payload->>'executed')::boolean = true
-       ) AS live_mcp`,
+       ) AS live_mcp,
+       EXISTS (
+         SELECT 1 FROM events.events
+          WHERE tenant_id = $1
+            AND type = 'pm.sync.upserted'
+            AND lower(payload->>'appName') LIKE '%arrowhedge%'
+       ) AS arrowhedge_read_attach,
+       EXISTS (
+         SELECT 1 FROM events.events
+          WHERE tenant_id = $1
+            AND type = 'pm.sync.upserted'
+            AND lower(payload->>'appName') LIKE '%plugged%'
+       ) AS plugged_in_social_read_attach,
+       EXISTS (
+         SELECT 1 FROM events.events
+          WHERE tenant_id = $1
+            AND type = 'pm.executor.dispatched'
+            AND lower(payload->>'target') LIKE '%arrowhedge%'
+       ) AS arrowhedge_governed_action,
+       EXISTS (
+         SELECT 1 FROM events.events
+          WHERE tenant_id = $1
+            AND type = 'pm.executor.dispatched'
+            AND lower(payload->>'target') LIKE '%plugged%'
+       ) AS plugged_in_social_governed_action`,
     [tenantId],
   );
   const row = evidence.rows[0]!;
@@ -103,6 +151,10 @@ async function computeEvidenceFlags(
     l5ReadAttach: row.l5_read_attach,
     governedWrite: row.governed_write,
     liveMcp: row.live_mcp,
+    arrowHedgeReadAttach: row.arrowhedge_read_attach,
+    pluggedInSocialReadAttach: row.plugged_in_social_read_attach,
+    arrowHedgeGovernedAction: row.arrowhedge_governed_action,
+    pluggedInSocialGovernedAction: row.plugged_in_social_governed_action,
   };
 }
 
@@ -171,13 +223,56 @@ async function main(): Promise<void> {
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
     const events = new PostgresEventStore(pool);
-    const [m, shadow, adapters, evidence, lab] = await Promise.all([
+    const [m, shadow, adapters, evidence, lab, objectiveMeasurementEvents] =
+      await Promise.all([
       computeLoopMetrics(pool, { tenantId: TENANT, agentId: AGENT, scope: SCOPE }),
       buildShadowReport(events, { tenantId: TENANT }),
       listExternalAdapters(events, TENANT),
       computeEvidenceFlags(pool, TENANT),
       summarizeLiveLabEvidence(pool),
+      events.read({
+        tenantId: TENANT,
+        typePattern: "pm.objective.lab-measured",
+        limit: 1000,
+      }),
     ]);
+
+    const measurementFold = foldObjectiveLabMeasurements(
+      objectiveMeasurementEvents.map((event) => event.payload),
+    );
+    const measurementByLab = new Map(
+      measurementFold.latest.map((measurement) => [
+        measurement.labId,
+        measurement,
+      ]),
+    );
+    const objectiveLabs: ObjectiveLabEvidence[] = [
+      {
+        labId: "plugged_in_social",
+        readAttached: evidence.pluggedInSocialReadAttach,
+        governedActionDispatched: evidence.pluggedInSocialGovernedAction,
+        measurement: measurementByLab.get("plugged_in_social") ?? null,
+      },
+      {
+        labId: "arrowhedge",
+        readAttached: evidence.arrowHedgeReadAttach,
+        governedActionDispatched: evidence.arrowHedgeGovernedAction,
+        measurement: measurementByLab.get("arrowhedge") ?? null,
+      },
+    ];
+    const objective = evaluateBusinessOperabilityObjective({
+      requiredLabIds: REQUIRED_LAB_IDS,
+      thresholds: DEFAULT_BUSINESS_OPERABILITY_THRESHOLDS,
+      technical: {
+        chainValid: m.chainValid,
+        liveMcpActions: m.mcpAdmitted + m.mcpBlocked,
+        genericSyncUpserts: m.syncUpserted,
+        executorDispatches: m.executorDispatched,
+        livePairedScenarios: lab?.scenarios ?? 0,
+      },
+      labs: objectiveLabs,
+      invalidMeasurementEvents: measurementFold.invalid,
+    });
 
     // Owner-found bug (2026-07-07): pointed at the wrong database/tenant/
     // scope, the memo regenerated a zeroed snapshot that LOOKED authoritative.
@@ -210,9 +305,32 @@ async function main(): Promise<void> {
     ].filter((gap): gap is string => gap !== null);
     const evidenceGapText =
       openEvidenceGaps.length === 0
-        ? "No open D7 evidence gaps remain in this ledger fold. Re-run from the same coordinates before the gate if new evidence is admitted."
+        ? "No open technical-substrate evidence gaps remain in this ledger fold. This does not imply the business objective is met."
         : openEvidenceGaps.map((item, i) => `${i + 1}. ${item}`).join("\n");
+    const objectiveDimensionText = objective.dimensions
+      .map((dimension) => {
+        const heading = `- ${dimension.met ? "✅" : "❌"} **${dimension.dimension}**`;
+        return dimension.met
+          ? `${heading}: threshold met`
+          : `${heading}:\n${dimension.gaps.map((item) => `  - ${item}`).join("\n")}`;
+      })
+      .join("\n");
+    const objectiveWarningText = objective.warnings
+      .map((warning) => `- ⚠️ ${warning}`)
+      .join("\n");
     const verdict = readExistingVerdict();
+    const finalVerdict = parseFinalVerdict(verdict);
+    if (
+      finalVerdict !== null &&
+      !isObjectiveFinalVerdictPermitted(
+        finalVerdict,
+        objective.verdictCeiling,
+      )
+    ) {
+      throw new Error(
+        `pm:memo: REFUSING to preserve final verdict "${finalVerdict}" above admitted-evidence ceiling "${objective.verdictCeiling}"`,
+      );
+    }
 
     const memo = `# D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
 
@@ -255,13 +373,25 @@ ${
     : "- ❌ **GAP** — no live lab events persisted; run `pnpm evals:local-agent-lab:live`"
 }
 
-## 6 · Evidence gaps before the gate
+## 6 · Business-operability objective gate
 
-The memo is honest only if these are either filled or explicitly waived on 07-16:
+Technical activity is necessary but cannot prove that either lab is worth operating. The executable scorecard requires zero-edit adoption, repeated correct end-to-end outcomes, governance quality, bounded cost/operator effort, and external acceptance for **both** labs.
+
+- **Verdict ceiling from admitted evidence:** \`${objective.verdictCeiling}\`
+- **Full objective ready:** ${objective.objectiveReady ? "YES" : "NO"}
+- **Objective measurement events:** ${measurementFold.latest.length} valid latest lab record(s) · ${measurementFold.invalid} invalid event(s)${objectiveWarningText ? `\n${objectiveWarningText}` : ""}
+
+${objectiveDimensionText}
+
+Record or update a source-cited lab measurement with \`pnpm pm:objective -- record <measurement.json>\`. Read attachment and governed action dispatch are independently derived from the admitted event log; the measurement cannot self-assert them.
+
+## 7 · Technical evidence gaps before the gate
+
+These are substrate proof gaps, distinct from the business-operability gaps above:
 
 ${evidenceGapText}
 
-## 7 · Verdict (hand-written at the gate — owner + agent)
+## 8 · Verdict (hand-written at the gate — owner + agent)
 
 ${verdict}
 `;

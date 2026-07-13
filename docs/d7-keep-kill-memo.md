@@ -1,22 +1,22 @@
 # D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
 
-*Generated 2026-07-11T02:15:53.889Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
+*Generated 2026-07-13T12:07:31.370Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
 
 **Evidence coordinates:** db postgres://pm@127.0.0.1:5432/pm_substrate · tenant tenant_dev · agent joat-dev · scope pm-substrate-dev
 
 ## 1 · Resume fidelity (the original problem)
 
-- Sessions resumed from the ledger: **1**, handoff coverage: **100%**, hash chain: **VALID**
-- Standing decisions: **8** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
+- Sessions resumed from the ledger: **3**, handoff coverage: **100%**, hash chain: **VALID**
+- Standing decisions: **11** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
 
 ## 2 · Throughput and cost
 
-- Work closed: **8** of 17 opened (1 open) — **8/session**
-- Tokens: **2,290,000** across 1 costed sessions → **286,250 per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
+- Work closed: **10** of 21 opened (1 open) — **3.33/session**
+- Tokens: **4,980,000** across 2 costed sessions → **498,000 per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
 
 ## 3 · Governance did real work?
 
-- MCP gate: **19** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
+- MCP gate: **31** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
 - Executor bridge: **1** dispatched · **5** refused · **8** failed
 - Shadow verdict: advisory would-have-blocked **0** · enforced blocks **5** · data rejections **0** · pending drift obstructions **7**
 - Work dispatched to roles: **0**
@@ -35,14 +35,45 @@
 - Baseline arm: **12** failed · 0 passed — every seeded failure class reproduced without the substrate
 - Substrate arm: **12** blocked at the gate · 0 passed — **every baseline failure was caught before it landed**
 
-## 6 · Evidence gaps before the gate
+## 6 · Business-operability objective gate
 
-The memo is honest only if these are either filled or explicitly waived on 07-16:
+Technical activity is necessary but cannot prove that either lab is worth operating. The executable scorecard requires zero-edit adoption, repeated correct end-to-end outcomes, governance quality, bounded cost/operator effort, and external acceptance for **both** labs.
 
-No open D7 evidence gaps remain in this ledger fold. Re-run from the same coordinates before the gate if new evidence is admitted.
+- **Verdict ceiling from admitted evidence:** `keep_with_scope_cut`
+- **Full objective ready:** NO
+- **Objective measurement events:** 0 valid latest lab record(s) · 0 invalid event(s)
 
-## 7 · Verdict (hand-written at the gate — owner + agent)
+- ✅ **technical_baseline**: threshold met
+- ❌ **adoption**:
+  - plugged_in_social: no admitted read attachment
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **operational_outcomes**:
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **governance_quality**:
+  - plugged_in_social: no governed action was dispatched
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no governed action was dispatched
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **economic_value**:
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **external_validity**:
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no validated lab measurement was admitted
+
+Record or update a source-cited lab measurement with `pnpm pm:objective -- record <measurement.json>`. Read attachment and governed action dispatch are independently derived from the admitted event log; the measurement cannot self-assert them.
+
+## 7 · Technical evidence gaps before the gate
+
+These are substrate proof gaps, distinct from the business-operability gaps above:
+
+No open technical-substrate evidence gaps remain in this ledger fold. This does not imply the business objective is met.
+
+## 8 · Verdict (hand-written at the gate — owner + agent)
 
 - **Keep / kill / keep-with-scope-cut:** keep-with-scope-cut.
-- **If keep:** next falsification window runs to 2026-07-16. Criteria: one live MCP observe→propose→admit session; one governed write/action rehearsal through an accepted envelope with replay dedupe; Liquid external-id obstruction when the fetched rows omit the approved id field; `pm:memo` must refuse ambiguous tenant/scope instead of emitting a misleading zero snapshot.
-- **If kill:** salvage the entity-mapping approval gate, idempotent sync runner, executor bridge, adapter registry, and Liquid sidecar process-boundary pattern. Kill only the claim that Liquid is ready as a broad default adapter until L1/L5 evidence repeats on a second real surface and the write path is proven live.
+- **Scope retained:** the continuity loop, MCP admission boundary, generic mapping/sync/executor kit, adapter registry, shadow report, and Liquid process-boundary pattern have sufficient technical evidence to continue. Freeze the Later ladder.
+- **Next falsification window:** D6 ends 2026-07-31. Restore and revision-pin both external app boundaries; then require every adoption, correct-outcome, governance, economic-value, and external-validity threshold in `docs/objective-falsification.md`. Missing measurements remain failures to establish the claim, not waivers.
+- **If D6 fails:** repair the failed dimension or reduce/kill the two-lab business-operability claim. Salvage the generic kit and continuity/governance surfaces only to the extent their independent evidence remains green.

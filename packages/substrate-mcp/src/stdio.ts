@@ -5,8 +5,8 @@
  *   claude mcp add pm-substrate -- node packages/substrate-mcp/dist/stdio.js
  *
  * Env: PM_DATABASE_URL (required), PM_DEV_TENANT_ID, PM_DEV_AGENT_ID,
- * PM_DEV_SCOPE. stdio trust boundary = the OS user; the HTTP transport with
- * bearer-token auth is the recorded follow-up work item.
+ * PM_DEV_SCOPE. stdio trust boundary = the OS user. Streamable HTTP with
+ * mandatory bearer auth is implemented in `http.ts`.
  */
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

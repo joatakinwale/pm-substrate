@@ -21,7 +21,7 @@ Work moves through many tools, teams, and AI agents that each hold a partial mod
 
 pm-substrate is that enforcement medium: what the workspace accepts as actionable, where each claim came from, how fresh it is, who may change it, which gate it passed, and how agents resume after context loss.
 
-**The immediate objective (see ROADMAP):** make two agent-run businesses viable — the marketing lab (PluggedInSocial) and the hedge-fund lab (ArrowHedge) — with the substrate managing its own development as the first proof. Keep/kill gate: 2026-07-16.
+**The immediate objective (see ROADMAP):** make the operating loops of two agent-run businesses demonstrably worth using the substrate for — the marketing lab (PluggedInSocial) and the hedge-fund lab (ArrowHedge) — with the substrate managing its own development as the first proof. Technical correctness is necessary but cannot prove business value; the comparative outcome/cost/owner-effort gate is defined in [`docs/objective-falsification.md`](./docs/objective-falsification.md). Keep/kill gate: 2026-07-16.
 
 ## The product shape (decided 2026-07-02)
 
@@ -38,10 +38,10 @@ Five questions, answered only from the admitted log — never from self-report:
 | What is being done? | open `work` checkpoints + last `handoff` (`pnpm dev:status`) |
 | What did governance do? | admitted events by type, stage-gate applications, procedure admissions, blocks |
 | What did it cost? | `dev.session.cost` events (tokens per session/agent/model) |
-| What are the results? | eval metrics in CI (`pnpm evals:amnesia`: baseline 0% vs substrate 100% recall; 12-metric lanes as they light up) |
+| What are the results? | eval metrics in CI plus admitted per-lab business-operability measurements (`pnpm pm:objective -- list`; folded into `pnpm pm:memo`) |
 | What got optimized? | closed work items + superseding decisions in the ledger |
 
-v0 is the `dev:status` CLI; the dashboard page is phase D4.
+v0 is the `dev:status` CLI; the D4 dashboard control-plane page is shipped. The D7 objective verdict remains a CLI/memo gate so it is generated from the same admitted-log fold used for the decision.
 
 ## Architecture (reference)
 
@@ -67,6 +67,7 @@ export PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate
 pnpm db:migrate && pnpm db:seed && pnpm dev:seed-dogfood
 pnpm build && pnpm typecheck && pnpm test
 pnpm dev:resume        # ← the session briefing; start every session here
+pnpm pm:memo -- --stdout  # technical + business-operability verdict ceiling
 ```
 
 Environment knobs: `PM_DATABASE_URL` (unset ⇒ DB-gated tests skip), `PM_DEV_TENANT_ID` (`tenant_dev`), `PM_ENABLE_AGENT_STATE_PROVENANCE`, `PM_PLUGGED_IN_SOCIAL_DIR` (external app checkout; unset ⇒ conformance tests skip).
@@ -81,7 +82,7 @@ Environment knobs: `PM_DATABASE_URL` (unset ⇒ DB-gated tests skip), `PM_DEV_TE
 | Primitive back-map (recursion stop) | `pnpm validate:arrowsmith-primitives` |
 | Amnesia headline number | `pnpm evals:amnesia` |
 
-Verification baseline 2026-07-02: build + typecheck clean; **875 passed / 7 env-gated skips**, identical on core-only and tower-enabled databases (`docs/state-validation/verification-baseline-2026-07-02.md`).
+Current verification 2026-07-13: build + typecheck clean; **955 passed / 7 env-gated skips** on the core development database; strict contracts, budgets, zero-edit, and primitive back-map gates green. The original core/tower parity baseline is preserved in [`docs/state-validation/verification-baseline-2026-07-02.md`](./docs/state-validation/verification-baseline-2026-07-02.md).
 
 ## Repository layout
 

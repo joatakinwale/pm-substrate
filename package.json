@@ -45,6 +45,7 @@
     "pm:sync": "tsx scripts/pm-sync.ts",
     "pm:mappings": "tsx scripts/pm-mappings.ts",
     "pm:shadow": "tsx scripts/pm-shadow-report.ts",
+    "pm:objective": "tsx scripts/pm-objective.ts",
     "pm:memo": "tsx scripts/build-d7-memo.ts",
     "pm:rehearse-write": "tsx scripts/pm-rehearse-liquid-write.ts"
   },

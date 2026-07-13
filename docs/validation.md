@@ -4,12 +4,26 @@
 
 ## The objective
 
-The substrate is validated when **two claims hold simultaneously** on the ArrowHedgeLabs sandbox (a multi-agent research project used strictly for research/education — the *agents and their operational state* are the subject, not finance):
+The substrate is validated only when **three claims hold together** across the
+PluggedInSocial and ArrowHedge testbeds:
 
-1. **Plug-in claim** — ArrowHedgeLabs onboards through mapping/profile/capability files with **zero substrate-package edits and zero changes to existing providers**.
-2. **Agent-state claim** — agents resuming from substrate state outperform chat-history baselines on staleness, authority, evidence, replay, and continuity.
+1. **Plug-in claim** — each lab onboards through mapping/profile/capability
+   files with zero substrate-package edits and no app rewrite.
+2. **Agent-state/PM-governance claim** — agents using admitted state and gates
+   outperform or protect matched no-substrate workflows on staleness,
+   authority, evidence, replay, continuity, and expected allow/block behavior.
+3. **Business-operability claim** — those protections survive end-to-end work:
+   correct outcomes do not regress, owner effort does not rise, and cash cost
+   stays within the declared premium on held-out and production-like runs.
 
-The agent-state work is not a pivot from the PM-layer thesis; it is the harder validation surface for it (see `artifacts/pm_substrate_rewrite.md`).
+The first two claims can make the technical substrate worth keeping. They do
+not, alone, prove that either business is worth operating. The executable
+scorecard, non-claims, and verdict ceilings are in
+[`objective-falsification.md`](./objective-falsification.md). The agent-state
+work remains an extension and proof of the PM-layer thesis, not a pivot from it
+(see `artifacts/pm_substrate_rewrite.md`). ArrowHedge is used strictly for
+historical research/education; the agents and operating state are the subject,
+not financial performance.
 
 ---
 
@@ -78,7 +92,29 @@ pnpm vitest run \
 
 Time-to-plugin · substrate edit count (target: zero) · mapping coverage · validator rejection rate · evidence coverage · state disagreement rate · stale action rate · agent resume success · replay fidelity · unauthorized action block rate · cross-tool outcome success · mean time to reconcile.
 
-Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. The plug-in lane (time-to-plugin, substrate edit count, mapping coverage) is **not yet instrumented** — tracked in `research/index.md` → remaining frontier.
+Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. `pm.objective.lab-measured.v1` now instruments time-to-first-value, substrate edit count, app rewrite, mapping coverage, correct outcomes, write-path coverage, false positives/negatives, cost, owner minutes, holdouts, and acceptance. D6 still has to collect and admit those measurements from the two real labs; a schema with no evidence is a gap, not a pass.
+
+## Business-operability gate
+
+Generate a template, replace every placeholder with source-cited observations,
+and admit it:
+
+```bash
+pnpm pm:objective -- template plugged_in_social --out /tmp/pis-objective.json
+pnpm pm:objective -- record /tmp/pis-objective.json
+pnpm pm:objective -- list
+pnpm pm:memo -- --stdout
+```
+
+The evaluator requires both labs to pass six dimensions: technical baseline,
+adoption, operational outcomes, governance quality, economic value, and
+external validity. A full `keep` requires at least five matched attempts per
+arm per lab, at least 80% correct substrate outcomes without regression, a
+holdout, full in-scope write governance with zero pilot false positives and
+false negatives, no increase in owner minutes per correct outcome, no more than
+a 1.25x cash-cost premium, a production-like shadow run, and owner acceptance.
+See [`objective-falsification.md`](./objective-falsification.md) for exact
+definitions and the research basis.
 
 Market-win claims require a saved paired run with:
 
@@ -89,6 +125,13 @@ Market-win claims require a saved paired run with:
 - backtest/PnL deltas reported separately from governance deltas.
 
 Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
+
+> **Revision warning (2026-07-13):** the detailed adapter evidence below was
+> produced against the revision rehearsed on 2026-07-07. Current ArrowHedge
+> `main@6713139` does not mount an `/integration/v1` router. The admitted
+> historical rehearsal remains evidence for that revision, but current D6
+> readiness is blocked until the neutral boundary is restored and revalidated.
+> Every new objective measurement must bind its app revision and run manifest.
 
 - `arrowhedgelab` is now a submodule-style external repo reference to
   `https://github.com/virattt/ai-hedge-fund.git` at commit `65a0349`.
@@ -188,6 +231,8 @@ current adapter contract and integration review.
 6. **Hash-chain or replay failure** — an event chain or artifact that cannot replay to the same hashes without a deterministic explanation.
 7. **Two-state divergence** — agent memory acted on without rebase against substrate state. The review layer makes this visible (warn-first); once runtime wiring lands, blockable by invariant-class policy.
 8. **The second profile stops being free.** If `profile-agency` (or any future profile) requires substrate diffs to coexist with `finance-research`, the universality claim is dead.
+9. **Technical success substitutes for useful outcomes.** If the project claims “worth operating” from event counts, fixture passes, or blocks without matched correct outcomes, cost, owner effort, and acceptance, the objective claim is falsified even when the substrate remains salvageable.
+10. **Governance is bypassable or unusably conservative.** Any in-scope direct write path, false-negative allow, or gate that avoids errors by blocking valid pilot actions fails the operational claim.
 
 ---
 
@@ -212,6 +257,8 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 ---
 
 ## Changelog
+
+- **2026-07-13** — separated technical substrate viability from business operability; added the admitted `pm.objective.lab-measured.v1` scorecard, matched outcome/cost/owner-effort thresholds, held-out/production-like requirements, and D7 verdict ceilings.
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).

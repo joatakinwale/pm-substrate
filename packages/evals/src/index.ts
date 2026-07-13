@@ -239,3 +239,24 @@ export {
   type WriteBindingReplayRecord,
 } from "./write-binding.js";
 export * from "./amnesia.js";
+export {
+  BUSINESS_OPERABILITY_DIMENSIONS,
+  DEFAULT_BUSINESS_OPERABILITY_THRESHOLDS,
+  OBJECTIVE_LAB_MEASUREMENT_SCHEMA_VERSION,
+  ObjectiveLabMeasurementValidationError,
+  evaluateBusinessOperabilityObjective,
+  foldObjectiveLabMeasurements,
+  isObjectiveFinalVerdictPermitted,
+  parseObjectiveLabMeasurement,
+  type BusinessOperabilityDimension,
+  type BusinessOperabilityDimensionAssessment,
+  type BusinessOperabilityObjectiveAssessment,
+  type BusinessOperabilityObjectiveInput,
+  type BusinessOperabilityThresholds,
+  type ObjectiveLabEvidence,
+  type ObjectiveLabMeasurement,
+  type ObjectiveFinalVerdict,
+  type ObjectiveLabMeasurementFold,
+  type ObjectiveTechnicalEvidence,
+  type ObjectiveVerdictCeiling,
+} from "./objective.js";
