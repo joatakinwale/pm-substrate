@@ -21,6 +21,13 @@
   `browser_qa_harness` and `operatorRunMonitorSurface`; ArrowHedge current main
   no longer mounts the `/integration/v1` contract used by the 2026-07-07 live
   rehearsal. Historical evidence remains valid only for its recorded revision.
+- Repaired a merge regression that copied all 122 quarantined provenance
+  migrations back into the default core directory. Fresh core installs had
+  failed at 0053, and existing installs aborted on a checksum mismatch. The
+  intended two-tier split is restored without rewriting applied migrations;
+  a new boundary test prevents filename overlap or agent-state migrations in
+  core. Existing DBs migrate idempotently, fresh core applies 26 migrations,
+  fresh provenance applies 149, and the 957-test suite passes on both.
 
 
 ## 2026-07-08 - ArrowHedge viewer removed from the substrate dashboard

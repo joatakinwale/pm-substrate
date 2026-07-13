@@ -82,7 +82,7 @@ Environment knobs: `PM_DATABASE_URL` (unset ⇒ DB-gated tests skip), `PM_DEV_TE
 | Primitive back-map (recursion stop) | `pnpm validate:arrowsmith-primitives` |
 | Amnesia headline number | `pnpm evals:amnesia` |
 
-Current verification 2026-07-13: build + typecheck clean; **955 passed / 7 env-gated skips** on the core development database; strict contracts, budgets, zero-edit, and primitive back-map gates green. The original core/tower parity baseline is preserved in [`docs/state-validation/verification-baseline-2026-07-02.md`](./docs/state-validation/verification-baseline-2026-07-02.md).
+Current verification 2026-07-13: build + typecheck clean; **957 passed / 7 env-gated skips**, identical on freshly migrated core-only (26 migrations) and provenance-enabled (149 migrations) databases; strict contracts, budgets, zero-edit, and primitive back-map gates green. The original core/tower parity baseline is preserved in [`docs/state-validation/verification-baseline-2026-07-02.md`](./docs/state-validation/verification-baseline-2026-07-02.md).
 
 ## Repository layout
 
