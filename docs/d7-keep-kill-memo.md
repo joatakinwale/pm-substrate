@@ -1,22 +1,22 @@
 # D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
 
-*Generated 2026-07-13T12:26:49.025Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
+*Generated 2026-07-13T12:47:50.419Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
 
 **Evidence coordinates:** db postgres://pm@127.0.0.1:5432/pm_substrate · tenant tenant_dev · agent joat-dev · scope pm-substrate-dev
 
 ## 1 · Resume fidelity (the original problem)
 
 - Sessions resumed from the ledger: **4**, handoff coverage: **100%**, hash chain: **VALID**
-- Standing decisions: **13** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
+- Standing decisions: **14** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
 
 ## 2 · Throughput and cost
 
-- Work closed: **13** of 26 opened (0 open) — **3.25/session**
-- Tokens: **4,980,000** across 2 costed sessions → **383,077 per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
+- Work closed: **14** of 28 opened (0 open) — **3.5/session**
+- Tokens: **4,980,000** across 2 costed sessions → **355,714 per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
 
 ## 3 · Governance did real work?
 
-- MCP gate: **40** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
+- MCP gate: **44** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
 - Executor bridge: **1** dispatched · **5** refused · **8** failed
 - Shadow verdict: advisory would-have-blocked **0** · enforced blocks **5** · data rejections **0** · pending drift obstructions **7**
 - Work dispatched to roles: **0**

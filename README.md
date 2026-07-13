@@ -67,6 +67,8 @@ export PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate
 pnpm db:migrate && pnpm db:seed && pnpm dev:seed-dogfood
 pnpm build && pnpm typecheck && pnpm test
 pnpm dev:resume        # ← the session briefing; start every session here
+pnpm pm:boundary -- --app <id> --app-dir <checkout> --out <artifact.json> \
+  --check 'contract::your-existing-conformance-command'
 pnpm pm:memo -- --stdout  # technical + business-operability verdict ceiling
 ```
 
@@ -82,7 +84,7 @@ Environment knobs: `PM_DATABASE_URL` (unset ⇒ DB-gated tests skip), `PM_DEV_TE
 | Primitive back-map (recursion stop) | `pnpm validate:arrowsmith-primitives` |
 | Amnesia headline number | `pnpm evals:amnesia` |
 
-Current verification 2026-07-13: build + typecheck clean; **957 passed / 7 env-gated skips**, identical on freshly migrated core-only (26 migrations) and provenance-enabled (149 migrations) databases; strict contracts, budgets, zero-edit, and primitive back-map gates green. The original core/tower parity baseline is preserved in [`docs/state-validation/verification-baseline-2026-07-02.md`](./docs/state-validation/verification-baseline-2026-07-02.md).
+Current verification 2026-07-13: build + typecheck clean; **967 passed / 7 external-app skips** in the default suite. The external-app conformance lane is deliberately opt-in via `PM_PLUGGED_IN_SOCIAL_DIR`; the current marketing checkout makes that lane red because its two required anchors are absent. See the content-addressed receipt in [`docs/evidence`](./docs/evidence/README.md). Strict contracts, budgets, zero-edit, and primitive back-map gates are green. The original core/tower parity baseline is preserved in [`docs/state-validation/verification-baseline-2026-07-02.md`](./docs/state-validation/verification-baseline-2026-07-02.md).
 
 ## Repository layout
 

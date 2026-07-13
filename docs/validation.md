@@ -100,6 +100,9 @@ Generate a template, replace every placeholder with source-cited observations,
 and admit it:
 
 ```bash
+pnpm pm:boundary -- --app <lab-id> --app-dir <checkout> \
+  --out <boundary-artifact.json> \
+  --check 'contract::your-existing-conformance-command'
 pnpm pm:objective -- template plugged_in_social --out /tmp/pis-objective.json
 pnpm pm:objective -- record /tmp/pis-objective.json
 pnpm pm:objective -- list
@@ -115,6 +118,10 @@ false negatives, no increase in owner minutes per correct outcome, no more than
 a 1.25x cash-cost premium, a production-like shadow run, and owner acceptance.
 See [`objective-falsification.md`](./objective-falsification.md) for exact
 definitions and the research basis.
+
+The measurement command opens and recomputes its content-addressed boundary
+artifact before admission. A failed/tampered artifact, hash mismatch, different
+lab ID, or different app/substrate revision is a hard refusal.
 
 Market-win claims require a saved paired run with:
 

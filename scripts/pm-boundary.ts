@@ -6,6 +6,7 @@
  * Example:
  *   pnpm pm:boundary -- --app orbit_crm --app-dir ../orbit_crm \
  *     --out artifacts/orbit-boundary.json \
+ *     --fingerprint-path server --fingerprint-path web \
  *     --check 'contract::pnpm --dir ../orbit_crm test:integration-contract'
  */
 
@@ -16,9 +17,10 @@ import {
   mkdirSync,
   readFileSync,
   readlinkSync,
+  readdirSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import {
@@ -36,6 +38,7 @@ interface Args {
   readonly appDir: string;
   readonly outPath: string;
   readonly observedAt: string;
+  readonly fingerprintPaths: readonly string[];
   readonly checks: readonly CheckSpec[];
 }
 
@@ -90,6 +93,7 @@ function parseArgs(argv: readonly string[]): Args {
     appDir: resolve(appDir),
     outPath: resolve(outPath),
     observedAt,
+    fingerprintPaths: valuesFor("--fingerprint-path", argv),
     checks,
   };
 }
@@ -107,8 +111,94 @@ function git(dir: string, args: readonly string[]): Buffer {
   return result.stdout;
 }
 
-function describeGitWorktree(label: string, dir: string): string {
-  const head = git(dir, ["rev-parse", "HEAD"]).toString("utf8").trim();
+const SOURCE_TREE_IGNORED_DIRECTORIES = new Set([
+  ".git",
+  ".next",
+  ".playwright-cli",
+  ".pytest_cache",
+  ".venv",
+  "__pycache__",
+  "build",
+  "dist",
+  "node_modules",
+  "output",
+  "var",
+  "venv",
+]);
+
+function sourceTreePaths(root: string, current: string): readonly string[] {
+  const paths: string[] = [];
+  for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  )) {
+    if (
+      entry.name === ".DS_Store" ||
+      entry.name.startsWith("._") ||
+      entry.name.endsWith(".pyc") ||
+      entry.name.endsWith(".tsbuildinfo")
+    ) {
+      continue;
+    }
+    if (entry.isDirectory() && SOURCE_TREE_IGNORED_DIRECTORIES.has(entry.name)) {
+      continue;
+    }
+    const absolute = join(current, entry.name);
+    if (entry.isDirectory()) {
+      paths.push(...sourceTreePaths(root, absolute));
+    } else {
+      paths.push(relative(root, absolute));
+    }
+  }
+  return paths;
+}
+
+function describeSourceTree(
+  label: string,
+  dir: string,
+  requestedPaths: readonly string[],
+): string {
+  const fingerprintPaths = (requestedPaths.length === 0 ? ["."] : requestedPaths)
+    .map((path) => path.replace(/\/$/, ""))
+    .sort();
+  const paths = new Set<string>();
+  for (const requested of fingerprintPaths) {
+    const absolute = resolve(dir, requested);
+    const relativePath = relative(dir, absolute);
+    if (relativePath.startsWith("..") || resolve(dir, relativePath) !== absolute) {
+      throw new Error(`--fingerprint-path escapes --app-dir: ${requested}`);
+    }
+    if (!existsSync(absolute)) {
+      throw new Error(`--fingerprint-path does not exist: ${requested}`);
+    }
+    const stat = lstatSync(absolute);
+    if (stat.isDirectory()) {
+      for (const path of sourceTreePaths(dir, absolute)) paths.add(path);
+    } else {
+      paths.add(relativePath);
+    }
+  }
+  const hash = createHash("sha256");
+  hash.update(`pm-source-tree-v1\0${fingerprintPaths.join("\0")}\0`);
+  for (const path of [...paths].sort()) {
+    const absolute = resolve(dir, path);
+    const stat = lstatSync(absolute);
+    hash.update(`\0${path}\0${stat.mode}\0`);
+    hash.update(stat.isSymbolicLink() ? readlinkSync(absolute) : readFileSync(absolute));
+  }
+  return `${label}@tree-sha256:${hash.digest("hex")};scope:${fingerprintPaths.join(",")}`;
+}
+
+function describeWorktree(
+  label: string,
+  dir: string,
+  fingerprintPaths: readonly string[] = [],
+): string {
+  let head: string;
+  try {
+    head = git(dir, ["rev-parse", "HEAD"]).toString("utf8").trim();
+  } catch {
+    return describeSourceTree(label, dir, fingerprintPaths);
+  }
   const status = git(dir, [
     "status",
     "--porcelain=v1",
@@ -139,7 +229,7 @@ function describeGitWorktree(label: string, dir: string): string {
       hash.update("non-file");
     }
   }
-  return `${label}@${head}+dirty.${hash.digest("hex").slice(0, 16)}`;
+  return `${label}@${head}+dirty-sha256:${hash.digest("hex")}`;
 }
 
 function sha256(value: Buffer): string {
@@ -177,13 +267,19 @@ function main(): void {
   const artifact = buildBoundaryConformanceArtifact({
     appId: args.appId,
     observedAt: args.observedAt,
-    appRevision: describeGitWorktree(args.appId, args.appDir),
-    substrateRevision: describeGitWorktree("pm-substrate", ROOT),
+    appRevision: describeWorktree(
+      args.appId,
+      args.appDir,
+      args.fingerprintPaths,
+    ),
+    substrateRevision: describeWorktree("pm-substrate", ROOT),
     checks: args.checks.map(runCheck),
   });
   mkdirSync(dirname(args.outPath), { recursive: true });
   writeFileSync(args.outPath, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
-  const artifactRef = `artifact:${relative(ROOT, args.outPath)}#sha256:${artifact.contentHash}`;
+  const relativeOut = relative(ROOT, args.outPath);
+  const refPath = relativeOut.startsWith("..") ? args.outPath : relativeOut;
+  const artifactRef = `artifact:${refPath}#sha256:${artifact.contentHash}`;
   console.log(
     JSON.stringify({
       ready: artifact.ready,

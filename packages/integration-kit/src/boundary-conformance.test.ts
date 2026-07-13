@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   BOUNDARY_CONFORMANCE_SCHEMA_VERSION,
   buildBoundaryConformanceArtifact,
+  parseBoundaryConformanceArtifact,
+  requireBoundaryConformanceBinding,
   type BoundaryConformanceArtifactInput,
 } from "./boundary-conformance.js";
 
@@ -84,5 +86,51 @@ describe("boundary-conformance artifact", () => {
         }),
       ),
     ).toThrow(/stdoutSha256/);
+  });
+
+  it("detects tampering and requires an exact green revision binding", () => {
+    const artifact = buildBoundaryConformanceArtifact(input());
+    expect(parseBoundaryConformanceArtifact(artifact)).toEqual(artifact);
+    expect(() =>
+      parseBoundaryConformanceArtifact({ ...artifact, ready: false }),
+    ).toThrow(/ready verdict/);
+    expect(() =>
+      parseBoundaryConformanceArtifact({
+        ...artifact,
+        checks: [{ ...artifact.checks[0]!, exitCode: 1 }],
+      }),
+    ).toThrow(/ready verdict|blockers|contentHash/);
+
+    expect(
+      requireBoundaryConformanceBinding(artifact, {
+        appId: artifact.appId,
+        appRevision: artifact.appRevision,
+        substrateRevision: artifact.substrateRevision,
+        contentHash: artifact.contentHash,
+      }),
+    ).toEqual(artifact);
+    expect(() =>
+      requireBoundaryConformanceBinding(artifact, {
+        appId: artifact.appId,
+        appRevision: "orbit_crm@new-head",
+        substrateRevision: artifact.substrateRevision,
+        contentHash: artifact.contentHash,
+      }),
+    ).toThrow(/appRevision mismatch/);
+  });
+
+  it("never accepts a failed artifact as a D6 binding", () => {
+    const failed = buildBoundaryConformanceArtifact(
+      input({ checks: [{ ...input().checks[0]!, exitCode: 1 }] }),
+    );
+
+    expect(() =>
+      requireBoundaryConformanceBinding(failed, {
+        appId: failed.appId,
+        appRevision: failed.appRevision,
+        substrateRevision: failed.substrateRevision,
+        contentHash: failed.contentHash,
+      }),
+    ).toThrow(/not ready/);
   });
 });

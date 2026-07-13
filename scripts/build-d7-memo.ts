@@ -20,8 +20,10 @@ import {
   evaluateBusinessOperabilityObjective,
   foldObjectiveLabMeasurements,
   isObjectiveFinalVerdictPermitted,
+  parseObjectiveLabMeasurement,
   type ObjectiveFinalVerdict,
   type ObjectiveLabEvidence,
+  type ObjectiveLabMeasurement,
   type ObjectiveIntegrationEvidenceEvent,
 } from "../packages/evals/src/index.js";
 import { PostgresEventStore } from "../packages/events/src/index.js";
@@ -31,6 +33,7 @@ import {
 } from "../packages/integration-kit/src/index.js";
 import type { TenantId } from "../packages/types/src/index.js";
 import { computeLoopMetrics } from "./loop-metrics.js";
+import { verifyObjectiveMeasurementBoundaryArtifact } from "./objective-boundary-evidence.js";
 
 const TENANT = (process.env["PM_DEV_TENANT_ID"] ?? "tenant_dev") as TenantId;
 const AGENT = process.env["PM_DEV_AGENT_ID"] ?? "joat-dev";
@@ -235,9 +238,18 @@ async function main(): Promise<void> {
         readObjectiveIntegrationEvents(pool, TENANT),
       ]);
 
-    const measurementFold = foldObjectiveLabMeasurements(
-      objectiveMeasurementEvents.map((event) => event.payload),
-    );
+    const verifiedMeasurements: ObjectiveLabMeasurement[] = [];
+    let invalidObjectiveMeasurementEvents = 0;
+    for (const event of objectiveMeasurementEvents) {
+      try {
+        const measurement = parseObjectiveLabMeasurement(event.payload);
+        verifyObjectiveMeasurementBoundaryArtifact(measurement);
+        verifiedMeasurements.push(measurement);
+      } catch {
+        invalidObjectiveMeasurementEvents += 1;
+      }
+    }
+    const measurementFold = foldObjectiveLabMeasurements(verifiedMeasurements);
     const measurementByLab = new Map(
       measurementFold.latest.map((measurement) => [
         measurement.labId,
@@ -269,7 +281,8 @@ async function main(): Promise<void> {
         livePairedScenarios: lab?.scenarios ?? 0,
       },
       labs: objectiveLabs,
-      invalidMeasurementEvents: measurementFold.invalid,
+      invalidMeasurementEvents:
+        measurementFold.invalid + invalidObjectiveMeasurementEvents,
     });
 
     // Owner-found bug (2026-07-07): pointed at the wrong database/tenant/

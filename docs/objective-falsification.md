@@ -86,6 +86,14 @@ revision/source hash, and substrate revision. Sync and executor events must
 carry the same four coordinates, so a successful rehearsal cannot silently
 stand in for a later app revision whose integration boundary has changed.
 
+Generate the boundary receipt by running the app's existing conformance suite
+through `pnpm pm:boundary`. Git worktrees are pinned to the commit plus a dirty
+tree hash. Gitless snapshots use an explicit, sorted `--fingerprint-path`
+scope and a SHA-256 source-tree revision. Failed checks still write a durable
+red receipt, but `pm:objective record` recomputes the receipt and refuses it
+unless it is green and exactly matches the measurement's lab and revisions.
+Raw command output is not copied into the receipt; byte counts and hashes are.
+
 Use:
 
 ```bash
@@ -117,10 +125,12 @@ unmeasured. The evidence therefore caps the verdict at
 missing `browser_qa_harness` plus `operatorRunMonitorSurface`, while current
 ArrowHedge `main@6713139` no longer mounts the `/integration/v1` contract used
 by the historical 2026-07-07 rehearsal. The default substrate suite is green
-(962 passed, 7 external-app tests skipped); opting the current
+(967 passed, 7 external-app tests skipped); opting the current
 PluggedInSocial checkout into conformance produces 6 failures, all downstream
 of those missing anchors. The roadmap therefore treats app-boundary repair as
 a prerequisite, not as evidence that can be waived by the green core suite.
+The durable red receipt is
+[`plugged-in-social-boundary-conformance-2026-07-13.json`](./evidence/plugged-in-social-boundary-conformance-2026-07-13.json).
 
 ## Research basis
 

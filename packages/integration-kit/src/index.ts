@@ -24,9 +24,12 @@ export {
 export {
   BOUNDARY_CONFORMANCE_SCHEMA_VERSION,
   buildBoundaryConformanceArtifact,
+  parseBoundaryConformanceArtifact,
+  requireBoundaryConformanceBinding,
   type BoundaryConformanceArtifact,
   type BoundaryConformanceArtifactInput,
   type BoundaryConformanceCheckObservation,
+  type BoundaryConformanceExpectedBinding,
 } from "./boundary-conformance.js";
 export {
   parseIntegrationEvidenceContext,

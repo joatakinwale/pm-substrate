@@ -38,24 +38,27 @@ pm-substrate exists so that **two agent-run businesses are operationally worth o
 
 ### Up next — D6/D7 execution sequence
 
-1. **07-13–07-14 · Make the decision honest.** Land and verify the executable
+1. **07-13 ✅ · Make the decision honest.** Land and verify the executable
    objective scorecard, source/revision-bound measurement command, verdict
    ceiling, exact-provenance sync/action receipts, and corrected front-door
    docs. Historical integration events must not count for a newer app revision.
-   This is substrate work.
+   This substrate work is complete: the current verdict remains
+   `keep_with_scope_cut`.
 2. **07-14–07-15 · Re-establish per-revision boundary conformance.** Current
    source inspection found two real blockers: PluggedInSocial is missing the
    `browser_qa_harness` external adapter and `operatorRunMonitorSurface` gate;
    ArrowHedge `main@6713139` no longer mounts the `/integration/v1` surfaces
    used in the 07-07 rehearsal. Restore those anchors additively in the
-   external app repos, then run their conformance checks. Do not add lab names
-   or compensating adapters to substrate packages.
+   external app repos, then run their conformance checks through
+   `pnpm pm:boundary`. Preserve the content-addressed receipt. Do not add lab
+   names or compensating adapters to substrate packages.
 3. **07-15 · Predeclare the pilots.** For each lab, save a revision-pinned run
    manifest: workflow, matched inputs, outcome oracle, expected allow/block
    cases, versions, budget, and maximum owner intervention. Preserve the
    revision-pinned boundary-conformance artifact and pass both refs into sync
    and action dispatch. Generate objective measurement templates but do not
-   fill unknowns with estimates.
+   fill unknowns with estimates. `pm:objective record` must refuse red,
+   tampered, or revision-mismatched boundary artifacts.
 4. **07-16 · Take the D7 snapshot.** Regenerate `pnpm pm:memo`. On the current
    evidence, the technically green project is `keep_with_scope_cut`; missing D6
    data cannot become a waiver or a full `keep`.

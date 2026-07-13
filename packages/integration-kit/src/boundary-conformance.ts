@@ -34,6 +34,13 @@ export interface BoundaryConformanceArtifact
   readonly contentHash: string;
 }
 
+export interface BoundaryConformanceExpectedBinding {
+  readonly appId: string;
+  readonly appRevision: string;
+  readonly substrateRevision: string;
+  readonly contentHash: string;
+}
+
 const SHA256 = /^[a-f0-9]{64}$/;
 
 const isConcrete = (value: unknown): value is string =>
@@ -120,4 +127,71 @@ export function buildBoundaryConformanceArtifact(
     .digest("hex");
 
   return { ...body, contentHash };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Recompute the content address and all derived verdict fields. */
+export function parseBoundaryConformanceArtifact(
+  value: unknown,
+): BoundaryConformanceArtifact {
+  if (!isRecord(value)) {
+    throw new Error("boundary-conformance artifact must be an object");
+  }
+  if (value["schemaVersion"] !== BOUNDARY_CONFORMANCE_SCHEMA_VERSION) {
+    throw new Error(
+      `boundary-conformance schemaVersion must be ${BOUNDARY_CONFORMANCE_SCHEMA_VERSION}`,
+    );
+  }
+  const rawChecks = value["checks"];
+  if (!Array.isArray(rawChecks) || rawChecks.some((check) => !isRecord(check))) {
+    throw new Error("boundary-conformance checks must be an array of objects");
+  }
+  const rebuilt = buildBoundaryConformanceArtifact({
+    appId: value["appId"] as string,
+    observedAt: value["observedAt"] as string,
+    appRevision: value["appRevision"] as string,
+    substrateRevision: value["substrateRevision"] as string,
+    checks: rawChecks as unknown as readonly BoundaryConformanceCheckObservation[],
+  });
+  if (value["ready"] !== rebuilt.ready) {
+    throw new Error("boundary-conformance ready verdict does not recompute");
+  }
+  if (canonicalStringify(value["blockers"]) !== canonicalStringify(rebuilt.blockers)) {
+    throw new Error("boundary-conformance blockers do not recompute");
+  }
+  if (value["contentHash"] !== rebuilt.contentHash) {
+    throw new Error("boundary-conformance contentHash does not recompute");
+  }
+  return rebuilt;
+}
+
+/**
+ * A D6 measurement may cite only a green artifact for the exact app and
+ * substrate revisions it claims. Returns the verified, normalized artifact.
+ */
+export function requireBoundaryConformanceBinding(
+  value: unknown,
+  expected: BoundaryConformanceExpectedBinding,
+): BoundaryConformanceArtifact {
+  const artifact = parseBoundaryConformanceArtifact(value);
+  if (!artifact.ready) {
+    throw new Error(
+      `boundary-conformance artifact is not ready: ${artifact.blockers.join("; ")}`,
+    );
+  }
+  for (const field of ["appId", "appRevision", "substrateRevision"] as const) {
+    if (artifact[field] !== expected[field]) {
+      throw new Error(
+        `boundary-conformance ${field} mismatch: expected ${expected[field]}, received ${artifact[field]}`,
+      );
+    }
+  }
+  if (artifact.contentHash !== expected.contentHash) {
+    throw new Error(
+      `boundary-conformance content hash mismatch: expected ${expected.contentHash}, received ${artifact.contentHash}`,
+    );
+  }
+  return artifact;
 }

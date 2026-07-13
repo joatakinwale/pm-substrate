@@ -25,6 +25,7 @@ import {
   timestamp,
   type TenantId,
 } from "../packages/types/src/index.js";
+import { verifyObjectiveMeasurementBoundaryArtifact } from "./objective-boundary-evidence.js";
 
 const TENANT = tenantId(process.env["PM_DEV_TENANT_ID"] ?? "tenant_dev");
 const AGENT = process.env["PM_DEV_AGENT_ID"] ?? "joat-dev";
@@ -111,6 +112,7 @@ async function main(): Promise<void> {
       const measurement = parseObjectiveLabMeasurement(
         JSON.parse(readFileSync(argument, "utf8")),
       );
+      verifyObjectiveMeasurementBoundaryArtifact(measurement);
       const event = await events.publish({
         tenantId: TENANT,
         type: "pm.objective.lab-measured",
@@ -133,12 +135,25 @@ async function main(): Promise<void> {
         typePattern: "pm.objective.lab-measured",
         limit: 1000,
       });
-      const folded = foldObjectiveLabMeasurements(
-        admitted.map((event) => event.payload),
-      );
+      const verified: ObjectiveLabMeasurement[] = [];
+      let invalidMeasurementEvents = 0;
+      for (const event of admitted) {
+        try {
+          const measurement = parseObjectiveLabMeasurement(event.payload);
+          verifyObjectiveMeasurementBoundaryArtifact(measurement);
+          verified.push(measurement);
+        } catch {
+          invalidMeasurementEvents += 1;
+        }
+      }
+      const folded = foldObjectiveLabMeasurements(verified);
       console.log(
         JSON.stringify(
-          { latest: folded.latest, invalidMeasurementEvents: folded.invalid },
+          {
+            latest: folded.latest,
+            invalidMeasurementEvents:
+              invalidMeasurementEvents + folded.invalid,
+          },
           null,
           2,
         ),
