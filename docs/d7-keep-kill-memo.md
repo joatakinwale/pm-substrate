@@ -1,22 +1,22 @@
 # D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
 
-*Generated 2026-07-13T12:07:31.370Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
+*Generated 2026-07-13T12:26:49.025Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
 
 **Evidence coordinates:** db postgres://pm@127.0.0.1:5432/pm_substrate · tenant tenant_dev · agent joat-dev · scope pm-substrate-dev
 
 ## 1 · Resume fidelity (the original problem)
 
-- Sessions resumed from the ledger: **3**, handoff coverage: **100%**, hash chain: **VALID**
-- Standing decisions: **11** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
+- Sessions resumed from the ledger: **4**, handoff coverage: **100%**, hash chain: **VALID**
+- Standing decisions: **13** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
 
 ## 2 · Throughput and cost
 
-- Work closed: **10** of 21 opened (1 open) — **3.33/session**
-- Tokens: **4,980,000** across 2 costed sessions → **498,000 per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
+- Work closed: **13** of 26 opened (0 open) — **3.25/session**
+- Tokens: **4,980,000** across 2 costed sessions → **383,077 per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
 
 ## 3 · Governance did real work?
 
-- MCP gate: **31** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
+- MCP gate: **40** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
 - Executor bridge: **1** dispatched · **5** refused · **8** failed
 - Shadow verdict: advisory would-have-blocked **0** · enforced blocks **5** · data rejections **0** · pending drift obstructions **7**
 - Work dispatched to roles: **0**
@@ -45,16 +45,17 @@ Technical activity is necessary but cannot prove that either lab is worth operat
 
 - ✅ **technical_baseline**: threshold met
 - ❌ **adoption**:
-  - plugged_in_social: no admitted read attachment
+  - plugged_in_social: no revision-bound admitted read attachment
   - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no revision-bound admitted read attachment
   - arrowhedge: no validated lab measurement was admitted
 - ❌ **operational_outcomes**:
   - plugged_in_social: no validated lab measurement was admitted
   - arrowhedge: no validated lab measurement was admitted
 - ❌ **governance_quality**:
-  - plugged_in_social: no governed action was dispatched
+  - plugged_in_social: no revision-bound governed action was dispatched
   - plugged_in_social: no validated lab measurement was admitted
-  - arrowhedge: no governed action was dispatched
+  - arrowhedge: no revision-bound governed action was dispatched
   - arrowhedge: no validated lab measurement was admitted
 - ❌ **economic_value**:
   - plugged_in_social: no validated lab measurement was admitted
@@ -63,7 +64,7 @@ Technical activity is necessary but cannot prove that either lab is worth operat
   - plugged_in_social: no validated lab measurement was admitted
   - arrowhedge: no validated lab measurement was admitted
 
-Record or update a source-cited lab measurement with `pnpm pm:objective -- record <measurement.json>`. Read attachment and governed action dispatch are independently derived from the admitted event log; the measurement cannot self-assert them.
+Record or update a source-cited lab measurement with `pnpm pm:objective -- record <measurement.json>`. Read attachment and governed action dispatch are independently derived from admitted events carrying an exact match for the run manifest, boundary conformance, app revision, and substrate revision; the measurement cannot self-assert them or reuse a historical rehearsal.
 
 ## 7 · Technical evidence gaps before the gate
 

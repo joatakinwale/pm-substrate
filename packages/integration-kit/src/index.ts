@@ -22,6 +22,10 @@ export {
   PI_HARNESS_ADAPTER,
 } from "./known-adapters.js";
 export {
+  parseIntegrationEvidenceContext,
+  type IntegrationEvidenceContext,
+} from "./evidence-context.js";
+export {
   EXECUTOR_DISPATCHED_EVENT_TYPE,
   EXECUTOR_FAILED_EVENT_TYPE,
   EXECUTOR_REFUSED_EVENT_TYPE,

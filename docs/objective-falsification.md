@@ -81,9 +81,10 @@ Run baseline and substrate arms against matched inputs. Record every attempt,
 including failures and owner interventions. Keep the holdout input or dynamic
 state out of the implementation loop. Source refs must point to durable
 artifacts or admitted event IDs; placeholder refs are rejected. Every record
-also binds the run-manifest reference, app revision/source hash, and substrate
-revision so a successful rehearsal cannot silently stand in for a later app
-revision whose integration boundary has changed.
+also binds the run-manifest reference, boundary-conformance artifact, app
+revision/source hash, and substrate revision. Sync and executor events must
+carry the same four coordinates, so a successful rehearsal cannot silently
+stand in for a later app revision whose integration boundary has changed.
 
 Use:
 
@@ -115,7 +116,11 @@ unmeasured. The evidence therefore caps the verdict at
 `keep_with_scope_cut`. Revision revalidation also found that PluggedInSocial is
 missing `browser_qa_harness` plus `operatorRunMonitorSurface`, while current
 ArrowHedge `main@6713139` no longer mounts the `/integration/v1` contract used
-by the historical 2026-07-07 rehearsal.
+by the historical 2026-07-07 rehearsal. The default substrate suite is green
+(962 passed, 7 external-app tests skipped); opting the current
+PluggedInSocial checkout into conformance produces 6 failures, all downstream
+of those missing anchors. The roadmap therefore treats app-boundary repair as
+a prerequisite, not as evidence that can be waived by the green core suite.
 
 ## Research basis
 

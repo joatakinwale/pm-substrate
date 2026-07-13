@@ -65,6 +65,13 @@ const FIXTURE_RECORDS = [
   },
 ] as const;
 
+const EVIDENCE_CONTEXT = {
+  appRevision: "orbit-crm@abc1234",
+  substrateRevision: "pm-substrate@def5678",
+  runManifestRef: "artifact:orbit-crm:run-manifest",
+  boundaryConformanceRef: "artifact:orbit-crm:boundary-conformance",
+} as const;
+
 describe("sync identity (pure)", () => {
   it("uuidV5 is deterministic and RFC-4122 shaped", () => {
     const a = uuidV5("tenant/app/Customer/cust-1", "3c1a2f60-9e4b-5d78-8a2c-f0b1d4e6c9a7");
@@ -120,6 +127,7 @@ describeIfDb("entity-mapping sync-runner (fixture app, zero rewrites)", () => {
         mapping: FIXTURE_MAPPING,
         records: [...FIXTURE_RECORDS],
         syncedBy: "sync-runner-test",
+        evidenceContext: EVIDENCE_CONTEXT,
       },
     );
     expect(result).toMatchObject({ created: 3, updated: 0, unchanged: 0 });
@@ -141,6 +149,11 @@ describeIfDb("entity-mapping sync-runner (fixture app, zero rewrites)", () => {
     });
     expect(upserts).toHaveLength(3);
     expect(upserts.every((e) => (e.payload as { op: string }).op === "created")).toBe(true);
+    for (const event of upserts) {
+      expect(
+        (event.payload as { evidenceContext: unknown }).evidenceContext,
+      ).toEqual(EVIDENCE_CONTEXT);
+    }
   });
 
   it("re-sync of identical records is a complete no-op (idempotent)", async () => {

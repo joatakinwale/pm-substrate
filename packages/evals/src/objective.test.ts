@@ -4,9 +4,11 @@ import {
   DEFAULT_BUSINESS_OPERABILITY_THRESHOLDS,
   OBJECTIVE_LAB_MEASUREMENT_SCHEMA_VERSION,
   ObjectiveLabMeasurementValidationError,
+  deriveObjectiveIntegrationEvidence,
   evaluateBusinessOperabilityObjective,
   foldObjectiveLabMeasurements,
   isObjectiveFinalVerdictPermitted,
+  objectiveEventContextMatchesMeasurement,
   parseObjectiveLabMeasurement,
   type BusinessOperabilityObjectiveInput,
   type ObjectiveLabMeasurement,
@@ -22,6 +24,7 @@ const measurement = (
   sourceRefs: [`artifact:${labId}:paired-runs`],
   runProvenance: {
     runManifestRef: `artifact:${labId}:run-manifest`,
+    boundaryConformanceRef: `artifact:${labId}:boundary-conformance`,
     appRevision: `${labId}@abc1234`,
     substrateRevision: "pm-substrate@def5678",
   },
@@ -308,5 +311,88 @@ describe("business-operability objective evidence", () => {
     expect(
       isObjectiveFinalVerdictPermitted("keep-with-scope-cut", "kill_or_repair"),
     ).toBe(false);
+  });
+
+  it("accepts integration evidence only for the exact measured run provenance", () => {
+    const measured = measurement("arrowhedge");
+
+    expect(
+      objectiveEventContextMatchesMeasurement(measured.runProvenance, measured),
+    ).toBe(true);
+    expect(
+      objectiveEventContextMatchesMeasurement(
+        { ...measured.runProvenance, appRevision: "arrowhedge@new-head" },
+        measured,
+      ),
+    ).toBe(false);
+    expect(
+      objectiveEventContextMatchesMeasurement(
+        { ...measured.runProvenance, boundaryConformanceRef: "" },
+        measured,
+      ),
+    ).toBe(false);
+    expect(objectiveEventContextMatchesMeasurement(null, measured)).toBe(false);
+  });
+
+  it("does not reuse historical integration receipts for a new measured revision", () => {
+    const measured = measurement("arrowhedge");
+    const historicalContext = {
+      ...measured.runProvenance,
+      appRevision: "arrowhedge@historical-head",
+    };
+    const historicalEvents = [
+      {
+        type: "pm.sync.upserted" as const,
+        payload: {
+          appName: "arrowhedge",
+          evidenceContext: historicalContext,
+        },
+      },
+      {
+        type: "pm.executor.dispatched" as const,
+        payload: {
+          target: "arrowhedge-api",
+          evidenceContext: historicalContext,
+        },
+      },
+    ];
+
+    expect(
+      deriveObjectiveIntegrationEvidence(measured, ["arrowhedge"], historicalEvents),
+    ).toEqual({ readAttached: false, governedActionDispatched: false });
+  });
+
+  it("derives read and action evidence only from matching app and run receipts", () => {
+    const measured = measurement("plugged_in_social");
+    const events = [
+      {
+        type: "pm.sync.upserted" as const,
+        payload: {
+          appName: "unrelated-app",
+          evidenceContext: measured.runProvenance,
+        },
+      },
+      {
+        type: "pm.sync.upserted" as const,
+        payload: {
+          appName: "plugged-in-social",
+          evidenceContext: measured.runProvenance,
+        },
+      },
+      {
+        type: "pm.executor.dispatched" as const,
+        payload: {
+          target: "stevie-actions",
+          evidenceContext: measured.runProvenance,
+        },
+      },
+    ];
+
+    expect(
+      deriveObjectiveIntegrationEvidence(measured, ["plugged", "stevie"], events),
+    ).toEqual({ readAttached: true, governedActionDispatched: true });
+    expect(
+      deriveObjectiveIntegrationEvidence(null, ["plugged"], events),
+    ).toEqual({ readAttached: false, governedActionDispatched: false });
   });
 });

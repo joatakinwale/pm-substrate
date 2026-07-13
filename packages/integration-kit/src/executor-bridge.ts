@@ -26,6 +26,11 @@ import type { ActionOutcomeEnvelope } from "@pm/agent-state-core";
 import type { EventPublisher, EventReader } from "@pm/events";
 import type { EntityId, TenantId } from "@pm/types";
 
+import {
+  parseIntegrationEvidenceContext,
+  type IntegrationEvidenceContext,
+} from "./evidence-context.js";
+
 export const EXECUTOR_DISPATCHED_EVENT_TYPE = "pm.executor.dispatched";
 export const EXECUTOR_REFUSED_EVENT_TYPE = "pm.executor.refused";
 export const EXECUTOR_FAILED_EVENT_TYPE = "pm.executor.failed";
@@ -47,6 +52,8 @@ export interface ExecuteAdmittedActionInput {
   readonly executedBy: string;
   /** Chain-of-custody grant; defaults to executedBy. */
   readonly authority?: string;
+  /** Revision/run binding consumed by the D6 objective gate. */
+  readonly evidenceContext?: IntegrationEvidenceContext;
   /** Action payload forwarded to the app (verbatim, under `body`). */
   readonly body?: Readonly<Record<string, unknown>>;
   /** Injectable for tests; defaults to global fetch. */
@@ -112,6 +119,10 @@ export async function executeAdmittedAction(
 ): Promise<ExecuteAdmittedActionResult> {
   const { envelope, target } = input;
   const authority = input.authority ?? input.executedBy;
+  const evidenceContext =
+    input.evidenceContext === undefined
+      ? undefined
+      : parseIntegrationEvidenceContext(input.evidenceContext);
   const entityId = dispatchEntityId(target.name, envelope.outcomeHash);
   const base = {
     tenantId: input.tenantId,
@@ -131,6 +142,7 @@ export async function executeAdmittedAction(
         target: target.name,
         terminalOutcome: envelope.terminalOutcome,
         blockingCauseCodes: envelope.blockingCauses.map((c) => c.code),
+        ...(evidenceContext === undefined ? {} : { evidenceContext }),
       },
     });
     return { executed: false, reason: "not_accepted" };
@@ -182,6 +194,7 @@ export async function executeAdmittedAction(
         target: target.name,
         endpoint: target.endpoint,
         reason: failure,
+        ...(evidenceContext === undefined ? {} : { evidenceContext }),
         ...(httpStatus !== undefined ? { httpStatus } : {}),
       },
     });
@@ -201,6 +214,7 @@ export async function executeAdmittedAction(
       actionId: envelope.actionId,
       target: target.name,
       endpoint: target.endpoint,
+      ...(evidenceContext === undefined ? {} : { evidenceContext }),
       ...(httpStatus !== undefined ? { httpStatus } : {}),
     },
   });

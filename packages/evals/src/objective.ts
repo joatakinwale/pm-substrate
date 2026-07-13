@@ -1,5 +1,5 @@
 export const OBJECTIVE_LAB_MEASUREMENT_SCHEMA_VERSION =
-  "pm.objective.lab-measured.v1" as const;
+  "pm.objective.lab-measured.v2" as const;
 
 export const BUSINESS_OPERABILITY_DIMENSIONS = [
   "technical_baseline",
@@ -58,11 +58,7 @@ export interface ObjectiveLabMeasurement {
   readonly labId: string;
   readonly observedAt: string;
   readonly sourceRefs: readonly string[];
-  readonly runProvenance: {
-    readonly runManifestRef: string;
-    readonly appRevision: string;
-    readonly substrateRevision: string;
-  };
+  readonly runProvenance: ObjectiveRunProvenance;
   readonly adoption: {
     readonly substratePackageEdits: number | null;
     readonly appRewriteRequired: boolean | null;
@@ -97,13 +93,30 @@ export interface ObjectiveLabMeasurement {
   };
 }
 
+export interface ObjectiveRunProvenance {
+  readonly runManifestRef: string;
+  readonly boundaryConformanceRef: string;
+  readonly appRevision: string;
+  readonly substrateRevision: string;
+}
+
 export interface ObjectiveLabEvidence {
   readonly labId: string;
-  /** Derived from admitted pm.sync.* events, never from the measurement file. */
+  /** Derived from an exact-provenance admitted pm.sync.* event. */
   readonly readAttached: boolean;
-  /** Derived from admitted pm.executor.dispatched events. */
+  /** Derived from an exact-provenance pm.executor.dispatched event. */
   readonly governedActionDispatched: boolean;
   readonly measurement: ObjectiveLabMeasurement | null;
+}
+
+export interface ObjectiveIntegrationEvidenceEvent {
+  readonly type: "pm.sync.upserted" | "pm.executor.dispatched";
+  readonly payload: Readonly<Record<string, unknown>>;
+}
+
+export interface ObjectiveDerivedIntegrationEvidence {
+  readonly readAttached: boolean;
+  readonly governedActionDispatched: boolean;
 }
 
 export interface ObjectiveTechnicalEvidence {
@@ -159,7 +172,9 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
 const isConcreteString = (value: unknown): value is string =>
-  isNonEmptyString(value) && !value.startsWith("replace-with:");
+  isNonEmptyString(value) &&
+  value === value.trim() &&
+  !value.startsWith("replace-with:");
 
 const isIsoTimestamp = (value: unknown): value is string =>
   isNonEmptyString(value) && Number.isFinite(Date.parse(value));
@@ -242,7 +257,12 @@ export function parseObjectiveLabMeasurement(
     "$.runProvenance",
     issues,
   );
-  for (const key of ["runManifestRef", "appRevision", "substrateRevision"]) {
+  for (const key of [
+    "runManifestRef",
+    "boundaryConformanceRef",
+    "appRevision",
+    "substrateRevision",
+  ]) {
     if (!isConcreteString(runProvenance[key])) {
       issues.push(
         `$.runProvenance.${key} must be a concrete, non-placeholder string`,
@@ -399,6 +419,73 @@ export function parseObjectiveLabMeasurement(
   return value as ObjectiveLabMeasurement;
 }
 
+/**
+ * Historical integration events are not evidence for a later app revision.
+ * The D6 fold accepts a sync/dispatch only when every run coordinate matches.
+ */
+export function objectiveEventContextMatchesMeasurement(
+  value: unknown,
+  measurement: ObjectiveLabMeasurement,
+): boolean {
+  if (!isRecord(value)) return false;
+  const expected = measurement.runProvenance;
+  return (
+    isConcreteString(value["runManifestRef"]) &&
+    value["runManifestRef"] === expected.runManifestRef &&
+    isConcreteString(value["boundaryConformanceRef"]) &&
+    value["boundaryConformanceRef"] === expected.boundaryConformanceRef &&
+    isConcreteString(value["appRevision"]) &&
+    value["appRevision"] === expected.appRevision &&
+    isConcreteString(value["substrateRevision"]) &&
+    value["substrateRevision"] === expected.substrateRevision
+  );
+}
+
+/**
+ * Derive the two integration facts from admitted receipts. Name fragments are
+ * supplied by the app profile; the evaluator remains app-agnostic. An event
+ * only counts when both its app/target name and all four provenance
+ * coordinates match the measurement under evaluation.
+ */
+export function deriveObjectiveIntegrationEvidence(
+  measurement: ObjectiveLabMeasurement | null,
+  appNameFragments: readonly string[],
+  events: readonly ObjectiveIntegrationEvidenceEvent[],
+): ObjectiveDerivedIntegrationEvidence {
+  if (measurement === null) {
+    return { readAttached: false, governedActionDispatched: false };
+  }
+
+  const normalizedFragments = appNameFragments
+    .map((fragment) => fragment.trim().toLowerCase())
+    .filter((fragment) => fragment.length > 0);
+  const matchesName = (value: unknown): boolean =>
+    typeof value === "string" &&
+    normalizedFragments.some((fragment) =>
+      value.toLowerCase().includes(fragment),
+    );
+  const matchesRun = (event: ObjectiveIntegrationEvidenceEvent): boolean =>
+    objectiveEventContextMatchesMeasurement(
+      event.payload["evidenceContext"],
+      measurement,
+    );
+
+  return {
+    readAttached: events.some(
+      (event) =>
+        event.type === "pm.sync.upserted" &&
+        matchesName(event.payload["appName"]) &&
+        matchesRun(event),
+    ),
+    governedActionDispatched: events.some(
+      (event) =>
+        event.type === "pm.executor.dispatched" &&
+        matchesName(event.payload["target"]) &&
+        matchesRun(event),
+    ),
+  };
+}
+
 /** Latest valid measurement per lab; invalid evidence is counted, never trusted. */
 export function foldObjectiveLabMeasurements(
   payloads: readonly unknown[],
@@ -503,10 +590,12 @@ export function evaluateBusinessOperabilityObjective(
       continue;
     }
     if (!lab.readAttached) {
-      adoptionGaps.push(`${labId}: no admitted read attachment`);
+      adoptionGaps.push(`${labId}: no revision-bound admitted read attachment`);
     }
     if (!lab.governedActionDispatched) {
-      governanceGaps.push(`${labId}: no governed action was dispatched`);
+      governanceGaps.push(
+        `${labId}: no revision-bound governed action was dispatched`,
+      );
     }
 
     const measurement = lab.measurement;

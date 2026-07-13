@@ -37,6 +37,11 @@ import type { EventPublisher } from "@pm/events";
 import type { CreateNodeResult, GraphReader, GraphWriter } from "@pm/graph";
 import type { EntityId, TenantId } from "@pm/types";
 
+import {
+  parseIntegrationEvidenceContext,
+  type IntegrationEvidenceContext,
+} from "./evidence-context.js";
+
 export const SYNC_UPSERTED_EVENT_TYPE = "pm.sync.upserted";
 export const SYNC_REJECTED_EVENT_TYPE = "pm.sync.rejected";
 
@@ -71,6 +76,8 @@ export interface EntityMappingSyncInput {
   readonly syncedBy: string;
   /** Chain-of-custody grant; defaults to syncedBy. */
   readonly authority?: string;
+  /** Revision/run binding consumed by the D6 objective gate. */
+  readonly evidenceContext?: IntegrationEvidenceContext;
   /**
    * Shadow mode (hard req 5): compute the full verdict — created/updated/
    * unchanged/edges/rejections — with ZERO writes and ZERO events. Reads
@@ -158,6 +165,10 @@ export async function runEntityMappingSync(
 
   const authority = input.authority ?? input.syncedBy;
   const dryRun = input.dryRun ?? false;
+  const evidenceContext =
+    input.evidenceContext === undefined
+      ? undefined
+      : parseIntegrationEvidenceContext(input.evidenceContext);
   let created = 0;
   let updated = 0;
   let unchanged = 0;
@@ -245,6 +256,7 @@ export async function runEntityMappingSync(
             sourceName: record.sourceName,
             externalId: record.externalId,
             reason,
+            ...(evidenceContext === undefined ? {} : { evidenceContext }),
           },
         });
       }
@@ -265,6 +277,7 @@ export async function runEntityMappingSync(
         nodeId,
         op,
         identityHash,
+        ...(evidenceContext === undefined ? {} : { evidenceContext }),
       },
     });
   }
@@ -338,6 +351,7 @@ export async function runEntityMappingSync(
             edgeKey: edge.edgeKey,
             edgeType: edgeInput.type,
             toId,
+            ...(evidenceContext === undefined ? {} : { evidenceContext }),
           },
         });
       } catch (error) {
@@ -362,6 +376,7 @@ export async function runEntityMappingSync(
               externalId: record.externalId,
               edgeKey: edge.edgeKey,
               reason,
+              ...(evidenceContext === undefined ? {} : { evidenceContext }),
             },
           });
         }

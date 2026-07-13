@@ -92,7 +92,7 @@ pnpm vitest run \
 
 Time-to-plugin · substrate edit count (target: zero) · mapping coverage · validator rejection rate · evidence coverage · state disagreement rate · stale action rate · agent resume success · replay fidelity · unauthorized action block rate · cross-tool outcome success · mean time to reconcile.
 
-Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. `pm.objective.lab-measured.v1` now instruments time-to-first-value, substrate edit count, app rewrite, mapping coverage, correct outcomes, write-path coverage, false positives/negatives, cost, owner minutes, holdouts, and acceptance. D6 still has to collect and admit those measurements from the two real labs; a schema with no evidence is a gap, not a pass.
+Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. `pm.objective.lab-measured.v2` now instruments time-to-first-value, substrate edit count, app rewrite, mapping coverage, correct outcomes, write-path coverage, false positives/negatives, cost, owner minutes, holdouts, and acceptance. The v2 measurement binds those claims to a run manifest, boundary-conformance artifact, app revision, and substrate revision; read/action receipts must match all four coordinates. D6 still has to collect and admit those measurements from the two real labs; a schema with no evidence is a gap, not a pass.
 
 ## Business-operability gate
 
@@ -258,7 +258,7 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 
 ## Changelog
 
-- **2026-07-13** — separated technical substrate viability from business operability; added the admitted `pm.objective.lab-measured.v1` scorecard, matched outcome/cost/owner-effort thresholds, held-out/production-like requirements, and D7 verdict ceilings.
+- **2026-07-13** — separated technical substrate viability from business operability; added the admitted `pm.objective.lab-measured.v2` scorecard, matched outcome/cost/owner-effort thresholds, held-out/production-like requirements, exact revision/run-bound integration receipts, and D7 verdict ceilings.
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).

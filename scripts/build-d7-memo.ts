@@ -16,11 +16,13 @@ import pg from "pg";
 
 import {
   DEFAULT_BUSINESS_OPERABILITY_THRESHOLDS,
+  deriveObjectiveIntegrationEvidence,
   evaluateBusinessOperabilityObjective,
   foldObjectiveLabMeasurements,
   isObjectiveFinalVerdictPermitted,
   type ObjectiveFinalVerdict,
   type ObjectiveLabEvidence,
+  type ObjectiveIntegrationEvidenceEvent,
 } from "../packages/evals/src/index.js";
 import { PostgresEventStore } from "../packages/events/src/index.js";
 import {
@@ -35,6 +37,10 @@ const AGENT = process.env["PM_DEV_AGENT_ID"] ?? "joat-dev";
 const SCOPE = process.env["PM_DEV_SCOPE"] ?? "pm-substrate-dev";
 const OUT_PATH = resolve(import.meta.dirname, "../docs/d7-keep-kill-memo.md");
 const REQUIRED_LAB_IDS = ["plugged_in_social", "arrowhedge"] as const;
+const LAB_EVIDENCE_MATCHERS = {
+  plugged_in_social: ["plugged", "stevie"],
+  arrowhedge: ["arrowhedge"],
+} as const;
 
 /** Evidence coordinates with the password redacted — every snapshot self-describes. */
 function describeDatabase(url: string): string {
@@ -78,19 +84,11 @@ async function computeEvidenceFlags(
   readonly l5ReadAttach: boolean;
   readonly governedWrite: boolean;
   readonly liveMcp: boolean;
-  readonly arrowHedgeReadAttach: boolean;
-  readonly pluggedInSocialReadAttach: boolean;
-  readonly arrowHedgeGovernedAction: boolean;
-  readonly pluggedInSocialGovernedAction: boolean;
 }> {
   const evidence = await pool.query<{
     l5_read_attach: boolean;
     governed_write: boolean;
     live_mcp: boolean;
-    arrowhedge_read_attach: boolean;
-    plugged_in_social_read_attach: boolean;
-    arrowhedge_governed_action: boolean;
-    plugged_in_social_governed_action: boolean;
   }>(
     `SELECT
        EXISTS (
@@ -119,31 +117,7 @@ async function computeEvidenceFlags(
             AND type = 'pm.mcp.action'
             AND payload->>'terminalOutcome' = 'accepted'
             AND (payload->>'executed')::boolean = true
-       ) AS live_mcp,
-       EXISTS (
-         SELECT 1 FROM events.events
-          WHERE tenant_id = $1
-            AND type = 'pm.sync.upserted'
-            AND lower(payload->>'appName') LIKE '%arrowhedge%'
-       ) AS arrowhedge_read_attach,
-       EXISTS (
-         SELECT 1 FROM events.events
-          WHERE tenant_id = $1
-            AND type = 'pm.sync.upserted'
-            AND lower(payload->>'appName') LIKE '%plugged%'
-       ) AS plugged_in_social_read_attach,
-       EXISTS (
-         SELECT 1 FROM events.events
-          WHERE tenant_id = $1
-            AND type = 'pm.executor.dispatched'
-            AND lower(payload->>'target') LIKE '%arrowhedge%'
-       ) AS arrowhedge_governed_action,
-       EXISTS (
-         SELECT 1 FROM events.events
-          WHERE tenant_id = $1
-            AND type = 'pm.executor.dispatched'
-            AND lower(payload->>'target') LIKE '%plugged%'
-       ) AS plugged_in_social_governed_action`,
+       ) AS live_mcp`,
     [tenantId],
   );
   const row = evidence.rows[0]!;
@@ -151,11 +125,22 @@ async function computeEvidenceFlags(
     l5ReadAttach: row.l5_read_attach,
     governedWrite: row.governed_write,
     liveMcp: row.live_mcp,
-    arrowHedgeReadAttach: row.arrowhedge_read_attach,
-    pluggedInSocialReadAttach: row.plugged_in_social_read_attach,
-    arrowHedgeGovernedAction: row.arrowhedge_governed_action,
-    pluggedInSocialGovernedAction: row.plugged_in_social_governed_action,
   };
+}
+
+async function readObjectiveIntegrationEvents(
+  pool: pg.Pool,
+  tenantId: TenantId,
+): Promise<readonly ObjectiveIntegrationEvidenceEvent[]> {
+  const result = await pool.query<ObjectiveIntegrationEvidenceEvent>(
+    `SELECT type, payload
+       FROM events.events
+      WHERE tenant_id = $1
+        AND type IN ('pm.sync.upserted', 'pm.executor.dispatched')
+      ORDER BY seq ASC`,
+    [tenantId],
+  );
+  return result.rows;
 }
 
 interface LiveLabEvidence {
@@ -223,19 +208,32 @@ async function main(): Promise<void> {
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
     const events = new PostgresEventStore(pool);
-    const [m, shadow, adapters, evidence, lab, objectiveMeasurementEvents] =
+    const [
+      m,
+      shadow,
+      adapters,
+      evidence,
+      lab,
+      objectiveMeasurementEvents,
+      objectiveIntegrationEvents,
+    ] =
       await Promise.all([
-      computeLoopMetrics(pool, { tenantId: TENANT, agentId: AGENT, scope: SCOPE }),
-      buildShadowReport(events, { tenantId: TENANT }),
-      listExternalAdapters(events, TENANT),
-      computeEvidenceFlags(pool, TENANT),
-      summarizeLiveLabEvidence(pool),
-      events.read({
-        tenantId: TENANT,
-        typePattern: "pm.objective.lab-measured",
-        limit: 1000,
-      }),
-    ]);
+        computeLoopMetrics(pool, {
+          tenantId: TENANT,
+          agentId: AGENT,
+          scope: SCOPE,
+        }),
+        buildShadowReport(events, { tenantId: TENANT }),
+        listExternalAdapters(events, TENANT),
+        computeEvidenceFlags(pool, TENANT),
+        summarizeLiveLabEvidence(pool),
+        events.read({
+          tenantId: TENANT,
+          typePattern: "pm.objective.lab-measured",
+          limit: 1000,
+        }),
+        readObjectiveIntegrationEvents(pool, TENANT),
+      ]);
 
     const measurementFold = foldObjectiveLabMeasurements(
       objectiveMeasurementEvents.map((event) => event.payload),
@@ -246,20 +244,20 @@ async function main(): Promise<void> {
         measurement,
       ]),
     );
-    const objectiveLabs: ObjectiveLabEvidence[] = [
-      {
-        labId: "plugged_in_social",
-        readAttached: evidence.pluggedInSocialReadAttach,
-        governedActionDispatched: evidence.pluggedInSocialGovernedAction,
-        measurement: measurementByLab.get("plugged_in_social") ?? null,
+    const objectiveLabs: ObjectiveLabEvidence[] = REQUIRED_LAB_IDS.map(
+      (labId) => {
+        const measurement = measurementByLab.get(labId) ?? null;
+        return {
+          labId,
+          measurement,
+          ...deriveObjectiveIntegrationEvidence(
+            measurement,
+            LAB_EVIDENCE_MATCHERS[labId],
+            objectiveIntegrationEvents,
+          ),
+        };
       },
-      {
-        labId: "arrowhedge",
-        readAttached: evidence.arrowHedgeReadAttach,
-        governedActionDispatched: evidence.arrowHedgeGovernedAction,
-        measurement: measurementByLab.get("arrowhedge") ?? null,
-      },
-    ];
+    );
     const objective = evaluateBusinessOperabilityObjective({
       requiredLabIds: REQUIRED_LAB_IDS,
       thresholds: DEFAULT_BUSINESS_OPERABILITY_THRESHOLDS,
@@ -383,7 +381,7 @@ Technical activity is necessary but cannot prove that either lab is worth operat
 
 ${objectiveDimensionText}
 
-Record or update a source-cited lab measurement with \`pnpm pm:objective -- record <measurement.json>\`. Read attachment and governed action dispatch are independently derived from the admitted event log; the measurement cannot self-assert them.
+Record or update a source-cited lab measurement with \`pnpm pm:objective -- record <measurement.json>\`. Read attachment and governed action dispatch are independently derived from admitted events carrying an exact match for the run manifest, boundary conformance, app revision, and substrate revision; the measurement cannot self-assert them or reuse a historical rehearsal.
 
 ## 7 · Technical evidence gaps before the gate
 

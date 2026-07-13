@@ -36,6 +36,7 @@ const template = (labId: string): ObjectiveLabMeasurement => ({
   sourceRefs: ["replace-with:artifact-or-event-ref"],
   runProvenance: {
     runManifestRef: "replace-with:run-manifest-ref",
+    boundaryConformanceRef: "replace-with:boundary-conformance-ref",
     appRevision: "replace-with:app-revision",
     substrateRevision: "replace-with:substrate-revision",
   },
