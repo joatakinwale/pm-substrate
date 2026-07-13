@@ -112,6 +112,32 @@ describe("three-axis coverage gate", () => {
     expect(report.complete).toBe(false);
     expect(report.verified).toBe(false);
   });
+
+  it("does not treat a duplicated or imbalanced arm group as a complete pair", () => {
+    const pair = pairedEvents({
+      axis: "local_lab",
+      failureClass: "stale_observation",
+      scenarioId: "duplicate-stale-observation",
+      substrateResult: "pass",
+      evidenceStage: "live_run",
+      actionOutcomeRefs: true,
+    });
+    const duplicated = analyzeThreeAxisCoverage([...pair, pair[0]]);
+    const duplicatedCell = duplicated.byCell.local_lab.stale_observation;
+
+    expect(duplicatedCell.pairedGroups).toBe(1);
+    expect(duplicatedCell.completePairedGroups).toBe(0);
+    expect(duplicatedCell.protectivePairs).toBe(0);
+    expect(duplicatedCell.covered).toBe(false);
+    expect(duplicatedCell.reasons).toContain("missing_complete_pair");
+
+    const imbalanced = analyzeThreeAxisCoverage([pair[0]]);
+    expect(imbalanced.byCell.local_lab.stale_observation).toMatchObject({
+      completePairedGroups: 0,
+      protectivePairs: 0,
+      covered: false,
+    });
+  });
 });
 
 function pairedEvents(input: {

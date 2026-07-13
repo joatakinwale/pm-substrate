@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "pm.public-proof-run-register.v1",
+  "recordedAt": "2026-07-13T18:30:00.000Z",
+  "claimBoundary": "Digest and failure register only. Entries classified as conformance or qualification do not establish public agent efficacy.",
+  "toolSandboxProviderFailure": {
+    "classification": "provider-failed-derivative-attempt-not-efficacy",
+    "upstreamRevision": "165848b9a78cead7ca7fe7c89c688b58e6501219",
+    "corpusHash": "0166e8e4f0e6b955a84401e3ba45304b876409d8fcea2cc286a5a607e40546ef",
+    "manifestHash": "dcfdd1702ff552d7ef6026e73fadc3f694ba566204be3461f551acb9ddcbee79",
+    "batchId": "live-20260713-1241",
+    "batchHash": "a7ff4e24c7303dcc740163d4a84b3b828ca830b1e1e7264cfb948356dd7f0c4e",
+    "batchFileSha256": "c7063b76090647f3c9c602ef1755cb75da0d49174886af6f9b1eb21db801addc",
+    "evaluationTrack": "restart_lost_response_derivative",
+    "headlineEligible": false,
+    "randomizationSeed": "live-preregistered-seed-20260713",
+    "armOrder": ["substrate", "native", "sham"],
+    "terminalCondition": "OpenAI 429 insufficient_quota before first action in every arm",
+    "attempts": [
+      {
+        "arm": "substrate",
+        "attemptId": "live-20260713-1241-substrate-001",
+        "receiptHash": "7ca3ae02c457d0ccfd81192b4e75ae94412d9d5bf6d329984fffcbfe5e9b8024",
+        "strictTaskSuccess": false,
+        "faultStatus": "trigger_not_reached"
+      },
+      {
+        "arm": "native",
+        "attemptId": "live-20260713-1241-native-001",
+        "receiptHash": "426bd1a89ed5407d3d2ce43445f6d421980c71ca0fa0362d1152f750cac009db",
+        "strictTaskSuccess": false,
+        "faultStatus": "trigger_not_reached"
+      },
+      {
+        "arm": "sham",
+        "attemptId": "live-20260713-1241-sham-001",
+        "receiptHash": "32d99b895795dbc2e663deeb168e366c14f1f29d2e7676c1d5faa92e5c9ce399",
+        "strictTaskSuccess": false,
+        "faultStatus": "trigger_not_reached"
+      }
+    ],
+    "rawArtifactLocationAtCapture": "/tmp/pm-toolsandbox-matched-live-20260713-1241",
+    "rawArtifactDurability": "session-local; full batch and member hashes are preserved here, but this failed attempt is not a D7 evidence credential",
+    "currentVerifierStatus": "rejected by raw-verification.v2; the original raw bytes are not durable/content-resolved and the batch lacks provider, real-sidecar, exact task/oracle, usage/cost/latency, OS-restart, and independent-trust receipts",
+    "eligiblePublicEvalAttemptArtifacts": 0
+  },
+  "stateBenchQualification": {
+    "classification": "adapter-conformance-no-official-output",
+    "upstreamRevision": "fd980728da482af21f0d33406aea0ac499645125",
+    "trainCorpusSha256": "77de6f66fa84837df2a44fd5bcc61cebdd0da5117db90e99de59ab1a956f38f0",
+    "officialScoredTrajectories": 0,
+    "requiredOfficialScoredTrajectories": 2250,
+    "pinnedUpstreamTestResult": "148 passed, 1 live skipped",
+    "adapterFocusedTestResult": "11 passed",
+    "currentEvidenceClass": "official_output_shape_and_procedure_conformance_only",
+    "publicEvalConversion": "fail-closed; zero eligible attempts",
+    "missingEvidenceClasses": [
+      "official_runner_receipt",
+      "agent_provider_request_response_receipt",
+      "simulator_provider_request_response_receipt",
+      "judge_provider_request_response_receipt",
+      "usage_cost_latency_receipt"
+    ]
+  },
+  "cornerQualifications": [
+    {
+      "cornerId": "memoryagentbench-factconsolidation-6k",
+      "manifestSha256": "fae1306b5c7c9b42358a53ac5f1a2e977d68be288093766f837d1053e0b72525",
+      "sourceVerificationSha256": "57a7aa2c2c6520a64fec11a3a5d3fc7ea0c387ba65db937cf196738139c70f19",
+      "stdoutSha256": "a02992133be67554ff5e5d53466cba81e94cadb45d709bb33674bf56a5447b16",
+      "stderrSha256": "12f4f8d701b28e2e7cf847000ecf6eeb006340991ef94ed5a772997ddcf3433c",
+      "receiptHash": "399b253402aec2fa3901c9f1cbcd4a7e2450decfbe78c0450e0fd93b3ea04ea6",
+      "efficacyClaimed": false
+    },
+    {
+      "cornerId": "tau2-airline-32",
+      "manifestSha256": "181c0a4cc633ecd53ad3e544e015479533e9d6f856c6d726ccd0c7c8cee55a96",
+      "sourceVerificationSha256": "9850f96792959cfa0075dd43cf8aa047b6888e94a8c83ff6f0895ef72bfa0d45",
+      "stdoutSha256": "eb4655fbdbd1f67534ae136b81567dfea2fb9f0a7f6a929d4331c5202390f8ae",
+      "stderrSha256": "08f792a2d706edb6f5a06e4ae09f0198c7c22626841d2728ab068a977f97dc60",
+      "receiptHash": "89c5fa8589e939bc6d26c9fabfe9c474bc00822319bd5c99da9a3cf5adfbb035",
+      "efficacyClaimed": false
+    },
+    {
+      "cornerId": "sentinel-microhub-stars",
+      "manifestSha256": "6047c57496c28bf1ba542aea21d69fc2daa75cce1d10a624c6797a8c7db9b47e",
+      "sourceVerificationSha256": "15fb439640ceca499fb0529cae9eabdec7879369cca25bff6976cb00808676b3",
+      "stdoutSha256": "91d4ff33e74e038081d3b0f7d315363ee5a6f392fe3123269b92a20608595026",
+      "stderrSha256": "130e1164c1bfd15f48c62e449f041c7606994910c640f310586c764a15c63946",
+      "receiptHash": "3a80a27b5f6c30f02af98435c5b692ab16660fe1c81722b71ef2755c61c5327a",
+      "efficacyClaimed": false
+    },
+    {
+      "cornerId": "appworld-22cc237_2",
+      "manifestSha256": "8c72961e14916b6a8dcfb82af853765d096a22abe851627ef4bfb3a2f82e109e",
+      "sourceVerificationSha256": "c9c893465f3dae98a6f4982bbb111d833fc73569a7eeea6d017213d667e70221",
+      "stdoutSha256": "37af2b4d17610829e1bad3f0eb3e17cedc1ebd40f8a258588b8ee92832ee7695",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receiptHash": "febefba76d5b99f2c68adc60d065f12a7479fc9e92667b4f24340c3c977fb5e0",
+      "efficacyClaimed": false
+    }
+  ],
+  "cornerBehavioralHarness": {
+    "classification": "matched-arm-harness-conformance-no-behavioral-efficacy",
+    "focusedTestResult": "24 passed",
+    "matchingBoundary": "one shared runner/config/model/supporting-file identity; exact typed treatment deltas; recomputed matching proof",
+    "oracleBoundary": "fresh neutral temporary view with task output only; no declared arm/treatment metadata",
+    "oracleInvocationVerification": "not independently verified; local plans, receipts, and verifier results are always analysis-ineligible",
+    "behavioralTripletsExecuted": 0,
+    "residualLimit": "not an OS sandbox; independent review/provider receipts must rule out host inspection, order inference, covert channels, and false pinned-oracle invocation"
+  },
+  "d7EvidenceGate": {
+    "classification": "signed-structured-assertions-diagnostic-only-no-current-eligibility-path",
+    "focusedTestResult": "30 passed",
+    "manifestSelection": "selectionCount plus exact deterministic SHA-256 top-ranked confirmatory/replication subset",
+    "evidenceResolution": "evidence schema v2; one canonical structured observation per required check; evaluator-recomputed subject plus strict kind/check/procedure/fact schema; opaque, missing, irrelevant, unsupported, unresolved, unreferenced, and claim/result-mismatched evidence rejected; self-consistent facts remain ineligible because current generic procedures do not derive them from bound raw records",
+    "semanticEvidenceAuthority": "signed_structured_assertions_diagnostic_only",
+    "semanticDerivationStatus": "adapter_specific_raw_derivation_not_implemented",
+    "possibleStatuses": [
+      "not_eligible"
+    ],
+    "futureReservedStatus": "evidence_eligible_under_supplied_policy",
+    "ownerAuthorizationRequired": true,
+    "operationalKeepOutputExists": false,
+    "externalTrustAnchorPresent": false
+  },
+  "continuityRepair": {
+    "classification": "observed-dogfood-failure-driven-repair-not-public-efficacy",
+    "mergeCheckpointId": "chk_26e6a15f-890e-4339-883c-bf48cb1fca58",
+    "mergeCheckpointContentHash": "e38484ff05e819085db349342869bb9a75d3fd0b816650154385b97dc075cac4",
+    "preservedMergedHeadHash": "96fbdbd9abf747974619dadbc5add099bfd072467f2ef12eced5540063ef4ca4"
+  }
+}

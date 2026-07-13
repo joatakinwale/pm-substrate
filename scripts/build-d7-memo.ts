@@ -1,13 +1,13 @@
 /**
- * pm:memo — render the D7 keep/kill memo from live evidence (the 07-16 gate).
+ * pm:memo — render the D7 public-proof decision memo from verified evidence.
  *
  *   pnpm pm:memo            # writes docs/d7-keep-kill-memo.md
  *   pnpm pm:memo -- --stdout
  *
- * Numbers come from the SAME folds the loop watches (scripts/loop-metrics.ts
- * + buildShadowReport + the adapter registry) — regenerating before the gate
- * refreshes evidence without touching the verdict slots, which are the
- * owner's to fill.
+ * Ledger numbers come from the same folds the loop watches. Public efficacy
+ * can enter only through a hash-verified decision bundle with all six
+ * externally authenticated verification receipts; repository-authored conformance and app
+ * scorecards remain separate evidence layers.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -19,13 +19,21 @@ import {
   deriveObjectiveIntegrationEvidence,
   evaluateBusinessOperabilityObjective,
   foldObjectiveLabMeasurements,
-  isObjectiveFinalVerdictPermitted,
   parseObjectiveLabMeasurement,
-  type ObjectiveFinalVerdict,
+  summarizeLocalAgentLabMechanismEvidence,
+  type EvalEvent,
+  type LocalAgentLabMechanismEvidenceSummary,
   type ObjectiveLabEvidence,
   type ObjectiveLabMeasurement,
   type ObjectiveIntegrationEvidenceEvent,
 } from "../packages/evals/src/index.js";
+import {
+  analyzePublicEval,
+  evaluatePublicEvalDecisionBundle,
+  type PublicEvalAnalysisReport,
+  type PublicEvalDecisionBundleInput,
+  type PublicEvalDecisionReport,
+} from "../packages/public-eval-analysis/src/index.js";
 import { PostgresEventStore } from "../packages/events/src/index.js";
 import {
   buildShadowReport,
@@ -55,29 +63,119 @@ function describeDatabase(url: string): string {
   }
 }
 
-function readExistingVerdict(): string {
-  const fallback = `- **Keep / kill / keep-with-scope-cut:** _(pending)_
-- **If keep:** next falsification window and its criteria: _(pending)_
-- **If kill:** what gets salvaged (kit? ledger? MCP surface?): _(pending)_`;
-  try {
-    const existing = readFileSync(OUT_PATH, "utf8");
-    // Match by suffix, not section number — the verdict section renumbers as
-    // evidence sections are added.
-    const marker = "· Verdict (hand-written at the gate — owner + agent)";
-    const index = existing.indexOf(marker);
-    if (index === -1) return fallback;
-    const body = existing.slice(index + marker.length).trim();
-    return body.length > 0 ? body : fallback;
-  } catch {
-    return fallback;
-  }
+interface PublicEvidenceInput {
+  readonly analysis: PublicEvalAnalysisReport | null;
+  readonly decision: PublicEvalDecisionReport | null;
+  readonly source: "none" | "analysis_only" | "decision_bundle";
 }
 
-function parseFinalVerdict(text: string): ObjectiveFinalVerdict | null {
-  const match = text.match(
-    /\*\*Keep \/ kill \/ keep-with-scope-cut:\*\*\s*(keep-with-scope-cut|keep|kill)\b/,
+function argumentValue(flag: string, environmentVariable: string): string | null {
+  const argumentIndex = process.argv.indexOf(flag);
+  const value =
+    (argumentIndex === -1 ? undefined : process.argv[argumentIndex + 1]) ??
+    process.env[environmentVariable];
+  return value === undefined || value.trim() === "" ? null : value;
+}
+
+function readPublicEvidence(): PublicEvidenceInput {
+  const decisionPath = argumentValue(
+    "--public-decision-bundle",
+    "PM_PUBLIC_EVAL_DECISION_BUNDLE",
   );
-  return (match?.[1] as ObjectiveFinalVerdict | undefined) ?? null;
+  const analysisPath = argumentValue(
+    "--public-analysis",
+    "PM_PUBLIC_EVAL_ANALYSIS_INPUT",
+  );
+  if (decisionPath !== null && analysisPath !== null) {
+    throw new Error(
+      "supply either --public-decision-bundle or --public-analysis, not both",
+    );
+  }
+  if (decisionPath !== null) {
+    const trustPolicyPath = argumentValue(
+      "--public-trust-policy",
+      "PM_PUBLIC_EVAL_TRUST_POLICY",
+    );
+    const expectedTrustPolicyHash = argumentValue(
+      "--public-trust-policy-hash",
+      "PM_PUBLIC_EVAL_TRUST_POLICY_SHA256",
+    );
+    if (trustPolicyPath === null || expectedTrustPolicyHash === null) {
+      throw new Error(
+        "a decision bundle requires --public-trust-policy and an out-of-band --public-trust-policy-hash",
+      );
+    }
+    const input = JSON.parse(
+      readFileSync(resolve(decisionPath), "utf8"),
+    ) as PublicEvalDecisionBundleInput;
+    const trustPolicy = JSON.parse(
+      readFileSync(resolve(trustPolicyPath), "utf8"),
+    ) as unknown;
+    const decision = evaluatePublicEvalDecisionBundle(
+      input,
+      trustPolicy,
+      expectedTrustPolicyHash,
+    );
+    return { analysis: decision.analysis, decision, source: "decision_bundle" };
+  }
+  if (analysisPath !== null) {
+    const input = JSON.parse(
+      readFileSync(resolve(analysisPath), "utf8"),
+    ) as Parameters<typeof analyzePublicEval>[0];
+    return {
+      analysis: analyzePublicEval(input),
+      decision: null,
+      source: "analysis_only",
+    };
+  }
+  return { analysis: null, decision: null, source: "none" };
+}
+
+function publicDecision(evidence: PublicEvidenceInput): {
+  readonly status:
+    | "unproven"
+    | "failed"
+    | "confirmatory_only"
+    | "owner_authorization_required";
+  readonly text: string;
+} {
+  if (evidence.decision === null) {
+    return {
+      status: "unproven",
+      text:
+        evidence.source === "analysis_only"
+          ? "A statistical analysis was supplied, but analysis alone cannot authorize KEEP. The exact attempt set still lacks the complete, bound independent-verification bundle."
+          : "No verified public evidence bundle was supplied. Harness and conformance work cannot decide efficacy.",
+    };
+  }
+  if (evidence.decision.evidenceEligibleUnderSuppliedPolicy) {
+    return {
+      status: "owner_authorization_required",
+      text: "EVIDENCE ELIGIBLE UNDER THE SUPPLIED POLICY, NOT KEEP: sealed confirmation, distinct-model replication, preregistration/timestamp bindings, and all six signed verification receipts passed the automated checks. The report is evidence only; a separate owner authorization over this exact report hash is still required before any operational consequence.",
+    };
+  }
+  const report = evidence.decision.analysis;
+  if (report.confirmatoryPassed) {
+    return {
+      status: report.replicationPassed ? "failed" : "confirmatory_only",
+      text: report.replicationPassed
+        ? `NOT ELIGIBLE: statistical confirmation and replication passed, but the evidence-verification gate failed (${evidence.decision.reasons.join("; ")}). Do not resume app transfer work.`
+        : "UNPROVEN: confirmation passed, but distinct-model replication did not pass the complete decision gate. Do not resume app transfer work.",
+    };
+  }
+  return {
+    status: "failed",
+    text: "REPAIR, NARROW, OR KILL the current causal claim: the sealed confirmatory phase failed at least one frozen decision criterion.",
+  };
+}
+
+function renderPublicPhase(
+  report: PublicEvalAnalysisReport | null,
+  phase: "qualification" | "confirmatory" | "replication",
+): string {
+  const result = report?.phases[phase];
+  if (result == null) return `- **${phase}:** no verified phase report supplied`;
+  return `- **${phase}:** ${result.decision.status} · ${result.taskCount} task(s) · ${result.exactArmTriples} exact native/sham/substrate trio(s) · strict-completion lift **${result.primary.lift.toFixed(4)}** · reliable-task lift **${result.reliableTaskSuccessLift.toFixed(4)}** · paired CI [${result.primary.pairedBootstrap.low.toFixed(4)}, ${result.primary.pairedBootstrap.high.toFixed(4)}] · cost ratio ${result.unitEconomics.costPerStrictSuccessRatio?.toFixed(4) ?? "not comparable"} · latency ratio ${result.unitEconomics.latencyPerStrictSuccessRatio?.toFixed(4) ?? "not comparable"}${result.decision.reasons.length > 0 ? ` · ${result.decision.reasons.join("; ")}` : ""}`;
 }
 
 async function computeEvidenceFlags(
@@ -146,59 +244,67 @@ async function readObjectiveIntegrationEvents(
   return result.rows;
 }
 
-interface LiveLabEvidence {
+interface LiveLabEvidence extends LocalAgentLabMechanismEvidenceSummary {
   readonly runDate: string;
   readonly model: string;
-  readonly scenarios: number;
-  readonly baselineFailed: number;
-  readonly baselinePassed: number;
-  readonly substrateBlocked: number;
-  readonly substratePassed: number;
+  readonly suiteRunId: string | null;
 }
 
 /**
- * Latest live local-agent-lab run (Axis C), paired baseline vs substrate.
- * Lab runs use throwaway per-world tenants, so this folds by axis + the most
- * recent run date rather than by the dev tenant.
+ * Latest identified local-agent-lab mechanism suite. Unlike the previous
+ * date-level count fold, this reopens raw EvalEvents and lets only exact,
+ * uniquely identified two-arm attempts contribute. Legacy date aggregates
+ * remain visible but cannot produce a passing evidence summary.
  */
 async function summarizeLiveLabEvidence(
   pool: pg.Pool,
 ): Promise<LiveLabEvidence | null> {
+  const latestIdentified = await pool.query<{
+    suite_run_id: string;
+  }>(
+    `SELECT event->>'suiteRunId' AS suite_run_id
+       FROM evals.eval_events
+      WHERE axis = 'local_lab'
+        AND event->>'evidenceStage' = 'live_run'
+        AND nullif(event->>'suiteRunId', '') IS NOT NULL
+      ORDER BY observed_at DESC, id DESC
+      LIMIT 1`,
+  );
+  const suiteRunId = latestIdentified.rows[0]?.suite_run_id ?? null;
   const { rows } = await pool.query<{
-    run_arm: string;
-    result: string;
-    n: string;
-    scenarios: string;
+    event: EvalEvent;
     source: string;
     run_date: string;
   }>(
-    `WITH latest AS (
-       SELECT max(observed_at)::date AS d FROM evals.eval_events WHERE axis = 'local_lab'
-     )
-     SELECT e.run_arm, e.result, count(*)::text AS n,
-            count(DISTINCT e.scenario_id)::text AS scenarios,
-            min(e.source) AS source, latest.d::text AS run_date
-     FROM evals.eval_events e, latest
-     WHERE e.axis = 'local_lab' AND e.observed_at::date = latest.d
-     GROUP BY e.run_arm, e.result, latest.d`,
+    suiteRunId === null
+      ? `WITH latest AS (
+           SELECT max(observed_at)::date AS d
+             FROM evals.eval_events
+            WHERE axis = 'local_lab'
+         )
+         SELECT e.event, e.source, latest.d::text AS run_date
+           FROM evals.eval_events e, latest
+          WHERE e.axis = 'local_lab'
+            AND e.observed_at::date = latest.d
+          ORDER BY e.observed_at ASC, e.id ASC`
+      : `SELECT event, source, observed_at::date::text AS run_date
+           FROM evals.eval_events
+          WHERE axis = 'local_lab'
+            AND event->>'evidenceStage' = 'live_run'
+            AND event->>'suiteRunId' = $1
+          ORDER BY observed_at ASC, id ASC`,
+    suiteRunId === null ? [] : [suiteRunId],
   );
-  if (rows.length === 0) return null;
-  const count = (arm: string, result: string): number =>
-    rows
-      .filter((r) => r.run_arm === arm && r.result === result)
-      .reduce((sum, r) => sum + Number(r.n), 0);
   const first = rows[0];
-  if (!first) return null;
+  if (first === undefined) return null;
+  const summary = summarizeLocalAgentLabMechanismEvidence(
+    rows.map((row) => row.event),
+  );
   return {
+    ...summary,
     runDate: first.run_date,
     model: first.source.split("/")[1] ?? "unknown",
-    scenarios: rows
-      .filter((r) => r.run_arm === "baseline")
-      .reduce((sum, r) => sum + Number(r.scenarios), 0),
-    baselineFailed: count("baseline", "fail"),
-    baselinePassed: count("baseline", "pass"),
-    substrateBlocked: count("substrate", "blocked"),
-    substratePassed: count("substrate", "pass"),
+    suiteRunId,
   };
 }
 
@@ -210,6 +316,10 @@ async function main(): Promise<void> {
   }
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
+    const publicEvidence = readPublicEvidence();
+    const publicReport = publicEvidence.analysis;
+    const publicDecisionReport = publicEvidence.decision;
+    const publicGate = publicDecision(publicEvidence);
     const events = new PostgresEventStore(pool);
     const [
       m,
@@ -278,7 +388,8 @@ async function main(): Promise<void> {
         liveMcpActions: m.mcpAdmitted + m.mcpBlocked,
         genericSyncUpserts: m.syncUpserted,
         executorDispatches: m.executorDispatched,
-        livePairedScenarios: lab?.scenarios ?? 0,
+        livePairedScenarios:
+          lab?.mutantControlGatePassed === true ? lab.exactPairs : 0,
       },
       labs: objectiveLabs,
       invalidMeasurementEvents:
@@ -329,82 +440,103 @@ async function main(): Promise<void> {
     const objectiveWarningText = objective.warnings
       .map((warning) => `- ⚠️ ${warning}`)
       .join("\n");
-    const verdict = readExistingVerdict();
-    const finalVerdict = parseFinalVerdict(verdict);
-    if (
-      finalVerdict !== null &&
-      !isObjectiveFinalVerdictPermitted(
-        finalVerdict,
-        objective.verdictCeiling,
-      )
-    ) {
-      throw new Error(
-        `pm:memo: REFUSING to preserve final verdict "${finalVerdict}" above admitted-evidence ceiling "${objective.verdictCeiling}"`,
-      );
-    }
+    const publicGaps = [
+      publicDecisionReport === null
+        ? "No complete verified public evidence bundle was supplied to this memo."
+        : null,
+      publicReport !== null && !publicReport.confirmatoryPassed
+        ? "The sealed confirmatory public phase did not pass every frozen criterion."
+        : null,
+      publicReport !== null && !publicReport.replicationPassed
+        ? "Distinct-model replication has not passed every frozen criterion."
+        : null,
+      publicDecisionReport?.evidenceEligibleUnderSuppliedPolicy === true
+        ? `The automated report is conditionally evidence-eligible, but owner authorization over decision report ${publicDecisionReport.decisionReportHash} is still required.`
+        : null,
+      ...(publicDecisionReport?.reasons ?? []),
+    ].filter((item): item is string => item !== null);
+    const publicGapText =
+      publicGaps.length === 0
+        ? "No eligible evidence bundle was supplied; no operational decision can be made."
+        : publicGaps.map((item, index) => `${index + 1}. ${item}`).join("\n");
 
-    const memo = `# D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
+    const memo = `# D7 public-proof decision memo — pm-substrate
 
-*Generated ${m.generatedAt} by \`pnpm pm:memo\` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
+*Generated ${m.generatedAt} by \`pnpm pm:memo\`. The north star is a causal one: does pm-substrate improve strict outcomes on independent public agent-state tasks over both native and sham controls? There is no calendar waiver. Repository-authored fixtures, event counts, and blocked actions never substitute for the benchmark oracle.*
 
 **Evidence coordinates:** ${coordinates}${evidenceEmpty ? " — ⚠️ EMPTY FOLD (written under --force)" : ""}
 
-## 1 · Resume fidelity (the original problem)
+## 1 · Public causal decision gate
+
+- **Current status:** \`${publicGate.status}\`
+- **Decision:** ${publicGate.text}
+- **Evidence input:** ${publicReport === null ? "none" : `${publicEvidence.source === "decision_bundle" ? "decision bundle" : "analysis only (diagnostic; ineligible for KEEP)"} · experiment \`${publicReport.experimentId}\` · benchmark \`${publicReport.benchmark.benchmarkId}@${publicReport.benchmark.revision}\` · manifest \`${publicReport.manifestHash}\``}
+- **Exact-pair admission:** ${publicReport === null ? "not evaluated" : `${publicReport.pairing.admittedAttemptArtifacts}/${publicReport.pairing.expectedAttemptArtifacts} attempt artifact(s), ${publicReport.pairing.exactTaskRepeatTriples} exact task-repeat trio(s)`}
+- **Verification evidence (non-authoritative):** ${publicDecisionReport === null ? "not admitted" : `decision report \`${publicDecisionReport.decisionReportHash}\` · out-of-band trust policy \`${publicDecisionReport.trustPolicyHash}\` · attempt-set root \`${publicDecisionReport.attemptSetRootHash}\` · evidence-set root \`${publicDecisionReport.evidenceSetRootHash}\` · ${Object.entries(publicDecisionReport.verificationReceiptHashes).map(([kind, hash]) => `${kind}=\`${hash ?? "missing"}\` signed by \`${publicDecisionReport.verificationSignerIdentities[kind as keyof typeof publicDecisionReport.verificationSignerIdentities] ?? "missing"}\``).join(" · ")}`}
+
+${renderPublicPhase(publicReport, "qualification")}
+${renderPublicPhase(publicReport, "confirmatory")}
+${renderPublicPhase(publicReport, "replication")}
+
+Qualification is exploratory. Sealed confirmation, distinct-model replication, signed preregistration/timestamp bindings, and all six bound verification receipts can at most set \`evidenceEligibleUnderSuppliedPolicy=true\`. That report is non-authoritative and cannot emit KEEP; a separate owner authorization over the exact decision-report hash is mandatory. Per-strict-success cost and latency are decision criteria, not diagnostics.
+
+## 2 · Continuity and evidence integrity
 
 - Sessions resumed from the ledger: **${m.sessions}**, handoff coverage: **${m.handoffCoverage ? "100%" : "INCOMPLETE"}**, hash chain: **${m.chainValid ? "VALID" : "BROKEN"}**
 - Standing decisions: **${m.decisionsStanding}** · superseded (re-decided with a paper trail): **${m.decisionsSuperseded}** · re-litigated from chat memory: **0 observed**
-
-## 2 · Throughput and cost
-
 - Work closed: **${m.workClosed}** of ${m.workOpened} opened (${m.workStillOpen} open) — **${m.closedPerSession}/session**
-- Tokens: **${m.totalTokens.toLocaleString()}** across ${m.costSessions} costed sessions → **${m.tokensPerClosedItem?.toLocaleString() ?? "n/a"} per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
+- Tokens: **${m.totalTokens.toLocaleString()}** across ${m.costSessions} costed sessions → **${m.tokensPerClosedItem?.toLocaleString() ?? "n/a"} per closed item**
 
-## 3 · Governance did real work?
+## 3 · Runtime technical baseline (not public efficacy)
 
 - MCP gate: **${m.mcpAdmitted}** admitted · **${m.mcpBlocked}** blocked (block rate ${m.blockRate ?? "n/a"}) — ${gap(m.mcpAdmitted + m.mcpBlocked > 0, "live propose→admit traffic outside tests")}
 - Executor bridge: **${m.executorDispatched}** dispatched · **${m.executorRefused}** refused · **${m.executorFailed}** failed
 - Shadow verdict: advisory would-have-blocked **${shadow.totals.advisoryWouldHaveBlocked}** · enforced blocks **${shadow.totals.enforcedBlocks}** · data rejections **${shadow.totals.dataRejections}** · pending drift obstructions **${shadow.totals.pendingMappingObstructions}**
 - Work dispatched to roles: **${m.workDispatched}**
-
-## 4 · Zero-rewrite integration held?
-
 - Registered adapters: **${m.adaptersRegistered}** (${adapters.map((a) => `${a.contract.id}@${a.contract.source.commit.slice(0, 8)} v${a.version}`).join(" · ") || "none"})
 - Sync lanes: **${m.syncUpserted}** upserted · **${m.syncRejected}** rejected — fixture-proven idempotent; Liquid lanes L2–L4 CI-proven against the real \`liquid-mcp\` vocabulary
 - ${gap(evidence.l5ReadAttach || evidence.governedWrite, "L1: sidecar run once in the owner's environment (runbook smoke)")}
 - ${gap(evidence.l5ReadAttach, "L5 / D6 read attach: one real lab endpoint attached through the kit")}
 - ${gap(evidence.governedWrite, "L4 governed write: blocked envelope refused, accepted envelope dispatched, replay deduped")}
 
-## 5 · Live lab evidence (Axis C — local-agent-lab, paired arms)
+Technical ledger evidence gaps, which do not alter the public decision:
+
+${evidenceGapText}
+
+## 4 · Internal mechanism/conformance evidence (Axis C — not efficacy proof)
 
 ${
   lab
-    ? `- Latest live run **${lab.runDate}** on **${lab.model}**: **${lab.scenarios}** scenarios, paired baseline-vs-substrate
-- Baseline arm: **${lab.baselineFailed}** failed · ${lab.baselinePassed} passed — every seeded failure class reproduced without the substrate
-- Substrate arm: **${lab.substrateBlocked}** blocked at the gate · ${lab.substratePassed} passed — ${lab.baselineFailed > 0 && lab.substrateBlocked >= lab.baselineFailed ? "**every baseline failure was caught before it landed**" : "coverage incomplete; rerun `pnpm evals:local-agent-lab:live`"}`
+    ? `- Classification: \`${lab.evidenceClaim}\`. These repository-authored controls test mechanism behavior only; they cannot establish benefit on an independent task.
+- Latest suite: **${lab.runDate}** on **${lab.model}** · suite **${lab.suiteRunId ?? "legacy/unidentified"}** · **${lab.exactPairs}** exact pair(s) across ${lab.scenarios} scenario(s)
+- Pair integrity: **${lab.exactPairIntegrityPassed ? "PASS" : "FAIL"}** · ${lab.invalidPairedGroups} imbalanced, duplicate, or identity-mismatched pair group(s)
+- Expected-block controls: **${lab.protectivePairs}/${lab.expectedBlockPairs}** produced the predeclared baseline-fail/substrate-block pattern
+- Expected-allow controls: **${lab.passingExpectedAllowPairs}/${lab.expectedAllowPairs}** remained accepted in both arms
+- Mutant sensitivity: allow-all **${lab.allowAllMutantRejected ? "REJECTED" : "NOT REJECTED"}** · block-all **${lab.blockAllMutantRejected ? "REJECTED" : "NOT REJECTED"}** · gate **${lab.mutantControlGatePassed ? "PASS" : "FAIL"}**`
     : "- ❌ **GAP** — no live lab events persisted; run `pnpm evals:local-agent-lab:live`"
 }
 
-## 6 · Business-operability objective gate
+## 5 · Deferred app-transfer scorecard (excluded from D6/D7 efficacy)
 
-Technical activity is necessary but cannot prove that either lab is worth operating. The executable scorecard requires zero-edit adoption, repeated correct end-to-end outcomes, governance quality, bounded cost/operator effort, and external acceptance for **both** labs.
+PluggedInSocial and ArrowHedge remain frozen. Their historical business-operability scorecard is preserved for a possible post-keep transfer phase, but neither app may design, tune, score, or rescue the public causal claim.
 
-- **Verdict ceiling from admitted evidence:** \`${objective.verdictCeiling}\`
-- **Full objective ready:** ${objective.objectiveReady ? "YES" : "NO"}
+- **Historical transfer verdict ceiling:** \`${objective.verdictCeiling}\`
+- **Historical transfer objective ready:** ${objective.objectiveReady ? "YES" : "NO"}
 - **Objective measurement events:** ${measurementFold.latest.length} valid latest lab record(s) · ${measurementFold.invalid} invalid event(s)${objectiveWarningText ? `\n${objectiveWarningText}` : ""}
 
 ${objectiveDimensionText}
 
-Record or update a source-cited lab measurement with \`pnpm pm:objective -- record <measurement.json>\`. Read attachment and governed action dispatch are independently derived from admitted events carrying an exact match for the run manifest, boundary conformance, app revision, and substrate revision; the measurement cannot self-assert them or reuse a historical rehearsal.
+## 6 · Open public-proof gates
 
-## 7 · Technical evidence gaps before the gate
+${publicGapText}
 
-These are substrate proof gaps, distinct from the business-operability gaps above:
+Use \`pnpm pm:memo -- --public-decision-bundle path/to/decision-bundle.json --public-trust-policy path/to/trust-policy.json --public-trust-policy-hash OWNER_PINNED_SHA256\` to verify the sealed manifest, 31 procedure-versioned structured assertions, preregistration/timestamp attestations, and six signed receipts. The current D7 v4 path remains diagnostic-only and always \`not_eligible\` until adapter-specific procedures derive each fact from bound raw records. The expected policy hash must come from an owner/CI channel outside the bundle. \`--public-analysis\` remains diagnostic-only. Neither this command nor a hand-written verdict can authorize KEEP; owner authorization is a separate trust boundary.
 
-${evidenceGapText}
+## 7 · Operational consequence
 
-## 8 · Verdict (hand-written at the gate — owner + agent)
-
-${verdict}
+- **Apps:** remain frozen; this evidence report cannot authorize PluggedInSocial or ArrowHedge transfer work.
+- **Claim:** ${publicGate.status === "owner_authorization_required" ? "the exact benchmark/model/task evidence is conditionally eligible under the supplied policy, but no KEEP decision exists" : "no demonstrated public causal benefit yet"}.
+- **Next action:** ${publicGate.status === "failed" ? "classify the observed failures, research the smallest repair, rerun qualification, and seal a new confirmatory manifest" : publicGate.status === "owner_authorization_required" ? "archive the exact signed bundle, externally anchored preregistration, policy pin, and decision-report hash; request a separate owner decision without changing app state" : "complete real public matched-arm execution and distinct-model replication"}.
 `;
 
     if (process.argv.includes("--stdout")) {

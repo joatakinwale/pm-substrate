@@ -1,13 +1,14 @@
 /**
  * Engine — runs a ScenarioSpec across both arms against fresh hermetic worlds
  * and produces a paired result with metrics derived from the admitted log +
- * token ledgers. NOTHING is hardcoded: the verdict comes from each spec's
- * oracle reading the real event store.
+ * token ledgers. The verdict comes from each repository-authored spec's oracle;
+ * therefore these runs validate mechanism/conformance and cannot establish
+ * efficacy on an independent benchmark.
  *
  * One run = one scenario × {no_substrate, substrate}. A suite runs many specs.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   buildActionOutcomeEnvelope,
   buildActionOutcomeProviderAuthority,
@@ -26,6 +27,7 @@ import type {
   EvalResult,
   IntendedAction,
   Observation,
+  ExpectedAdmission,
   ScenarioSpec,
 } from "./scenario.js";
 
@@ -42,8 +44,14 @@ export interface ArmRun {
 }
 
 export interface ScenarioRun {
+  /** Shared identity for every scenario attempt in one suite invocation. */
+  readonly suiteRunId: string;
+  /** Exact identity shared by the baseline/substrate arms of this attempt. */
+  readonly attemptId: string;
   readonly scenarioId: string;
   readonly failureClass: string;
+  readonly expectedAdmission: ExpectedAdmission;
+  readonly controlGroup: string;
   readonly realityQualities: readonly number[];
   readonly model: string;
   readonly arms: Readonly<Record<Arm, ArmRun>>;
@@ -57,6 +65,8 @@ export interface EngineConfig {
   readonly ollama?: OllamaClient;
   readonly retainWorlds?: boolean;
   readonly actionOutcomeAuthorityProvider?: LocalAgentLabActionOutcomeAuthorityProvider;
+  readonly suiteRunIdFactory?: () => string;
+  readonly attemptIdFactory?: (spec: Pick<ScenarioSpec, "scenarioId">) => string;
 }
 
 export interface LocalAgentLabActionOutcomeAuthorityInput {
@@ -98,6 +108,7 @@ async function runArm(
   spec: ScenarioSpec,
   arm: Arm,
   cfg: EngineConfig,
+  identity: { readonly suiteRunId: string; readonly attemptId: string },
 ): Promise<ArmRun> {
   const world = await World.create(cfg.databaseUrl);
   const agent = new LabAgent(cfg.ollama ?? new OllamaClient());
@@ -118,6 +129,8 @@ async function runArm(
       action,
       outcome,
       result,
+      suiteRunId: identity.suiteRunId,
+      attemptId: identity.attemptId,
       ...(cfg.actionOutcomeAuthorityProvider !== undefined
         ? { authorityProvider: cfg.actionOutcomeAuthorityProvider }
         : {}),
@@ -151,12 +164,30 @@ export async function runScenario(
   spec: ScenarioSpec,
   cfg: EngineConfig,
 ): Promise<ScenarioRun> {
+  const identity = {
+    suiteRunId: cfg.suiteRunIdFactory?.() ?? `suite_${randomUUID()}`,
+    attemptId:
+      cfg.attemptIdFactory?.(spec) ??
+      `attempt_${spec.scenarioId}_${randomUUID()}`,
+  };
+  return runScenarioWithIdentity(spec, cfg, identity);
+}
+
+async function runScenarioWithIdentity(
+  spec: ScenarioSpec,
+  cfg: EngineConfig,
+  identity: { readonly suiteRunId: string; readonly attemptId: string },
+): Promise<ScenarioRun> {
   const ollama = cfg.ollama ?? new OllamaClient();
-  const a = await runArm(spec, "no_substrate", { ...cfg, ollama });
-  const b = await runArm(spec, "substrate", { ...cfg, ollama });
+  const a = await runArm(spec, "no_substrate", { ...cfg, ollama }, identity);
+  const b = await runArm(spec, "substrate", { ...cfg, ollama }, identity);
   return {
+    suiteRunId: identity.suiteRunId,
+    attemptId: identity.attemptId,
     scenarioId: spec.scenarioId,
     failureClass: spec.failureClass,
+    expectedAdmission: spec.expectedAdmission ?? "block",
+    controlGroup: spec.controlGroup ?? spec.failureClass,
     realityQualities: spec.realityQualities,
     model: ollama.model,
     arms: { no_substrate: a, substrate: b },
@@ -169,6 +200,7 @@ export async function runScenario(
 }
 
 export interface SuiteResult {
+  readonly suiteRunId: string;
   readonly runs: readonly ScenarioRun[];
   readonly model: string;
   readonly actionOutcomeEnvelopes: readonly ActionOutcomeEnvelope[];
@@ -183,9 +215,15 @@ export async function runSuite(
   specs: readonly ScenarioSpec[],
   cfg: EngineConfig,
 ): Promise<SuiteResult> {
+  const suiteRunId = cfg.suiteRunIdFactory?.() ?? `suite_${randomUUID()}`;
   const runs: ScenarioRun[] = [];
   for (const spec of specs) {
-    runs.push(await runScenario(spec, cfg));
+    const attemptId =
+      cfg.attemptIdFactory?.(spec) ??
+      `attempt_${spec.scenarioId}_${randomUUID()}`;
+    runs.push(
+      await runScenarioWithIdentity(spec, cfg, { suiteRunId, attemptId }),
+    );
   }
   let substrateProtectedCount = 0;
   let noFailureCount = 0;
@@ -202,6 +240,7 @@ export async function runSuite(
   }
   const tpa = (x: { t: number; n: number }) => (x.n > 0 ? x.t / x.n : x.t);
   return {
+    suiteRunId,
     runs,
     model: cfg.ollama?.model ?? new OllamaClient().model,
     actionOutcomeEnvelopes: runs.flatMap((run) => run.actionOutcomeEnvelopes),
@@ -223,6 +262,8 @@ export function buildLocalAgentLabActionOutcomeEnvelope(input: {
   readonly action: IntendedAction;
   readonly outcome: AdmitOutcome;
   readonly result: EvalResult;
+  readonly suiteRunId?: string;
+  readonly attemptId?: string;
   readonly authorityProvider?: LocalAgentLabActionOutcomeAuthorityProvider;
 }): ActionOutcomeEnvelope {
   const terminalOutcome = input.outcome.admitted ? "accepted" : "blocked";
@@ -234,9 +275,16 @@ export function buildLocalAgentLabActionOutcomeEnvelope(input: {
       terminalOutcome,
       checkedAt: input.decidedAt,
     });
-  const envelopeId = `outcome_local_agent_lab_${input.spec.scenarioId}_${input.arm}`;
+  const identitySuffix = input.attemptId === undefined
+    ? ""
+    : `_${localAgentLabIdentitySuffix(input.attemptId)}`;
+  const envelopeId =
+    `outcome_local_agent_lab_${input.spec.scenarioId}_${input.arm}${identitySuffix}`;
   const evidenceRefs = [
-    stateRef("document", `local-agent-lab:${input.spec.scenarioId}:observation`),
+    stateRef(
+      "document",
+      `local-agent-lab:${input.spec.scenarioId}:observation${identitySuffix}`,
+    ),
   ];
   const substrateRefs = [
     stateRef(
@@ -252,12 +300,14 @@ export function buildLocalAgentLabActionOutcomeEnvelope(input: {
 
   return buildActionOutcomeEnvelope({
     tenantId: input.tenantId as ActionOutcomeEnvelope["tenantId"],
-    actionId: `local_agent_lab:${input.spec.scenarioId}:${input.arm}`,
+    actionId:
+      `local_agent_lab:${input.spec.scenarioId}:${input.arm}${identitySuffix}`,
     subject: stateRef("document", input.spec.scenarioId),
-    proposalReviewId: `local_agent_lab:${input.spec.scenarioId}:${input.arm}:proposal_review`,
+    proposalReviewId:
+      `local_agent_lab:${input.spec.scenarioId}:${input.arm}${identitySuffix}:proposal_review`,
     stateReviewArtifactHash: localAgentLabArtifactHash(input),
     evidenceAdmissionReviewIds: [
-      `local_agent_lab:${input.spec.scenarioId}:${input.arm}:evidence_review`,
+      `local_agent_lab:${input.spec.scenarioId}:${input.arm}${identitySuffix}:evidence_review`,
     ],
     ...(authority !== undefined
       ? {
@@ -301,6 +351,8 @@ function localAgentLabArtifactHash(input: {
   readonly action: IntendedAction;
   readonly outcome: AdmitOutcome;
   readonly result: EvalResult;
+  readonly suiteRunId?: string;
+  readonly attemptId?: string;
 }): string {
   return createHash("sha256")
     .update(
@@ -312,7 +364,13 @@ function localAgentLabArtifactHash(input: {
         action: input.action,
         outcome: input.outcome,
         result: input.result,
+        suiteRunId: input.suiteRunId,
+        attemptId: input.attemptId,
       }),
     )
     .digest("hex");
+}
+
+function localAgentLabIdentitySuffix(attemptId: string): string {
+  return createHash("sha256").update(attemptId).digest("hex").slice(0, 16);
 }

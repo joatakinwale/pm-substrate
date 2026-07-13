@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "pm.public-eval-corner-synthetic-fixture.v1",
+  "fixtureId": "tau2-airline-32-synthetic-v1",
+  "cornerId": "tau2-airline-32",
+  "label": "pm-synthetic-conformance",
+  "claimScope": "adapter-conformance",
+  "distribution": "package-synthetic",
+  "containsUpstreamTaskData": false,
+  "containsProtectedContent": false,
+  "nonGating": true,
+  "syntheticNotice": "PM-authored synthetic values; no upstream task data.",
+  "content": {
+    "cases": [
+      {
+        "caseId": "synthetic-final-state-matches",
+        "expected": {
+          "agentDb": {
+            "reservation": {
+              "id": "SYN-RES-7",
+              "cabin": "economy",
+              "flights": [{ "number": "SYN-041", "date": "2031-04-02" }]
+            }
+          },
+          "userDb": { "account": "SYN-USER-4", "status": "active" }
+        },
+        "observed": {
+          "agentDb": {
+            "reservation": {
+              "id": "SYN-RES-7",
+              "cabin": "economy",
+              "flights": [{ "number": "SYN-041", "date": "2031-04-02" }]
+            }
+          },
+          "userDb": { "account": "SYN-USER-4", "status": "active" }
+        },
+        "expectDbMatch": true
+      },
+      {
+        "caseId": "synthetic-intermediate-state-fails",
+        "expected": {
+          "agentDb": {
+            "reservation": {
+              "id": "SYN-RES-7",
+              "cabin": "economy",
+              "flights": [{ "number": "SYN-041", "date": "2031-04-02" }]
+            }
+          },
+          "userDb": { "account": "SYN-USER-4", "status": "active" }
+        },
+        "observed": {
+          "agentDb": {
+            "reservation": {
+              "id": "SYN-RES-7",
+              "cabin": "economy",
+              "flights": [
+                { "number": "SYN-202", "date": "2031-04-02" },
+                { "number": "SYN-232", "date": "2031-04-02" }
+              ]
+            }
+          },
+          "userDb": { "account": "SYN-USER-4", "status": "active" }
+        },
+        "expectDbMatch": false
+      },
+      {
+        "caseId": "synthetic-collateral-write-fails",
+        "expected": {
+          "agentDb": {
+            "reservation": {
+              "id": "SYN-RES-7",
+              "cabin": "economy",
+              "flights": [{ "number": "SYN-041", "date": "2031-04-02" }]
+            }
+          },
+          "userDb": { "account": "SYN-USER-4", "status": "active" }
+        },
+        "observed": {
+          "agentDb": {
+            "reservation": {
+              "id": "SYN-RES-7",
+              "cabin": "economy",
+              "flights": [{ "number": "SYN-041", "date": "2031-04-02" }]
+            },
+            "unrelatedReservation": { "id": "SYN-OTHER", "status": "changed" }
+          },
+          "userDb": { "account": "SYN-USER-4", "status": "active" }
+        },
+        "expectDbMatch": false
+      }
+    ]
+  }
+}

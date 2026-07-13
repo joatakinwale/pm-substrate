@@ -1,0 +1,30 @@
+{
+  "name": "@pm/public-eval-corners",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned provenance, conformance adapters, and fail-closed matched-arm evidence harness for public agent-state corners.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "pm-public-eval-corners": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true",
+    "public-eval-corners": "node dist/cli.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

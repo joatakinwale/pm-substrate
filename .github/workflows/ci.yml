@@ -65,6 +65,12 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Public-evaluation adapter conformance (offline; not efficacy)
+        run: |
+          node packages/public-eval-toolsandbox/dist/cli.js manifest > /dev/null
+          node packages/public-eval-state-bench/dist/cli.js manifest > /dev/null
+          node packages/public-eval-corners/dist/cli.js list > /dev/null
+
       - name: Migrate dev DB
         run: pnpm db:migrate
 
@@ -74,7 +80,7 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Amnesia-resume headline number (T4)
+      - name: Amnesia-resume mechanism diagnostic (T4; not efficacy)
         run: pnpm evals:amnesia
 
       - name: Migrate provenance tier

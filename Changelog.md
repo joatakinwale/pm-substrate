@@ -1,5 +1,69 @@
 # Changelog
 
+## 2026-07-13 - Public-proof reset and first observed repair loop
+
+- Replaced the app-first D6/D7 claim with independent public-benchmark causal
+  proof over native, sham, and substrate arms; froze PluggedInSocial and
+  ArrowHedge until confirmation and replication pass.
+- Reclassified local agent labs as mechanism conformance, added exact suite and
+  attempt identities, expected-allow controls, and allow-all/block-all mutant
+  sensitivity so a deny-all policy cannot look successful.
+- Added peripheral pinned adapters for ToolSandbox, STATE-Bench, and four
+  public corner scenarios plus hash-bound task-clustered analysis with frozen
+  lift, reliability, collateral, cost, latency, and distinct-model replication
+  criteria. Adapter readiness remains separate from benchmark outcome.
+- Red-teamed the D7 gate before use: canonical-task aliases and a missing
+  latency-ratio ceiling are rejected; task-content/universe membership,
+  original/derivative identity, arm interventions, environment snapshots,
+  randomized execution order, and individual configuration hashes are bound;
+  simultaneous inference must beat native and sham separately; and zero
+  false-block/collateral plus fixed absolute/relative economics fail closed.
+  Signed preregistration and per-attempt time/raw-root receipts are required.
+  The analyzer computes the predeclared statistical/guardrail criteria, but D7
+  report v4 currently emits only `not_eligible`, always requires separate owner
+  authorization, and has no KEEP output.
+- Closed two further D7 false-positive paths: decision-phase tasks must be the
+  exact deterministic SHA-256 top-ranked subset for a predeclared count, and
+  every required check must resolve non-empty kind-specific canonical JSON plus
+  embedded raw observation bytes. Empty, malformed, irrelevant, unresolved, or
+  unreferenced evidence now fails before signatures can make it look eligible.
+- Closed the follow-up structured-assertion exploit: evidence schema v2 requires
+  one canonical observation for each of 31 checks, pins its
+  kind/check/subject/procedure and exact fact keys, and validates an internal
+  predicate. Report v4 recognizes that self-consistent facts are not derived
+  from the subject and therefore keeps every current bundle diagnostic-only and
+  ineligible—even the adversarial 363-attempt fixture that claims `1/1` counts.
+  Opaque `banana` bytes, unsupported procedures, and signer-claimed results that
+  disagree with the structured facts also reject. A future eligibility path
+  must derive facts from bound raw provider/oracle records.
+- Recorded Arrowsmith v231 after the same review showed that valid signatures
+  under a caller-supplied policy still amount to self-attestation. in-toto,
+  Sigstore/OSF preregistration, and the supplied NASA PM Handbook all support
+  the repair boundary: an externally anchored plan and independent assessment
+  inform a distinct owner decision; they do not authorize themselves.
+- Recorded Arrowsmith v230 after concurrent dogfood writers forked the
+  continuity ledger. A tenant/agent transaction advisory lock now serializes
+  append; fork verification and `dev:repair-chain` preserve both historical
+  heads through an explicit append-only merge. Sequence-backed graph-head
+  selection rejects silent fork choice, two-genesis/ancestor fake merges, and
+  repair over unrelated tampering. One strict shared merge parser now rejects
+  malformed reserved merge payloads before insertion as well as during replay.
+  The 24-writer, malformed-admission, and killed-connection regressions are
+  green after repair.
+- Hardened the public corner harness after a constant-output wrapper showed
+  that bundling pinned oracle bytes did not prove they were invoked. Local
+  plans/receipts now carry a content-resolved but explicitly unverified oracle
+  invocation boundary and are always analysis-ineligible until an independent
+  invocation-proof format and verifier exist.
+- Claim boundary: public causal benefit is still unproven until real official
+  confirmatory artifacts and distinct-model or second-benchmark replication
+  pass the sealed analysis gate and a separately authenticated owner decides
+  the narrow operational consequence.
+- Final verification: build and typecheck clean; 1,059 tests passed with 11
+  expected external/credential skips; strict contracts, budgets, zero-edit,
+  Arrowsmith primitive guard, and amnesia diagnostic green; pinned STATE-Bench
+  upstream suite 148 passed with 1 live credential skip.
+
 ## 2026-07-13 - Business-operability objective made executable
 
 - Separated technical substrate viability from the stronger claim that the two

@@ -1,54 +1,188 @@
-# Business-operability objective and falsification gate
+# Public agent-state objective and falsification gate
 
-*Decided 2026-07-13. The continuity-ledger decision is authoritative; this
-document explains the executable gate consumed by `pnpm pm:memo`.*
+*Proof order superseded 2026-07-13. The continuity-ledger decision is
+authoritative. The public-benchmark gate below is immediate; the existing
+business-operability gate consumed by `pnpm pm:memo` is preserved as a deferred
+transfer gate and cannot currently produce a full keep decision.*
 
 ## The criticism
 
 The original north star — “make two agent-run businesses worth operating” —
-mixes three different claims:
+mixed four different claims:
 
 1. the substrate is technically sound;
-2. the substrate improves the labs' operating loops;
-3. the businesses themselves have market value.
+2. its state mechanism changes agent behavior;
+3. that behavior causes more correct end-to-end outcomes;
+4. the two businesses themselves have market value.
 
-The repository can directly test the first two. It cannot prove demand,
-marketing ROI, or investment alpha merely by proving state coherence. A green
-hash chain, a blocked unsafe action, or an idempotent sync is necessary product
-evidence, but none says that a correct useful outcome occurred at an acceptable
-cost. Treating technical activity as the business outcome would let a safe but
-unused system pass.
+The current suite strongly exercises the first claim and locally demonstrates
+parts of the second. It has not independently established the third. Most local
+scenarios own both the failure injection and the expected gate verdict, so they
+can reward a mechanism that merely recognizes its own fixture. A green hash
+chain, a blocked unsafe action, or an idempotent sync is useful mechanism
+evidence, but none proves that an independent task finished. Small paired runs,
+repeated attempts on the same fixture, or an oracle derived from the gate can
+also create false confidence. The fourth claim requires later business evidence
+and cannot be inferred from any benchmark.
 
-The falsifiable claim is therefore narrower and causal:
+The immediate falsifiable claim is narrower and causal:
 
-> Relative to the same lab workflows without pm-substrate, the sidecar makes
-> correct end-to-end operation at least as reliable and no more costly in owner
-> effort, while adding enforceable governance, requiring no substrate edits or
-> app rewrite, and staying within a bounded cash-cost premium.
+> On pinned public tasks that expose stale, contradictory, lost, or changing
+> operational state, an agent using pm-substrate completes more tasks according
+> to the benchmark's unchanged independent oracle than the same agent using
+> either its native state path or an equal-overhead sham sidecar, while staying
+> within declared collateral-state, false-block, cost, and latency guardrails.
 
-Commercial viability remains a lab-level claim. ArrowHedge remains historical
-research/simulation; this gate makes no trading-performance or financial-advice
-claim.
+This does not claim that a benchmark represents every workplace, that the
+substrate improves model intelligence, or that the two labs are commercially
+valuable. PluggedInSocial and ArrowHedge are frozen until this public claim is
+kept. ArrowHedge remains historical research/simulation; no result is a trading
+performance or financial-advice claim.
 
 ## How a technically green project could still fail
 
 | Failure | How it can hide | Required counter-evidence |
 |---|---|---|
-| Activity substitutes for outcomes | Counts of events, blocks, sessions, or closed work rise while no useful task finishes | Predeclared outcome oracle and correct-outcome rate for paired lab runs |
-| A demo is overfit | One known fixture or seeded failure passes | At least one held-out or dynamic-state run per lab |
-| Safety destroys utility | The gate blocks everything, producing zero false negatives by refusing valid work | Expected-allow and expected-block cases; measure both false positives and false negatives |
-| The app routes around governance | One showcased write is governed while another write path remains direct | Inventory all write paths and require 100% coverage for the pilot action scope |
-| Integration is cheap only in theory | Adapters work after hidden substrate edits, app rewrites, or days of setup | Git-derived edit count, rewrite declaration, time-to-first-value, and mapping coverage |
-| Correct work is uneconomic | Reliability improves but model/tool spend or owner babysitting overwhelms the benefit | Cost and operator minutes per correct outcome versus the paired baseline |
-| Benchmark success does not transfer | Clean local fixtures pass; changing state, external dependencies, or environment drift fail | Production-like shadow run with source refs and owner acceptance |
-| Measurement is self-asserted | A scorecard says that attachment/action happened without log evidence | Derive read attachment and governed dispatch independently from admitted events |
-| Infrastructure changes move the score | Runtime/model/tool changes are mistaken for product improvement | Pin run manifests and compare only matched arms; report environment changes |
+| Activity substitutes for outcomes | Events, blocks, receipts, or warnings rise while no task finishes | The unchanged benchmark-owned strict task oracle is primary |
+| Gate and oracle share logic | The same predicate decides whether to block and whether the run passed | Oracle code cannot import or call the admission predicate; verify this structurally and with mutants |
+| Safety destroys utility | Blocking everything appears perfectly protective | Expected-allow/no-op tasks plus a `block-all` mutant must be red |
+| Guardrails are absent | Allowing everything maximizes completion while ignoring stale state | Expected-block tasks plus an `allow-all` mutant must be red |
+| A demo is overfit | One known fixture or tuned public task passes | Locked held-out split, separate qualification artifacts, and second-benchmark/model replication |
+| Fault injection changes the claim | A modified task is reported as the original benchmark result | Untouched headline score and labeled derivative fault-injection score are separate |
+| Repeats masquerade as sample size | Five runs of one task are treated as five independent tasks | Task-level paired analysis; repeats/seeds clustered within task |
+| Identity collisions hide failures | Fixed run/pair IDs overwrite or merge attempts | Unique attempt ID plus exact benchmark, split, model, config, seed, and revision binding |
+| State benefit is really extra context | A larger prompt or extra tool call creates the lift | Equal-overhead sham sidecar with irrelevant but structurally equivalent state |
+| Infrastructure changes move the score | Model, simulator, prompt, or tool changes are mistaken for substrate lift | Content-addressed run manifests and matched arms; mismatches are refused, not adjusted away |
+| Correct work is uneconomic | Extra retries/tokens buy a small completion gain | Cost and latency per strict success, with a declared premium ceiling |
+| Receipt is self-asserted | The producer writes both result and proof, or selects the verifier policy after seeing results | Pre-run registration under an externally pinned authority; independent verifier recomputes raw evidence; separate owner authorizes the exact report hash |
+| Arms differ outside the treatment | Substrate gets a better command, model, prompt, environment, context budget, or order | Immutable typed arm interventions, one shared runner/config/model, environment hashes, deterministic randomized order, and directly checked overhead equivalence |
+| Score-shaped JSON substitutes for execution | A locally authored file matches an official metric schema | Raw runner/provider/simulator/judge request and response receipts, IDs, usage, cost, latency, exact bytes, and an adapter that fails closed when any are absent |
+| Verification becomes the decision | Six signatures are translated directly into KEEP | Automation emits only conditional evidence eligibility; a distinct authenticated owner signs the report hash and consequence |
 
-## Executable scorecard
+## Immediate public-proof scorecard
 
-`@pm/evals` evaluates six dimensions for **both** `plugged_in_social` and
-`arrowhedge`. Initial D6 pilot thresholds are intentionally small, not a claim
-of statistical generality:
+### Outcome hierarchy
+
+The primary endpoint is the public benchmark's strict task completion, paired
+by task between arms. A second primary reliability endpoint is the share of
+tasks that succeed across every predeclared restart/mutation repeat; a lucky
+single pass is not reliable success. Diagnostic drivers include stale-state
+detection, duplicate prevention, recovery time, and retrieval quality. The
+guardrails are false blocks on expected-allow/no-op tasks, collateral state
+changes, cost per strict success, and latency per strict success. Substrate
+event counts, blocks, warnings, and receipt counts never appear above the
+diagnostic layer.
+
+Every comparison has at least three matched arms:
+
+1. `native` — the benchmark's default state path;
+2. `sham` — the same sidecar/tool/token/latency shape but irrelevant state and
+   no useful substrate decision;
+3. `substrate` — the real read/observe/review path.
+
+An enforced-admission arm may be added for tool-use tasks, but is reported
+separately because preventing a tool call changes task affordances. A block is
+correct only when the independent upstream oracle says the resulting task is
+correct. Qualification also runs `block-all` and `allow-all` mutants; neither
+may satisfy the combined outcome and guardrail gate.
+
+### Evidence layers
+
+- **Conformance:** deterministic fixtures prove adapters, hashes, controls, and
+  boundary wiring. They make no efficacy claim.
+- **Qualification:** visible public tasks debug the harness, estimate variance,
+  and set the predeclared confirmatory sample size. They cannot be reused as
+  confirmatory evidence.
+- **Confirmatory:** locked held-out tasks use the official simulator/judge and
+  a frozen manifest. Exclusions and stopping rules are declared before results.
+- **Replication:** a clean checkout independently verifies receipts, then a
+  second benchmark or model tests whether the direction survives.
+
+The frozen decision threshold is a task-level paired lift of at least ten
+percentage points over both native and sham, using simultaneous inference
+against the maximum control inside each bootstrap draw, with the confirmatory
+confidence interval excluding no lift. Qualification may revise a future
+protocol only before its held-out manifest is externally preregistered.
+Reliable success must be at least 0.5 and improve separately over both controls;
+false blocks and unexpected collateral changes are zero for the deterministic
+state tasks; cost per strict success is capped at both $10 absolute and 1.25
+times each control; latency per strict success is capped at both 300,000 ms and
+1.25 times each control. An unavailable comparison fails closed. A five-run
+pilot is never enough by itself: even zero failures in five leaves large
+failure-rate uncertainty.
+
+### Manifest and receipt contract
+
+Each attempt binds the upstream HTTPS repository URL, immutable content
+revision, SPDX license, task ID and content hash, original/derivative label,
+eligible-universe inventory root/index/proof, deterministic selection digest,
+split and corpus hash, resolved simulator/judge/model identities, individual
+prompt/tool/decoding/runner hashes, seed, substrate revision/configuration,
+immutable arm intervention and execution binding, initial environment snapshot,
+randomized arm position, pair ID, unique attempt ID, start/end timestamps, raw
+artifact hashes, token/tool counts, and strict oracle result. Aggregate
+configuration hashes are recomputed from those components rather than accepted
+as opaque labels.
+
+Before the first attempt, a signed preregistration receipt binds the exact
+manifest and trust policy. One independently signed execution receipt per
+attempt binds its start/end time and raw-artifact root. The D7 bundle contains
+the evidence bytes (or content-resolved inventories) for every declared
+verifier check. Receipts bind the exact manifest, attempt root, and evidence
+root and are Ed25519-signed. The verifier owner must differ from the experiment
+producer; its public key/source revision comes from a separate trust policy
+whose expected hash is supplied by the owner or CI outside the bundle.
+Verification rejects changed bytes, premature or missing time receipts,
+unreferenced evidence, duplicate task content, cross-arm mismatches, split
+leakage, model/config aliases, intervention/environment drift, and an
+oracle/gate dependency. Plain hashes, timestamps, signatures under a
+caller-selected key, or an `independent=true` assertion are not authentication.
+
+The current evaluator requires non-empty kind-specific canonical JSON for all
+six verifier classes and all 31 required checks. Every check binds exactly one
+embedded semantic observation to an evaluator-recomputed subject hash. The
+gate reopens its base64, length, media type, and SHA-256; enforces its exact
+kind/check/subject, versioned procedure, and strict fact keys; and recomputes
+an internal predicate from those facts. Opaque, missing, structurally irrelevant,
+unsupported, unresolved, unreferenced, or claim/result-mismatched observations
+fail. That does not yet prove the facts came from the subject: the current
+generic procedures do not derive them from the bound manifest, attempts,
+analysis, and content-addressed provider/oracle records. Report v4 therefore
+labels them `signed_structured_assertions_diagnostic_only`, records
+`adapter_specific_raw_derivation_not_implemented`, and always emits
+`not_eligible`. A future adapter-specific raw-derivation path may emit
+conditional eligibility, but it remains non-authoritative and requires a
+separate owner authorization over the exact report hash. No automated output
+can be KEEP or unfreeze an app.
+
+The first slice is ToolSandbox's public multi-turn cellular/message scenario.
+Its original milestone/minefield result is the headline. A separately labeled
+derivative must lose a tool response and restart the OS process; the substrate
+must recover without sending the message twice or changing unrelated state.
+The current adapter only reinstantiates the provider role inside one Python
+process, so it is conformance scaffolding and cannot satisfy that derivative.
+The
+headline held-out program is STATE-Bench Agent Learning Track. Independent
+corners add public fact-supersession, restart/idempotency/collateral, and
+dynamic-state tasks. Exact pinned revisions and licenses are recorded by the
+adapter manifests rather than copied into this prose.
+
+### Failure-driven repair (Arrowsmith)
+
+No new primitive is justified by a plausible story. A repair must preserve this
+chain: public failing trace → classification against existing primitives →
+documented adjacent solution → falsifiable hypothesis → smallest general
+runtime-consumed change → ablation → exact task retest → clean regression and
+control run. If removing the change does not remove the measured benefit, or if
+the change does not beat sham, it is not the cause and must be reverted or the
+claim narrowed.
+
+## Deferred business-operability scorecard
+
+`@pm/evals` already evaluates six dimensions for **both**
+`plugged_in_social` and `arrowhedge`. This remains executable so historical
+evidence can be audited, but collection is paused until D7 keeps the public
+claim. Its small pilot thresholds are not a claim of statistical generality:
 
 | Dimension | Threshold |
 |---|---|
@@ -115,25 +249,37 @@ log, then applies the verdict ceiling:
 
 ## Current result — 2026-07-13
 
-The technical baseline is green, including live MCP traffic, generic sync,
-executor rehearsal, an ArrowHedge read attach, and local paired failure cases.
-There are no admitted per-lab objective measurements, no PluggedInSocial read
-attach, and no per-lab governed dispatch. Cost per correct outcome, owner effort,
-held-out runs, production-like acceptance, and end-to-end correct outcomes are
-unmeasured. The evidence therefore caps the verdict at
-`keep_with_scope_cut`. Revision revalidation also found that PluggedInSocial is
-missing `browser_qa_harness` plus `operatorRunMonitorSurface`, while current
-ArrowHedge `main@6713139` no longer mounts the `/integration/v1` contract used
-by the historical 2026-07-07 rehearsal. The default substrate suite is green
-(967 passed, 7 external-app tests skipped); opting the current
-PluggedInSocial checkout into conformance produces 6 failures, all downstream
-of those missing anchors. The roadmap therefore treats app-boundary repair as
-a prerequisite, not as evidence that can be waived by the green core suite.
-The durable red receipt is
-[`plugged-in-social-boundary-conformance-2026-07-13.json`](./evidence/plugged-in-social-boundary-conformance-2026-07-13.json).
+The implementation baseline was green before this reset (build and typecheck;
+967 passing tests with 7 external-app skips; strict contract, budget, zero-edit,
+and primitive back-map gates). Live MCP traffic, generic sync, executor
+rehearsal, and local paired scenarios show that mechanisms can execute. The new
+public packages harden matching, provenance, transition replay, and decision
+authority, but deliberately refuse to manufacture eligible attempts from the
+available ToolSandbox and STATE-Bench artifacts. The corner harness has no real
+matched-agent result. There is no externally preregistered held-out run,
+provider-complete public score, replicated evidence bundle, or owner
+authorization. The current public-efficacy verdict is therefore **unproven**,
+not `keep`.
+
+Historical lab-boundary and objective artifacts remain auditable at their exact
+revisions, but no PluggedInSocial or ArrowHedge repair or measurement is part of
+the current program. `pnpm pm:memo` must keep reporting its business verdict as
+a separate deferred claim; it cannot promote local conformance or a future
+public result into business operability.
 
 ## Research basis
 
+- [in-toto layouts and links](https://in-toto.io/docs/getting-started/)
+  separate an owner-authorized plan from functionary-signed execution evidence.
+- [Sigstore Rekor](https://docs.sigstore.dev/logging/overview/) and its
+  [timestamp model](https://docs.sigstore.dev/cosign/verifying/timestamps/)
+  show why artifact signatures need an append-only witness and trustworthy time
+  source rather than a bundle-local clock.
+- [OSF preregistration](https://help.osf.io/article/330-welcome-to-registrations)
+  freezes a time-stamped, read-only analysis plan before collection.
+- NASA's [Space Flight Program and Project Management Handbook](https://ntrs.nasa.gov/citations/20220009501)
+  and [NPR 7120.5F](https://nodis3.gsfc.nasa.gov/displayDir.cfm?Internal_ID=N_PR_7120_005F_&page_name=Chapter2)
+  separate independent review from the Decision Authority's signed decision.
 - [NIST AI RMF Core](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
   calls for deployment-context testing, production monitoring, and ongoing
   measurement with human/domain input.

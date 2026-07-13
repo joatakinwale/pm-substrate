@@ -7,7 +7,7 @@ import {
   type ThreeAxisProofPacketSource,
 } from "../packages/evals/src/index.js";
 import {
-  SCENARIOS,
+  EVIDENCE_SCENARIOS,
   runSuite,
 } from "../packages/local-agent-lab/src/index.js";
 import {
@@ -22,7 +22,7 @@ if (!databaseUrl) {
   exit(1);
 }
 
-const dynamicSuite = await runSuite(SCENARIOS, {
+const dynamicSuite = await runSuite(EVIDENCE_SCENARIOS, {
   databaseUrl,
   retainWorlds: true,
 });
@@ -43,14 +43,20 @@ const prePersistenceProofPacket = buildStrictRunnerProofPacket({
 });
 
 console.log(JSON.stringify({
+  evidenceClaim: evalSuite.evidenceClaim,
+  suiteRunId: dynamicSuite.suiteRunId,
   scenarios: dynamicSuite.runs.length,
   model: dynamicSuite.model,
   events: evalSuite.events.length,
   actionOutcomeEnvelopePackets: evalSuite.actionOutcomeEnvelopes.length,
-  baselineFailures: evalSuite.baselineFailures,
-  substrateFailures: evalSuite.substrateFailures,
-  failureReduction: evalSuite.failureReduction,
-  allStageFailureReduction: evalSuite.allStageFailureReduction,
+  mechanismFailureReduction: evalSuite.mechanismFailureReduction,
+  mechanismEvidence: evalSuite.mechanismEvidence,
+  rawDiagnostics: {
+    baselineFailures: evalSuite.baselineFailures,
+    substrateFailures: evalSuite.substrateFailures,
+    failureReduction: evalSuite.failureReduction,
+    allStageFailureReduction: evalSuite.allStageFailureReduction,
+  },
   substrateProtectedCount: dynamicSuite.substrateProtectedCount,
   noFailureCount: dynamicSuite.noFailureCount,
   tokensPerAdmittedTransition: dynamicSuite.tokensPerAdmittedTransition,
@@ -60,6 +66,7 @@ console.log(JSON.stringify({
     coverageRate: evalSuite.liveCoverage.coverageRate,
     coveredFailureClasses: evalSuite.liveCoverage.coveredFailureClasses,
     missingFailureClasses: evalSuite.liveCoverage.missingFailureClasses,
+    mutantControlGatePassed: evalSuite.liveCoverage.mutantControlGatePassed,
   },
   byFailureClass: evalSuite.metrics.byFailureClass,
   authorityRecovery: {

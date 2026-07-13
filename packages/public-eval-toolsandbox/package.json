@@ -1,0 +1,30 @@
+{
+  "name": "@pm/public-eval-toolsandbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned Apple ToolSandbox receipt adapter for independent pm-substrate agent-state evaluation.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true",
+    "public-eval": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

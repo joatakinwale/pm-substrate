@@ -10,7 +10,9 @@ export type {
 export { checkpointHash, sha256Hex } from "./hash.js";
 export { PostgresContinuityLedger } from "./postgres.js";
 export {
+  buildContinuityChainRepairPlan,
   verifyContinuityCheckpointChain,
+  type ContinuityChainRepairPlan,
   type ContinuityCheckpointChainVerificationInput,
 } from "./verify.js";
 

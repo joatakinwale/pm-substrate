@@ -4,31 +4,147 @@
 
 ## The objective
 
-The substrate is validated only when **three claims hold together** across the
-PluggedInSocial and ArrowHedge testbeds:
+Validation now proceeds through three claims in order; evidence cannot skip a
+layer:
 
-1. **Plug-in claim** — each lab onboards through mapping/profile/capability
-   files with zero substrate-package edits and no app rewrite.
-2. **Agent-state/PM-governance claim** — agents using admitted state and gates
-   outperform or protect matched no-substrate workflows on staleness,
-   authority, evidence, replay, continuity, and expected allow/block behavior.
-3. **Business-operability claim** — those protections survive end-to-end work:
-   correct outcomes do not regress, owner effort does not rise, and cash cost
-   stays within the declared premium on held-out and production-like runs.
+1. **Mechanism conformance** — deterministic runtime tests show that the PM
+   state boundary, recovery, replay, and admission rules behave as specified.
+2. **Public causal efficacy** — on pinned independent tasks, the same agent with
+   real substrate state beats both native and equal-overhead sham controls on
+   the benchmark's unchanged strict outcome while reliability, collateral
+   state, false-block, cost, and latency guardrails hold.
+3. **Deferred transfer/business operability** — only after public efficacy is
+   kept, external apps onboard with zero substrate edits and demonstrate useful
+   operating outcomes at acceptable owner effort and cost.
 
-The first two claims can make the technical substrate worth keeping. They do
-not, alone, prove that either business is worth operating. The executable
-scorecard, non-claims, and verdict ceilings are in
-[`objective-falsification.md`](./objective-falsification.md). The agent-state
-work remains an extension and proof of the PM-layer thesis, not a pivot from it
-(see `artifacts/pm_substrate_rewrite.md`). ArrowHedge is used strictly for
-historical research/education; the agents and operating state are the subject,
-not financial performance.
+The local suite currently supports claim 1, not claim 2. The existing app and
+business scorecard supports a future claim 3 but is frozen during D6/D7. A
+passing lower layer never proves the next one. The executable scorecards,
+non-claims, and verdict ceilings are in
+[`objective-falsification.md`](./objective-falsification.md). Agent state is an
+extension and proof of the PM-layer thesis, not a pivot: the hypothesis is that
+explicit current state, provenance, decisions, recovery cuts, and admission at
+the tool boundary improve project execution.
 
 ---
 
-## Axis B - PluggedInSocial marketing-engine validation
+## Axis P — public agent-state validation (active)
 
+### P0: evidence integrity
+
+- Existing local agent-lab and synthetic paired evals are **conformance-only**.
+  Their oracles may diagnose whether the intended gate fired, but may not be
+  cited as independent outcome evidence.
+- Every attempt has a unique identity. Pairing requires exact benchmark,
+  revision, task content and eligible-universe membership, split, model,
+  prompt/tool/runner configuration, seed, initial environment, typed arm
+  intervention, deterministic randomized order, and fault-injection
+  coordinates.
+- Benchmark oracles cannot import the substrate's admission predicate. A block
+  counts only through the unchanged external task oracle.
+- Expected-allow/no-op and expected-block cases are both mandatory. `block-all`
+  and `allow-all` mutants must fail qualification.
+
+### P1: ToolSandbox vertical slice
+
+Pin the public multi-turn scenario in which the agent must clarify a message,
+look up a contact, encounter disabled cellular service, enable it, and retry.
+The original milestone DAG and minefields remain the primary oracle. Compare
+native, sham, and substrate arms with identical model and tool affordances. A
+separate derivative loses a tool response and restarts the agent process; pass
+requires exactly one intended message and no unrelated state mutation. The
+adapter may translate public tool calls at the periphery, but the substrate path
+must consume the real HTTP/MCP sidecar protocol. The current implementation is
+only a direct `@pm/agent-state-core` peripheral adapter and reinstantiates a
+provider role in one Python process; neither property satisfies that exit
+criterion. Current artifacts also lack provider request/response bytes,
+request IDs, usage/cost/latency, exact task/oracle bytes, and independent trust
+evidence, so conversion to `PublicEvalAttemptArtifact` fails closed.
+
+### P2: STATE-Bench held-out headline
+
+Use the Agent Learning Track with its official training/held-out separation,
+domain tools, simulator, judge, prompt hashes, and score. Substrate learnings are
+exposed only through the track's permitted read-only
+`retrieve_learnings(query, top_k=3)` seam; test definitions never enter the
+learning store. Qualification tasks tune the harness and estimate power. The
+confirmatory manifest is then sealed before held-out results are inspected.
+Official simulator/judge credentials are an execution prerequisite, not a
+reason to substitute a local self-judge or claim success from adapter tests.
+Output that merely matches the expected score-file shape is conformance only.
+The adapter must refuse D7 conversion without raw runner, agent-provider,
+simulator, and judge bytes, request IDs, usage, cost, and latency.
+
+### P3: independent corner battery
+
+Use separately owned public tasks to cover:
+
+- contradiction and supersession (including value-reversion/ABA);
+- restart between dependent writes, lost responses, idempotency, and collateral
+  state preservation;
+- changing-world state, relative queries, and correct no-op behavior.
+
+Original benchmark results remain separate from derivative fault injection.
+Where a benchmark contains UI or perception variance, use its deterministic DB
+or task-state oracle for the state claim and report perception failures as a
+separate confound.
+
+Behavioral trials use one shared runner, non-treatment configuration, model,
+and supporting-file identity; each arm supplies only a registered typed
+treatment delta. The oracle executes from a fresh neutral view containing only
+the task output and receives no arm/treatment metadata. This reduces accidental
+leakage but is not an OS sandbox: independent review and execution receipts must
+still rule out host inspection, order inference, covert output channels, and a
+runner that did not invoke the pinned oracle.
+
+### P4: analysis and decision
+
+Primary analysis is task-level paired strict completion with simultaneous
+inference against the maximum of native and sham inside each bootstrap draw.
+Repeats are clustered within task. Reliable lift and economics pass separately
+against both controls; missing comparisons fail. Report paired uncertainty,
+false blocks, collateral changes, absolute and relative cost per strict
+success, and absolute and relative latency per strict success. Preserve every
+failure and exclusion. Qualification, confirmatory, and replication artifacts
+use different IDs and may not be pooled. The exact manifest is signed before
+execution, and one signed receipt binds each attempt's timestamps and raw root.
+A clean verifier recomputes every metric from content-resolved raw artifacts.
+Its Ed25519 key and source revision must be selected in an out-of-bundle trust
+policy, the verifier owner must differ from the experiment producer, and the
+owner/CI-pinned policy hash must be supplied outside the result bundle. A
+second benchmark or model must preserve the direction. Even then, automation
+reports only conditional evidence eligibility; a separately authenticated
+owner must sign the exact report hash before D7 can decide or unfreeze apps.
+Analysis files, unsigned/hash-only receipts, and caller-selected trust alone are
+diagnostic/non-authoritative.
+
+### P5: Arrowsmith repair
+
+Research begins only after a public failure is captured. Map the trace to the
+existing state-identity, replay, recovery, evidence, settlement, or procedure
+primitive; document the missing behavior and falsifier; implement the smallest
+general change with a non-test runtime consumer; ablate it; rerun the exact task
+and clean controls. A non-causal or non-improving change is reverted or narrows
+the claim.
+
+The first real dogfood failure in this program was a concurrent continuity
+append fork. Its preserved trace, cause, advisory-lock repair, append-only merge,
+and ablation are documented in
+[`state-validation/continuity-concurrency-failure-2026-07-13.md`](./state-validation/continuity-concurrency-failure-2026-07-13.md).
+It validates a repair loop, not public task benefit.
+
+Adversarial review then found a false-KEEP authority gap: valid signatures under
+a caller-supplied policy could be mistaken for a decision. Arrowsmith
+[v231](../research/daily-arrowsmith-agent-state/v231-externally-anchored-evaluation-authority-2026-07-13.md)
+separates preregistered evidence eligibility from owner decision authority. It
+is evaluation-integrity hardening, not a public behavioral repair or benefit.
+
+---
+
+## Axis B — PluggedInSocial marketing-engine validation (deferred)
+
+This axis is frozen until a D7 public-proof keep decision. Historical evidence
+remains revision-bound and auditable but cannot score Axis P. When reopened,
 PluggedInSocial is the marketing-operations validation lane. Its test is whether
 the substrate can observe and govern a complete agency loop without prompt-memory
 shortcuts:
@@ -77,6 +193,9 @@ pnpm vitest run \
 
 ## Test plan T1–T8 (from the rewrite thesis)
 
+These tests remain mechanism-conformance history. “Implemented” or “measured”
+in this table does not mean independently validated public efficacy.
+
 | Test | Pass condition | Status / executable proof |
 |---|---|---|
 | T1 Source mapping | ArrowHedge tickers/signals/risk/decisions map into substrate entities/events; mapping validates structurally + semantically; no substrate edits | **Implemented** — `ARROWHEDGE_ENTITY_MAPPING`, `@pm/entity-mapping` structural + semantic validators, ingestion-plan tests |
@@ -92,9 +211,13 @@ pnpm vitest run \
 
 Time-to-plugin · substrate edit count (target: zero) · mapping coverage · validator rejection rate · evidence coverage · state disagreement rate · stale action rate · agent resume success · replay fidelity · unauthorized action block rate · cross-tool outcome success · mean time to reconcile.
 
-Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. `pm.objective.lab-measured.v2` now instruments time-to-first-value, substrate edit count, app rewrite, mapping coverage, correct outcomes, write-path coverage, false positives/negatives, cost, owner minutes, holdouts, and acceptance. The v2 measurement binds those claims to a run manifest, boundary-conformance artifact, app revision, and substrate revision; read/action receipts must match all four coordinates. D6 still has to collect and admit those measurements from the two real labs; a schema with no evidence is a gap, not a pass.
+Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover staleness/evidence/replay/policy mechanisms, catalog-verification failures, and selected write-gate outcomes. They are diagnostic drivers, not Axis P endpoints. `pm.objective.lab-measured.v2` instruments the deferred transfer gate and remains revision-bound; a schema or local fixture with no independent outcome evidence is a gap, not a pass.
 
-## Business-operability gate
+## Business-operability gate (deferred)
+
+Do not execute new app-bound work under this section until D7 keeps the public
+claim. These commands and criteria remain documented for historical
+reproducibility and later transfer.
 
 Generate a template, replace every placeholder with source-cited observations,
 and admit it:
@@ -240,6 +363,10 @@ current adapter contract and integration review.
 8. **The second profile stops being free.** If `profile-agency` (or any future profile) requires substrate diffs to coexist with `finance-research`, the universality claim is dead.
 9. **Technical success substitutes for useful outcomes.** If the project claims “worth operating” from event counts, fixture passes, or blocks without matched correct outcomes, cost, owner effort, and acceptance, the objective claim is falsified even when the substrate remains salvageable.
 10. **Governance is bypassable or unusably conservative.** Any in-scope direct write path, false-negative allow, or gate that avoids errors by blocking valid pilot actions fails the operational claim.
+11. **The public oracle is not independent.** If gate logic supplies the task verdict, or a block is counted as success without the upstream oracle, the efficacy result is invalid.
+12. **Placebo explains the lift.** If the real substrate does not beat an equal-overhead sham, the state-specific causal claim is not supported.
+13. **The result depends on tuned or leaked test tasks.** Split leakage, post-result exclusions, reuse of qualification tasks, or silent task mutation invalidates confirmatory evidence.
+14. **The result cannot replicate.** If a clean verifier cannot recompute it or the direction disappears on the declared second benchmark/model, D7 cannot keep the general claim.
 
 ---
 
@@ -265,6 +392,7 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 
 ## Changelog
 
+- **2026-07-13** — superseded the app-first execution order with Axis P: independent public oracles, native/sham/substrate controls, ToolSandbox first slice, STATE-Bench held-out headline, public corner battery, failure-driven Arrowsmith repair, and clean replication. Lab apps are frozen until D7.
 - **2026-07-13** — separated technical substrate viability from business operability; added the admitted `pm.objective.lab-measured.v2` scorecard, matched outcome/cost/owner-effort thresholds, held-out/production-like requirements, exact revision/run-bound integration receipts, and D7 verdict ceilings.
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).

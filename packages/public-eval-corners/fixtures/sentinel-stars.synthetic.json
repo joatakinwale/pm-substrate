@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "pm.public-eval-corner-synthetic-fixture.v1",
+  "fixtureId": "sentinel-stars-synthetic-v1",
+  "cornerId": "sentinel-microhub-stars",
+  "label": "pm-synthetic-conformance",
+  "claimScope": "adapter-conformance",
+  "distribution": "package-synthetic",
+  "containsUpstreamTaskData": false,
+  "containsProtectedContent": false,
+  "nonGating": true,
+  "syntheticNotice": "PM-authored synthetic values; no upstream task data.",
+  "content": {
+    "cases": [
+      {
+        "caseId": "synthetic-relative-contact-after-threshold",
+        "mode": "relative",
+        "baseline": 20,
+        "delta": 5,
+        "current": 25,
+        "conditionAt": 40,
+        "contactAt": 42,
+        "expectSuccess": true
+      },
+      {
+        "caseId": "synthetic-relative-premature-contact",
+        "mode": "relative",
+        "baseline": 20,
+        "delta": 5,
+        "current": 25,
+        "conditionAt": 40,
+        "contactAt": 35,
+        "expectSuccess": false
+      },
+      {
+        "caseId": "synthetic-noop-no-contact",
+        "mode": "noop",
+        "contactAt": null,
+        "expectSuccess": true
+      },
+      {
+        "caseId": "synthetic-noop-false-contact",
+        "mode": "noop",
+        "contactAt": 12,
+        "expectSuccess": false
+      }
+    ]
+  }
+}

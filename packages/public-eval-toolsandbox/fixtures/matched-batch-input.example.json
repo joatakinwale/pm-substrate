@@ -1,0 +1,13 @@
+{
+  "checkoutPath": "/absolute/path/to/clean/ToolSandbox",
+  "pythonExecutable": "/absolute/path/to/tool-sandbox-python",
+  "nodeExecutable": "/absolute/path/to/node",
+  "outputRoot": "/absolute/path/to/empty/output-directory",
+  "batchId": "toolsandbox-live-001",
+  "evaluationTrack": "restart_lost_response_derivative",
+  "agent": "GPT_4_o_2024_05_13",
+  "user": "GPT_4_o_2024_05_13",
+  "preferredToolBackend": "DEFAULT",
+  "randomizationSeed": "preregistered-order-seed-001",
+  "timeoutMs": 900000
+}

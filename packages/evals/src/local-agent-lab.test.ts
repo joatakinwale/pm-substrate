@@ -10,8 +10,10 @@ import type { TenantId, Timestamp } from "@pm/types";
 
 import {
   assertEventsHaveGeneratedActionOutcomePackets,
+  analyzeDynamicLocalAgentLabLiveCoverage,
   buildDynamicLocalAgentLabEvalSuite,
   recordDynamicLocalAgentLabEvalSuite,
+  summarizeLocalAgentLabMechanismEvidence,
   type DynamicLocalAgentLabScenarioRunForEval,
 } from "./local-agent-lab.js";
 import { FAILURE_CLASSES, type FailureClass } from "./schema.js";
@@ -38,7 +40,8 @@ describe("dynamic local-agent-lab eval adapter", () => {
       "accepted",
       "blocked",
     ]);
-    expect(suite.events.every((event) => event.pairedRunGroup === "pair_local_agent_lab_stale-observation")).toBe(true);
+    expect(new Set(suite.events.map((event) => event.pairedRunGroup)).size).toBe(1);
+    expect(suite.events.every((event) => event.attemptId === run.attemptId)).toBe(true);
     expect(suite.events[0]!.tenantId).toBe("tnt_live_baseline");
     expect(suite.events[1]!.tenantId).toBe("tnt_live_substrate");
     expect(
@@ -52,6 +55,8 @@ describe("dynamic local-agent-lab eval adapter", () => {
       ),
     ).toBe(true);
     expect(suite.metrics.evidenceStages).toEqual(["live_run"]);
+    expect(suite.evidenceClaim).toBe("mechanism_conformance_only");
+    expect(suite.mechanismFailureReduction).toBeNull();
     expect(suite.failureReduction).toBe(1);
     expect(suite.allStageFailureReduction).toBe(1);
     expect(suite.metrics.byEvidenceStage.live_run).toMatchObject({
@@ -62,34 +67,43 @@ describe("dynamic local-agent-lab eval adapter", () => {
     });
     expect(suite.liveCoverage).toMatchObject({
       complete: false,
-      coverageRate: 1 / FAILURE_CLASSES.length,
-      coveredFailureClasses: ["stale_observation"],
+      coverageRate: 0,
+      coveredFailureClasses: [],
+      mutantControlGatePassed: false,
     });
     expect(suite.liveCoverage.missingFailureClasses).toContain("partial_observation");
   });
 
   it("reports complete live coverage only after every failure class has a packet-backed pair", () => {
-    const runs = FAILURE_CLASSES.map((failureClass) =>
+    const runs = FAILURE_CLASSES.flatMap((failureClass) => [
       scenarioRunFixture({
         failureClass,
-        scenarioId: failureClass.replaceAll("_", "-"),
+        scenarioId: `${failureClass.replaceAll("_", "-")}-expected-block`,
+        expectedAdmission: "block",
       }),
-    );
+      scenarioRunFixture({
+        failureClass,
+        scenarioId: `${failureClass.replaceAll("_", "-")}-expected-allow`,
+        expectedAdmission: "allow",
+      }),
+    ]);
     const suite = buildDynamicLocalAgentLabEvalSuite({
       runs,
       model: "llama3.2:3b",
       actionOutcomeEnvelopes: runs.flatMap((run) => run.actionOutcomeEnvelopes),
     });
 
-    expect(suite.events).toHaveLength(FAILURE_CLASSES.length * 2);
+    expect(suite.events).toHaveLength(FAILURE_CLASSES.length * 4);
     expect(suite.liveCoverage.complete).toBe(true);
+    expect(suite.liveCoverage.mutantControlGatePassed).toBe(true);
+    expect(suite.mechanismFailureReduction).toBe(FAILURE_CLASSES.length);
     expect(suite.liveCoverage.coverageRate).toBe(1);
     expect(suite.liveCoverage.coveredFailureClasses).toEqual(FAILURE_CLASSES);
     expect(suite.liveCoverage.missingFailureClasses).toEqual([]);
     expect(
       FAILURE_CLASSES.every(
         (failureClass) =>
-          suite.liveCoverage.byFailureClass[failureClass].completePacketBackedPairs === 1,
+          suite.liveCoverage.byFailureClass[failureClass].completePacketBackedPairs === 2,
       ),
     ).toBe(true);
     expect(
@@ -128,6 +142,125 @@ describe("dynamic local-agent-lab eval adapter", () => {
     });
     expect(suite.liveCoverage.coveredFailureClasses).toEqual([]);
     expect(suite.liveCoverage.missingFailureClasses).toContain("workflow_invalidation");
+  });
+
+  it("rejects a block-all mutant because the matched expected-allow control is denied", () => {
+    const expectedBlock = scenarioRunFixture({
+      scenarioId: "stale-observation-expected-block",
+      expectedAdmission: "block",
+    });
+    const blockAllControl = scenarioRunFixture({
+      scenarioId: "stale-observation-expected-allow",
+      expectedAdmission: "allow",
+      substrateResult: "blocked",
+      substrateTerminalOutcome: "blocked",
+    });
+    const suite = buildDynamicLocalAgentLabEvalSuite({
+      runs: [expectedBlock, blockAllControl],
+      model: "llama3.2:3b",
+      actionOutcomeEnvelopes: [
+        ...expectedBlock.actionOutcomeEnvelopes,
+        ...blockAllControl.actionOutcomeEnvelopes,
+      ],
+    });
+    const summary = summarizeLocalAgentLabMechanismEvidence(suite.events);
+
+    expect(summary).toMatchObject({
+      exactPairs: 2,
+      protectivePairs: 1,
+      expectedAllowPairs: 1,
+      passingExpectedAllowPairs: 0,
+      allowAllMutantRejected: true,
+      blockAllMutantRejected: false,
+      mutantControlGatePassed: false,
+    });
+    expect(suite.mechanismFailureReduction).toBeNull();
+    expect(suite.liveCoverage.byFailureClass.stale_observation.covered).toBe(false);
+  });
+
+  it("rejects an allow-all mutant because the expected-block hazard lands", () => {
+    const allowAllHazard = scenarioRunFixture({
+      scenarioId: "stale-observation-expected-block",
+      expectedAdmission: "block",
+      substrateResult: "fail",
+      substrateTerminalOutcome: "accepted",
+    });
+    const expectedAllow = scenarioRunFixture({
+      scenarioId: "stale-observation-expected-allow",
+      expectedAdmission: "allow",
+    });
+    const suite = buildDynamicLocalAgentLabEvalSuite({
+      runs: [allowAllHazard, expectedAllow],
+      model: "llama3.2:3b",
+      actionOutcomeEnvelopes: [
+        ...allowAllHazard.actionOutcomeEnvelopes,
+        ...expectedAllow.actionOutcomeEnvelopes,
+      ],
+    });
+    const summary = summarizeLocalAgentLabMechanismEvidence(suite.events);
+
+    expect(summary).toMatchObject({
+      exactPairs: 2,
+      expectedBlockPairs: 1,
+      protectivePairs: 0,
+      passingExpectedAllowPairs: 1,
+      allowAllMutantRejected: false,
+      blockAllMutantRejected: true,
+      mutantControlGatePassed: false,
+    });
+    expect(suite.mechanismFailureReduction).toBeNull();
+    expect(suite.liveCoverage.byFailureClass.stale_observation.covered).toBe(false);
+  });
+
+  it("does not overstate duplicate or imbalanced pair groups", () => {
+    const expectedBlock = scenarioRunFixture({
+      scenarioId: "stale-observation-expected-block",
+      expectedAdmission: "block",
+    });
+    const expectedAllow = scenarioRunFixture({
+      scenarioId: "stale-observation-expected-allow",
+      expectedAdmission: "allow",
+    });
+    const suite = buildDynamicLocalAgentLabEvalSuite({
+      runs: [expectedBlock, expectedAllow],
+      model: "llama3.2:3b",
+      actionOutcomeEnvelopes: [
+        ...expectedBlock.actionOutcomeEnvelopes,
+        ...expectedAllow.actionOutcomeEnvelopes,
+      ],
+    });
+
+    expect(summarizeLocalAgentLabMechanismEvidence(suite.events)).toMatchObject({
+      exactPairs: 2,
+      invalidPairedGroups: 0,
+      exactPairIntegrityPassed: true,
+      mutantControlGatePassed: true,
+    });
+
+    const duplicated = [...suite.events, suite.events[0]!];
+    expect(summarizeLocalAgentLabMechanismEvidence(duplicated)).toMatchObject({
+      exactPairs: 1,
+      invalidPairedGroups: 1,
+      exactPairIntegrityPassed: false,
+      mutantControlGatePassed: false,
+    });
+    expect(
+      analyzeDynamicLocalAgentLabLiveCoverage(
+        duplicated,
+        suite.actionOutcomeEnvelopes,
+      ).byFailureClass.stale_observation.covered,
+    ).toBe(false);
+
+    const imbalanced = suite.events.filter(
+      (event) =>
+        event.expectedAdmission === "allow" || event.runArm === "baseline",
+    );
+    expect(summarizeLocalAgentLabMechanismEvidence(imbalanced)).toMatchObject({
+      exactPairs: 1,
+      invalidPairedGroups: 1,
+      exactPairIntegrityPassed: false,
+      mutantControlGatePassed: false,
+    });
   });
 
   it("persists generated packets before recording live EvalEvents", async () => {
@@ -193,10 +326,24 @@ function scenarioRunFixture(
   input: {
     readonly scenarioId?: string;
     readonly failureClass?: FailureClass;
+    readonly suiteRunId?: string;
+    readonly attemptId?: string;
+    readonly expectedAdmission?: "allow" | "block";
+    readonly baselineResult?: "pass" | "fail" | "blocked";
+    readonly substrateResult?: "pass" | "fail" | "blocked";
+    readonly substrateTerminalOutcome?: ActionTerminalOutcome;
   } = {},
 ): DynamicLocalAgentLabScenarioRunForEval {
   const scenarioId = input.scenarioId ?? "stale-observation";
   const failureClass = input.failureClass ?? "stale_observation";
+  const expectedAdmission = input.expectedAdmission ?? "block";
+  const baselineResult =
+    input.baselineResult ?? (expectedAdmission === "block" ? "fail" : "pass");
+  const substrateResult =
+    input.substrateResult ?? (expectedAdmission === "block" ? "blocked" : "pass");
+  const substrateTerminalOutcome =
+    input.substrateTerminalOutcome ??
+    (expectedAdmission === "block" ? "blocked" : "accepted");
   const baselineEnvelope = envelopeFixture({
     tenantId: "tnt_live_baseline" as TenantId,
     scenarioId,
@@ -209,19 +356,23 @@ function scenarioRunFixture(
     tenantId: "tnt_live_substrate" as TenantId,
     scenarioId,
     arm: "substrate",
-    terminalOutcome: "blocked",
+    terminalOutcome: substrateTerminalOutcome,
     decidedAt: "2026-06-25T19:00:01.000Z" as Timestamp,
   });
 
   return {
+    suiteRunId: input.suiteRunId ?? "suite_fixture",
+    attemptId: input.attemptId ?? `attempt_${scenarioId}`,
     scenarioId,
     failureClass,
+    expectedAdmission,
+    controlGroup: failureClass,
     realityQualities: [5, 6, 7, 9, 10],
     model: "llama3.2:3b",
     arms: {
       no_substrate: {
         arm: "no_substrate",
-        result: "fail",
+        result: baselineResult,
         actedValue: 100,
         admitted: true,
         tokens: 42,
@@ -231,10 +382,12 @@ function scenarioRunFixture(
       },
       substrate: {
         arm: "substrate",
-        result: "blocked",
+        result: substrateResult,
         actedValue: 100,
-        admitted: false,
-        refusedReason: "stale_basis position=1 < head=2",
+        admitted: substrateTerminalOutcome === "accepted",
+        ...(substrateTerminalOutcome === "accepted"
+          ? {}
+          : { refusedReason: "stale_basis position=1 < head=2" }),
         tokens: 44,
         admittedTransitions: 2,
         chainValid: true,
@@ -242,7 +395,7 @@ function scenarioRunFixture(
       },
     },
     actionOutcomeEnvelopes: [baselineEnvelope, substrateEnvelope],
-    behaviorDiverged: true,
+    behaviorDiverged: baselineResult !== substrateResult,
   };
 }
 

@@ -32,6 +32,7 @@ export type { LabInjection, LabInjectionType } from "./injection.js";
 export type { LabMutation, LabMutationType } from "./mutation.js";
 export type {
   Arm,
+  ExpectedAdmission,
   EvalResult,
   Observation,
   IntendedAction,
@@ -53,7 +54,7 @@ export type {
   LocalAgentLabActionOutcomeAuthorityInput,
   LocalAgentLabActionOutcomeAuthorityProvider,
 } from "./engine.js";
-export { SCENARIOS, scenarioById } from "./registry.js";
+export { EVIDENCE_SCENARIOS, SCENARIOS, scenarioById } from "./registry.js";
 export { staleObservationScenario } from "./scenarios/stale-observation.js";
 export {
   capabilityContractViolationScenario,

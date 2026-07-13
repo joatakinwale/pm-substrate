@@ -1,6 +1,7 @@
 export {
   EVAL_AXES,
   EVAL_OPERATIONAL_TERMINAL_OUTCOMES,
+  EVAL_EXPECTED_ADMISSIONS,
   EVAL_REF_KINDS,
   EVAL_RESULTS,
   FAILURE_CLASSES,
@@ -21,6 +22,7 @@ export {
   type CoordinationClass,
   type EvalAxis,
   type EvalEvent,
+  type EvalExpectedAdmission,
   type EvalEvidenceRef,
   type EvalOperationalTerminalOutcome,
   type EvalRefKind,
@@ -102,6 +104,7 @@ export {
   buildDynamicLocalAgentLabEvalEvents,
   buildDynamicLocalAgentLabEvalSuite,
   recordDynamicLocalAgentLabEvalSuite,
+  summarizeLocalAgentLabMechanismEvidence,
   type DynamicLocalAgentLabArm,
   type DynamicLocalAgentLabArmRunForEval,
   type DynamicLocalAgentLabEvalOptions,
@@ -112,6 +115,7 @@ export {
   type DynamicLocalAgentLabScenarioRunForEval,
   type DynamicLocalAgentLabSuiteForEval,
   type DynamicLocalAgentLabTaxonomy,
+  type LocalAgentLabMechanismEvidenceSummary,
 } from "./local-agent-lab.js";
 export {
   buildAdapterStateProofEvalPair,

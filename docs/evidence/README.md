@@ -19,3 +19,18 @@ Artifacts cited by an objective measurement must be stored inside this
 pm-substrate checkout (normally here). The memo refuses external paths and
 symlinks that escape the checkout, so an untrusted event cannot turn evidence
 verification into an arbitrary local-file read.
+
+## Public-proof run register
+
+[`public-proof-run-register-2026-07-13.json`](./public-proof-run-register-2026-07-13.json)
+preserves the full content hashes and claim boundaries for the first public
+adapter qualifications, the provider-failed ToolSandbox batch, the zero-output
+STATE-Bench status, and the observed continuity repair. It is a digest register,
+not a D7 credential. ToolSandbox raw-verification v2 rejects the recorded v1
+provider failure because its `/tmp` bytes are no longer independently
+resolvable and it lacks provider/sidecar/usage evidence. STATE-Bench's current
+score-shaped output is procedure conformance only and its converter emits no
+attempt artifact. A future confirmatory bundle must include externally anchored
+preregistration, content-resolved raw/provider/oracle evidence, adapter-specific
+verification, external-verifier signatures, the out-of-band trust-policy pin,
+and a separate owner authorization over the conditional decision-report hash.
