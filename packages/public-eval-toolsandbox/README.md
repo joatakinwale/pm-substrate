@@ -1,18 +1,33 @@
 # `@pm/public-eval-toolsandbox`
 
-Pinned receipt adapter for the first public agent-state validation slice. It
-does not reimplement ToolSandbox and does not decide whether an internal block
-was useful. Apple ToolSandbox's own `result_summary.json` remains the outcome
-oracle.
+Pinned ToolSandbox adapter for a falsification-first public agent-state slice.
+It does not reimplement ToolSandbox and does not promote an internal substrate
+decision into task success. Apple's pinned evaluator remains the task-outcome
+authority; replayed target-state effects are reported separately because the
+upstream score does not detect every duplicate side effect.
 
-The pin is `apple/ToolSandbox@165848b9a78cead7ca7fe7c89c688b58e6501219`,
-scenario
+The benchmark pin is
+`apple/ToolSandbox@165848b9a78cead7ca7fe7c89c688b58e6501219`, scenario
 `send_message_with_contact_content_cellular_off_multiple_user_turn`. The
-scenario owns four milestones and no minefields. The manifest preserves that
-zero instead of adding a local success condition. It also keeps two result
-tracks disjoint: `official_headline` is the unchanged upstream scenario;
-`restart_lost_response_derivative` uses the same upstream evaluator over a
-locally perturbed trajectory and is never headline-eligible.
+manifest hash for the final qualification is
+`bd3285e471ed35d0440ab3b57105d43703456cc51d5e676b8a4bde3287ccbb2b`.
+The scenario owns four milestones and no minefields; this package preserves
+that zero rather than adding a local success condition.
+
+Two result tracks stay disjoint:
+
+- `official_headline` runs the unchanged upstream scenario without a restart
+  fault and is headline-track eligible.
+- `restart_lost_response_derivative` loses the response after the first
+  successful target send, kills and reaps the provider process group, starts a
+  fresh provider process, and retries. It is never headline-track eligible.
+
+Headline-track eligibility is not public-efficacy eligibility. The final runs
+use deterministic agent `PmScriptedStateProbe`, user `Cli`, and scripted stdin
+`["end"]`; they qualify the mechanism and verifier, not stochastic agent
+behavior or general task lift.
+
+## Commands
 
 After building the package:
 
@@ -22,92 +37,111 @@ pnpm --filter @pm/public-eval-toolsandbox public-eval verify-corpus /path/to/Too
 pnpm --filter @pm/public-eval-toolsandbox public-eval qualify-headline qualification-input.json
 pnpm --filter @pm/public-eval-toolsandbox public-eval run-matched-batch matched-batch-input.json
 pnpm --filter @pm/public-eval-toolsandbox public-eval verify-matched-batch raw-verification-input.json
-pnpm --filter @pm/public-eval-toolsandbox public-eval assess-public-eval-eligibility raw-verification.json
+pnpm --filter @pm/public-eval-toolsandbox public-eval verify-and-assess-matched-batch raw-verification-input.json
 pnpm --filter @pm/public-eval-toolsandbox public-eval convert-public-eval-attempts raw-verification.json
 pnpm --filter @pm/public-eval-toolsandbox public-eval create attempt-input.json
 pnpm --filter @pm/public-eval-toolsandbox public-eval verify receipt-set.json
 ```
 
-`qualify-headline` verifies the clean checkout and corpus, executes exactly the
-pinned scenario through ToolSandbox's official CLI, locates the sole generated
-`result_summary.json`, and embeds it in a content-addressed receipt. It writes a
-`pm-qualification-<hash>.json` artifact under the requested empty output root.
-Its Python executable must be an absolute path with ToolSandbox's pinned
-dependencies installed. For a no-API plumbing smoke, use official agent
-`Unhelpful`, user `Cli`, and scripted stdin `["end"]`; this only qualifies the
-harness and oracle path and is not agent-efficacy evidence.
+`assess-public-eval-eligibility` remains available only for legacy detached
+`raw-verification.v2` diagnostics. A v3 eligibility diagnosis must use
+`verify-and-assess-matched-batch`, which reopens the raw inputs before it
+assesses them.
 
-`run-matched-batch` generates matched candidate evidence. It is not itself a D7
-efficacy-artifact path. It verifies the same clean pinned checkout,
-deterministically randomizes native/sham/substrate run order from a recorded
-seed, and runs every arm with the same official agent, user simulator, `DEFAULT`
-tool backend, upstream harness seed `42`, and 30-message limit. Raw stdout,
-stderr, official result summaries, conversations, boundary traces, and
-content-addressed receipts stay under the requested output root. The batch
-artifact inventories their hashes. `Unhelpful`, `Cli`, scripted, or fixture
-runs only test plumbing. A provider-backed run still remains conformance-only
-unless the provider request and response bytes, request IDs, token usage, cost,
-and latency are retained and independently verified. New runs emit
-`matched-batch.v2`: the runner bytes and raw runner metadata bind the arm,
-track, model identities, backend, seed, and turn limit. Earlier
-`matched-batch.v1` files lack that raw config binding and are intentionally not
-accepted by the raw verifier; rerun them instead of upgrading their claims.
+## What `matched-batch.v3` retains
 
-`verify-matched-batch` takes an input object with absolute `batchPath`,
-`outputRoot`, and `checkoutPath` values. It reopens the batch and the entire
-output tree, requires an exact no-extra/no-missing inventory, rejects symlinks
-and path escapes, and re-hashes stdout, stderr, result summaries, trajectories,
-boundary traces/state, and receipt files. It also rechecks the clean pinned git
-checkout and corpus, the manifest-pinned local runner, randomized arm order,
-and raw arm/config metadata. Finally it reconstructs every receipt from the raw
-metadata plus Apple result summary and recomputes the official oracle fields and
-batch summary. An embedded receipt cannot supply its own score or fault claim;
-an applied restart fault must be supported by the raw trajectory and, for sham
-or substrate, the boundary trace's target-side outcome receipt.
+`run-matched-batch` verifies a clean pinned checkout, deterministically
+randomizes native/sham/substrate order from the recorded seed, and holds the
+agent, user simulator, `DEFAULT` tool backend, upstream seed `42`, and
+30-message limit constant. It retains an exact no-extra/no-missing inventory
+of:
 
-The verification artifact is deliberately labeled
-`artifactIntegrityAndConformanceOnly`. This is independent recomputation from
-raw bytes by the same producer package, not an independent signer or third-party
-replication, and it does not establish agent efficacy. A fault that was not
-reached remains visible as `trigger_not_reached`; it cannot be rewritten into an
-applied-fault claim. The hashed verification also records that the substrate
-treatment is a `direct_agent_state_core_peripheral_adapter`, invoked from the
-ToolSandbox Python runner through this package's Node CLI. It does not exercise
-the substrate's real authenticated HTTP/MCP sidecar protocol.
+- runner stdout/stderr, invocation metadata, result summaries, and execution
+  contexts;
+- raw provider request/response frames, request identities, process identities,
+  and restart-successor trace;
+- authenticated loopback HTTP sidecar lifecycle receipts, exchanges, durable
+  operation ledger, and state for sham and substrate;
+- the compiled runtime-module closure used by the sidecar; and
+- content-addressed attempt receipts and batch summary.
 
-`assess-public-eval-eligibility` is the explicit bridge to the generic
-`PublicEvalAttemptArtifact` gate. For current `matched-batch.v2` output it
-reports `publicEvalAttemptArtifactEligible: false`, even after verifier-v2 has
-replayed all three trajectories. Current artifacts do not content-resolve:
+The provider role is a real child OS process in every arm. In the derivative,
+the first provider process group receives `SIGKILL`, is reaped, and a fresh
+process handles the retry. Native has no state service. Sham and substrate use
+the same authenticated sidecar shape and persist equal-shaped state; sham
+reads unrelated state, while substrate can use the retained target outcome to
+block an exact retry.
 
-- provider request bytes, response bytes, request IDs, usage, cost, or latency;
-- exact extracted benchmark task and oracle bytes (whole-file corpus pins are
-  not a substitute);
-- a verified receipt proving the real authenticated HTTP/MCP sidecar protocol
-  was exercised; or
-- an independent verifier signature anchored in an external trust policy.
+## What `raw-verification.v3` proves
 
-`convert-public-eval-attempts` therefore always fails closed for the current
-schema. Adding caller-authored usage fields or claiming that a sidecar ran does
-not upgrade the evidence: the bridge accepts only the exact verifier-v2 shape,
-binds the direct-adapter execution path, and rejects supplemental claims. A
-future adapter revision must retain and independently verify every missing byte
-and receipt before it may emit a `PublicEvalAttemptArtifact`.
+`verify-matched-batch` reopens the batch and complete output tree, rejects
+symlinks, path escapes, extra or missing files, and hash mismatches, and then
+recomputes the evidence from raw bytes. It:
 
-The derivative uses the exact official scenario and its evaluator, but is
-reported separately from headline evidence. After the first successful
-`send_message_with_phone_number` side effect, the runner persists its outcome,
-drops the response, tears down the provider agent role, and creates a new role
-inside the same Python process. This is session/role re-instantiation, not an OS
-process restart. Native receives no state service. Sham and substrate both
-cross the same package-CLI/core-review adapter and persist equal-shaped state;
-sham deliberately reads unrelated state, while substrate uses the durable
-target receipt to block an exact retry before ToolSandbox executes it. An
-internal block is telemetry only: Apple's milestone oracle still exclusively
-decides task success.
+- rechecks the pinned clean checkout, exact task/oracle bytes, manifest,
+  randomized order, and raw run configuration;
+- runs a verifier-selected pinned Apple oracle replay over each retained
+  execution context and compares the recomputed result;
+- cross-replays provider frames, ToolSandbox trajectory rows, sidecar
+  requests/responses, durable state deltas, and restart-successor identity;
+- verifies the sidecar lifecycle and runtime-module closure; and
+- binds the first provider request to the pinned starting context hash
+  `62717eafc44807b3b6729f8c5b5f0f47fbeffba30093c421d90689ac30da2d04`
+  after normalizing only the 11 exact timestamp locations declared by policy
+  `pm.public-eval.toolsandbox-starting-context.exact-timestamp-paths.v1`.
 
-`create` writes a content-addressed receipt to stdout. `verify` expects a JSON
-array containing one matched native, sham, and substrate receipt. A scheduled
-fault that is not reached is retained as a failed attempt; it is not silently
-dropped. Raw upstream results and internal block telemetry remain separate, so
-blocking cannot be promoted into task completion.
+The replay is outcome-neutral: it checks whether observed allow/block decisions
+and effects are internally real, not whether they favor substrate. A regression
+retains an unexpected block as counterevidence and verifies the actual block
+semantics (`review.valid=false`, `allowed=false`, `blocking=true`) rather than
+selecting it away. Duplicate control sends and a hypothetical substrate
+duplicate therefore remain verifiable observations. Seventy-five focused
+tests passed during hardening, followed by a green 30-test final regression
+subset.
+
+## Final deterministic qualification
+
+| Track | Batch / raw verification / eligibility hash | Observed result |
+| --- | --- | --- |
+| Official headline | `7ad2c0e8…` / `36318957…` / `9a631ee3…` | All three arms: strict score `1.0`; no restart; no duplicate target effect |
+| Lost-response derivative | `0043af27…` / `673963f0…` / `c7624df3…` | All three arms: strict score `1.0`; actual kill/reap/restart in every arm; native and sham retried successfully with one duplicate target effect each; substrate blocked the retry with zero duplicates |
+
+The shared verified runtime-closure hash is
+`a71ae2d14d807449b5864f28985a195b27fb9bb62aa41fe55e10068a24d3f869`.
+The full roots and hashes are recorded in
+`docs/evidence/public-proof-run-register-2026-07-13.json`.
+
+The central finding is a measurement gap: Apple's official strict score stayed
+`1.0` when native and sham each sent the target message twice. Consequently,
+official task success and replayed state-effect safety must always be reported
+as separate outcomes. The internal substrate block is telemetry and safety
+evidence only; it is never rewritten into upstream task success.
+
+## Claim and eligibility boundary
+
+`verify-and-assess-matched-batch` still returns
+`publicEvalAttemptArtifactEligible: false`. V3 now content-resolves provider
+frames and request IDs, exact task/oracle bytes, oracle recomputation,
+authenticated sidecar execution, real restart evidence, trajectory binding,
+and the runtime closure. It still lacks:
+
+- provider usage tokens, cost, and latency;
+- an independent verifier signature and external trust anchor;
+- a trusted oracle replay runtime and environment; and
+- a non-scripted public-agent execution for these deterministic runs.
+
+`convert-public-eval-attempts` therefore fails closed. The final triplets are
+strong qualification/mechanism evidence for one known state-failure scenario;
+they do not establish agent efficacy, generalize across tasks, qualify
+STATE-Bench or the corner battery, satisfy confirmation/replication, or justify
+unfreezing either application.
+
+## Preserved failure history
+
+The original provider-backed derivative stopped before its first action in
+every arm on `429 insufficient_quota`; it remains a failed attempt, not a
+substrate result. The first deterministic derivative then exposed a real
+substrate-specific `400`: its 136-character concatenated idempotency key
+exceeded the sidecar's deliberate 128-character limit. The bounded,
+domain-separated SHA-256 repair is documented in Arrowsmith v232. Neither
+failure was overwritten by the final green qualification.

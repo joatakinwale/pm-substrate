@@ -1,22 +1,26 @@
 """Run one pinned ToolSandbox arm without modifying the upstream checkout.
 
 The official scenario and evaluator stay upstream-owned. Sham and substrate
-tool proposals cross the package's compiled Node admission CLI before the
-official execution environment executes them. The derivative drops the first
-successful send response and reinstantiates the provider agent session only
-after the target-side outcome has been persisted.
+tool proposals cross a startup-bound authenticated HTTP sidecar before the
+official execution environment executes them. Every provider role runs in a
+separate supervised OS process. The derivative drops the first successful send
+response and kills/reaps that provider process only after the target-side
+outcome and lost-response context have been persisted.
 """
 
 from __future__ import annotations
 
 import ast
+import base64
 import hashlib
 import json
+import os
 import random
 import re
-import subprocess
 import sys
 import traceback
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -25,7 +29,6 @@ import polars as pl
 
 from tool_sandbox.cli import write_result_summary
 from tool_sandbox.cli.utils import (
-    AGENT_TYPE_TO_FACTORY,
     USER_TYPE_TO_FACTORY,
     RoleImplType,
     get_category_summary,
@@ -43,6 +46,8 @@ from tool_sandbox.roles.execution_environment import (
     ExecutionEnvironment,
     get_messages_to_process,
 )
+
+from provider_process import ProviderProcessRole, SCRIPTED_AGENT
 
 SCENARIO = "send_message_with_contact_content_cellular_off_multiple_user_turn"
 DERIVATIVE = "restart_lost_response_derivative"
@@ -68,6 +73,17 @@ def canonical_hash(value: Any) -> str:
     return sha256_text(
         json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     )
+
+
+def idempotency_key(domain: str, *components: str) -> str:
+    """Return a bounded, domain-separated key regardless of public IDs' length."""
+    digest = canonical_hash(
+        {
+            "domain": f"pm.public-eval.toolsandbox-http-idempotency.{domain}.v1",
+            "components": list(components),
+        }
+    )
+    return f"pm-ts-{domain}-{digest}"
 
 
 def parse_call(message: Message) -> tuple[str, str, dict[str, Any]]:
@@ -116,43 +132,122 @@ def parse_call(message: Message) -> tuple[str, str, dict[str, Any]]:
     return call_id, tool_name, arguments
 
 
-class NodeBoundary:
+class HttpBoundary:
     def __init__(self, config: dict[str, Any]) -> None:
         self.arm = config["arm"]
         self.track = config["evaluationTrack"]
         self.attempt_id = config["attemptId"]
-        self.node = config["nodeExecutable"]
-        self.cli = config["boundaryCliPath"]
+        self.origin = config["boundaryOrigin"]
+        if re.fullmatch(r"http://127\.0\.0\.1:[1-9][0-9]{0,4}", self.origin) is None:
+            raise ValueError("boundaryOrigin must be an explicit IPv4 loopback origin")
+        self.bearer_token = config["boundaryBearerToken"]
+        if not isinstance(self.bearer_token, str) or len(self.bearer_token) < 32:
+            raise ValueError("boundaryBearerToken is invalid")
+        self.timeout_seconds = float(config.get("boundaryHttpTimeoutSeconds", 30.0))
         self.state_path = config["statePath"]
         self.trace_path = Path(config["boundaryTracePath"])
         self.trace_path.parent.mkdir(parents=True, exist_ok=True)
         self.allowed = 0
         self.blocked = 0
         self.block_reason_codes: set[str] = set()
+        self.trace_sequence = 0
+        self.trace_head_hash = "0" * 64
 
-    def _call(self, command: str, payload: dict[str, Any]) -> dict[str, Any]:
-        completed = subprocess.run(
-            [self.node, self.cli, command, "-"],
-            input=json.dumps(payload, ensure_ascii=False),
-            capture_output=True,
-            text=True,
-            check=False,
+    def _call(
+        self,
+        command: str,
+        payload: dict[str, Any],
+        operation_key: str,
+    ) -> dict[str, Any]:
+        endpoint = {
+            "admit-tool": "/v1/admit-tool",
+            "record-tool-outcome": "/v1/record-tool-outcome",
+        }[command]
+        request_bytes = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            self.origin + endpoint,
+            data=request_bytes,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self.bearer_token}",
+                "Content-Type": "application/json",
+                "Idempotency-Key": operation_key,
+            },
         )
-        if completed.returncode != 0:
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=self.timeout_seconds,
+            ) as response:
+                status = response.status
+                response_bytes = response.read()
+                content_type = response.headers.get("Content-Type")
+                request_id = response.headers.get("X-PM-Request-ID")
+        except urllib.error.HTTPError as error:
+            response_bytes = error.read()
             raise RuntimeError(
-                f"Node boundary {command} failed: "
-                f"stderrSha256={sha256_text(completed.stderr)}"
+                f"HTTP boundary {command} failed: status={error.code}; "
+                f"responseSha256={hashlib.sha256(response_bytes).hexdigest()}"
+            ) from error
+        except urllib.error.URLError as error:
+            raise RuntimeError(f"HTTP boundary {command} transport failed") from error
+        if status != 200 or content_type != "application/json" or not request_id:
+            raise RuntimeError(
+                f"HTTP boundary {command} returned invalid protocol metadata"
             )
-        result = json.loads(completed.stdout)
+        try:
+            result = json.loads(response_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise RuntimeError(
+                f"HTTP boundary {command} returned invalid JSON bytes"
+            ) from error
+        if not isinstance(result, dict):
+            raise RuntimeError(f"HTTP boundary {command} result must be an object")
+        self.trace_sequence += 1
+        body = {
+            "schemaVersion": "pm.public-eval.toolsandbox-boundary-http-client.v1",
+            "sequence": self.trace_sequence,
+            "previousEntryHash": self.trace_head_hash,
+            "command": command,
+            "request": payload,
+            "response": result,
+            "http": {
+                "endpointPath": endpoint,
+                "operationKeySha256": sha256_text(operation_key),
+                "request": {
+                    "bodyByteLength": len(request_bytes),
+                    "bodyBytesBase64": base64.b64encode(request_bytes).decode("ascii"),
+                    "bodySha256": hashlib.sha256(request_bytes).hexdigest(),
+                },
+                "response": {
+                    "status": status,
+                    "contentType": content_type,
+                    "requestId": request_id,
+                    "bodyByteLength": len(response_bytes),
+                    "bodyBytesBase64": base64.b64encode(response_bytes).decode("ascii"),
+                    "bodySha256": hashlib.sha256(response_bytes).hexdigest(),
+                },
+            },
+        }
+        entry_hash = canonical_hash(body)
         with self.trace_path.open("a", encoding="utf-8") as handle:
             handle.write(
                 json.dumps(
-                    {"command": command, "request": payload, "response": result},
+                    {**body, "entryHash": entry_hash},
                     sort_keys=True,
                     ensure_ascii=False,
                 )
                 + "\n"
             )
+            handle.flush()
+            os.fsync(handle.fileno())
+        self.trace_head_hash = entry_hash
         return result
 
     def propose(
@@ -176,6 +271,7 @@ class NodeBoundary:
                 "arguments": arguments,
                 "proposedAt": now_iso(),
             },
+            idempotency_key("admit", self.attempt_id, session_id, call_id),
         )
         if result["decision"] == "allow":
             self.allowed += 1
@@ -200,6 +296,7 @@ class NodeBoundary:
             {
                 "schemaVersion": "pm.public-eval.toolsandbox-tool-outcome.v1",
                 "arm": self.arm,
+                "evaluationTrack": self.track,
                 "attemptId": self.attempt_id,
                 "statePath": self.state_path,
                 "proposalId": proposal["proposalId"],
@@ -210,6 +307,12 @@ class NodeBoundary:
                 "responseHash": sha256_text(response_content),
                 "observedAt": now_iso(),
             },
+            idempotency_key(
+                "outcome",
+                self.attempt_id,
+                proposal["proposalId"],
+                call_id,
+            ),
         )
 
 
@@ -217,14 +320,14 @@ class InterceptingExecutionEnvironment(ExecutionEnvironment):
     def __init__(
         self,
         config: dict[str, Any],
-        restart_agent: Callable[[], str],
+        restart_agent: Callable[[dict[str, Any]], str],
     ) -> None:
         self.arm = config["arm"]
         self.track = config["evaluationTrack"]
         self.session_id = "session-001"
         self.restart_agent = restart_agent
         self.boundary = (
-            None if self.arm == "native" else NodeBoundary(config)
+            None if self.arm == "native" else HttpBoundary(config)
         )
         self.fault_applied = False
         self.fault_evidence: Optional[dict[str, Any]] = None
@@ -403,7 +506,20 @@ class InterceptingExecutionEnvironment(ExecutionEnvironment):
                     "restarted. The target-side outcome is unknown to this session."
                 )
                 self._replace_tool_response(response, lost)
-                self.session_id = self.restart_agent()
+                applied_at_turn = get_current_context().max_sandbox_message_index
+                self.session_id = self.restart_agent(
+                    {
+                        "targetCallId": call_id,
+                        "targetSideEffectReceiptHash": outcome_receipt[
+                            "targetSideEffectReceiptHash"
+                        ],
+                        "lostResponseHash": sha256_text(lost),
+                        "contextHashAfterLostResponse": canonical_hash(
+                            get_current_context().to_dict(serialize_console=False)
+                        ),
+                        "appliedAtTurn": applied_at_turn,
+                    }
+                )
                 self.restart_count += 1
                 self.fault_applied = True
                 self.fault_evidence = {
@@ -413,7 +529,7 @@ class InterceptingExecutionEnvironment(ExecutionEnvironment):
                         "targetSideEffectReceiptHash"
                     ],
                     "restartedAgentSessionId": self.session_id,
-                    "appliedAtTurn": get_current_context().max_sandbox_message_index,
+                    "appliedAtTurn": applied_at_turn,
                 }
 
     def final_fault_evidence(self) -> Optional[dict[str, Any]]:
@@ -446,23 +562,33 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
     random.seed(42)
     output = Path(config["outputRoot"])
     output.mkdir(parents=True, exist_ok=True)
-    agent_type = RoleImplType(config["agent"])
+    configured_agent = config["agent"]
+    agent_type = (
+        configured_agent
+        if configured_agent == SCRIPTED_AGENT
+        else str(RoleImplType(configured_agent))
+    )
     user_type = RoleImplType(config["user"])
-    agent_factory = AGENT_TYPE_TO_FACTORY[agent_type]
     user_factory = USER_TYPE_TO_FACTORY[user_type]
+    provider_process = ProviderProcessRole(
+        python_executable=sys.executable,
+        agent=agent_type,
+        attempt_id=config["attemptId"],
+        arm=config["arm"],
+        evaluation_track=config["evaluationTrack"],
+        trace_path=output / "provider-process.jsonl",
+        runner_path=Path(__file__),
+        response_timeout_seconds=float(
+            config.get("providerProcessResponseTimeoutSeconds", 900.0)
+        ),
+    )
     roles: dict[RoleType, BaseRole] = {
-        RoleType.AGENT: agent_factory(),
+        RoleType.AGENT: provider_process,
         RoleType.USER: user_factory(),
     }
-    session_counter = 1
 
-    def restart_agent() -> str:
-        nonlocal session_counter
-        old = roles[RoleType.AGENT]
-        old.teardown()
-        roles[RoleType.AGENT] = agent_factory()
-        session_counter += 1
-        return f"session-{session_counter:03d}"
+    def restart_agent(trigger: dict[str, Any]) -> str:
+        return provider_process.restart_after_sigkill(trigger)
 
     environment = InterceptingExecutionEnvironment(config, restart_agent)
     roles[RoleType.EXECUTION_ENVIRONMENT] = environment
@@ -489,21 +615,35 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
             "minefield_mapping": result.evaluation_result.minefield_mapping,
         }
     except Exception as error:
+        # ToolSandbox deliberately retains the partial execution context in the
+        # play_and_evaluate finally block. Never invent score-zero evidence for
+        # that context: replay the pinned evaluator so result_summary.json and
+        # the retained trajectory remain mutually checkable.
+        partial_evaluation = scenario.evaluation.evaluate(
+            execution_context=get_current_context(),
+            max_turn_count=scenario.max_messages,
+        )
         scenario_result = {
             "name": SCENARIO,
             "categories": scenario.categories,
             "traceback": traceback.format_exc(),
             "exception_type": type(error).__name__,
-            "milestone_similarity": 0,
-            "minefield_similarity": 0,
-            "similarity": 0,
-            "turn_count": scenario.max_messages,
-            "milestone_mapping": {},
-            "minefield_mapping": {},
+            "milestone_similarity": partial_evaluation.milestone_similarity,
+            "minefield_similarity": partial_evaluation.minefield_similarity,
+            "similarity": partial_evaluation.similarity,
+            "turn_count": partial_evaluation.turn_count,
+            "milestone_mapping": partial_evaluation.milestone_mapping,
+            "minefield_mapping": partial_evaluation.minefield_mapping,
         }
     finally:
         for role in roles.values():
             role.teardown()
+
+    provider_process_summary = provider_process.trace_summary()
+    if provider_process_summary["restartCount"] != environment.restart_count:
+        raise RuntimeError(
+            "provider process trace restart count does not match fault runner telemetry"
+        )
 
     write_result_summary(
         result_summary=[scenario_result],
@@ -512,7 +652,7 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
     )
     completed_at = now_iso()
     metadata = {
-        "schemaVersion": "pm.public-eval.toolsandbox-arm-run.v2",
+        "schemaVersion": "pm.public-eval.toolsandbox-arm-run.v3",
         "arm": config["arm"],
         "evaluationTrack": config["evaluationTrack"],
         "attemptId": config["attemptId"],
@@ -526,6 +666,8 @@ def run(config: dict[str, Any]) -> dict[str, Any]:
         "completedAt": completed_at,
         "resultSummaryPath": str(output / "result_summary.json"),
         "boundaryTracePath": config["boundaryTracePath"],
+        "providerProcessTracePath": provider_process_summary["tracePath"],
+        "providerProcess": provider_process_summary,
         "internalOutcome": environment.internal_outcome(),
         "faultEvidence": environment.final_fault_evidence(),
         "providerSessionRestartCount": environment.restart_count,

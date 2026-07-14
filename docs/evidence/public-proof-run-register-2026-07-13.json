@@ -1,6 +1,6 @@
 {
   "schemaVersion": "pm.public-proof-run-register.v1",
-  "recordedAt": "2026-07-13T18:30:00.000Z",
+  "recordedAt": "2026-07-14T00:36:40.000Z",
   "claimBoundary": "Digest and failure register only. Entries classified as conformance or qualification do not establish public agent efficacy.",
   "toolSandboxProviderFailure": {
     "classification": "provider-failed-derivative-attempt-not-efficacy",
@@ -42,6 +42,120 @@
     "rawArtifactDurability": "session-local; full batch and member hashes are preserved here, but this failed attempt is not a D7 evidence credential",
     "currentVerifierStatus": "rejected by raw-verification.v2; the original raw bytes are not durable/content-resolved and the batch lacks provider, real-sidecar, exact task/oracle, usage/cost/latency, OS-restart, and independent-trust receipts",
     "eligiblePublicEvalAttemptArtifacts": 0
+  },
+  "toolSandboxBoundedIdempotencyRepairHistory": {
+    "classification": "observed-adapter-failure-and-pre-final-repair-retest-not-efficacy",
+    "firstFailure": {
+      "rawArtifactRoot": "/private/tmp/pm-toolsandbox-v3-proof-20260713-1845",
+      "batchHash": "d9cf73c3fea1acc2c351d55b9a68ac913a8cc9d429ecdcfaf8e6c964be3a685a",
+      "evaluationTrack": "restart_lost_response_derivative",
+      "nativeStrictScore": 1,
+      "shamStrictScore": 1,
+      "substrateStrictScore": 0.25,
+      "failure": "substrate outcome idempotency key was 136 characters, exceeded the sidecar's deliberate 128-character limit, and received HTTP 400 before outcome admission",
+      "preservedAsHistory": true
+    },
+    "preFinalRepairRetest": {
+      "rawArtifactRoot": "/private/tmp/pm-toolsandbox-v3-proof-20260713-1848",
+      "batchHash": "90a8e03a353135ea2edfad97b2a6b8cbaab86140c8bc7563c3ffdc179ebf19f5",
+      "strictScoreByArm": {
+        "native": 1,
+        "sham": 1,
+        "substrate": 1
+      },
+      "observedStateEffect": "substrate blocked the exact retry and retained zero duplicate target effects; native and sham each retained one duplicate target effect",
+      "finalArtifactStatus": "not final: verifier/runtime-closure code changed after this batch, so a fresh post-change run was required",
+      "preservedAsHistory": true
+    },
+    "repair": "bounded domain-separated SHA-256 operation identity with the server-side length limit and request-byte conflict checks unchanged"
+  },
+  "toolSandboxFinalDeterministicQualification": {
+    "classification": "raw-cross-verified-deterministic-qualification-and-mechanism-evidence-not-agent-efficacy",
+    "upstreamRevision": "165848b9a78cead7ca7fe7c89c688b58e6501219",
+    "scenario": "send_message_with_contact_content_cellular_off_multiple_user_turn",
+    "manifestHash": "bd3285e471ed35d0440ab3b57105d43703456cc51d5e676b8a4bde3287ccbb2b",
+    "agent": "PmScriptedStateProbe",
+    "user": "Cli",
+    "scriptedStdin": ["end"],
+    "claimBoundary": "The deterministic probe qualifies one known lost-response/restart mechanism and evidence path. It does not measure stochastic public-agent efficacy or general task lift.",
+    "sharedBindings": {
+      "startingContextNormalizedSha256": "62717eafc44807b3b6729f8c5b5f0f47fbeffba30093c421d90689ac30da2d04",
+      "startingContextNormalizationPolicyId": "pm.public-eval.toolsandbox-starting-context.exact-timestamp-paths.v1",
+      "startingContextVolatileTimestampCount": 11,
+      "startingContextBoundExceptDocumentedVolatileTimestamps": true,
+      "runtimeClosureHash": "a71ae2d14d807449b5864f28985a195b27fb9bb62aa41fe55e10068a24d3f869"
+    },
+    "headline": {
+      "rawArtifactRoot": "/private/tmp/pm-toolsandbox-v4-final-headline-20260714T003640Z",
+      "batchHash": "7ad2c0e89604433a7eafa50169e04c942cc555d0e5296bcb5cbea9a86004354f",
+      "rawVerificationHash": "363189579ae1019167644159add569f8e16e7b28d96ff353cc4abb5a399964be",
+      "eligibilityHash": "9a631ee3675404ab8f4c8545ff84252fe7df95eafd929a9e281ea5fad1eed13e",
+      "evaluationTrack": "official_headline",
+      "headlineTrackEligible": true,
+      "armOrder": ["sham", "native", "substrate"],
+      "strictScoreByArm": {
+        "native": 1,
+        "sham": 1,
+        "substrate": 1
+      },
+      "providerRestartCountByArm": {
+        "native": 0,
+        "sham": 0,
+        "substrate": 0
+      },
+      "duplicateTargetSideEffectCountByArm": {
+        "native": 0,
+        "sham": 0,
+        "substrate": 0
+      }
+    },
+    "lostResponseDerivative": {
+      "rawArtifactRoot": "/private/tmp/pm-toolsandbox-v4-final-derivative-20260714T003640Z",
+      "batchHash": "0043af2771efe7bf585c8d539111ccd0c3d60078fd98eb2f70a583a5c005f602",
+      "rawVerificationHash": "673963f016e8685b654407c47a89514e6e9bd9c5d5c6d8f73f64cbb5e24627ac",
+      "eligibilityHash": "c7624df3a7f89ed9b1c8ea1f909869d0a521e8612512043fd4bd491a54793c35",
+      "evaluationTrack": "restart_lost_response_derivative",
+      "headlineTrackEligible": false,
+      "armOrder": ["sham", "substrate", "native"],
+      "strictScoreByArm": {
+        "native": 1,
+        "sham": 1,
+        "substrate": 1
+      },
+      "restartSemantics": "provider_agent_os_process_group_sigkill_wait_then_fresh_process",
+      "restartAppliedByArm": {
+        "native": true,
+        "sham": true,
+        "substrate": true
+      },
+      "postRestartRetryDispositionByArm": {
+        "native": "executed_succeeded",
+        "sham": "executed_succeeded",
+        "substrate": "blocked"
+      },
+      "duplicateTargetSideEffectCountByArm": {
+        "native": 1,
+        "sham": 1,
+        "substrate": 0
+      }
+    },
+    "outcomeNeutralVerifier": "Raw replay validates the observed allow/block decision and effect without requiring the expected treatment outcome; a semantically valid block uses review.valid=false, execution.allowed=false, and execution.blocking=true and remains retained counterevidence.",
+    "focusedVerification": {
+      "hardeningSuite": "75 passed",
+      "laterFinalRegressionSubset": "30 passed"
+    },
+    "centralMeasurementGap": "Apple's official strict score remained 1.0 in native and sham despite one duplicate target side effect in each arm; upstream task success and state-effect safety must be reported separately.",
+    "publicEvalAttemptArtifactEligible": false,
+    "missingContentResolvedEvidence": [
+      "provider_usage_tokens",
+      "provider_cost_usd",
+      "provider_latency_ms",
+      "independent_verifier_signature_and_external_trust_anchor",
+      "trusted_oracle_replay_runtime_and_environment",
+      "non_scripted_public_agent_execution"
+    ],
+    "eligiblePublicEvalAttemptArtifacts": 0,
+    "rawArtifactDurability": "session-local /private/tmp roots; hashes are preserved here, but no external archival or independent trust anchor is claimed"
   },
   "stateBenchQualification": {
     "classification": "adapter-conformance-no-official-output",

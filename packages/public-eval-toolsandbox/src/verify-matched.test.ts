@@ -510,10 +510,99 @@ function addValidBoundaryTrace(fixture: Fixture, arm: "sham" | "substrate"): voi
   fixture.rewriteBatch();
 }
 
+function replaceWithConsistentUnexpectedBlock(fixture: Fixture, arm: "sham" | "substrate"): void {
+  const attempt = fixture.batch.attempts.find((candidate) => candidate.arm === arm)!;
+  const tracePath = resolve(fixture.outputRoot, attempt.boundaryTracePath!);
+  const first = JSON.parse(readFileSync(tracePath, "utf8").split("\n")[0]!) as {
+    request: Record<string, unknown>;
+    response: Record<string, unknown> & {
+      review: { valid: boolean; execution: Record<string, unknown>; warnings: unknown[] };
+    };
+  };
+  first.response.decision = "block";
+  first.response.responseForAgent = "Fixture deliberately retained an unexpected block.";
+  first.response.review.valid = false;
+  first.response.review.execution.allowed = false;
+  first.response.review.execution.blocking = true;
+  first.response.review.execution.reason = "fixture_unexpected_block";
+  first.response.review.warnings = [
+    { code: "UNEXPECTED_BLOCK", message: "counterevidence must remain verifiable" },
+  ];
+  const { decisionHash: _oldHash, ...decisionBody } = first.response;
+  first.response.decisionHash = hashJson(decisionBody);
+  writeFileSync(tracePath, `${JSON.stringify(first)}\n`);
+
+  const statePath = resolve(String(first.request.statePath));
+  const previousState = JSON.parse(readFileSync(statePath, "utf8")) as Record<string, unknown>;
+  const decision = {
+    proposalId: first.response.proposalId,
+    toolCallId: first.request.toolCallId,
+    toolName: first.request.toolName,
+    fingerprint: first.response.fingerprint,
+    decision: "block",
+    decisionHash: first.response.decisionHash,
+  };
+  const stateBody = {
+    schemaVersion: previousState.schemaVersion,
+    arm: previousState.arm,
+    attemptId: previousState.attemptId,
+    sequence: 1,
+    irrelevantState: previousState.irrelevantState,
+    delivered: {},
+    decisions: [decision],
+    outcomes: [],
+  };
+  writeJson(statePath, { ...stateBody, stateHash: hashJson(stateBody) });
+
+  const metadataPath = resolve(fixture.outputRoot, attempt.metadataPath);
+  const metadata = JSON.parse(readFileSync(metadataPath, "utf8")) as Record<string, unknown>;
+  metadata.internalOutcome = {
+    admittedActionCount: 0,
+    blockedActionCount: 1,
+    haltedByInternalBlock: false,
+    blockReasonCodes: ["UNEXPECTED_BLOCK"],
+  };
+  writeJson(metadataPath, metadata);
+  writeFileSync(
+    resolve(fixture.outputRoot, String(attempt.invocation["stdoutPath"])),
+    `fixture stdout\nPM_TOOL_SANDBOX_ARM_METADATA=${JSON.stringify(metadata)}\n`,
+  );
+  rmSync(resolve(fixture.outputRoot, attempt.receiptPath));
+  const receipt = toolSandboxVerticalSlice.createReceipt({
+    batchId: fixture.batch.batchId,
+    attemptId: attempt.attemptId,
+    arm,
+    evaluationTrack: fixture.batch.evaluationTrack,
+    completedAt: String(metadata.completedAt),
+    execution: fixture.batch.execution,
+    faultEvidence: metadata.faultEvidence as ToolSandboxAttemptReceipt["faultEvidence"],
+    internalOutcome: metadata.internalOutcome as ToolSandboxAttemptReceipt["internalOutcome"],
+    upstreamResultSummary: upstreamPass,
+  });
+  const receiptPath = resolve(tracePath, `../pm-receipt-${receipt.receiptHash}.json`);
+  writeJson(receiptPath, receipt);
+  attempt.receipt = receipt;
+  attempt.receiptPath = relative(fixture.outputRoot, receiptPath);
+  fixture.batch.summary = toolSandboxVerticalSlice.verifyReceiptSet(
+    fixture.batch.attempts.map((candidate) => candidate.receipt),
+  );
+  fixture.refreshRawInventory();
+  fixture.rewriteBatch();
+}
+
 describe("raw matched-batch verifier", () => {
-  it("reopens the complete raw tree and reconstructs official receipts without claiming efficacy or signer independence", () => {
+  it("reopens the raw tree but refuses to promote a perfect summary over a one-row trajectory", () => {
     const fixture = makeFixture();
     try {
+      const trajectoryPath = fixture.batch.attempts[0]!.rawArtifacts.find((entry) =>
+        entry.path.endsWith("execution_context.json"),
+      )!.path;
+      const trajectory = JSON.parse(
+        readFileSync(resolve(fixture.outputRoot, trajectoryPath), "utf8"),
+      ) as { _dbs: { SANDBOX: unknown[]; MESSAGING: unknown[] } };
+      expect(trajectory._dbs.SANDBOX).toHaveLength(1);
+      expect(trajectory._dbs.MESSAGING).toHaveLength(0);
+
       const verified = verifyRawMatchedBatch(fixture.input, fixture.dependencies);
       expect(verified.attempts.map((attempt) => attempt.arm).sort()).toEqual([
         "native",
@@ -526,6 +615,16 @@ describe("raw matched-batch verifier", () => {
         independentSigner: false,
         efficacyFinding: false,
       });
+      expect(
+        verified.attempts.every(
+          (attempt) =>
+            attempt.trajectoryStructureVerified &&
+            !attempt.upstreamOracleRecomputedFromRawTrajectory,
+        ),
+      ).toBe(true);
+      expect(verified.attempts.every((attempt) => attempt.reportedStrictTaskSuccess)).toBe(
+        true,
+      );
       expect(verified.executionBoundary).toEqual({
         substrateTreatment: "direct_agent_state_core_peripheral_adapter",
         invocationPath: "toolsandbox_python_runner_to_package_cli",
@@ -549,7 +648,7 @@ describe("raw matched-batch verifier", () => {
       expect(eligibility.source).toMatchObject({
         rawVerificationSchema: "pm.public-eval.toolsandbox-raw-verification.v2",
         rawVerificationHash: verified.verificationHash,
-        verifierV2TrajectoryReplayContentResolved: true,
+        verifierV2TrajectoryStructureContentResolved: true,
       });
       expect(eligibility.executionBoundary).toEqual(verified.executionBoundary);
       expect(eligibility.missingContentResolvedEvidence).toEqual([
@@ -561,6 +660,7 @@ describe("raw matched-batch verifier", () => {
         "provider_latency_ms",
         "exact_benchmark_task_bytes",
         "exact_benchmark_oracle_bytes",
+        "upstream_oracle_recomputation_from_raw_trajectory",
         "verified_real_http_or_mcp_sidecar_protocol_receipt",
         "independent_verifier_signature_and_external_trust_anchor",
       ]);
@@ -599,6 +699,29 @@ describe("raw matched-batch verifier", () => {
     } finally {
       fixture.cleanup();
     }
+  });
+
+  it("rejects detached self-hashed v3 summaries before eligibility assessment", () => {
+    const forgedBody = {
+      schemaVersion: "pm.public-eval.toolsandbox-raw-verification.v3",
+      verifier: {
+        id: "@pm/public-eval-toolsandbox:raw-matched-batch-verifier",
+        revision: "v3",
+        mode: "independent_recomputation_from_raw_artifacts",
+      },
+      attempts: [],
+      executionBoundary: {
+        realHttpMcpSidecarProtocolExercised: true,
+        actualOsProcessRestartObserved: true,
+      },
+    };
+    const forged = {
+      ...forgedBody,
+      verificationHash: hashJson(forgedBody),
+    };
+    expect(() =>
+      assessToolSandboxPublicEvalAttemptEligibility(forged),
+    ).toThrow(/detached raw-verification\.v3 summaries are diagnostic only/u);
   });
 
   it("rejects changed bytes plus missing or extra output-root inventory", () => {
@@ -664,7 +787,7 @@ describe("raw matched-batch verifier", () => {
       fixture.refreshRawInventory();
       fixture.rewriteBatch();
       expect(() => verifyRawMatchedBatch(fixture.input, fixture.dependencies)).toThrow(
-        /boundary decision does not replay|boundary decision hash does not recompute/,
+        /boundary decision does not replay|boundary review contradicts replayed decision|boundary decision hash does not recompute/,
       );
     } finally {
       fixture.cleanup();
@@ -722,6 +845,25 @@ describe("raw matched-batch verifier", () => {
       ).toThrow(/does not replay from prior state/);
     } finally {
       selfConsistentForgery.cleanup();
+    }
+  });
+
+  it("retains a self-consistent unexpected sham block as counterevidence", () => {
+    const fixture = makeFixture();
+    try {
+      addValidBoundaryTrace(fixture, "sham");
+      replaceWithConsistentUnexpectedBlock(fixture, "sham");
+      const verified = verifyRawMatchedBatch(fixture.input, fixture.dependencies);
+      const sham = verified.attempts.find((attempt) => attempt.arm === "sham");
+      expect(fixture.batch.attempts.find((attempt) => attempt.arm === "sham")?.receipt.internalOutcome).toEqual({
+        admittedActionCount: 0,
+        blockedActionCount: 1,
+        haltedByInternalBlock: false,
+        blockReasonCodes: ["UNEXPECTED_BLOCK"],
+      });
+      expect(sham?.boundaryTraceEntryCount).toBe(1);
+    } finally {
+      fixture.cleanup();
     }
   });
 

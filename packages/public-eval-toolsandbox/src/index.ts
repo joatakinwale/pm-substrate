@@ -1,11 +1,16 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
+  closeSync,
   mkdirSync,
   existsSync,
+  fsyncSync,
+  openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
@@ -19,7 +24,6 @@ import {
   reviewExternalStateEvidence,
   reviewProposedActionAgainstCurrentState,
   stateRef,
-  type ActionProposalReview,
   type ActionOutcomeTerminalIndex,
   type CurrentStateView,
   type EvidenceAuthorityStatus,
@@ -27,264 +31,44 @@ import {
 } from "@pm/agent-state-core";
 import { tenantId, timestamp } from "@pm/types";
 
-export type ToolSandboxArm = "native" | "sham" | "substrate";
-export type ToolSandboxEvaluationTrack =
-  | "official_headline"
-  | "restart_lost_response_derivative";
+import { startToolSandboxSidecarProcess } from "./sidecar-supervisor.js";
+import type {
+  ToolSandboxArm,
+  ToolSandboxAttemptInput,
+  ToolSandboxAttemptReceipt,
+  ToolSandboxBoundaryArm,
+  ToolSandboxEvaluationTrack,
+  ToolSandboxExecutionBinding,
+  ToolSandboxFaultEvidence,
+  ToolSandboxHeadlineQualificationInput,
+  ToolSandboxInternalOutcome,
+  ToolSandboxMatchedBatchArtifact,
+  ToolSandboxMatchedBatchInput,
+  ToolSandboxQualificationArtifact,
+  ToolSandboxReceiptSetSummary,
+  ToolSandboxToolOutcomeInput,
+  ToolSandboxToolProposalDecision,
+  ToolSandboxToolProposalInput,
+} from "./types.js";
 
-export interface ToolSandboxExecutionBinding {
-  readonly agentModel: string;
-  readonly userSimulatorModel: string;
-  readonly toolBackend: string;
-  readonly seed: string;
-  readonly maxTurns: number;
-}
-
-export type ToolSandboxFaultEvidence =
-  | {
-      readonly status: "applied";
-      readonly targetCallId: string;
-      readonly targetSideEffectReceiptHash: string;
-      readonly restartedAgentSessionId: string;
-      readonly appliedAtTurn: number;
-    }
-  | {
-      readonly status: "trigger_not_reached";
-      readonly reason: string;
-    };
-
-export interface ToolSandboxInternalOutcome {
-  readonly admittedActionCount: number;
-  readonly blockedActionCount: number;
-  readonly haltedByInternalBlock: boolean;
-  readonly blockReasonCodes: readonly string[];
-}
-
-export interface ToolSandboxAttemptInput {
-  readonly batchId: string;
-  readonly attemptId: string;
-  readonly arm: ToolSandboxArm;
-  readonly evaluationTrack: ToolSandboxEvaluationTrack;
-  readonly completedAt: string;
-  readonly execution: ToolSandboxExecutionBinding;
-  readonly faultEvidence?: ToolSandboxFaultEvidence;
-  readonly internalOutcome: ToolSandboxInternalOutcome;
-  readonly upstreamResultSummary: unknown;
-}
-
-export interface ToolSandboxAttemptReceipt {
-  readonly schemaVersion: "pm.public-eval.toolsandbox-receipt.v2";
-  readonly manifestHash: string;
-  readonly batchId: string;
-  readonly attemptId: string;
-  readonly arm: ToolSandboxArm;
-  readonly evaluationTrack: ToolSandboxEvaluationTrack;
-  readonly headlineEligible: boolean;
-  readonly completedAt: string;
-  readonly execution: ToolSandboxExecutionBinding;
-  readonly intervention:
-    | { readonly kind: "none" }
-    | {
-        readonly kind: "scheduled_fault";
-        readonly faultId: string;
-        readonly targetTool: string;
-        readonly trigger: string;
-        readonly effect: string;
-        readonly evidence: ToolSandboxFaultEvidence;
-      };
-  readonly internalOutcome: ToolSandboxInternalOutcome;
-  readonly upstream: {
-    readonly repositoryUrl: string;
-    readonly revision: string;
-    readonly scenario: string;
-    readonly corpusHash: string;
-    readonly resultSummaryHash: string;
-    readonly resultSummary: unknown;
-  };
-  readonly oracleOutcome: {
-    readonly owner: string;
-    readonly score: number;
-    readonly milestoneSimilarity: number;
-    readonly minefieldSimilarity: number;
-    readonly strictTaskSuccess: boolean;
-    readonly milestoneMapping: Readonly<
-      Record<string, readonly [number, number]>
-    >;
-    readonly minefieldMapping: Readonly<
-      Record<string, readonly [number, number]>
-    >;
-    readonly internalBlocksAffectTaskSuccess: false;
-    readonly resultScope:
-      | "official_unchanged_scenario"
-      | "official_oracle_on_derived_trajectory";
-  };
-  readonly receiptHash: string;
-}
-
-export interface ToolSandboxReceiptSetSummary {
-  readonly schemaVersion: "pm.public-eval.toolsandbox-batch-summary.v2";
-  readonly manifestHash: string;
-  readonly batchId: string;
-  readonly evaluationTrack: ToolSandboxEvaluationTrack;
-  readonly headlineEligible: boolean;
-  readonly authorityStatus: EvidenceAuthorityStatus;
-  readonly attempts: readonly {
-    readonly attemptId: string;
-    readonly arm: ToolSandboxArm;
-    readonly faultApplied: boolean;
-    readonly oracleScore: number;
-    readonly strictTaskSuccess: boolean;
-    readonly blockedActionCount: number;
-    readonly haltedByInternalBlock: boolean;
-  }[];
-}
-
-export interface ToolSandboxHeadlineQualificationInput {
-  readonly checkoutPath: string;
-  readonly pythonExecutable: string;
-  readonly outputRoot: string;
-  readonly agent: string;
-  readonly user: string;
-  readonly preferredToolBackend: "DEFAULT";
-  readonly scriptedStdin?: readonly string[];
-  readonly timeoutMs?: number;
-  readonly attempt: Omit<
-    ToolSandboxAttemptInput,
-    | "evaluationTrack"
-    | "faultEvidence"
-    | "upstreamResultSummary"
-    | "completedAt"
-  >;
-}
-
-export interface ToolSandboxQualificationArtifact {
-  readonly schemaVersion: "pm.public-eval.toolsandbox-qualification.v1";
-  readonly evaluationTrack: "official_headline";
-  readonly headlineEligible: true;
-  readonly checkoutPath: string;
-  readonly corpusVerification: {
-    readonly revision: string;
-    readonly corpusHash: string;
-    readonly fileCount: number;
-  };
-  readonly invocation: {
-    readonly executable: string;
-    readonly arguments: readonly string[];
-    readonly cwd: string;
-    readonly exitCode: 0;
-    readonly stdoutSha256: string;
-    readonly stderrSha256: string;
-  };
-  readonly resultSummaryPath: string;
-  readonly receipt: ToolSandboxAttemptReceipt;
-  readonly qualificationHash: string;
-}
-
-export type ToolSandboxBoundaryArm = "sham" | "substrate";
-
-export interface ToolSandboxToolProposalInput {
-  readonly schemaVersion: "pm.public-eval.toolsandbox-tool-proposal.v1";
-  readonly arm: ToolSandboxBoundaryArm;
-  readonly evaluationTrack: ToolSandboxEvaluationTrack;
-  readonly attemptId: string;
-  readonly sessionId: string;
-  readonly statePath: string;
-  readonly toolCallId: string;
-  readonly toolName: string;
-  readonly arguments: Readonly<Record<string, unknown>>;
-  readonly proposedAt: string;
-}
-
-export interface ToolSandboxToolProposalDecision {
-  readonly schemaVersion: "pm.public-eval.toolsandbox-tool-decision.v1";
-  readonly proposalId: string;
-  readonly arm: ToolSandboxBoundaryArm;
-  readonly decision: "allow" | "block";
-  readonly responseForAgent: string | null;
-  readonly fingerprint: string;
-  readonly review: Pick<
-    ActionProposalReview,
-    "valid" | "execution" | "warnings"
-  >;
-  readonly stateHashBefore: string;
-  readonly decisionHash: string;
-}
-
-export interface ToolSandboxToolOutcomeInput {
-  readonly schemaVersion: "pm.public-eval.toolsandbox-tool-outcome.v1";
-  readonly arm: ToolSandboxBoundaryArm;
-  readonly attemptId: string;
-  readonly statePath: string;
-  readonly proposalId: string;
-  readonly toolCallId: string;
-  readonly toolName: string;
-  readonly arguments: Readonly<Record<string, unknown>>;
-  readonly succeeded: boolean;
-  readonly responseHash: string;
-  readonly observedAt: string;
-}
-
-export interface ToolSandboxMatchedBatchInput {
-  readonly checkoutPath: string;
-  readonly pythonExecutable: string;
-  readonly nodeExecutable: string;
-  readonly outputRoot: string;
-  readonly batchId: string;
-  readonly evaluationTrack: ToolSandboxEvaluationTrack;
-  readonly agent: string;
-  readonly user: string;
-  readonly preferredToolBackend: "DEFAULT";
-  readonly randomizationSeed: string;
-  readonly timeoutMs?: number;
-}
-
-export interface ToolSandboxMatchedBatchArtifact {
-  readonly schemaVersion: "pm.public-eval.toolsandbox-matched-batch.v2";
-  readonly manifestHash: string;
-  readonly batchId: string;
-  readonly evaluationTrack: ToolSandboxEvaluationTrack;
-  readonly headlineEligible: boolean;
-  readonly checkoutPath: string;
-  readonly corpusVerification: {
-    readonly revision: string;
-    readonly corpusHash: string;
-    readonly fileCount: number;
-  };
-  readonly randomization: {
-    readonly seed: string;
-    readonly armOrder: readonly ToolSandboxArm[];
-  };
-  readonly execution: ToolSandboxExecutionBinding;
-  readonly attempts: readonly {
-    readonly order: number;
-    readonly arm: ToolSandboxArm;
-    readonly attemptId: string;
-    readonly invocation: {
-      readonly executable: string;
-      readonly arguments: readonly string[];
-      readonly cwd: string;
-      readonly exitCode: 0;
-      readonly runnerSha256: string;
-      readonly stdoutPath: string;
-      readonly stdoutSha256: string;
-      readonly stderrPath: string;
-      readonly stderrSha256: string;
-    };
-    readonly resultSummaryPath: string;
-    readonly metadataPath: string;
-    readonly boundaryTracePath: string | null;
-    readonly boundaryTraceSha256: string | null;
-    readonly providerSessionRestartCount: number;
-    readonly receiptPath: string;
-    readonly receipt: ToolSandboxAttemptReceipt;
-    readonly rawArtifacts: readonly {
-      readonly path: string;
-      readonly sha256: string;
-    }[];
-  }[];
-  readonly summary: ToolSandboxReceiptSetSummary;
-  readonly batchHash: string;
-}
+export type {
+  ToolSandboxArm,
+  ToolSandboxAttemptInput,
+  ToolSandboxAttemptReceipt,
+  ToolSandboxBoundaryArm,
+  ToolSandboxEvaluationTrack,
+  ToolSandboxExecutionBinding,
+  ToolSandboxFaultEvidence,
+  ToolSandboxHeadlineQualificationInput,
+  ToolSandboxInternalOutcome,
+  ToolSandboxMatchedBatchArtifact,
+  ToolSandboxMatchedBatchInput,
+  ToolSandboxQualificationArtifact,
+  ToolSandboxReceiptSetSummary,
+  ToolSandboxToolOutcomeInput,
+  ToolSandboxToolProposalDecision,
+  ToolSandboxToolProposalInput,
+} from "./types.js";
 
 const REPOSITORY_URL = "https://github.com/apple/ToolSandbox";
 const REVISION = "165848b9a78cead7ca7fe7c89c688b58e6501219";
@@ -297,6 +81,10 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const ARMS: readonly ToolSandboxArm[] = ["native", "sham", "substrate"];
 const EVAL_TENANT = tenantId("tenant_public_eval");
 const DURABLE_SIDE_EFFECT_TOOLS = ["send_message_with_phone_number"] as const;
+const STARTING_CONTEXT_NORMALIZATION_POLICY =
+  "pm.public-eval.toolsandbox-starting-context.exact-timestamp-paths.v1" as const;
+const NORMALIZED_STARTING_CONTEXT_SHA256 =
+  "62717eafc44807b3b6729f8c5b5f0f47fbeffba30093c421d90689ac30da2d04" as const;
 
 const CORPUS_FILES = [
   {
@@ -351,6 +139,12 @@ const CORPUS_HASH =
 const MATCHED_RUNNER_PATH = fileURLToPath(
   new URL("../upstream/matched_runner.py", import.meta.url),
 );
+const PROVIDER_PROCESS_PATH = fileURLToPath(
+  new URL("../upstream/provider_process.py", import.meta.url),
+);
+const ORACLE_REPLAY_PATH = fileURLToPath(
+  new URL("../upstream/replay_oracle.py", import.meta.url),
+);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -389,6 +183,8 @@ function sha256Bytes(value: Uint8Array): string {
 }
 
 const MATCHED_RUNNER_SHA256 = sha256Bytes(readFileSync(MATCHED_RUNNER_PATH));
+const PROVIDER_PROCESS_SHA256 = sha256Bytes(readFileSync(PROVIDER_PROCESS_PATH));
+const ORACLE_REPLAY_SHA256 = sha256Bytes(readFileSync(ORACLE_REPLAY_PATH));
 
 function jsonSnapshot(value: unknown): unknown {
   return JSON.parse(canonicalStringify(value)) as unknown;
@@ -479,7 +275,7 @@ function parseMapping(
 }
 
 const manifestBody = {
-  schemaVersion: "pm.public-eval.toolsandbox-manifest.v2",
+  schemaVersion: "pm.public-eval.toolsandbox-manifest.v4",
   benchmark: {
     owner: "apple/ToolSandbox",
     repositoryUrl: REPOSITORY_URL,
@@ -497,12 +293,12 @@ const manifestBody = {
     {
       id: "sham",
       stateTreatment:
-        "equal-interface package-CLI adapter with unrelated state; HTTP/MCP sidecar not exercised",
+        "equal authenticated HTTP-sidecar interface with unrelated durable state",
     },
     {
       id: "substrate",
       stateTreatment:
-        "direct @pm/agent-state-core peripheral adapter; HTTP/MCP sidecar not exercised",
+        "authenticated HTTP sidecar over the @pm/agent-state-core peripheral adapter",
     },
   ],
   evaluationTracks: [
@@ -522,7 +318,7 @@ const manifestBody = {
         trigger:
           "after target side effect, before first successful tool response is observed",
         effect:
-          "drop tool response and reinstate the provider agent role inside the same Python process; no OS-process restart",
+          "persist the target outcome, replace the response, SIGKILL and reap the provider process group, then start a distinct provider process",
       },
     },
   ],
@@ -543,8 +339,16 @@ const manifestBody = {
     internalBlocksAffectTaskSuccess: false,
   },
   localHarness: {
-    runnerSchemaVersion: "pm.public-eval.toolsandbox-arm-run.v2",
+    runnerSchemaVersion: "pm.public-eval.toolsandbox-arm-run.v3",
     runnerSha256: MATCHED_RUNNER_SHA256,
+    providerProcessSha256: PROVIDER_PROCESS_SHA256,
+    oracleReplaySha256: ORACLE_REPLAY_SHA256,
+    startingContextBinding: {
+      normalizationRuleId: STARTING_CONTEXT_NORMALIZATION_POLICY,
+      normalizedContextSha256: NORMALIZED_STARTING_CONTEXT_SHA256,
+      volatileTimestampValueCount: 11,
+    },
+    boundaryProtocol: "authenticated_loopback_http_json_v1",
     stateMechanism:
       "@pm/agent-state-core ActionOutcomeEnvelope terminal index over adapter-mapped side effects",
     durableSideEffectTools: DURABLE_SIDE_EFFECT_TOOLS,
@@ -650,13 +454,33 @@ function readBoundaryState(
 }
 
 function writeBoundaryState(path: string, state: BoundaryState): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.${process.pid}.tmp`;
-  writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`, {
-    encoding: "utf8",
-    flag: "wx",
-  });
-  renameSync(temporary, path);
+  const directory = dirname(path);
+  mkdirSync(directory, { recursive: true });
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  let temporaryDescriptor: number | undefined;
+  try {
+    temporaryDescriptor = openSync(temporary, "wx", 0o600);
+    writeFileSync(temporaryDescriptor, `${JSON.stringify(state, null, 2)}\n`, {
+      encoding: "utf8",
+    });
+    fsyncSync(temporaryDescriptor);
+    closeSync(temporaryDescriptor);
+    temporaryDescriptor = undefined;
+    renameSync(temporary, path);
+
+    // Atomic rename protects readers from partial bytes; syncing the directory
+    // makes the new name durable before a sidecar can acknowledge the write.
+    const directoryDescriptor = openSync(directory, "r");
+    try {
+      fsyncSync(directoryDescriptor);
+    } finally {
+      closeSync(directoryDescriptor);
+    }
+  } catch (error) {
+    if (temporaryDescriptor !== undefined) closeSync(temporaryDescriptor);
+    if (existsSync(temporary)) unlinkSync(temporary);
+    throw error;
+  }
 }
 
 function parseBoundaryArm(value: unknown): ToolSandboxBoundaryArm {
@@ -1392,6 +1216,25 @@ function prepareEmptyOutputRoot(value: string): string {
   return outputRoot;
 }
 
+function sanitizedPythonEnvironment(): NodeJS.ProcessEnv {
+  const environment = { ...process.env };
+  for (const key of [
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "PYTHONSTARTUP",
+    "PYTHONINSPECT",
+    "LD_PRELOAD",
+    "DYLD_INSERT_LIBRARIES",
+    "DYLD_LIBRARY_PATH",
+  ]) {
+    delete environment[key];
+  }
+  environment["PYTHONNOUSERSITE"] = "1";
+  environment["PYTHONDONTWRITEBYTECODE"] = "1";
+  environment["PYTHONUTF8"] = "1";
+  return environment;
+}
+
 function findResultSummaries(root: string): readonly string[] {
   const found: string[] = [];
   const visit = (directory: string): void => {
@@ -1467,7 +1310,7 @@ function runOfficialHeadlineQualification(
   const run = spawnSync(pythonExecutable, arguments_, {
     cwd: checkoutPath,
     encoding: "utf8",
-    env: process.env,
+    env: sanitizedPythonEnvironment(),
     input: scriptedStdin,
     maxBuffer: 50 * 1024 * 1024,
     shell: false,
@@ -1534,6 +1377,19 @@ interface ParsedArmRunMetadata {
   readonly internalOutcome: ToolSandboxInternalOutcome;
   readonly faultEvidence?: ToolSandboxFaultEvidence;
   readonly providerSessionRestartCount: number;
+  readonly providerProcessTracePath: string;
+  readonly providerProcess: {
+    readonly tracePath: string;
+    readonly traceSha256: string;
+    readonly traceHeadHash: string;
+    readonly traceEntryCount: number;
+    readonly processInstanceCount: number;
+    readonly restartCount: number;
+    readonly restartSemantics: string;
+    readonly runnerSha256: string;
+    readonly workerSha256: string;
+    readonly pythonExecutableSha256: string;
+  };
 }
 
 function absoluteFile(value: unknown, path: string): string {
@@ -1572,7 +1428,7 @@ function parseArmRunMetadata(
   readonly boundaryTracePath: string;
 } {
   const record = requiredRecord(value, "/armRunMetadata");
-  if (record["schemaVersion"] !== "pm.public-eval.toolsandbox-arm-run.v2") {
+  if (record["schemaVersion"] !== "pm.public-eval.toolsandbox-arm-run.v3") {
     throw new Error("matched runner returned an unknown metadata schema");
   }
   if (
@@ -1592,6 +1448,42 @@ function parseArmRunMetadata(
     record["providerSessionRestartCount"],
     "/providerSessionRestartCount",
   );
+  const providerProcessTraceRelative = relativeFileWithin(
+    expected.armDirectory,
+    record["providerProcessTracePath"],
+    "/providerProcessTracePath",
+  );
+  if (providerProcessTraceRelative !== "provider-process.jsonl") {
+    throw new Error("provider process trace must use provider-process.jsonl");
+  }
+  const providerProcessRecord = requiredRecord(
+    record["providerProcess"],
+    "/providerProcess",
+  );
+  const providerProcess = {
+    tracePath: requiredString(providerProcessRecord["tracePath"], "/providerProcess/tracePath"),
+    traceSha256: requiredString(providerProcessRecord["traceSha256"], "/providerProcess/traceSha256"),
+    traceHeadHash: requiredString(providerProcessRecord["traceHeadHash"], "/providerProcess/traceHeadHash"),
+    traceEntryCount: requiredInteger(providerProcessRecord["traceEntryCount"], "/providerProcess/traceEntryCount"),
+    processInstanceCount: requiredInteger(providerProcessRecord["processInstanceCount"], "/providerProcess/processInstanceCount"),
+    restartCount: requiredInteger(providerProcessRecord["restartCount"], "/providerProcess/restartCount"),
+    restartSemantics: requiredString(providerProcessRecord["restartSemantics"], "/providerProcess/restartSemantics"),
+    runnerSha256: requiredString(providerProcessRecord["runnerSha256"], "/providerProcess/runnerSha256"),
+    workerSha256: requiredString(providerProcessRecord["workerSha256"], "/providerProcess/workerSha256"),
+    pythonExecutableSha256: requiredString(
+      providerProcessRecord["pythonExecutableSha256"],
+      "/providerProcess/pythonExecutableSha256",
+    ),
+  } as const;
+  if (
+    resolve(providerProcess.tracePath) !==
+      resolve(expected.armDirectory, providerProcessTraceRelative) ||
+    providerProcess.restartCount !== providerSessionRestartCount ||
+    providerProcess.runnerSha256 !== MATCHED_RUNNER_SHA256 ||
+    providerProcess.workerSha256 !== PROVIDER_PROCESS_SHA256
+  ) {
+    throw new Error("provider process metadata does not bind its matched runner/trace");
+  }
   const resultSummaryRelative = relativeFileWithin(
     expected.armDirectory,
     record["resultSummaryPath"],
@@ -1628,6 +1520,11 @@ function parseArmRunMetadata(
     internalOutcome,
     ...(faultEvidence === undefined ? {} : { faultEvidence }),
     providerSessionRestartCount,
+    providerProcessTracePath: resolve(
+      expected.armDirectory,
+      providerProcessTraceRelative,
+    ),
+    providerProcess,
     resultSummaryPath: resolve(expected.armDirectory, resultSummaryRelative),
     boundaryTracePath: boundaryTrace,
   };
@@ -1697,6 +1594,24 @@ function runMatchedEfficacyBatch(
   const evaluationTrack = parseEvaluationTrack(input.evaluationTrack);
   const agent = requiredString(input.agent, "/agent");
   const user = requiredString(input.user, "/user");
+  const scriptedStdin = input.scriptedStdin ?? [];
+  if (
+    !Array.isArray(scriptedStdin) ||
+    scriptedStdin.length > 64 ||
+    scriptedStdin.some(
+      (line) =>
+        typeof line !== "string" ||
+        line.length > 4096 ||
+        /[\r\n\0]/u.test(line),
+    )
+  ) {
+    throw new Error(
+      "/scriptedStdin must contain at most 64 newline-free strings of at most 4096 characters",
+    );
+  }
+  if (scriptedStdin.length > 0 && user !== "Cli") {
+    throw new Error("/scriptedStdin is only valid for the upstream Cli user role");
+  }
   if (input.preferredToolBackend !== "DEFAULT") {
     throw new Error("/preferredToolBackend must be DEFAULT for the pinned corpus");
   }
@@ -1715,9 +1630,9 @@ function runMatchedEfficacyBatch(
   if (sha256Bytes(readFileSync(runnerPath)) !== MATCHED_RUNNER_SHA256) {
     throw new Error("matched runner bytes do not match the manifest");
   }
-  const boundaryCliPath = absoluteFile(
-    fileURLToPath(new URL("./cli.js", import.meta.url)),
-    "/compiledBoundaryCliPath",
+  const sidecarEntryPath = absoluteFile(
+    fileURLToPath(new URL("./sidecar-entry.js", import.meta.url)),
+    "/compiledSidecarEntryPath",
   );
   const outputRoot = prepareEmptyOutputRoot(input.outputRoot);
   const armOrder = ARMS.map((arm) => ({
@@ -1756,28 +1671,66 @@ function runMatchedEfficacyBatch(
     );
     mkdirSync(armDirectory, { recursive: false });
     const boundaryTracePath = resolve(armDirectory, "boundary.jsonl");
+    const boundaryStatePath = resolve(armDirectory, "boundary-state.json");
+    const sidecarPaths = {
+      auditPath: resolve(armDirectory, "sidecar-audit.jsonl"),
+      readyPath: resolve(armDirectory, "sidecar-ready.json"),
+      finalReceiptPath: resolve(armDirectory, "sidecar-final.json"),
+      stdoutPath: resolve(armDirectory, "sidecar.stdout.log"),
+      stderrPath: resolve(armDirectory, "sidecar.stderr.log"),
+      operationLedgerPath: `${boundaryStatePath}.sidecar-operations.jsonl`,
+    } as const;
+    const sidecar =
+      arm === "native"
+        ? undefined
+        : startToolSandboxSidecarProcess({
+            nodeExecutable,
+            entryPath: sidecarEntryPath,
+            arm,
+            evaluationTrack,
+            attemptId,
+            statePath: boundaryStatePath,
+            auditPath: sidecarPaths.auditPath,
+            readyPath: sidecarPaths.readyPath,
+            finalReceiptPath: sidecarPaths.finalReceiptPath,
+            stdoutPath: sidecarPaths.stdoutPath,
+            stderrPath: sidecarPaths.stderrPath,
+          });
     const configuration = {
       arm,
       evaluationTrack,
       attemptId,
       agent,
       user,
-      nodeExecutable,
-      boundaryCliPath,
-      statePath: resolve(armDirectory, "boundary-state.json"),
+      statePath: boundaryStatePath,
       boundaryTracePath,
       outputRoot: armDirectory,
+      ...(sidecar === undefined
+        ? {}
+        : {
+            boundaryOrigin: sidecar.origin,
+            boundaryBearerToken: sidecar.bearerToken,
+          }),
     } as const;
     const arguments_ = [runnerPath] as const;
-    const run = spawnSync(pythonExecutable, arguments_, {
-      cwd: checkoutPath,
-      encoding: "utf8",
-      env: process.env,
-      input: `${JSON.stringify(configuration)}\n`,
-      maxBuffer: 100 * 1024 * 1024,
-      shell: false,
-      timeout: timeoutMs,
-    });
+    let sidecarFinalReceipt: Readonly<Record<string, unknown>> | undefined;
+    const run = (() => {
+      try {
+        return spawnSync(pythonExecutable, arguments_, {
+          cwd: checkoutPath,
+          encoding: "utf8",
+          env: sanitizedPythonEnvironment(),
+          input: `${JSON.stringify(configuration)}\n${scriptedStdin
+            .map((line) => `${line}\n`)
+            .join("")}`,
+          maxBuffer: 100 * 1024 * 1024,
+          shell: false,
+          timeout: timeoutMs,
+        });
+      } finally {
+        sidecarFinalReceipt = sidecar?.stop();
+      }
+    })();
     const stdout = run.stdout ?? "";
     const stderr = run.stderr ?? "";
     const stdoutPath = resolve(armDirectory, "runner.stdout.log");
@@ -1828,6 +1781,16 @@ function runMatchedEfficacyBatch(
       boundaryTracePath,
       execution,
     });
+    if (
+      sidecar !== undefined &&
+      (sidecarFinalReceipt === undefined ||
+        !existsSync(sidecarPaths.readyPath) ||
+        !existsSync(sidecarPaths.finalReceiptPath) ||
+        !existsSync(sidecarPaths.auditPath) ||
+        !existsSync(sidecarPaths.operationLedgerPath))
+    ) {
+      throw new Error("matched ToolSandbox sidecar did not retain complete evidence");
+    }
     const upstreamResultSummary = JSON.parse(
       readFileSync(metadata.resultSummaryPath, "utf8"),
     ) as unknown;
@@ -1867,6 +1830,37 @@ function runMatchedEfficacyBatch(
       boundaryTraceSha256: traceExists
         ? sha256Bytes(readFileSync(metadata.boundaryTracePath))
         : null,
+      boundarySidecar:
+        sidecar === undefined
+          ? null
+          : {
+              readyPath: relative(outputRoot, sidecarPaths.readyPath),
+              finalReceiptPath: relative(outputRoot, sidecarPaths.finalReceiptPath),
+              auditPath: relative(outputRoot, sidecarPaths.auditPath),
+              operationLedgerPath: relative(
+                outputRoot,
+                sidecarPaths.operationLedgerPath,
+              ),
+              stdoutPath: relative(outputRoot, sidecarPaths.stdoutPath),
+              stderrPath: relative(outputRoot, sidecarPaths.stderrPath),
+              launch: {
+                pid: sidecar.pid,
+                ppid: process.pid,
+                tokenSha256: sha256Bytes(Buffer.from(sidecar.bearerToken, "utf8")),
+                nodePath: realpathSync(nodeExecutable),
+                nodeSha256: sha256Bytes(readFileSync(nodeExecutable)),
+                entryPath: realpathSync(sidecarEntryPath),
+                entrySha256: sha256Bytes(readFileSync(sidecarEntryPath)),
+                runtimeModuleClosure: sidecar.runtimeModuleClosure,
+              },
+            },
+      providerProcessTracePath: relative(
+        outputRoot,
+        metadata.providerProcessTracePath,
+      ),
+      providerProcessTraceSha256: sha256Bytes(
+        readFileSync(metadata.providerProcessTracePath),
+      ),
       providerSessionRestartCount: metadata.providerSessionRestartCount,
       receiptPath: relative(outputRoot, receiptPath),
       receipt,
@@ -1876,7 +1870,7 @@ function runMatchedEfficacyBatch(
 
   const summary = verifyReceiptSet(receipts);
   const body = {
-    schemaVersion: "pm.public-eval.toolsandbox-matched-batch.v2",
+    schemaVersion: "pm.public-eval.toolsandbox-matched-batch.v3",
     manifestHash: manifest.manifestHash,
     batchId,
     evaluationTrack,
@@ -1885,6 +1879,7 @@ function runMatchedEfficacyBatch(
     corpusVerification,
     randomization: { seed: randomizationSeed, armOrder },
     execution,
+    scriptedStdin,
     attempts,
     summary,
   } as const;
@@ -1914,8 +1909,11 @@ export const toolSandboxVerticalSlice = deepFreeze({
 export {
   assessToolSandboxPublicEvalAttemptEligibility,
   convertToolSandboxRawVerificationToPublicEvalAttemptArtifacts,
+  verifyAndAssessToolSandboxPublicEvalAttemptEligibility,
   verifyRawMatchedBatch,
   type ToolSandboxPublicEvalAttemptEligibility,
+  type ToolSandboxPublicEvalAttemptEligibilityV2,
+  type ToolSandboxPublicEvalAttemptEligibilityV3,
   type ToolSandboxPublicEvalMissingEvidence,
   type ToolSandboxRawMatchedBatchVerification,
   type ToolSandboxRawMatchedBatchVerificationInput,

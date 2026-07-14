@@ -41,6 +41,28 @@
   Sigstore/OSF preregistration, and the supplied NASA PM Handbook all support
   the repair boundary: an externally anchored plan and independent assessment
   inform a distinct owner decision; they do not authorize themselves.
+- Recorded Arrowsmith v232 after the first fresh deterministic ToolSandbox
+  lost-response/process-restart derivative exposed a substrate-specific
+  protocol bug: a 136-character concatenated idempotency key exceeded the
+  sidecar's 128-character limit and produced HTTP `400`. The peripheral runner
+  now derives bounded domain-separated SHA-256 keys while the sidecar retains
+  its safety bound and request-byte conflict checks. Final post-change
+  qualification artifacts now bind the pinned Apple oracle replay, exact task
+  and starting context, raw provider frames, authenticated loopback sidecar,
+  runtime closure, trajectory/state deltas, and real provider-process lifecycle.
+  The unchanged headline batch (`7ad2c0e8…`) and lost-response derivative
+  (`0043af27…`) each scored `1.0` in all three arms. The derivative applied an
+  actual process-group `SIGKILL`, reap, and fresh-process retry in every arm:
+  substrate blocked the retry and retained zero duplicate target effects while
+  native and sham each executed it successfully and retained one duplicate.
+  The verifier is outcome-neutral, including semantically valid
+  `review.valid=false` blocks, so counterevidence is retained rather than
+  selected away. Because Apple's strict score also remained `1.0` for the two
+  duplicate controls, state-effect safety is now a required separate metric.
+  Raw verification hashes are `36318957…` (headline) and `673963f0…`
+  (derivative); 75 focused tests and a later 30-test final regression subset
+  passed. This is deterministic `PmScriptedStateProbe` qualification/mechanism
+  evidence, not agent efficacy, and both eligibility assessments remain false.
 - Recorded Arrowsmith v230 after concurrent dogfood writers forked the
   continuity ledger. A tenant/agent transaction advisory lock now serializes
   append; fork verification and `dev:repair-chain` preserve both historical

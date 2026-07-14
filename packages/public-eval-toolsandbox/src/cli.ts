@@ -4,6 +4,7 @@ import {
   assessToolSandboxPublicEvalAttemptEligibility,
   convertToolSandboxRawVerificationToPublicEvalAttemptArtifacts,
   toolSandboxVerticalSlice,
+  verifyAndAssessToolSandboxPublicEvalAttemptEligibility,
   verifyRawMatchedBatch,
 } from "./index.js";
 
@@ -18,7 +19,7 @@ function writeJson(value: unknown): void {
 
 function usage(): never {
   throw new Error(
-    "usage: public-eval manifest | verify-corpus <ToolSandbox checkout> | qualify-headline <qualification-input.json> | run-matched-batch <batch-input.json> | verify-matched-batch <verification-input.json> | assess-public-eval-eligibility <raw-verification.json> | convert-public-eval-attempts <raw-verification.json> | create <attempt-input.json> | verify <receipt-set.json> | admit-tool <request.json|-> | record-tool-outcome <request.json|->",
+    "usage: public-eval manifest | verify-corpus <ToolSandbox checkout> | qualify-headline <qualification-input.json> | run-matched-batch <batch-input.json> | verify-matched-batch <verification-input.json> | verify-and-assess-matched-batch <verification-input.json> | assess-public-eval-eligibility <legacy-raw-verification.v2.json> | convert-public-eval-attempts <raw-verification.json> | create <attempt-input.json> | verify <receipt-set.json> | admit-tool <request.json|-> | record-tool-outcome <request.json|->",
   );
 }
 
@@ -69,6 +70,15 @@ try {
     case "assess-public-eval-eligibility":
       writeJson(
         assessToolSandboxPublicEvalAttemptEligibility(readJson(argument)),
+      );
+      break;
+    case "verify-and-assess-matched-batch":
+      writeJson(
+        verifyAndAssessToolSandboxPublicEvalAttemptEligibility(
+          readJson(argument) as Parameters<
+            typeof verifyAndAssessToolSandboxPublicEvalAttemptEligibility
+          >[0],
+        ),
       );
       break;
     case "convert-public-eval-attempts":

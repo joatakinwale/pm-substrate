@@ -11,6 +11,18 @@ The run is not complete until the intended research slice is committed on `main`
 
 ## Current Strongest Thesis
 
+v232 update: the first fresh deterministic ToolSandbox lost-response/process-
+restart derivative falsified the substrate arm at the boundary: a raw
+concatenated outcome idempotency key was 136 characters and exceeded the
+sidecar's 128-character limit, producing HTTP `400` and an official score of
+`0.25`. A bounded, domain-separated SHA-256 client key repaired the exact
+failure; the retest scored `1.0` in all arms while substrate kept one unique
+target send and blocked the exact retry, versus two sends in native and sham.
+The official oracle also scored those duplicate controls `1.0`, so retained
+state-effect replay is a required companion metric. This is deterministic
+qualification/mechanism evidence only; a post-verifier-change raw cross-
+verified artifact is still pending.
+
 v231 update: red-team review found that internally valid signatures under a
 caller-supplied, self-hashed policy could still manufacture a false KEEP. The
 repair maps to `authority_topology` and `admission_calculus`: exact pre-run
