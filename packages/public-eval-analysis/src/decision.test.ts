@@ -10,6 +10,7 @@ import {
   publicEvalAttemptSetRoot,
   publicEvalEvidenceSetRoot,
   publicEvalVerificationSubjectHash,
+  verifyPublicEvalPreregistrationForExecution,
   type PublicEvalDecisionBundleInput,
   type PublicEvalDecisionTrustPolicy,
   type PublicEvalExecutionTimestampReceipt,
@@ -101,6 +102,31 @@ const REQUIRED_CHECKS: Readonly<
 };
 
 describe("public eval D7 decision gate", () => {
+  it("preflights preregistration only against an out-of-band pinned policy", () => {
+    const fixture = passingFixture();
+    const valid = verifyPublicEvalPreregistrationForExecution(
+      fixture.bundle.analysis.manifest,
+      fixture.preregistrationReceipt,
+      fixture.trustPolicy,
+      fixture.trustPolicy.policyHash,
+    );
+    expect(valid).toEqual({
+      valid: true,
+      issues: [],
+      policyHash: fixture.trustPolicy.policyHash,
+      receiptHash: fixture.preregistrationReceipt.receiptHash,
+      registeredAt: fixture.preregistrationReceipt.registeredAt,
+    });
+    expect(
+      verifyPublicEvalPreregistrationForExecution(
+        fixture.bundle.analysis.manifest,
+        fixture.preregistrationReceipt,
+        fixture.trustPolicy,
+        digest("caller-selected-policy"),
+      ).issues,
+    ).toEqual(["trust policy does not match the out-of-band pinned hash"]);
+  });
+
   it("keeps passing signed structured assertions diagnostic-only", () => {
     const fixture = passingFixture();
     const report = decide(fixture);

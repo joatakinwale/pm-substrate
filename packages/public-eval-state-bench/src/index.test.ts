@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
@@ -20,6 +21,23 @@ import {
 
 const PINNED_CHECKOUT = process.env["PM_STATE_BENCH_CHECKOUT"];
 const integrationIt = PINNED_CHECKOUT === undefined ? it.skip : it;
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value as Readonly<Record<string, unknown>>)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
+      .join(",")}}`;
+  }
+  const encoded = JSON.stringify(value);
+  if (encoded === undefined) throw new Error("fixture value is not JSON");
+  return encoded;
+}
+
+function sha256Json(value: unknown): string {
+  return createHash("sha256").update(canonical(value)).digest("hex");
+}
 
 function artifact(): StateBenchLearningArtifact {
   return {
@@ -82,7 +100,7 @@ function identity(overrides: Partial<StateBenchRetrievalIdentity> = {}): StateBe
   return {
     experimentId: "state-bench-proof",
     configSha256: "a".repeat(64),
-    runId: "state-bench-proof:substrate:customer_support:run1",
+    runId: "state-bench-proof:confirmatory:substrate:customer_support:run-index-1",
     taskId: "7-return_restocking_waived",
     domain: "customer_support",
     modelId: "agent-model",
@@ -94,22 +112,92 @@ function runConfig(
   arm: "native" | "sham" | "substrate",
   sealHash: string | null = null,
   extractionProvenanceHash: string | null = null,
+  exactTaskIds: readonly string[] = Array.from(
+    { length: 50 },
+    (_, index) => `fixture-task-${String(index + 1).padStart(3, "0")}`,
+  ),
 ): StateBenchRunConfig {
   const sidecar = arm !== "native";
+  const taskIds = [...exactTaskIds].sort();
+  const runLabels = [
+    "run-index-1",
+    "run-index-2",
+    "run-index-3",
+    "run-index-4",
+    "run-index-5",
+  ];
   return {
-    schemaVersion: "pm-state-bench-run-config.v2",
+    schemaVersion: "pm-state-bench-run-config.v3",
     experimentId: "state-bench-proof",
+    phase: "confirmatory",
+    qualificationPlanHash: null,
+    analysisManifestHash: "1".repeat(64),
+    preregistrationReceiptHash: "2".repeat(64),
+    phasePartitionHash: "3".repeat(64),
     arm,
+    armInterventionHash: sha256Json({ arm, intervention: "fixture" }),
     domain: "customer_support",
-    agentModel: { modelId: "agent-model", reasoningLevel: "high" },
+    agentModel: {
+      modelId: "agent-model",
+      modelDigest: "4".repeat(64),
+      reasoningLevel: "high",
+    },
     agentClass: sidecar ? "PmSubstrateAgent" : "StateBenchAgent",
     split: "test",
     numRuns: 5,
+    taskIds,
+    taskSetHash: sha256Json({
+      schemaVersion: "pm-state-bench-task-set.v1",
+      domain: "customer_support",
+      split: "test",
+      taskIds,
+    }),
+    taskInventoryRootHash: "5".repeat(64),
+    runLabels,
+    repeatScheduleHash: sha256Json({
+      schemaVersion: "pm-state-bench-repeat-schedule.v1",
+      repeatLabels: runLabels,
+    }),
+    attemptScheduleHash: "6".repeat(64),
+    nonModelConfigHash: "7".repeat(64),
+    executionPolicyHash: "8".repeat(64),
+    runtimeClosureHash: "9".repeat(64),
+    retryPolicy: { maxTaskAttempts: 1, maxProviderAttempts: 1 },
     retrieveLearningsTopK: sidecar ? 3 : null,
     artifactSealHash: sidecar ? (sealHash ?? "b".repeat(64)) : null,
     extractionProvenanceHash: sidecar
       ? (extractionProvenanceHash ?? "c".repeat(64))
       : null,
+  };
+}
+
+function qualificationRunConfig(
+  arm: "native" | "sham" | "substrate" = "native",
+): StateBenchRunConfig {
+  const base = runConfig(arm);
+  const taskIds = ["fixture-train-task"];
+  const runLabels = ["repeat-1"];
+  return {
+    ...base,
+    phase: "qualification",
+    qualificationPlanHash: "a".repeat(64),
+    analysisManifestHash: null,
+    preregistrationReceiptHash: null,
+    split: "train",
+    numRuns: 1,
+    taskIds,
+    taskSetHash: sha256Json({
+      schemaVersion: "pm-state-bench-task-set.v1",
+      domain: "customer_support",
+      split: "train",
+      taskIds,
+    }),
+    runLabels,
+    repeatScheduleHash: sha256Json({
+      schemaVersion: "pm-state-bench-repeat-schedule.v1",
+      repeatLabels: runLabels,
+    }),
+    retryPolicy: { maxTaskAttempts: 3, maxProviderAttempts: 2 },
   };
 }
 
@@ -125,9 +213,6 @@ function writeOfficialNativeFixture(
   const directory = mkdtempSync(join(tmpdir(), "pm-state-bench-official-"));
   const resultsPath = join(directory, "results");
   const configPath = join(directory, "run-config.json");
-  const config = runConfig("native");
-  writeFileSync(configPath, JSON.stringify(config));
-
   const split = JSON.parse(
     readFileSync(
       join(
@@ -137,6 +222,8 @@ function writeOfficialNativeFixture(
       "utf8",
     ),
   ) as { splits: { test: string[] } };
+  const config = runConfig("native", null, null, split.splits.test);
+  writeFileSync(configPath, JSON.stringify(config));
   const protocol = JSON.parse(
     readFileSync(
       join(checkout, "state_bench/configs/eval_protocols/gpt54.json"),
@@ -523,6 +610,72 @@ describe("stateBenchLearningAdapter", () => {
         runConfig("substrate"),
       ),
     ).not.toThrow();
+  });
+
+  it("makes phase partitions, manifests, task sets, repeats, and retries structural", () => {
+    const qualification = qualificationRunConfig();
+    expect(stateBenchLearningAdapter.parseRunConfig(qualification)).toEqual(
+      qualification,
+    );
+    expect(stateBenchLearningAdapter.officialRunId(qualification, 1)).toBe(
+      "state-bench-proof:qualification:native:customer_support:repeat-1",
+    );
+    expect(() =>
+      stateBenchLearningAdapter.parseRunConfig({
+        ...runConfig("native"),
+        schemaVersion: "pm-state-bench-run-config.v2",
+      }),
+    ).toThrow(/unsupported run config schemaVersion/u);
+    expect(() =>
+      stateBenchLearningAdapter.parseRunConfig({
+        ...runConfig("native"),
+        phase: "qualification",
+        split: "train",
+      }),
+    ).toThrow(/qualification requires qualificationPlanHash/u);
+    expect(() =>
+      stateBenchLearningAdapter.parseRunConfig({
+        ...qualification,
+        analysisManifestHash: "d".repeat(64),
+      }),
+    ).toThrow(/forbids decision manifest/u);
+    expect(() =>
+      stateBenchLearningAdapter.parseRunConfig({
+        ...runConfig("native"),
+        taskSetHash: "e".repeat(64),
+      }),
+    ).toThrow(/taskSetHash does not match/u);
+    expect(() =>
+      stateBenchLearningAdapter.parseRunConfig({
+        ...runConfig("native"),
+        retryPolicy: { maxTaskAttempts: 2, maxProviderAttempts: 1 },
+      }),
+    ).toThrow(/retry policies must retain one task and provider attempt/u);
+  });
+
+  it("treats run labels as a hashed repeat schedule, not provider seeds", () => {
+    const config = runConfig("native");
+    expect(stateBenchLearningAdapter.officialRunId(config, 5)).toContain(
+      ":confirmatory:native:customer_support:run-index-5",
+    );
+    expect(() =>
+      stateBenchLearningAdapter.parseRunConfig({
+        ...config,
+        runLabels: [
+          "run-index-2",
+          "run-index-1",
+          "run-index-3",
+          "run-index-4",
+          "run-index-5",
+        ],
+      }),
+    ).toThrow(/ordered logical runLabels/u);
+    expect(() =>
+      stateBenchLearningAdapter.parseRunConfig({
+        ...config,
+        repeatScheduleHash: "f".repeat(64),
+      }),
+    ).toThrow(/ordered logical runLabels/u);
   });
 
   it("creates arm-bound hash-chained audit records without sham source leakage", () => {

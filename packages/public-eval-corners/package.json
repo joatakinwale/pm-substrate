@@ -15,6 +15,11 @@
   "bin": {
     "pm-public-eval-corners": "./dist/cli.js"
   },
+  "dependencies": {
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/types": "workspace:*",
+    "playwright": "1.56.1"
+  },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",

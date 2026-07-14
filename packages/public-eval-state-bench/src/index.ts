@@ -26,8 +26,24 @@ import {
 } from "@pm/agent-state-core";
 import { tenantId, timestamp } from "@pm/types";
 
+import {
+  createStateBenchExecutionPlan,
+  type StateBenchRunConfig,
+} from "./execution-plan.js";
+import { createStateBenchDecisionManifestBridge } from "./decision-manifest.js";
+import { createStateBenchExecutionCommandPlanner } from "./execution-command-plan.js";
 import { createStateBenchExtractionProvenance } from "./provenance.js";
+import { createStateBenchQualificationPlanning } from "./qualification-plan.js";
+import { stateBenchRawEvidence } from "./raw-evidence.js";
+import { createStateBenchRunBinding } from "./run-binding.js";
+import { createStateBenchExecutionPreflight } from "./run-preflight.js";
 import type { StateBenchExtractionCollectionInput } from "./provenance.js";
+export type { StateBenchPhase, StateBenchRunConfig } from "./execution-plan.js";
+export type {
+  StateBenchDecisionManifestBridge,
+  StateBenchDecisionManifestInput,
+  StateBenchDecisionManifestVerification,
+} from "./decision-manifest.js";
 export type {
   StateBenchExtractionCollectionInput,
   StateBenchExtractionKind,
@@ -37,6 +53,23 @@ export type {
   StateBenchRawExtractionRecord,
   StateBenchRawExtractionRecordInput,
 } from "./provenance.js";
+export type {
+  StateBenchQualificationAttemptCell,
+  StateBenchQualificationExecutionInput,
+  StateBenchQualificationPlan,
+  StateBenchQualificationPlanInput,
+  StateBenchQualificationPlanVerification,
+  StateBenchQualificationTaskRecord,
+} from "./qualification-plan.js";
+export type {
+  StateBenchRunBindingInput,
+  StateBenchRunBindingVerification,
+} from "./run-binding.js";
+export type { StateBenchExecutionPreflightResult } from "./run-preflight.js";
+export type {
+  RawEvidenceBundle,
+  StateBenchRawEvidenceVerification,
+} from "./raw-evidence.js";
 
 export type StateBenchDomain =
   | "travel"
@@ -80,23 +113,6 @@ export interface StateBenchTrainArtifactSeal {
     readonly fileSha256: string;
   }[];
   readonly sealHash: string;
-}
-
-export interface StateBenchRunConfig {
-  readonly schemaVersion: "pm-state-bench-run-config.v2";
-  readonly experimentId: string;
-  readonly arm: StateBenchArm;
-  readonly domain: StateBenchDomain;
-  readonly agentModel: {
-    readonly modelId: string;
-    readonly reasoningLevel: "low" | "medium" | "high" | null;
-  };
-  readonly agentClass: "StateBenchAgent" | "PmSubstrateAgent";
-  readonly split: "test";
-  readonly numRuns: 5;
-  readonly retrieveLearningsTopK: 3 | null;
-  readonly artifactSealHash: string | null;
-  readonly extractionProvenanceHash: string | null;
 }
 
 export interface StateBenchRetrievalIdentity {
@@ -373,7 +389,7 @@ function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value !== null && typeof value === "object") {
     const entries = Object.entries(value as Readonly<Record<string, unknown>>)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
       .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`);
     return `{${entries.join(",")}}`;
   }
@@ -873,6 +889,69 @@ function assertVerifiedCheckout(path: string): string {
   return root;
 }
 
+const executionPlan = createStateBenchExecutionPlan({
+  sha256,
+  canonical,
+  isObject,
+  exactKeys,
+  safeId,
+  shaValue,
+  domainValue,
+  readJson,
+  assertVerifiedCheckout,
+  loadSplitManifest,
+});
+const {
+  parseRunConfig,
+  loadRunConfig,
+  officialTaskIds,
+  runConfigSha256,
+  officialRunId,
+} = executionPlan;
+
+const qualificationPlanning = createStateBenchQualificationPlanning({
+  manifest: {
+    upstreamUrl: STATE_BENCH_MANIFEST.upstreamUrl,
+    upstreamRevision: STATE_BENCH_MANIFEST.upstreamRevision,
+    packageVersion: STATE_BENCH_MANIFEST.packageVersion,
+    officialProtocolId: STATE_BENCH_MANIFEST.officialProtocolId,
+    protocolFileSha256: STATE_BENCH_MANIFEST.protocolFileSha256,
+    splitVersion: STATE_BENCH_MANIFEST.splitVersion,
+  },
+  domains: DOMAINS,
+  assertVerifiedCheckout,
+  loadSplitManifest,
+  sha256,
+  canonical,
+});
+
+const decisionManifestBridge = createStateBenchDecisionManifestBridge({
+  loadQualificationPlan: qualificationPlanning.loadQualificationPlan,
+  sha256,
+  canonical,
+});
+
+const runBinding = createStateBenchRunBinding({
+  loadQualificationPlan: qualificationPlanning.loadQualificationPlan,
+  loadDecisionManifestBridge: decisionManifestBridge.loadBridge,
+  parseRunConfig,
+  sha256,
+  canonical,
+});
+const executionPreflight = createStateBenchExecutionPreflight({
+  parseRunConfig,
+  loadQualificationPlan: qualificationPlanning.loadQualificationPlan,
+  loadDecisionManifestBridge: decisionManifestBridge.loadBridge,
+  verifyBoundRunConfig: runBinding.verifyRunConfigBinding,
+});
+const executionCommandPlanner = createStateBenchExecutionCommandPlanner({
+  sha256, canonical, parseRunConfig, officialRunId,
+  verifyBoundRunConfig: runBinding.verifyRunConfigBinding,
+  loadQualificationPlan: qualificationPlanning.loadQualificationPlan,
+  qualificationAttemptSchedule: qualificationPlanning.qualificationAttemptSchedule,
+  loadDecisionManifestBridge: decisionManifestBridge.loadBridge,
+});
+
 function createTrainArtifactSeal(
   checkoutPath: string,
   artifactPath: string,
@@ -1128,104 +1207,6 @@ function retrieve(
       measurement,
     },
   };
-}
-
-function parseRunConfig(value: unknown): StateBenchRunConfig {
-  if (!isObject(value)) throw new Error("run config must be an object");
-  exactKeys(
-    value,
-    [
-      "schemaVersion",
-      "experimentId",
-      "arm",
-      "domain",
-      "agentModel",
-      "agentClass",
-      "split",
-      "numRuns",
-      "retrieveLearningsTopK",
-      "artifactSealHash",
-      "extractionProvenanceHash",
-    ],
-    "run config",
-  );
-  if (value.schemaVersion !== "pm-state-bench-run-config.v2") {
-    throw new Error("unsupported run config schemaVersion");
-  }
-  if (value.arm !== "native" && value.arm !== "sham" && value.arm !== "substrate") {
-    throw new Error("run config arm must be native, sham, or substrate");
-  }
-  if (!isObject(value.agentModel)) throw new Error("agentModel must be an object");
-  exactKeys(value.agentModel, ["modelId", "reasoningLevel"], "agentModel");
-  const reasoningLevel = value.agentModel.reasoningLevel;
-  if (
-    reasoningLevel !== null &&
-    reasoningLevel !== "low" &&
-    reasoningLevel !== "medium" &&
-    reasoningLevel !== "high"
-  ) {
-    throw new Error("agentModel.reasoningLevel must be low, medium, high, or null");
-  }
-  if (value.split !== "test" || value.numRuns !== 5) {
-    throw new Error("official run config requires test split and exactly 5 runs");
-  }
-  const sidecar = value.arm !== "native";
-  const expectedAgentClass = sidecar ? "PmSubstrateAgent" : "StateBenchAgent";
-  if (value.agentClass !== expectedAgentClass) {
-    throw new Error(`${value.arm} arm requires agentClass ${expectedAgentClass}`);
-  }
-  if (value.retrieveLearningsTopK !== (sidecar ? 3 : null)) {
-    throw new Error(`${value.arm} arm has an invalid retrieval top_k treatment`);
-  }
-  if (sidecar) {
-    shaValue(value.artifactSealHash, "artifactSealHash");
-    shaValue(value.extractionProvenanceHash, "extractionProvenanceHash");
-  } else if (value.artifactSealHash !== null || value.extractionProvenanceHash !== null) {
-    throw new Error("native arm cannot bind learning artifact or extraction provenance seals");
-  }
-  return {
-    schemaVersion: "pm-state-bench-run-config.v2",
-    experimentId: safeId(value.experimentId, "experimentId"),
-    arm: value.arm,
-    domain: domainValue(value.domain, "domain"),
-    agentModel: {
-      modelId: safeId(value.agentModel.modelId, "agentModel.modelId"),
-      reasoningLevel,
-    },
-    agentClass: expectedAgentClass,
-    split: "test",
-    numRuns: 5,
-    retrieveLearningsTopK: sidecar ? 3 : null,
-    artifactSealHash: sidecar
-      ? shaValue(value.artifactSealHash, "artifactSealHash")
-      : null,
-    extractionProvenanceHash: sidecar
-      ? shaValue(value.extractionProvenanceHash, "extractionProvenanceHash")
-      : null,
-  };
-}
-
-function loadRunConfig(path: string): StateBenchRunConfig {
-  return parseRunConfig(readJson(path));
-}
-
-function officialTaskIds(
-  checkoutPath: string,
-  domain: StateBenchDomain,
-): readonly string[] {
-  const root = assertVerifiedCheckout(checkoutPath);
-  return loadSplitManifest(root, domainValue(domain, "domain")).test;
-}
-
-function runConfigSha256(config: StateBenchRunConfig): string {
-  return sha256(canonical(parseRunConfig(config)));
-}
-
-function officialRunId(config: StateBenchRunConfig, runIndex: number): string {
-  if (!Number.isInteger(runIndex) || runIndex < 1 || runIndex > 5) {
-    throw new Error("runIndex must be an integer from 1 through 5");
-  }
-  return `${config.experimentId}:${config.arm}:${config.domain}:run${runIndex}`;
 }
 
 function createAuditSession(
@@ -1610,9 +1591,19 @@ function collectOutputConformanceReceipt(
 ): StateBenchOutputConformanceReceipt {
   const root = assertVerifiedCheckout(input.checkoutPath);
   const config = loadRunConfig(input.configPath);
+  if (config.phase === "qualification") {
+    throw new Error(
+      "qualification output requires a separate technical receipt and cannot use official held-out conformance collection",
+    );
+  }
   const configHash = runConfigSha256(config);
   const split = loadSplitManifest(root, config.domain);
   const taskIds = [...split.test].sort();
+  if (canonical(config.taskIds) !== canonical(taskIds)) {
+    throw new Error(
+      "decision run config taskIds must equal the exact official held-out domain split",
+    );
+  }
   const protocol = protocolData(root);
   const simulatorHashes = promptHashes(protocol, "simulator", config.domain);
   const simulatorPromptHash = simulatorHashes["user_sim_base.md"];
@@ -1976,6 +1967,23 @@ export const stateBenchLearningAdapter = Object.freeze({
   loadProvenanceBoundArtifact: extractionProvenance.loadProvenanceBoundArtifact,
   retrieve,
   verifyCheckout,
+  createQualificationPlan: qualificationPlanning.createQualificationPlan,
+  loadQualificationPlan: qualificationPlanning.loadQualificationPlan,
+  verifyQualificationPlan: qualificationPlanning.verifyQualificationPlan,
+  qualificationAttemptSchedule: qualificationPlanning.qualificationAttemptSchedule,
+  assertQualificationArtifactSources:
+    qualificationPlanning.assertQualificationArtifactSources,
+  createDecisionManifestBridge: decisionManifestBridge.createBridge,
+  loadDecisionManifestBridge: decisionManifestBridge.loadBridge,
+  verifyDecisionManifestBridge: decisionManifestBridge.verifyBridge,
+  decisionTaskIdsFor: decisionManifestBridge.taskIdsFor,
+  createBoundRunConfig: runBinding.createRunConfig,
+  verifyBoundRunConfig: runBinding.verifyRunConfigBinding,
+  preflightExecution: executionPreflight.preflight,
+  createExecutionCommandPlan: executionCommandPlanner.createPlan,
+  verifyExecutionCommandPlan: executionCommandPlanner.verifyPlan,
+  parseRawEvidence: stateBenchRawEvidence.parse,
+  verifyRawEvidence: stateBenchRawEvidence.verify,
   parseRunConfig,
   loadRunConfig,
   officialTaskIds,

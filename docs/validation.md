@@ -37,9 +37,10 @@ the tool boundary improve project execution.
   cited as independent outcome evidence.
 - Every attempt has a unique identity. Pairing requires exact benchmark,
   revision, task content and eligible-universe membership, split, model,
-  prompt/tool/runner configuration, seed, initial environment, typed arm
-  intervention, deterministic randomized order, and fault-injection
-  coordinates.
+  prompt/tool/runner configuration, provider sampling seed when supported (or
+  an explicit no-seed declaration plus stochastic repeat identity), initial
+  environment, typed arm intervention, deterministic randomized order, and
+  fault-injection coordinates.
 - Benchmark oracles cannot import the substrate's admission predicate. A block
   counts only through the unchanged external task oracle.
 - Expected-allow/no-op and expected-block cases are both mandatory. `block-all`
@@ -54,12 +55,14 @@ native, sham, and substrate arms with identical model and tool affordances. A
 separate derivative loses a tool response and restarts the agent process; pass
 requires exactly one intended message and no unrelated state mutation. The
 adapter may translate public tool calls at the periphery, but the substrate path
-must consume the real HTTP/MCP sidecar protocol. The current implementation is
-only a direct `@pm/agent-state-core` peripheral adapter and reinstantiates a
-provider role in one Python process; neither property satisfies that exit
-criterion. Current artifacts also lack provider request/response bytes,
-request IDs, usage/cost/latency, exact task/oracle bytes, and independent trust
-evidence, so conversion to `PublicEvalAttemptArtifact` fails closed.
+must consume the real HTTP/MCP sidecar protocol. The final deterministic
+qualification uses an authenticated HTTP sidecar, real process-group kill/reap,
+and a fresh provider-process retry while retaining the pinned Apple oracle,
+starting context, scripted-provider frames, trajectories, and state effects.
+It remains mechanism evidence: the probe is scripted, provider
+usage/cost/latency and independently anchored runtime/oracle trust are absent,
+and the unchanged headline score did not distinguish duplicate control effects.
+Conversion to `PublicEvalAttemptArtifact` therefore remains closed.
 
 ### P2: STATE-Bench held-out headline
 
@@ -67,13 +70,23 @@ Use the Agent Learning Track with its official training/held-out separation,
 domain tools, simulator, judge, prompt hashes, and score. Substrate learnings are
 exposed only through the track's permitted read-only
 `retrieve_learnings(query, top_k=3)` seam; test definitions never enter the
-learning store. Qualification tasks tune the harness and estimate power. The
-confirmatory manifest is then sealed before held-out results are inspected.
+learning store. A deterministic 20-task/domain train qualification is disjoint
+from the remaining 80-task/domain extraction inventory. The decision bridge
+then freezes all 150 test tasks, five stochastic repeat identities, three arms,
+a randomized per-cell schedule, and a distinct-model replication. Because
+upstream accepts exact `--tasks` selection only with `--split all`, the hashed
+command contract treats that value as a parser sentinel while the verified test
+inventory remains selection authority. The confirmatory manifest is sealed and
+externally preregistered before held-out results are inspected.
 Official simulator/judge credentials are an execution prerequisite, not a
 reason to substitute a local self-judge or claim success from adapter tests.
 Output that merely matches the expected score-file shape is conformance only.
-The adapter must refuse D7 conversion without raw runner, agent-provider,
-simulator, and judge bytes, request IDs, usage, cost, and latency.
+The package emits and verifies an exact command plan and a strict raw schema,
+but not the instrumented executor or transport capture. It must refuse D7
+conversion without command-bound raw runner, agent-provider, simulator, and
+judge bytes; every hidden retry and terminal failure; actual model/request IDs;
+usage, cost, and latency; treatment uptake; independently replayed state; an
+externally pinned trust policy; and official scores derived from those records.
 
 ### P3: independent corner battery
 

@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -27,8 +28,10 @@ import {
   planBehavioralBatch as planBehavioralBatchRuntime,
   runBehavioralBatch as runBehavioralBatchRuntime,
   verifyBehavioralBatch as verifyBehavioralBatchRuntime,
+  type BehavioralBatchReceipt,
   type BehavioralServices,
 } from "./behavioral.js";
+import type { BehavioralFailureReceipt } from "./behavioral-failure.js";
 
 const TEMP_PATHS: string[] = [];
 
@@ -57,9 +60,94 @@ function digest(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+type DeepMutable<T> = T extends readonly (infer Item)[]
+  ? DeepMutable<Item>[]
+  : T extends object
+    ? { -readonly [Key in keyof T]: DeepMutable<T[Key]> }
+    : T;
+
+type MutableBehavioralReceipt = DeepMutable<BehavioralBatchReceipt>;
+type MutableBehavioralAttempt = MutableBehavioralReceipt["trials"][number]["attempts"][number];
+
+function canonicalTestJson(value: unknown): string {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("test canonicalizer rejects non-finite numbers");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalTestJson).join(",")}]`;
+  if (typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right, "en"))
+      .map(([key, child]) => `${JSON.stringify(key)}:${canonicalTestJson(child)}`)
+      .join(",")}}`;
+  }
+  throw new Error(`test canonicalizer rejects ${typeof value}`);
+}
+
+function canonicalDigest(value: unknown): string {
+  return digest(canonicalTestJson(value));
+}
+
+function resealForgedBehavioralReceipt(
+  receipt: MutableBehavioralReceipt,
+  previousReceiptHash: string,
+): void {
+  const planBody = structuredClone(receipt.plan) as unknown as Record<string, unknown>;
+  delete planBody.planHash;
+  receipt.plan.planHash = canonicalDigest(planBody);
+  receipt.planHash = receipt.plan.planHash;
+  const planBytes = `${JSON.stringify(receipt.plan, null, 2)}\n`;
+  writeFileSync(join(receipt.outputRoot, receipt.planPath), planBytes);
+  receipt.planFileSha256 = digest(planBytes);
+
+  const receiptBody = structuredClone(receipt) as unknown as Record<string, unknown>;
+  delete receiptBody.receiptHash;
+  receipt.receiptHash = canonicalDigest(receiptBody);
+  rmSync(
+    join(receipt.outputRoot, `pm-behavioral-batch-${previousReceiptHash}.json`),
+    { force: true },
+  );
+  writeFileSync(
+    join(receipt.outputRoot, `pm-behavioral-batch-${receipt.receiptHash}.json`),
+    `${JSON.stringify(receipt, null, 2)}\n`,
+  );
+}
+
+function replaceReceiptArtifact(
+  receipt: MutableBehavioralReceipt,
+  attempt: MutableBehavioralAttempt,
+  path: string,
+  bytes: Buffer,
+): void {
+  writeFileSync(join(receipt.outputRoot, path), bytes);
+  const inventoryEntry = attempt.rawArtifacts.find((entry) => entry.path === path);
+  if (!inventoryEntry) throw new Error(`missing receipt inventory entry ${path}`);
+  inventoryEntry.byteLength = bytes.byteLength;
+  inventoryEntry.sha256 = digest(bytes);
+}
+
 function writeFixture(path: string, bytes: string): string {
   writeFileSync(path, bytes);
   return digest(bytes);
+}
+
+function readFailureReceipt(outputRoot: string): {
+  readonly fileName: string;
+  readonly raw: string;
+  readonly receipt: BehavioralFailureReceipt;
+} {
+  const failures = readdirSync(outputRoot).filter((entry) =>
+    /^pm-behavioral-failure-[a-f0-9]{64}\.json$/u.test(entry),
+  );
+  expect(failures).toHaveLength(1);
+  const fileName = failures[0] as string;
+  const raw = readFileSync(join(outputRoot, fileName), "utf8");
+  const receipt = JSON.parse(raw) as BehavioralFailureReceipt;
+  expect(fileName).toBe(`pm-behavioral-failure-${receipt.receiptHash}.json`);
+  return { fileName, raw, receipt };
 }
 
 function conformanceBehavioralInput(): {
@@ -237,9 +325,22 @@ describe("immutable public benchmark manifests", () => {
     expect(appWorld.upstream.revision).toBe("a072b7a86e7c1d5b1d7175659d750ebb9b79f10a");
     expect(appWorld.upstream.license.additionalTerms).toContain("encrypted");
     expect(appWorld.artifactPolicy.prohibitedPackageContent).toContain("decrypted bundles");
-    expect(
-      publicEvalCorners.getManifest("sentinel-microhub-stars").manifest.tasks.map(({ taskId }) => taskId),
-    ).toEqual(["microhub-stars-relative-passive", "microhub-stars-noop"]);
+    const sentinel = publicEvalCorners.getManifest("sentinel-microhub-stars").manifest;
+    expect(sentinel.tasks.map(({ taskId }) => taskId)).toEqual([
+      "microhub-stars-relative-passive",
+      "microhub-stars-noop",
+      "microhub-stars-absolute-passive",
+    ]);
+    expect(sentinel.sources.find(({ sourceId }) => sourceId === "sentinel-stars-absolute")).toEqual({
+      sourceId: "sentinel-stars-absolute",
+      location: "checkout",
+      path: "scenarios/microhub/stars-absolute-passive.json",
+      sha256: "2fe141ded7e4afc06d77db16f07ccaa0e62ccda805cb7d3c4318eed9d61fb08e",
+      redistribution: "mit",
+    });
+    expect(sentinel.execution.locallyCheckableNow).toContain(
+      "upstream manual-clock absolute late-contact and premature-contact rejection",
+    );
   });
 
   it("has a single runtime export and makes every operation reachable from the CLI", () => {
@@ -316,6 +417,13 @@ describe("local qualification wrappers", () => {
       publicEvalCorners.getQualificationPlan("memoryagentbench-factconsolidation-6k")
         .requiredExternalSourceIds,
     ).toEqual(["mab-conflict-parquet"]);
+    const sentinelPlan = publicEvalCorners.getQualificationPlan("sentinel-microhub-stars");
+    expect(sentinelPlan.commandTemplate).toContain(
+      "<package>/runners/sentinel_qualify.py",
+    );
+    expect(sentinelPlan.rawOutputPolicy).toContain(
+      "scenario prompts and event payloads are never copied into receipts",
+    );
   });
 
   it("records source blockers in an external, non-gating receipt without spawning", () => {
@@ -413,6 +521,241 @@ describe("matched-arm behavioral evidence protocol", () => {
     const unlisted = publicEvalCorners.verifyBehavioralBatch(cleanReceipt);
     expect(unlisted.valid).toBe(false);
     expect(unlisted.issues).toContain("unexpected top-level output artifact unlisted.txt");
+  });
+
+  it("rejects an undeclared receipt field even when the forged receipt is coherently resealed", () => {
+    const fixture = conformanceBehavioralInput();
+    const receipt = structuredClone(
+      publicEvalCorners.runBehavioralBatch(fixture.input),
+    ) as MutableBehavioralReceipt;
+    const previousReceiptHash = receipt.receiptHash;
+    (receipt as unknown as Record<string, unknown>).undeclaredDecision = "green";
+    resealForgedBehavioralReceipt(receipt, previousReceiptHash);
+
+    const verified = publicEvalCorners.verifyBehavioralBatch(receipt);
+    expect(verified.valid).toBe(false);
+    expect(verified.issues).toEqual([
+      "behavioral receipt contains undeclared top-level fields",
+    ]);
+  });
+
+  it("rejects a plan/receipt manifest mismatch after every enclosing hash is resealed", () => {
+    const fixture = conformanceBehavioralInput();
+    const receipt = structuredClone(
+      publicEvalCorners.runBehavioralBatch(fixture.input),
+    ) as MutableBehavioralReceipt;
+    const previousReceiptHash = receipt.receiptHash;
+    receipt.plan.manifestSha256 = digest("forged embedded plan manifest");
+    resealForgedBehavioralReceipt(receipt, previousReceiptHash);
+
+    const verified = publicEvalCorners.verifyBehavioralBatch(receipt);
+    expect(verified.valid).toBe(false);
+    expect(verified.issues).toEqual([
+      "embedded plan manifest hash does not match receipt manifest hash",
+    ]);
+  });
+
+  it("reapplies arm blindness to coherently rehashed scoring artifacts", () => {
+    const fixture = conformanceBehavioralInput();
+    const receipt = structuredClone(
+      publicEvalCorners.runBehavioralBatch(fixture.input),
+    ) as MutableBehavioralReceipt;
+    const previousReceiptHash = receipt.receiptHash;
+    const attempt = receipt.trials[0]?.attempts[0];
+    if (!attempt) throw new Error("behavioral attempt missing");
+    const treatmentBearingBytes = Buffer.from(
+      `${JSON.stringify({
+        schemaVersion: "pm.public-eval-corners.scoring-input.v1",
+        taskOutput: { completed: true, arm: "substrate" },
+      })}\n`,
+    );
+    replaceReceiptArtifact(
+      receipt,
+      attempt,
+      `${attempt.outputRelativePath}/scoring-input.json`,
+      treatmentBearingBytes,
+    );
+    replaceReceiptArtifact(
+      receipt,
+      attempt,
+      attempt.oracle.scoringInputPath,
+      treatmentBearingBytes,
+    );
+    attempt.oracle.scoringInputSha256 = digest(treatmentBearingBytes);
+    resealForgedBehavioralReceipt(receipt, previousReceiptHash);
+
+    const verified = publicEvalCorners.verifyBehavioralBatch(receipt);
+    expect(verified.valid).toBe(false);
+    expect(verified.issues.join(" ")).toMatch(
+      /exposes treatment control key taskOutput\.arm/u,
+    );
+  });
+
+  it("rejects a coherently rehashed non-JSON oracle outcome", () => {
+    const fixture = conformanceBehavioralInput();
+    const receipt = structuredClone(
+      publicEvalCorners.runBehavioralBatch(fixture.input),
+    ) as MutableBehavioralReceipt;
+    const previousReceiptHash = receipt.receiptHash;
+    const attempt = receipt.trials[0]?.attempts[0];
+    if (!attempt) throw new Error("behavioral attempt missing");
+    const invalidOutcome = Buffer.from("not-json\n");
+    replaceReceiptArtifact(
+      receipt,
+      attempt,
+      attempt.oracle.outcomePath,
+      invalidOutcome,
+    );
+    attempt.oracle.outcomeSha256 = digest(invalidOutcome);
+    attempt.oracle.outcomeByteLength = invalidOutcome.byteLength;
+    resealForgedBehavioralReceipt(receipt, previousReceiptHash);
+
+    const verified = publicEvalCorners.verifyBehavioralBatch(receipt);
+    expect(verified.valid).toBe(false);
+    expect(verified.issues).toContain(
+      `${attempt.oracle.outcomePath} must be valid JSON`,
+    );
+  });
+
+  it("reapplies task/seed uniqueness to the embedded plan", () => {
+    const fixture = conformanceBehavioralInput();
+    const input = structuredClone(fixture.input) as DeepMutable<BehavioralBatchInput>;
+    const firstTrial = input.trials[0];
+    if (!firstTrial) throw new Error("first trial missing");
+    input.trials.push({
+      ...structuredClone(firstTrial),
+      trialId: "synthetic-trial-002",
+      seed: "seed-002",
+    });
+    const receipt = structuredClone(
+      publicEvalCorners.runBehavioralBatch(input),
+    ) as MutableBehavioralReceipt;
+    const previousReceiptHash = receipt.receiptHash;
+    const firstPlannedTrial = receipt.plan.trials[0];
+    const secondPlannedTrial = receipt.plan.trials[1];
+    if (!firstPlannedTrial || !secondPlannedTrial) {
+      throw new Error("two planned trials required");
+    }
+    secondPlannedTrial.taskId = firstPlannedTrial.taskId;
+    secondPlannedTrial.seed = firstPlannedTrial.seed;
+    resealForgedBehavioralReceipt(receipt, previousReceiptHash);
+
+    const verified = publicEvalCorners.verifyBehavioralBatch(receipt);
+    expect(verified.valid).toBe(false);
+    expect(verified.issues).toContain(
+      "embedded plan contains duplicate taskId/seed pair airline:32/seed-001",
+    );
+  });
+
+  it("retains runner failure logs in a content-addressed ineligible receipt", () => {
+    const fixture = conformanceBehavioralInput();
+    const runnerScript = `
+process.stdout.write("runner stdout retained\\n");
+process.stderr.write("runner stderr retained\\n");
+process.exit(23);
+`;
+    const runnerHash = writeFixture(fixture.scriptPath, runnerScript);
+    const supporting = fixture.input.trials[0]?.runner.supportingFiles[0];
+    if (!supporting) throw new Error("runner supporting file missing");
+    (supporting as { sha256: string }).sha256 = runnerHash;
+
+    let thrownMessage = "";
+    try {
+      publicEvalCorners.runBehavioralBatch(fixture.input);
+    } catch (error) {
+      thrownMessage = error instanceof Error ? error.message : String(error);
+    }
+    expect(thrownMessage).toMatch(/runner command failed/u);
+
+    const { raw, receipt } = readFailureReceipt(fixture.input.outputRoot);
+    const planBytes = readFileSync(join(fixture.input.outputRoot, "predeclared-plan.json"));
+    const parsedPlan = JSON.parse(planBytes.toString("utf8")) as { planHash: string };
+    expect(receipt).toMatchObject({
+      schemaVersion: "pm.public-eval-corners.behavioral-failure-receipt.v1",
+      evidenceClass: "protocol-conformance",
+      efficacyClaimed: false,
+      decisionGating: false,
+      eligibleForIndependentAnalysis: false,
+      upstreamOutcomesInterpreted: false,
+      analysisDisposition: "ineligible-execution-failure",
+      batchId: fixture.input.batchId,
+      cornerId: fixture.input.cornerId,
+      failureStage: "runner-execution",
+      planHash: parsedPlan.planHash,
+      planFileSha256: digest(planBytes),
+      errorMessageSha256: digest(thrownMessage),
+    });
+    expect(receipt.activeAttempt?.trialId).toBe("synthetic-trial-001");
+    expect(raw).not.toContain(thrownMessage);
+
+    const retained = receipt.retainedFileInventory.files;
+    const stdout = retained.find(({ path }) => path.endsWith("/agent.stdout.log"));
+    const stderr = retained.find(({ path }) => path.endsWith("/agent.stderr.log"));
+    expect(stdout).toBeDefined();
+    expect(stderr).toBeDefined();
+    for (const [entry, expected] of [
+      [stdout, "runner stdout retained\n"],
+      [stderr, "runner stderr retained\n"],
+    ] as const) {
+      if (!entry) throw new Error("runner log inventory entry missing");
+      const bytes = readFileSync(join(fixture.input.outputRoot, entry.path));
+      expect(bytes.toString("utf8")).toBe(expected);
+      expect(entry.byteLength).toBe(bytes.byteLength);
+      expect(entry.sha256).toBe(digest(bytes));
+    }
+    expect(readdirSync(fixture.input.outputRoot)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^pm-behavioral-batch-/u)]),
+    );
+    expect(() => publicEvalCorners.runBehavioralBatch(fixture.input)).toThrow(
+      /outputRoot must be empty/u,
+    );
+    expect(
+      readdirSync(fixture.input.outputRoot).filter((entry) =>
+        entry.startsWith("pm-behavioral-failure-"),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("copies failed oracle logs out of the neutral view before sealing failure", () => {
+    const fixture = conformanceBehavioralInput();
+    const oracleScript = `
+process.stdout.write("oracle stdout retained\\n");
+process.stderr.write("oracle stderr retained\\n");
+process.exit(47);
+`;
+    const oracleHash = writeFixture(fixture.oraclePath, oracleScript);
+    const expectedSource = fixture.input.source.mode === "protocol-conformance"
+      ? fixture.input.source.expectedFiles[0]
+      : undefined;
+    const supporting = fixture.input.oracle.command.supportingFiles[0];
+    if (!expectedSource || !supporting) throw new Error("oracle source binding missing");
+    (expectedSource as { sha256: string }).sha256 = oracleHash;
+    (supporting as { sha256: string }).sha256 = oracleHash;
+
+    expect(() => publicEvalCorners.runBehavioralBatch(fixture.input)).toThrow(
+      /oracle command failed/u,
+    );
+
+    const { receipt } = readFailureReceipt(fixture.input.outputRoot);
+    expect(receipt.failureStage).toBe("oracle-execution");
+    expect(receipt.eligibleForIndependentAnalysis).toBe(false);
+    const retained = receipt.retainedFileInventory.files;
+    for (const [suffix, expected] of [
+      ["/oracle.stdout.log", "oracle stdout retained\n"],
+      ["/oracle.stderr.log", "oracle stderr retained\n"],
+    ] as const) {
+      const entry = retained.find(({ path }) => path.endsWith(suffix));
+      if (!entry) throw new Error(`${suffix} inventory entry missing`);
+      const bytes = readFileSync(join(fixture.input.outputRoot, entry.path));
+      expect(bytes.toString("utf8")).toBe(expected);
+      expect(entry.byteLength).toBe(bytes.byteLength);
+      expect(entry.sha256).toBe(digest(bytes));
+    }
+    expect(retained.some(({ path }) => path.endsWith("/agent.stdout.log"))).toBe(true);
+    expect(retained.some(({ path }) => path.endsWith("/agent.stderr.log"))).toBe(true);
+    expect(readdirSync(fixture.input.outputRoot)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^pm-behavioral-batch-/u)]),
+    );
   });
 
   it("recomputes matching instead of trusting a substrate-arm equality assertion", () => {

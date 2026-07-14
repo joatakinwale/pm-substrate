@@ -25,12 +25,17 @@ pm-substrate is that enforcement medium: what the workspace accepts as actionabl
 
 **Current public-proof status (2026-07-13):** each of the six program steps now
 has a concrete repository artifact, but that is not the same as an executed
-proof. The local reset and two evaluation-integrity repairs ran; ToolSandbox
-stopped on provider quota and its direct-core adapter is ineligible for D7;
-STATE-Bench can verify only output/procedure shape and refuses score conversion;
-the corner battery has no real matched-agent run; and D7 can emit only
-non-authoritative evidence eligibility pending a separate owner decision.
-Causal benefit is still unproven. See the exact run results and blockers in
+proof. ToolSandbox completed a deterministic real-sidecar/process-restart
+qualification: every arm received the unchanged upstream score of `1.0`, even
+though native and sham duplicated the target side effect in the derivative.
+That is mechanism evidence plus an oracle blind spot, not agent efficacy.
+STATE-Bench now has disjoint train qualification/extraction plans, a complete
+test decision bridge, exact per-cell command planning, oracle-context redaction,
+and a strict raw-evidence contract, but zero official trajectories and no raw
+transport capture. The corner battery has no real matched-agent run, and D7
+still reports `not_eligible` pending raw-derived facts, external trust,
+replication, and a separate owner decision. Causal benefit is unproven. See the
+exact run results and blockers in
 [`docs/public-benchmark-status-2026-07-13.md`](./docs/public-benchmark-status-2026-07-13.md).
 
 ## The product shape (decided 2026-07-02)

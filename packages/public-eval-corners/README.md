@@ -7,7 +7,7 @@ corner evaluations:
 - MemoryAgentBench FactConsolidation `sh_6k` and `mh_6k`
 - tau2 airline task `32`
 - AppWorld task `22cc237_2`
-- SentinelBench MicroHub relative and no-op star monitoring
+- SentinelBench MicroHub relative, no-op, and absolute star monitoring
 
 The package does **not** include a benchmark agent, credentials, or a claim that
 the substrate improves behavior. Live agent and oracle commands are supplied by
@@ -61,6 +61,9 @@ node dist/cli.js behavioral-plan --input /tmp/public-corners-batch.json
 node dist/cli.js run-behavioral-batch --input /tmp/public-corners-batch.json
 node dist/cli.js verify-behavioral-batch \
   --receipt /tmp/public-corners-run/pm-behavioral-batch-<sha256>.json
+node dist/cli.js verify-behavioral-batch \
+  --receipt /tmp/public-corners-run/pm-behavioral-batch-<sha256>.json \
+  --allow-ineligible-conformance
 ```
 
 Source verification requires the pinned Git checkout and every external file
@@ -75,6 +78,13 @@ requires `--runner-option appworldDataRoot=/tmp/... --allow-protected-local`;
 the explicit opt-in permits local bundle unpacking but never redistribution.
 Use `qualification-plan` to inspect the exact `uv` wrapper command and local
 data requirements before execution.
+
+The Sentinel qualification binds three unchanged upstream scenarios as a
+control set: relative-threshold contact after the condition, no contact for the
+no-op task plus rejection of a false contact, and the absolute-threshold
+expected-allow control. The absolute control must pass after its authored
+threshold and reject a premature contact. This is still manual-clock oracle
+qualification, not a browser-agent efficacy result.
 
 ## Behavioral matched-arm protocol
 
@@ -138,6 +148,13 @@ returns `eligibleForIndependentAnalysis: false` even for a clean
 specified and verified invocation-proof receipt, followed by independent
 oracle/split/control verification and replication; this package does not yet
 accept or mint that proof.
+
+The CLI treats verification as an evidence gate by default: structural validity
+with `eligibleForIndependentAnalysis: false` exits nonzero. Only an operator who
+explicitly passes `--allow-ineligible-conformance` gets a green exit for the
+structural check, and the printed `cliEvidenceGate` records that override. This
+prevents CI from silently promoting a locally self-consistent or constant-oracle
+receipt into evidence.
 
 The minimum live input shape is:
 

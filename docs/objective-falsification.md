@@ -5,10 +5,12 @@ authoritative. The public-benchmark gate below is immediate; the existing
 business-operability gate consumed by `pnpm pm:memo` is preserved as a deferred
 transfer gate and cannot currently produce a full keep decision.*
 
-## The criticism
+## Why the current evidence is insufficient
 
-The original north star — “make two agent-run businesses worth operating” —
-mixed four different claims:
+The objective is to prove—or falsify—pm-substrate on real, publicly documented
+agent-state failures. PluggedInSocial and ArrowHedge are frozen future transfer
+targets; making those labs worth operating is not the current objective. The
+earlier validation path often mixed four different evidence layers:
 
 1. the substrate is technically sound;
 2. its state mechanism changes agent behavior;
@@ -25,7 +27,7 @@ repeated attempts on the same fixture, or an oracle derived from the gate can
 also create false confidence. The fourth claim requires later business evidence
 and cannot be inferred from any benchmark.
 
-The immediate falsifiable claim is narrower and causal:
+The governing falsifiable claim is causal:
 
 > On pinned public tasks that expose stale, contradictory, lost, or changing
 > operational state, an agent using pm-substrate completes more tasks according
@@ -117,7 +119,9 @@ Each attempt binds the upstream HTTPS repository URL, immutable content
 revision, SPDX license, task ID and content hash, original/derivative label,
 eligible-universe inventory root/index/proof, deterministic selection digest,
 split and corpus hash, resolved simulator/judge/model identities, individual
-prompt/tool/decoding/runner hashes, seed, substrate revision/configuration,
+prompt/tool/decoding/runner hashes, a provider sampling seed when the upstream
+runtime exposes one (otherwise a stochastic repeat identity plus an explicit
+no-seed declaration), substrate revision/configuration,
 immutable arm intervention and execution binding, initial environment snapshot,
 randomized arm position, pair ID, unique attempt ID, start/end timestamps, raw
 artifact hashes, token/tool counts, and strict oracle result. Aggregate
@@ -159,10 +163,15 @@ The first slice is ToolSandbox's public multi-turn cellular/message scenario.
 Its original milestone/minefield result is the headline. A separately labeled
 derivative must lose a tool response and restart the OS process; the substrate
 must recover without sending the message twice or changing unrelated state.
-The current adapter only reinstantiates the provider role inside one Python
-process, so it is conformance scaffolding and cannot satisfy that derivative.
-The
-headline held-out program is STATE-Bench Agent Learning Track. Independent
+The current deterministic qualification now uses an authenticated sidecar and
+real killed/reaped/fresh provider process. Native and sham duplicated the
+target side effect in the derivative while substrate suppressed it, but the
+unchanged upstream score stayed `1.0` in every arm. This qualifies the bounded
+mechanism and exposes an oracle blind spot; the scripted probe, missing provider
+economics, and absent external trust keep it ineligible for efficacy. The
+headline held-out program is STATE-Bench Agent Learning Track. Its phase-safe
+plan uses stochastic repeat identities because the pinned upstream exposes no
+sampling seed. Independent
 corners add public fact-supersession, restart/idempotency/collateral, and
 dynamic-state tasks. Exact pinned revisions and licenses are recorded by the
 adapter manifests rather than copied into this prose.

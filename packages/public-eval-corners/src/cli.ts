@@ -147,12 +147,25 @@ function main(): void {
     const result = publicEvalCorners.verifyBehavioralBatch(
       jsonFile(required("--receipt")),
     );
-    print(result);
-    markFailed(result.valid);
+    const allowIneligibleConformance = hasFlag("--allow-ineligible-conformance");
+    const gatePassed = allowIneligibleConformance
+      ? result.valid
+      : result.valid && result.eligibleForIndependentAnalysis;
+    print({
+      ...result,
+      cliEvidenceGate: {
+        mode: allowIneligibleConformance
+          ? "structural-conformance-only"
+          : "independent-analysis-required",
+        passed: gatePassed,
+        explicitIneligibleOverride: allowIneligibleConformance,
+      },
+    });
+    markFailed(gatePassed);
     return;
   }
   throw new Error(
-    "usage: <list|manifest|qualification-plan|verify-files|verify-source|validate-label|conformance|diagnose-appworld|qualify|behavioral-plan|run-behavioral-batch|verify-behavioral-batch> [options]",
+    "usage: <list|manifest|qualification-plan|verify-files|verify-source|validate-label|conformance|diagnose-appworld|qualify|behavioral-plan|run-behavioral-batch|verify-behavioral-batch> [options]; verify-behavioral-batch is an evidence gate unless --allow-ineligible-conformance is explicit",
   );
 }
 

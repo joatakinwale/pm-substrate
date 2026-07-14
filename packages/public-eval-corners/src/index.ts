@@ -576,8 +576,10 @@ const MANIFESTS = deepFreeze([
     tasks: [
       { taskId: "microhub-stars-relative-passive", role: "relative baseline monitoring" },
       { taskId: "microhub-stars-noop", role: "no-op false-contact guardrail" },
+      { taskId: "microhub-stars-absolute-passive", role: "absolute expected-allow control" },
     ],
-    sourceCoverage: "Pinned relative/no-op scenarios, evaluation harness, server, and frontend lockfile.",
+    sourceCoverage:
+      "Pinned relative/no-op/absolute scenarios, evaluation harness, server, and frontend lockfile.",
     sources: [
       {
         sourceId: "sentinel-stars-relative",
@@ -591,6 +593,13 @@ const MANIFESTS = deepFreeze([
         location: "checkout",
         path: "scenarios/microhub/stars-noop.json",
         sha256: "e689d9d99d97bf1cca71f96b96e72cbbd882a2848be26ba9d9d3ba78dd99649d",
+        redistribution: "mit",
+      },
+      {
+        sourceId: "sentinel-stars-absolute",
+        location: "checkout",
+        path: "scenarios/microhub/stars-absolute-passive.json",
+        sha256: "2fe141ded7e4afc06d77db16f07ccaa0e62ccda805cb7d3c4318eed9d61fb08e",
         redistribution: "mit",
       },
       {
@@ -623,7 +632,14 @@ const MANIFESTS = deepFreeze([
       limitations: ["Live browser operation remains model- and UI-dependent even though scenario evaluation is deterministic."],
     },
     execution: {
-      locallyCheckableNow: ["source hashes", "synthetic relative threshold", "synthetic no-op contact absence"],
+      locallyCheckableNow: [
+        "source hashes",
+        "upstream manual-clock relative late-contact",
+        "upstream manual-clock no-op contact absence and false-contact rejection",
+        "upstream manual-clock absolute late-contact and premature-contact rejection",
+        "synthetic relative threshold",
+        "synthetic no-op contact absence",
+      ],
       credentialGates: ["a live browser agent needs a local or provider model"],
       environmentCost: "Python 3.11+, Node 18+, frontend, API server, and browser; no benchmark API key.",
     },

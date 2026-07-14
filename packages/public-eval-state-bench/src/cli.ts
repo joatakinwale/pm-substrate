@@ -11,13 +11,17 @@ import { dirname, resolve } from "node:path";
 import {
   stateBenchLearningAdapter,
   type StateBenchExtractionCollectionInput,
+  type StateBenchDecisionManifestInput,
   type StateBenchExtractionKind,
   type StateBenchOfficialCollectionInput,
   type StateBenchOutputConformanceReceipt,
+  type StateBenchQualificationPlanInput,
   type StateBenchRetrievalIdentity,
   type StateBenchRetrievalRequest,
+  type StateBenchRunBindingInput,
   type StateBenchSidecarArm,
 } from "./index.js";
+import type { StateBenchExecutionCommandPlanInput } from "./execution-command-plan.js";
 
 function option(name: string): string | undefined {
   const index = process.argv.indexOf(name);
@@ -36,6 +40,62 @@ function print(value: unknown): void {
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function optionalJson(name: string): unknown | null {
+  const path = option(name);
+  return path === undefined ? null : readJson(path);
+}
+
+function qualificationPlanValue(): unknown {
+  return readJson(required("--qualification-plan"));
+}
+
+function executionPreflight(
+  checkoutPath: string,
+  config: ReturnType<typeof stateBenchLearningAdapter.loadRunConfig>,
+  qualificationPlan: unknown,
+) {
+  const result = stateBenchLearningAdapter.preflightExecution(
+    checkoutPath,
+    config,
+    qualificationPlan,
+    optionalJson("--decision-manifest"),
+    optionalJson("--preregistration-receipt"),
+    optionalJson("--trust-policy"),
+    option("--trust-policy-hash") ??
+      process.env["PM_PUBLIC_EVAL_TRUST_POLICY_SHA256"] ??
+      null,
+  );
+  if (!result.valid) throw new Error(`execution preflight failed: ${result.issues.join("; ")}`);
+  return result;
+}
+
+function executionCommandPlanInput(): StateBenchExecutionCommandPlanInput {
+  const value = readJson(required("--input"));
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    !Array.isArray((value as { runConfigs?: unknown }).runConfigs)
+  ) {
+    throw new Error("--input must contain a runConfigs array");
+  }
+  return value as StateBenchExecutionCommandPlanInput;
+}
+
+function preflightCommandPlan(
+  checkoutPath: string,
+  qualificationPlan: unknown,
+  input: StateBenchExecutionCommandPlanInput,
+): void {
+  for (const configValue of input.runConfigs) {
+    executionPreflight(
+      checkoutPath,
+      stateBenchLearningAdapter.parseRunConfig(configValue),
+      qualificationPlan,
+    );
+  }
 }
 
 function collectionInput(): StateBenchOfficialCollectionInput {
@@ -104,10 +164,19 @@ async function serve(): Promise<void> {
     throw new Error("native arm uses upstream StateBenchAgent and must not start a retrieval sidecar");
   }
   const sidecarArm: StateBenchSidecarArm = config.arm;
+  const qualificationPlan = qualificationPlanValue();
+  const preflight = executionPreflight(checkoutPath, config, qualificationPlan);
   const artifact = stateBenchLearningAdapter.loadProvenanceBoundArtifact(
     provenanceInput,
     extractionProvenancePath,
   );
+  if (config.phase === "qualification") {
+    stateBenchLearningAdapter.assertQualificationArtifactSources(
+      checkoutPath,
+      qualificationPlan,
+      artifact,
+    );
+  }
   stateBenchLearningAdapter.assertRunArtifactCoverage(
     artifact,
     config,
@@ -126,9 +195,7 @@ async function serve(): Promise<void> {
   const runIndex = Number(required("--run-index"));
   const runId = stateBenchLearningAdapter.officialRunId(config, runIndex);
   const configSha256 = stateBenchLearningAdapter.runConfigSha256(config);
-  const officialTasks = new Set(
-    stateBenchLearningAdapter.officialTaskIds(checkoutPath, config.domain),
-  );
+  const officialTasks = new Set(config.taskIds);
   const port = Number(option("--port") ?? "4319");
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error("--port is invalid");
@@ -176,7 +243,7 @@ async function serve(): Promise<void> {
           identity?.modelId !== config.agentModel.modelId ||
           !officialTasks.has(identity?.taskId)
         ) {
-          throw new Error("retrieval identity is not bound to this held-out run session");
+          throw new Error("retrieval identity is not bound to this phase run session");
         }
         const retrievalRequest: StateBenchRetrievalRequest = {
           query: String(body.query ?? ""),
@@ -221,6 +288,7 @@ async function serve(): Promise<void> {
       configSha256,
       auditPath,
       evidenceClass: stateBenchLearningAdapter.manifest.evidenceClasses.adapterConformance.id,
+      authorityStatus: preflight.authorityStatus,
     });
   });
 }
@@ -231,6 +299,150 @@ async function main(): Promise<void> {
   if (command === "manifest") return print(stateBenchLearningAdapter.manifest);
   if (command === "verify-checkout") {
     const result = stateBenchLearningAdapter.verifyCheckout(required("--checkout"));
+    print(result);
+    if (!result.valid) process.exitCode = 1;
+    return;
+  }
+  if (command === "create-qualification-plan") {
+    return print(
+      stateBenchLearningAdapter.createQualificationPlan(
+        required("--checkout"),
+        readJson(required("--input")) as StateBenchQualificationPlanInput,
+      ),
+    );
+  }
+  if (command === "verify-qualification-plan") {
+    const result = stateBenchLearningAdapter.verifyQualificationPlan(
+      required("--checkout"),
+      qualificationPlanValue(),
+    );
+    print(result);
+    if (!result.valid) process.exitCode = 1;
+    return;
+  }
+  if (command === "qualification-schedule") {
+    return print(
+      stateBenchLearningAdapter.qualificationAttemptSchedule(
+        required("--checkout"),
+        qualificationPlanValue(),
+      ),
+    );
+  }
+  if (command === "verify-qualification-artifact-sources") {
+    const checkoutPath = required("--checkout");
+    const artifact = stateBenchLearningAdapter.loadArtifact(required("--artifact"));
+    stateBenchLearningAdapter.assertQualificationArtifactSources(
+      checkoutPath,
+      qualificationPlanValue(),
+      artifact,
+    );
+    return print({ valid: true, issues: [] });
+  }
+  if (command === "create-decision-manifest") {
+    return print(
+      stateBenchLearningAdapter.createDecisionManifestBridge(
+        required("--checkout"),
+        qualificationPlanValue(),
+        readJson(required("--input")) as StateBenchDecisionManifestInput,
+      ),
+    );
+  }
+  if (command === "verify-decision-manifest") {
+    const result = stateBenchLearningAdapter.verifyDecisionManifestBridge(
+      required("--checkout"),
+      qualificationPlanValue(),
+      readJson(required("--decision-manifest")),
+    );
+    print(result);
+    if (!result.valid) process.exitCode = 1;
+    return;
+  }
+  if (command === "create-bound-config") {
+    const phaseInput = readJson(required("--input")) as StateBenchRunBindingInput;
+    return print(
+      stateBenchLearningAdapter.createBoundRunConfig(
+        required("--checkout"),
+        qualificationPlanValue(),
+        optionalJson("--decision-manifest"),
+        phaseInput,
+      ),
+    );
+  }
+  if (command === "verify-bound-config") {
+    const result = stateBenchLearningAdapter.verifyBoundRunConfig(
+      required("--checkout"),
+      qualificationPlanValue(),
+      optionalJson("--decision-manifest"),
+      readJson(required("--config")),
+    );
+    print(result);
+    if (!result.valid) process.exitCode = 1;
+    return;
+  }
+  if (command === "preflight-execution") {
+    const config = stateBenchLearningAdapter.loadRunConfig(required("--config"));
+    const result = stateBenchLearningAdapter.preflightExecution(
+      required("--checkout"),
+      config,
+      qualificationPlanValue(),
+      optionalJson("--decision-manifest"),
+      optionalJson("--preregistration-receipt"),
+      optionalJson("--trust-policy"),
+      option("--trust-policy-hash") ??
+        process.env["PM_PUBLIC_EVAL_TRUST_POLICY_SHA256"] ??
+        null,
+    );
+    print(result);
+    if (!result.valid) process.exitCode = 1;
+    return;
+  }
+  if (command === "create-execution-command-plan") {
+    const checkoutPath = required("--checkout");
+    const qualificationPlan = qualificationPlanValue();
+    const decisionManifest = optionalJson("--decision-manifest");
+    const input = executionCommandPlanInput();
+    preflightCommandPlan(checkoutPath, qualificationPlan, input);
+    return print(
+      stateBenchLearningAdapter.createExecutionCommandPlan(
+        checkoutPath,
+        qualificationPlan,
+        decisionManifest,
+        input,
+      ),
+    );
+  }
+  if (command === "verify-execution-command-plan") {
+    const checkoutPath = required("--checkout");
+    const qualificationPlan = qualificationPlanValue();
+    const decisionManifest = optionalJson("--decision-manifest");
+    const input = executionCommandPlanInput();
+    preflightCommandPlan(checkoutPath, qualificationPlan, input);
+    const result = stateBenchLearningAdapter.verifyExecutionCommandPlan(
+      checkoutPath,
+      qualificationPlan,
+      decisionManifest,
+      input,
+      readJson(required("--command-plan")),
+    );
+    print(result);
+    if (!result.valid) process.exitCode = 1;
+    return;
+  }
+  if (command === "verify-raw-evidence") {
+    const executionCommandPlanPath = option("--execution-command-plan");
+    const result = stateBenchLearningAdapter.verifyRawEvidence(
+      readJson(required("--bundle")),
+      option("--external-trust-policy") === undefined
+        ? undefined
+        : readJson(required("--external-trust-policy")),
+      option("--expected-policy-hash") ??
+        process.env["PM_STATE_BENCH_RAW_TRUST_POLICY_SHA256"],
+      executionCommandPlanPath === undefined
+        ? undefined
+        : readJson(executionCommandPlanPath),
+      option("--expected-command-plan-hash") ??
+        process.env["PM_STATE_BENCH_COMMAND_PLAN_SHA256"],
+    );
     print(result);
     if (!result.valid) process.exitCode = 1;
     return;
@@ -323,11 +535,23 @@ async function main(): Promise<void> {
     return;
   }
   if (command === "collect-output") {
-    return print(stateBenchLearningAdapter.collectOutputConformanceReceipt(collectionInput()));
+    const input = collectionInput();
+    executionPreflight(
+      input.checkoutPath,
+      stateBenchLearningAdapter.loadRunConfig(input.configPath),
+      qualificationPlanValue(),
+    );
+    return print(stateBenchLearningAdapter.collectOutputConformanceReceipt(input));
   }
   if (command === "verify-output") {
+    const input = collectionInput();
+    executionPreflight(
+      input.checkoutPath,
+      stateBenchLearningAdapter.loadRunConfig(input.configPath),
+      qualificationPlanValue(),
+    );
     const result = stateBenchLearningAdapter.verifyOutputConformanceReceipt(
-      collectionInput(),
+      input,
       readJson(required("--receipt")),
     );
     print(result);
@@ -340,7 +564,7 @@ async function main(): Promise<void> {
     );
   }
   throw new Error(
-    "usage: <serve|manifest|verify-checkout|seal-artifact|verify-artifact|create-extraction-manifest|verify-extraction-manifest|record-extraction|seal-extraction|verify-extraction|config-hash|verify-metrics|collect-output|verify-output|convert-to-public-attempt> [options]",
+    "usage: <serve|manifest|verify-checkout|create-qualification-plan|verify-qualification-plan|qualification-schedule|verify-qualification-artifact-sources|create-decision-manifest|verify-decision-manifest|create-bound-config|verify-bound-config|preflight-execution|create-execution-command-plan|verify-execution-command-plan|verify-raw-evidence|seal-artifact|verify-artifact|create-extraction-manifest|verify-extraction-manifest|record-extraction|seal-extraction|verify-extraction|config-hash|verify-metrics|collect-output|verify-output|convert-to-public-attempt> [options]",
   );
 }
 

@@ -169,6 +169,14 @@ export type PublicEvalPreregistrationReceiptInput = Omit<
   "schemaVersion" | "signature" | "receiptHash"
 >;
 
+export interface PublicEvalPreregistrationPreflight {
+  readonly valid: boolean;
+  readonly issues: readonly string[];
+  readonly policyHash: string | null;
+  readonly receiptHash: string | null;
+  readonly registeredAt: string | null;
+}
+
 export interface PublicEvalExecutionTimestampReceipt {
   readonly schemaVersion: "pm.public-eval.execution-timestamp-receipt.v1";
   readonly receiptId: string;
@@ -538,6 +546,61 @@ export function parsePublicEvalPreregistrationReceipt(
   };
   validateStructuredReceiptHash(parsed, "preregistrationReceipt");
   return freeze(parsed);
+}
+
+/**
+ * Pre-execution gate for a frozen manifest. This verifies the Ed25519 receipt
+ * against an independently supplied policy whose exact hash must arrive from
+ * an out-of-band owner/CI channel. Attempt-time ordering remains a later D7
+ * check because no attempt exists yet.
+ */
+export function verifyPublicEvalPreregistrationForExecution(
+  rawManifest: unknown,
+  rawReceipt: unknown,
+  rawTrustPolicy: unknown,
+  expectedTrustPolicyHash: string,
+): PublicEvalPreregistrationPreflight {
+  try {
+    const manifest = parsePublicEvalAnalysisManifest(rawManifest);
+    const policy = parsePublicEvalDecisionTrustPolicy(rawTrustPolicy);
+    if (
+      policy.policyHash !==
+      sha(expectedTrustPolicyHash, "expectedTrustPolicyHash")
+    ) {
+      throw new Error("trust policy does not match the out-of-band pinned hash");
+    }
+    if (
+      policy.preregistrationAuthority.ownerIdentity ===
+      manifest.producerIdentity
+    ) {
+      throw new Error("preregistration authority owner is the experiment producer");
+    }
+    const receipt = parsePublicEvalPreregistrationReceipt(rawReceipt);
+    validatePreregistrationReceipt(
+      receipt,
+      policy,
+      manifest.experimentId,
+      manifest.manifestHash,
+    );
+    if (receipt.registeredAt !== manifest.frozenAt) {
+      throw new Error("preregistration receipt time does not equal manifest frozenAt");
+    }
+    return {
+      valid: true,
+      issues: [],
+      policyHash: policy.policyHash,
+      receiptHash: receipt.receiptHash,
+      registeredAt: receipt.registeredAt,
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      issues: [error instanceof Error ? error.message : String(error)],
+      policyHash: null,
+      receiptHash: null,
+      registeredAt: null,
+    };
+  }
 }
 
 export function createPublicEvalExecutionTimestampReceipt(

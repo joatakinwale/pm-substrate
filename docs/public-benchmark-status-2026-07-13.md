@@ -8,9 +8,10 @@ that is not six completed proof steps. ToolSandbox now has fresh raw
 cross-verified headline and lost-response triplets over a real authenticated
 sidecar and provider-process restart. They use deterministic
 `PmScriptedStateProbe`, however, and both eligibility assessments correctly
-remain false. STATE-Bench still has procedure/output-shape conformance but no
-verifiable official execution; the corner harness has no real matched-agent
-result; and D7 v4 marks all current signed structured assertions
+remain false. STATE-Bench now has phase-safe train/test planning, exact per-cell
+commands, and a command-bound raw contract but no verifiable official
+execution; the corner harness has no real matched-agent result; and D7 v4 marks
+all current signed structured assertions
 diagnostic-only and `not_eligible`. PluggedInSocial and ArrowHedge therefore
 remain frozen.
 
@@ -80,10 +81,10 @@ a 30-test final regression subset passed.
 |---|---|---|---|
 | 1. Evidence integrity reset | Local labs are `mechanism_conformance_only`; exact pair identity, expected-allow checks, allow-all/block-all mutants, deterministic top-ranked task selection, immutable arm interventions, initial environment, randomized order, signed preregistration/attempt-time bindings, versioned structured assertions, and fixed guardrails ship | Live Ollama suite `suite_6cf46d7e-a3fe-46ce-a5dc-4fc57f2a8ed8`: 22 scenarios/22 exact pairs; expected-block 12/12; expected-allow 10/10; both mutants rejected. Analysis/decision adversarial suite: 30/30 | Conformance and gate integrity only. Internally consistent signed facts remain diagnostic-only and `not_eligible`; no local result can establish public efficacy or authorize KEEP |
 | 2. ToolSandbox slice | Pinned `apple/ToolSandbox@165848b9…`; matched-batch/raw-verification v3; verifier-selected Apple oracle replay; raw provider/trajectory/sidecar/state cross-binding; authenticated HTTP sidecar; runtime closure; pinned starting context; real OS-process restart; outcome-neutral replay | Preserved history: quota-failed v1 batch, then a deterministic derivative that exposed a 136-character idempotency-key `400`, then pre-final repair retest `90a8e03a…`. Final headline `7ad2c0e8…` and derivative `0043af27…` both scored `1.0` in every arm. In the derivative, native/sham duplicated the target side effect and substrate did not | Strong qualification/mechanism evidence for one known scenario, not efficacy. Eligibility remains false for missing provider usage/cost/latency, trusted oracle runtime/environment, non-scripted public-agent execution, and independent trust anchor. The upstream score's duplicate-send blind spot requires a separate state-effect metric |
-| 3. STATE-Bench held-out proof | Pinned `microsoft/STATE-Bench@fd980728…`; exact 300-file train byte/procedure provenance; native and sham/substrate parity through the core observation/contract path; exact output inventory; score-shaped output conversion refuses by design | Adapter adversarial suite: 11/11; full pinned upstream Python suite: 148 passed, 1 live skipped. Official scored trajectories: 0 | Current `official_output_shape_and_procedure_conformance_only` receipt is ineligible. Requires 2,250 official trajectories plus raw runner, agent-provider, simulator and judge bytes, request IDs, usage, cost, and latency; local “perfect” JSON cannot substitute |
+| 3. STATE-Bench held-out proof | Pinned `microsoft/STATE-Bench@fd980728…`; deterministic 20/80 train qualification/extraction partition; exact 150-task test confirmation and replication inventories; five stochastic repeat identities; randomized arm schedule; v3 bound configs; exact 2,250-command phase plans; oracle-field redaction; one-attempt policy; external preregistration preflight; command-bound raw transport/retry/treatment/state schema; score conversion refuses by design | STATE adversarial suite: 62/62; pinned upstream plus adapter Python suite: 150 passed, 1 credential-dependent skip. Official scored trajectories: 0 | Planning and schemas are controls, not execution. No instrumented executor captures runner/agent/simulator/judge transports, independently replays state, or derives official scores from raw judge bytes. Official credentials and external command/trust pins are absent; local “perfect” JSON cannot substitute |
 | 4. Independent corner battery | Four source-pinned adapters plus a matched-arm protocol with one shared runner/config/model, typed treatment deltas, recomputed matching proof, and a fresh arm-blind oracle view | Harness adversarial suite: 24/24. Oracle qualifications: MAB (`399b2534…`), tau2 (`89c5fa85…`), Sentinel (`3a80a27…`), AppWorld (`febefba7…`); no behavioral triplet ran | Every locally produced plan/receipt/verifier result is analysis-ineligible because no independent oracle-invocation proof format/verifier exists. Neutral temp views are not OS sandboxes; future independent review/provider receipts must also rule out host/order/covert-channel leakage |
 | 5. Failure-driven Arrowsmith loop | v230 repaired an observed continuity fork; v231 repaired the false-KEEP authority boundary; v232 repaired the observed ToolSandbox bounded-idempotency composition failure without weakening the sidecar's limit or request-byte conflict check | Continuity concurrency ablation passed; fabricated signed D7 facts remain ineligible; v232 preserves the failing `d9cf73c3…` batch and final derivative shows the bounded digest survives restart and suppresses the exact duplicate | Integrity and mechanism evidence, not public benefit. A general substrate repair still requires a non-scripted behavioral failure trace, minimal consumed primitive, ablation, exact rerun, and clean controls |
-| 6. Replicate and decide | Task-clustered analysis uses ≥20 deterministic top-ranked tasks/decision phase, 3 seeds/task, 10,000 bootstrap draws, simultaneous ≥0.10 lift over both controls, positive lower bound, ≥0.5 reliability, zero deterministic false blocks/collateral, ≤$10/≤300s absolute and ≤1.25× per-control economics. Future eligibility additionally requires adapter-specific derivation of all 31 facts from bound raw records plus six signed receipts | Analysis/decision suite: 30/30. The generated memo reports `unproven` | Current v4 automation always emits `not_eligible`, with structured assertions diagnostic-only and `ownerAuthorizationRequired=true`. No raw-derived semantic evidence, external preregistration/trust anchor, confirmation, replication, or owner authorization exists |
+| 6. Replicate and decide | Task-clustered analysis uses ≥20 deterministic top-ranked tasks/decision phase, ≥3 predeclared repeats/task (provider-seeded only when the runtime supports it), 10,000 bootstrap draws, simultaneous ≥0.10 lift over both controls, positive lower bound, ≥0.5 reliability, zero deterministic false blocks/collateral, ≤$10/≤300s absolute and ≤1.25× per-control economics. Future eligibility additionally requires adapter-specific derivation of all 31 facts from bound raw records plus six signed receipts | Analysis/decision suite: 30/30. The generated memo reports `unproven` | Current v4 automation always emits `not_eligible`, with structured assertions diagnostic-only and `ownerAuthorizationRequired=true`. No raw-derived semantic evidence, external preregistration/trust anchor, confirmation, replication, or owner authorization exists |
 
 ## Exact external blockers
 
@@ -97,7 +98,10 @@ a 30-test final regression subset passed.
 2. **STATE-Bench:** `STATE_BENCH_EVAL_ENDPOINT`,
    `STATE_BENCH_EVAL_DEPLOYMENTS`, `STATE_BENCH_EVAL_API_KEY`, and the declared
    `STATE_BENCH_AGENT_*` runtime identities are unavailable. A generic API key
-   is not substituted for the locked official evaluator.
+   is not substituted for the locked official evaluator. The repository also
+   does not yet contain the instrumented executor/transport capture required to
+   turn its verified command plan and raw schema into independently replayable
+   attempts.
 3. **Corner execution:** no matched model/provider run or independently
    verified OS-isolated oracle execution exists. The local harness cannot prove
    its own semantic parity or absence of covert leakage.
@@ -119,10 +123,14 @@ a 30-test final regression subset passed.
    usage/cost/latency, establish a trusted oracle runtime and independent trust
    anchor, then run unchanged headline and derivative triplets. Preserve every
    prior failure and report upstream score separately from state-effect safety.
-2. Instrument the official STATE-Bench runner to retain independently
-   verifiable provider/simulator/judge receipts, provision the locked
-   credentials, seal the learning artifact, then execute the predeclared 2,250
-   trajectories without post-result exclusions.
+2. Implement the missing STATE-Bench executor around the verified 2,250-command
+   plan: sanitize inherited environment, refuse existing output cells, retain
+   every task/provider retry and terminal failure, capture exact
+   runner/agent/simulator/judge bytes and actual model/economics, attest
+   treatment uptake, and independently replay state and derive official scores.
+   Then provision locked credentials, externally pin preregistration/trust and
+   command-plan hashes, seal the learning artifact, and execute without
+   post-result exclusions.
 3. Execute the four corner triplets with provider-resolved model/config/usage
    evidence, independent harness/oracle review, and stronger process isolation.
    Keep untouched headline scores separate from fault injection.

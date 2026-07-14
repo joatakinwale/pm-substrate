@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@pm/agent-state-core": "workspace:*",
+    "@pm/public-eval-analysis": "workspace:*",
     "@pm/types": "workspace:*"
   },
   "devDependencies": {

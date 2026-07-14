@@ -7,11 +7,15 @@ simulator, judge, tasks, and score. This hook is intentionally read-only.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import os
+from typing import Any, Callable
 from urllib import request
 
+from state_bench.agents.base import AgentRuntimeContext
 from state_bench.agents.state_bench import StateBenchAgent
+from state_bench.client import LLMClient, PooledLLMClient
 
 
 def _required_env(name: str) -> str:
@@ -21,8 +25,55 @@ def _required_env(name: str) -> str:
     return value
 
 
+@dataclass(frozen=True, slots=True)
+class _RetrievalRuntimeContext:
+    """The complete runtime context the retrieval adapter is allowed to retain."""
+
+    task_id: str
+    domain: str
+
+
+def _redact_runtime_context(
+    runtime_context: AgentRuntimeContext | None,
+) -> _RetrievalRuntimeContext | None:
+    if runtime_context is None:
+        return None
+    task_id = runtime_context.task_id
+    domain = runtime_context.domain
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ValueError("STATE-Bench runtime_context.task_id must be a non-empty string")
+    if not isinstance(domain, str) or not domain.strip():
+        raise ValueError("STATE-Bench runtime_context.domain must be a non-empty string")
+    return _RetrievalRuntimeContext(task_id=task_id, domain=domain)
+
+
 class PmSubstrateAgent(StateBenchAgent):
     """Expose pm-substrate learnings through STATE-Bench's official seam."""
+
+    def __init__(
+        self,
+        client: LLMClient | PooledLLMClient,
+        system_prompt: str,
+        tools: list[dict[str, Any]],
+        tool_handlers: dict[str, Callable],
+        runtime_context: AgentRuntimeContext | None = None,
+        retrieve_learnings_top_k: int = 3,
+        agent_reasoning_effort: str | None = None,
+    ) -> None:
+        # STATE-Bench constructs an oracle-bearing context for every custom
+        # agent. Never pass that object to upstream initialization: the
+        # retrieval sidecar needs only the exact task and domain identities.
+        retrieval_context = _redact_runtime_context(runtime_context)
+        runtime_context = None
+        super().__init__(
+            client=client,
+            system_prompt=system_prompt,
+            tools=tools,
+            tool_handlers=tool_handlers,
+            runtime_context=retrieval_context,  # type: ignore[arg-type]
+            retrieve_learnings_top_k=retrieve_learnings_top_k,
+            agent_reasoning_effort=agent_reasoning_effort,
+        )
 
     def retrieve_learnings(self, query: str, top_k: int = 3) -> list[str]:
         if top_k != 3:

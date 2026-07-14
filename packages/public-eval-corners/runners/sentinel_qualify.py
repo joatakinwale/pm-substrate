@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Instant manual-clock smoke of Sentinel's upstream relative/no-op evaluator."""
+"""Instant manual-clock smoke of Sentinel's upstream relative/no-op/absolute evaluator."""
 
 from __future__ import annotations
 
@@ -52,8 +52,10 @@ def main() -> int:
 
     relative_path = checkout / "scenarios" / "microhub" / "stars-relative-passive.json"
     noop_path = checkout / "scenarios" / "microhub" / "stars-noop.json"
+    absolute_path = checkout / "scenarios" / "microhub" / "stars-absolute-passive.json"
     relative_scenario = json.loads(relative_path.read_text())
     noop_scenario = json.loads(noop_path.read_text())
+    absolute_scenario = json.loads(absolute_path.read_text())
 
     with TestClient(app) as client:
         client.get("/close").raise_for_status()
@@ -79,22 +81,50 @@ def main() -> int:
         false_contact_result.raise_for_status()
         false_contact_data = false_contact_result.json()
 
+        client.get("/close").raise_for_status()
+        client.post("/init", json=init_payload(absolute_scenario)).raise_for_status()
+        absolute_contact_time = math.ceil(float(absolute_scenario["condition_at"])) + 1
+        client.get("/advance", params={"time": absolute_contact_time}).raise_for_status()
+        client.get("/contact").raise_for_status()
+        absolute_result = client.post("/evaluate")
+        absolute_result.raise_for_status()
+        absolute_data = absolute_result.json()
+
+        client.get("/close").raise_for_status()
+        client.post("/init", json=init_payload(absolute_scenario)).raise_for_status()
+        premature_contact_time = math.floor(float(absolute_scenario["condition_at"])) - 1
+        client.get("/advance", params={"time": premature_contact_time}).raise_for_status()
+        client.get("/contact").raise_for_status()
+        premature_result = client.post("/evaluate")
+        premature_result.raise_for_status()
+        premature_data = premature_result.json()
+
     if relative_data.get("success") is not True:
         raise AssertionError("upstream relative scenario evaluator did not pass scripted late contact")
     if noop_data.get("success") is not True:
         raise AssertionError("upstream no-op evaluator did not pass absence of contact")
     if false_contact_data.get("success") is not False:
         raise AssertionError("upstream no-op evaluator did not reject false contact")
+    if absolute_data.get("success") is not True:
+        raise AssertionError("upstream absolute scenario evaluator did not pass scripted late contact")
+    if premature_data.get("success") is not False:
+        raise AssertionError("upstream absolute scenario evaluator did not reject premature contact")
 
     output = {
         "qualificationStatus": "qualified",
         "cornerId": CORNER_ID,
-        "scenarioIds": [relative_scenario["id"], noop_scenario["id"]],
+        "scenarioIds": [
+            relative_scenario["id"],
+            noop_scenario["id"],
+            absolute_scenario["id"],
+        ],
         "upstreamOracle": "server.server.evaluate via FastAPI TestClient",
         "manualClock": True,
         "relativeLateContactPassed": True,
         "noopNoContactPassed": True,
         "noopFalseContactRejected": True,
+        "absoluteLateContactPassed": True,
+        "absolutePrematureContactRejected": True,
         "browserAgentInvoked": False,
         "adapterAndOraclePlumbingOnly": True,
         "efficacyClaimed": False,

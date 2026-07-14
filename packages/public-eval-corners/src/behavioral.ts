@@ -24,6 +24,18 @@ import type {
   PinnedSourceVerificationResult,
   PublicEvalCornerId,
 } from "./index.js";
+import {
+  writeBehavioralFailureReceipt,
+  type BehavioralFailureLocation,
+  type BehavioralFailureStage,
+} from "./behavioral-failure.js";
+import {
+  appendArtifactValidationIssue,
+  assertArmBlindScoringInput,
+  assertExactBehavioralReceiptKeys,
+  assertJsonDocument,
+  behavioralPlanLinkageIssues,
+} from "./behavioral-verification.js";
 
 export type BehavioralArm = "native" | "sham" | "substrate";
 export type BehavioralEvidenceClass =
@@ -774,47 +786,6 @@ function assertOracleCommandIsArmBlind(
   }
 }
 
-function armBlindScoringInput(bytes: Buffer, path: string): void {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(bytes.toString("utf8")) as unknown;
-  } catch {
-    throw new Error(`${path} must be valid JSON`);
-  }
-  if (!isRecord(parsed)) throw new Error(`${path} must be an object`);
-  const keys = Object.keys(parsed).sort(compareCodeUnits);
-  if (
-    keys.join(",") !== "schemaVersion,taskOutput" ||
-    parsed.schemaVersion !== "pm.public-eval-corners.scoring-input.v1"
-  ) {
-    throw new Error(
-      `${path} must contain only schemaVersion and arm-blind taskOutput`,
-    );
-  }
-  const forbiddenControlKeys = new Set([
-    "agentStateTreatment",
-    "arm",
-    "boundaryProvider",
-    "configPath",
-    "outputRoot",
-    "planPath",
-    "treatment",
-    "treatmentPath",
-  ]);
-  const visit = (value: unknown, location: string): void => {
-    if (Array.isArray(value)) value.forEach((entry, index) => visit(entry, `${location}[${index}]`));
-    else if (isRecord(value)) {
-      for (const [key, child] of Object.entries(value)) {
-        if (forbiddenControlKeys.has(key)) {
-          throw new Error(`${path} exposes treatment control key ${location}.${key}`);
-        }
-        visit(child, `${location}.${key}`);
-      }
-    }
-  };
-  visit(parsed.taskOutput, "taskOutput");
-}
-
 function armOrder(randomizationSeed: string, trial: Pick<PlannedTrial, "trialId" | "taskId" | "seed">): readonly BehavioralArm[] {
   return ARMS.map((arm) => ({
     arm,
@@ -1278,6 +1249,9 @@ export function runBehavioralBatch(
   const planPath = resolve(plan.outputRoot, "predeclared-plan.json");
   const planBytes = Buffer.from(`${JSON.stringify(plan, null, 2)}\n`);
   writeExclusive(planPath, planBytes);
+  let failureStage: BehavioralFailureStage = "pre-execution-verification";
+  let activeAttempt: BehavioralFailureLocation | null = null;
+  try {
   const checkedBefore = sourceVerification(plan.cornerId, plan.source, services);
   if (
     !verificationValid(checkedBefore.verification) ||
@@ -1292,6 +1266,8 @@ export function runBehavioralBatch(
     const plannedArms = new Map(trial.arms.map((arm) => [arm.arm, arm] as const));
     const attempts: BehavioralAttemptRecord[] = [];
     for (const [index, arm] of trial.armOrder.entries()) {
+      activeAttempt = { trialId: trial.trialId, arm };
+      failureStage = "attempt-preparation";
       assertPlanFileIdentities(plan);
       const plannedArm = plannedArms.get(arm);
       if (!plannedArm) throw new Error(`plan omitted arm ${arm}`);
@@ -1319,6 +1295,7 @@ export function runBehavioralBatch(
         PM_PUBLIC_EVAL_TREATMENT_PATH: treatmentPath,
         PM_PUBLIC_EVAL_SCORING_INPUT_PATH: scoringInputPath,
       } as const;
+      failureStage = "runner-execution";
       const agentRun = execute(
         trial.runner,
         armRoot,
@@ -1332,20 +1309,24 @@ export function runBehavioralBatch(
       if (agentRun.status !== 0 || agentRun.error !== null) {
         throw new Error(failedExecutionMessage("runner", trial.trialId, arm, agentRun));
       }
+      failureStage = "runner-output-validation";
       assertPlanFileIdentities(plan);
       if (!existsSync(scoringInputPath) || !lstatSync(scoringInputPath).isFile()) {
         throw new Error(`runner did not create scoring-input.json for ${trial.trialId}/${arm}`);
       }
       const scoringInputBytes = readFileSync(scoringInputPath);
-      armBlindScoringInput(scoringInputBytes, `${trial.trialId}/${arm}/scoring-input.json`);
+      assertArmBlindScoringInput(scoringInputBytes, `${trial.trialId}/${arm}/scoring-input.json`);
 
       const neutralRoot = mkdtempSync(resolve(tmpdir(), "pm-corners-oracle-view-"));
       const neutralInputPath = resolve(neutralRoot, "task-output.json");
       const neutralOutcomePath = resolve(neutralRoot, "oracle-outcome.json");
+      const oracleStdoutPath = resolve(armRoot, "oracle.stdout.log");
+      const oracleStderrPath = resolve(armRoot, "oracle.stderr.log");
       writeExclusive(neutralInputPath, scoringInputBytes);
       let oracleRun: ReturnType<typeof execute> | null = null;
       let outcomeBytes: Buffer | null = null;
       try {
+        failureStage = "oracle-execution";
         if (readdirSync(neutralRoot).join(",") !== "task-output.json") {
           throw new Error("arm-blind oracle view was not initially isolated");
         }
@@ -1359,9 +1340,12 @@ export function runBehavioralBatch(
           }),
           plan.timeoutMs,
         );
+        writeExclusive(oracleStdoutPath, oracleRun.stdout);
+        writeExclusive(oracleStderrPath, oracleRun.stderr);
         if (oracleRun.status !== 0 || oracleRun.error !== null) {
           throw new Error(failedExecutionMessage("oracle", trial.trialId, arm, oracleRun));
         }
+        failureStage = "oracle-output-validation";
         if (sha256(readFileSync(neutralInputPath)) !== sha256(scoringInputBytes)) {
           throw new Error(`oracle mutated its scoring input for ${trial.trialId}/${arm}`);
         }
@@ -1379,22 +1363,15 @@ export function runBehavioralBatch(
       if (oracleRun === null || outcomeBytes === null) {
         throw new Error(`oracle did not complete for ${trial.trialId}/${arm}`);
       }
-      const oracleStdoutPath = resolve(armRoot, "oracle.stdout.log");
-      const oracleStderrPath = resolve(armRoot, "oracle.stderr.log");
       const oracleInputPath = resolve(armRoot, "oracle-input.json");
       const outcomePath = resolve(armRoot, "oracle-outcome.json");
       writeExclusive(oracleInputPath, scoringInputBytes);
-      writeExclusive(oracleStdoutPath, oracleRun.stdout);
-      writeExclusive(oracleStderrPath, oracleRun.stderr);
       writeExclusive(outcomePath, outcomeBytes);
       if (outcomeBytes.byteLength === 0 || outcomeBytes.byteLength > MAX_CAPTURE_BYTES) {
         throw new Error(`oracle outcome size is invalid for ${trial.trialId}/${arm}`);
       }
-      try {
-        JSON.parse(outcomeBytes.toString("utf8")) as unknown;
-      } catch {
-        throw new Error(`oracle outcome is not valid JSON for ${trial.trialId}/${arm}`);
-      }
+      assertJsonDocument(outcomeBytes, `oracle outcome for ${trial.trialId}/${arm}`);
+      failureStage = "attempt-artifact-sealing";
       const rawArtifacts = inventory(armRoot, plan.outputRoot);
       attempts.push({
         order: index + 1,
@@ -1449,6 +1426,8 @@ export function runBehavioralBatch(
     });
   }
 
+  activeAttempt = null;
+  failureStage = "post-execution-verification";
   assertPlanFileIdentities(plan);
   const checkedAfter = sourceVerification(plan.cornerId, plan.source, services);
   if (
@@ -1481,6 +1460,7 @@ export function runBehavioralBatch(
   if (preReceiptIssues.length > 0) {
     throw new Error(`raw evidence changed before receipt sealing: ${preReceiptIssues.join("; ")}`);
   }
+  failureStage = "completion-receipt-sealing";
   const body = {
     schemaVersion: "pm.public-eval-corners.behavioral-batch-receipt.v1" as const,
     evidenceClass: plan.evidenceClass,
@@ -1521,6 +1501,21 @@ export function runBehavioralBatch(
     throw new Error(`sealed behavioral receipt failed self-verification: ${selfVerification.issues.join("; ")}`);
   }
   return receipt;
+  } catch (error) {
+    writeBehavioralFailureReceipt({
+      evidenceClass: plan.evidenceClass,
+      batchId: plan.batchId,
+      cornerId: plan.cornerId,
+      manifestSha256: plan.manifestSha256,
+      outputRoot: plan.outputRoot,
+      planHash: plan.planHash,
+      planBytes,
+      failureStage,
+      activeAttempt,
+      error,
+    });
+    throw error;
+  }
 }
 
 function receiptWithoutHash(receipt: BehavioralBatchReceipt): Omit<BehavioralBatchReceipt, "receiptHash"> {
@@ -1577,11 +1572,15 @@ function reopenInventory(
       issues.push(`${attempt.outputRelativePath}: required raw artifact ${path} is absent`);
     }
   }
-  const reopen = (path: string, expectedHash: string, expectedLength?: number): void => {
+  const reopen = (
+    path: string,
+    expectedHash: string,
+    expectedLength?: number,
+  ): Buffer | null => {
     const target = resolve(outputRoot, path);
     if (!isWithin(armRoot, target)) {
       issues.push(`${attempt.outputRelativePath}: raw path ${path} escapes its arm root`);
-      return;
+      return null;
     }
     try {
       const bytes = readFileSync(target);
@@ -1589,24 +1588,42 @@ function reopenInventory(
       if (expectedLength !== undefined && bytes.byteLength !== expectedLength) {
         issues.push(`${path}: raw byte length mismatch`);
       }
+      return bytes;
     } catch {
       issues.push(`${path}: raw bytes are missing or unreadable`);
+      return null;
     }
   };
   reopen(attempt.treatment.path, attempt.treatment.fileSha256);
-  reopen(
-    `${attempt.outputRelativePath}/scoring-input.json`,
-    attempt.oracle.scoringInputSha256,
+  const scoringInputPath = `${attempt.outputRelativePath}/scoring-input.json`;
+  appendArtifactValidationIssue(
+    issues,
+    reopen(scoringInputPath, attempt.oracle.scoringInputSha256),
+    scoringInputPath,
+    assertArmBlindScoringInput,
   );
   reopen(attempt.command.stdoutPath, attempt.command.stdoutSha256);
   reopen(attempt.command.stderrPath, attempt.command.stderrSha256);
   reopen(attempt.oracle.stdoutPath, attempt.oracle.stdoutSha256);
   reopen(attempt.oracle.stderrPath, attempt.oracle.stderrSha256);
-  reopen(attempt.oracle.scoringInputPath, attempt.oracle.scoringInputSha256);
-  reopen(
+  appendArtifactValidationIssue(
+    issues,
+    reopen(
+      attempt.oracle.scoringInputPath,
+      attempt.oracle.scoringInputSha256,
+    ),
+    attempt.oracle.scoringInputPath,
+    assertArmBlindScoringInput,
+  );
+  appendArtifactValidationIssue(
+    issues,
+    reopen(
+      attempt.oracle.outcomePath,
+      attempt.oracle.outcomeSha256,
+      attempt.oracle.outcomeByteLength,
+    ),
     attempt.oracle.outcomePath,
-    attempt.oracle.outcomeSha256,
-    attempt.oracle.outcomeByteLength,
+    assertJsonDocument,
   );
   return actual.length;
 }
@@ -1620,7 +1637,7 @@ export function verifyBehavioralBatch(
   let evidenceClass: BehavioralEvidenceClass | null = null;
   let receiptHash: string | null = null;
   try {
-    if (!isRecord(value)) throw new Error("behavioral receipt must be an object");
+    assertExactBehavioralReceiptKeys(value);
     if (value.schemaVersion !== "pm.public-eval-corners.behavioral-batch-receipt.v1") {
       throw new Error("unsupported behavioral receipt schemaVersion");
     }
@@ -1652,6 +1669,14 @@ export function verifyBehavioralBatch(
     if (envelope.manifestSha256 !== receipt.manifestSha256) {
       issues.push("corner manifest hash changed or does not match receipt");
     }
+    issues.push(
+      ...behavioralPlanLinkageIssues({
+        receiptManifestSha256: receipt.manifestSha256,
+        planManifestSha256: receipt.plan.manifestSha256,
+        trials: receipt.plan.trials,
+        manifestTaskIds: envelope.manifest.tasks.map(({ taskId }) => taskId),
+      }),
+    );
     if (
       (receipt.evidenceClass === "behavioral-efficacy-candidate" &&
         (receipt.plan.source.mode !== "pinned-upstream" ||
@@ -1814,9 +1839,6 @@ export function verifyBehavioralBatch(
         "treatmentIdentitySha256",
       ], `${plannedTrial.trialId}.matchingProof`);
       const expectedOrder = armOrder(receipt.plan.randomizationSeed, plannedTrial);
-      if (!envelope.manifest.tasks.some(({ taskId }) => taskId === plannedTrial.taskId)) {
-        issues.push(`${plannedTrial.trialId}: taskId is not pinned by the corner manifest`);
-      }
       if (!sameJson(expectedOrder, plannedTrial.armOrder) || !sameJson(expectedOrder, actualTrial.armOrder)) {
         issues.push(`${plannedTrial.trialId}: deterministic arm order mismatch`);
       }
