@@ -127,8 +127,14 @@ and passive network bytes, exact provider IDs/schema/usage, state requests and
 responses, process identities, collateral, timing, and the unchanged upstream
 result. MicroHub is qualification-only. The frozen 12-task cross-application
 procedural holdout is also ineligible for material benefit because it contains
-only four independent relative tasks. A separately powered, externally
-anchored, task-clustered confirmatory universe is mandatory.
+only four independent relative tasks. The 50-task untouched content catalog is
+now frozen, but its first power declaration is not: with 19 relative tasks and
+three repeats, true lift equal to the 0.10 claim threshold, and the declared
+independent-binomial planning model, the exact necessary two-control point-lift
+gate reaches at most 0.511210781855188 on the baseline grid before Holm,
+bootstrap, raw-completeness, or guardrail losses. A redesigned, externally
+verified, task-clustered power artifact is mandatory before confirmatory
+execution.
 Any missing or inconsistent cell blocks the phase conclusion. Local
 verification alone remains ineligible; external trust and replication are
 required even after a powered speed-1 confirmation.

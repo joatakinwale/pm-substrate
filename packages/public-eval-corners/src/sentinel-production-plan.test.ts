@@ -17,6 +17,7 @@ import {
   SENTINEL_POWERED_CONFIRMATORY_FULL_CATALOG_SHA256,
   SENTINEL_QUALIFICATION_MANIFEST_SHA256,
   SENTINEL_QUALIFICATION_TASKS,
+  buildSentinelRuntimeSanitizedEnvironment,
   buildSentinelProductionSchedule,
   createSentinelProductionPreregistration,
   sentinelProductionPlanningDisposition,
@@ -39,10 +40,13 @@ function hash(character: string): string {
 }
 
 function runtime(): SentinelRuntimeClosure {
+  const sanitizedEnvironment = buildSentinelRuntimeSanitizedEnvironment(
+    "/runtime/node/bin/node",
+  );
   const closure: SentinelRuntimeClosure = {
     closureSha256: hash("0"),
-    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v1",
-    closureDerivation: "canonical-runtime-fields-with-requested-and-resolved-paths-v1",
+    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2",
+    closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2",
     requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1",
     treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1",
     runnerReconstructsAndVerifiesClosure: true,
@@ -56,6 +60,36 @@ function runtime(): SentinelRuntimeClosure {
     agentScriptSha256: hash("7"),
     providerProxyScriptSha256: hash("8"),
     stateSidecarScriptSha256: hash("9"),
+    executionEnvironment: {
+      schemaVersion: "pm.public-eval-corners.sentinel-sanitized-environment.v2",
+      values: sanitizedEnvironment,
+      environmentSha256: sentinelProductionJsonSha256(sanitizedEnvironment),
+      inheritsHostEnvironment: false,
+    },
+    git: {
+      version: "git version 2.42.0",
+      executablePath: "/usr/bin/git",
+      executableSha256: hash("a"),
+      invocationEnvironmentSha256: sentinelProductionJsonSha256(sanitizedEnvironment),
+    },
+    workspace: {
+      checkoutPath: "/workspace/pm-substrate",
+      rootPackageJsonSha256: hash("b"),
+      pnpmWorkspaceManifestSha256: hash("c"),
+      rootTsconfigSha256: hash("d"),
+      tsconfigBaseSha256: hash("e"),
+      publicEvalPackageManifestSha256: hash("f"),
+      publicEvalTsconfigSha256: hash("0"),
+      packagesRootPath: "/workspace/pm-substrate/packages",
+      packagesTreeSha256: hash("1"),
+      packagesTreeEntryCount: 10,
+      installedDependenciesRootPath: "/workspace/pm-substrate/node_modules",
+      installedDependenciesTreeSha256: hash("2"),
+      installedDependenciesTreeEntryCount: 20,
+      compiledOutputRootPath: "/workspace/pm-substrate/packages/public-eval-corners/dist",
+      compiledOutputTreeSha256: hash("3"),
+      compiledOutputTreeEntryCount: 30,
+    },
     node: {
       version: "v26.0.0",
       requestedPath: "/runtime/node/bin/node",
@@ -80,6 +114,15 @@ function runtime(): SentinelRuntimeClosure {
       pipFreezeSha256: hash("1"),
       installedDistributionsManifestSha256: hash("2"),
       installedDistributionsManifestSchema: "canonical-name-version-files-record-sha256-v1",
+      environmentRootPath: "/runtime/python-venv",
+      environmentTreeSha256: hash("3"),
+      environmentTreeEntryCount: 40,
+      runtimeRootPath: "/runtime/python",
+      runtimeTreeSha256: hash("4"),
+      runtimeTreeEntryCount: 50,
+      stdlibRootPath: "/runtime/python/lib/python3.12",
+      stdlibTreeSha256: hash("5"),
+      stdlibTreeEntryCount: 60,
     },
     browser: {
       playwrightVersion: "1.56.1",
@@ -88,11 +131,28 @@ function runtime(): SentinelRuntimeClosure {
       bundleTreeSha256: hash("4"),
       executablePath: "/runtime/playwright/chromium/chrome",
       executableSha256: hash("5"),
+      libraryRootPath: "/runtime/node_modules/playwright",
+      libraryTreeSha256: hash("6"),
+      libraryTreeEntryCount: 70,
+      coreLibraryRootPath: "/runtime/node_modules/playwright-core",
+      coreLibraryTreeSha256: hash("7"),
+      coreLibraryTreeEntryCount: 80,
+      corePackageMetadataSha256: hash("8"),
     },
     upstream: {
       frontendPackageLockSha256: hash("6"),
       frontendInstalledTreeSha256: hash("7"),
       serverRequirementsSha256: hash("8"),
+    },
+    executionLease: {
+      schemaVersion: "pm.public-eval-corners.sentinel-runtime-execution-lease.v1",
+      boundPathsManifestSha256: hash("9"),
+      exactBoundPathsRequired: true,
+      preAndPostBlockReconstructionRequired: true,
+      mutationInvalidatesBlock: true,
+      immutableSnapshot: false,
+      osBoundaryLimitation:
+        "kernel-dynamic-loader-system-libraries-and-in-process-races-outside-user-space-hash-closure",
     },
   };
   return {
@@ -462,6 +522,45 @@ describe("Sentinel production preregistration", () => {
     );
     expect(verification.valid).toBe(false);
     expect(verification.issues).toContain("runtime closure is incomplete or invalid");
+  });
+
+  it("rejects runtime-tree shape additions and a rehashed non-sanitized environment", () => {
+    const preregistration = plan();
+    const extraShape = {
+      ...preregistration,
+      runtime: {
+        ...preregistration.runtime,
+        workspace: { ...preregistration.runtime.workspace, unboundTree: hash("a") },
+      },
+    } as unknown as SentinelProductionPreregistration;
+    const extraSigned = signed(extraShape);
+    expect(verifySentinelProductionPreregistration(
+      extraShape,
+      extraSigned.signature,
+      extraSigned.trustAnchor,
+    ).issues).toContain("runtime.workspace keys are not exact");
+
+    const changedRuntime = {
+      ...preregistration.runtime,
+      executionEnvironment: {
+        ...preregistration.runtime.executionEnvironment,
+        values: {
+          ...buildSentinelRuntimeSanitizedEnvironment(preregistration.runtime.node.requestedPath),
+          TZ: "Etc/UTC",
+        },
+      },
+    } as SentinelRuntimeClosure;
+    const internallyRehashed = {
+      ...changedRuntime,
+      closureSha256: sentinelProductionRuntimeClosureSha256(changedRuntime),
+    };
+    const changedPlan = { ...preregistration, runtime: internallyRehashed };
+    const changedSigned = signed(changedPlan);
+    expect(verifySentinelProductionPreregistration(
+      changedPlan,
+      changedSigned.signature,
+      changedSigned.trustAnchor,
+    ).issues).toContain("runtime closure is incomplete or invalid");
   });
 });
 

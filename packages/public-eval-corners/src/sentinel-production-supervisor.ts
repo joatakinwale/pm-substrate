@@ -19,6 +19,13 @@ import { createServer } from "node:net";
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import { finished } from "node:stream/promises";
 
+import { sealSentinelBrowserNetworkArtifact } from "./sentinel-browser-network-capture.js";
+import {
+  buildSentinelRuntimeSanitizedEnvironment,
+  isSentinelRuntimeSanitizedEnvironment,
+  type SentinelRuntimeClosure,
+} from "./sentinel-production-plan.js";
+
 export type SentinelFrozenPhaseTaskId =
   | "microhub-stars-relative-passive"
   | "microhub-stars-absolute-passive"
@@ -90,6 +97,7 @@ export interface SentinelProductionSupervisorInput {
   readonly serverPort: number;
   readonly frontendPort: number;
   readonly opaqueEnvironment: SentinelProductionOpaqueEnvironment;
+  readonly executionEnvironment: SentinelRuntimeClosure["executionEnvironment"];
   readonly pollIntervalMs: number;
   readonly activeSettleMs: number;
   readonly maxDecisions: number;
@@ -193,6 +201,8 @@ export interface SentinelProductionCommandPlan {
   readonly arguments: readonly string[];
   readonly cwd: string;
   readonly environmentSha256: string;
+  /** Hash of the redacted, reconstructable binding inventory retained in the plan. */
+  readonly environmentBindingsSha256: string;
   readonly identitySha256: string;
 }
 
@@ -259,6 +269,8 @@ export interface SentinelProductionAttemptTerminalReceipt {
   readonly evidenceEligible: false;
   readonly attemptId: string;
   readonly taskId: SentinelProductionTaskId;
+  /** Canonical wall-clock time after process reap, collateral verification, and artifact sealing. */
+  readonly completedAt: string;
   readonly completion: "behavioral-complete" | "infrastructure-incomplete";
   readonly infrastructureStage: string | null;
   readonly infrastructureIssue: string | null;
@@ -318,17 +330,6 @@ const ENVIRONMENTS = new Set<SentinelProductionEnvironment>([
   "microtube",
 ]);
 const CANONICAL_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
-const SAFE_ENVIRONMENT_KEYS = [
-  "HOME",
-  "LANG",
-  "LC_ALL",
-  "LC_CTYPE",
-  "PATH",
-  "TEMP",
-  "TMP",
-  "TMPDIR",
-  "VIRTUAL_ENV",
-] as const;
 const OPAQUE_ENVIRONMENT_NAMES = {
   stateOrigin: "PM_SENTINEL_STATE_ORIGIN",
   stateToken: "PM_SENTINEL_STATE_TOKEN",
@@ -658,18 +659,28 @@ function requirePinnedNumber(
   return expected;
 }
 
-function safeBaseEnvironment(
-  host: Readonly<Record<string, string | undefined>>,
+function verifiedExecutionEnvironment(
+  value: SentinelRuntimeClosure["executionEnvironment"],
+  nodeExecutablePath: string,
 ): Record<string, string> {
-  const environment: Record<string, string> = {};
-  for (const key of SAFE_ENVIRONMENT_KEYS) {
-    const value = host[key];
-    if (typeof value === "string" && value.length > 0 && !value.includes("\0")) {
-      environment[key] = value;
-    }
-  }
-  if (environment.PATH === undefined) throw new Error("sanitized child environment requires PATH");
-  return environment;
+  if (!isRecord(value)) throw new Error("executionEnvironment must be an object");
+  exactKeys(value, [
+    "environmentSha256", "inheritsHostEnvironment", "schemaVersion", "values",
+  ], "executionEnvironment");
+  if (!isRecord(value.values)) throw new Error("executionEnvironment.values must be an object");
+  exactKeys(
+    value.values,
+    Object.keys(buildSentinelRuntimeSanitizedEnvironment(nodeExecutablePath)),
+    "executionEnvironment.values",
+  );
+  if (
+    value.schemaVersion !== "pm.public-eval-corners.sentinel-sanitized-environment.v2" ||
+    value.inheritsHostEnvironment !== false ||
+    !isSentinelRuntimeSanitizedEnvironment(value.values, nodeExecutablePath) ||
+    value.environmentSha256 !== sha256(canonical(value.values)) ||
+    Object.values(value.values).some((entry) => typeof entry !== "string" || entry.includes("\0"))
+  ) throw new Error("executionEnvironment is not the exact signed no-inheritance environment");
+  return { ...value.values } as Record<string, string>;
 }
 
 function environmentBindings(
@@ -764,9 +775,18 @@ function commandPlan(
   arguments_: readonly string[],
   cwd: string,
   environment: Readonly<Record<string, string>>,
+  bindings: readonly SentinelProductionEnvironmentBinding[],
 ): SentinelProductionCommandPlan {
   const environmentSha256 = sha256Json(environment);
-  const body = { role, executable, arguments: arguments_, cwd, environmentSha256 } as const;
+  const environmentBindingsSha256 = sha256Json(bindings);
+  const body = {
+    role,
+    executable,
+    arguments: arguments_,
+    cwd,
+    environmentSha256,
+    environmentBindingsSha256,
+  } as const;
   return { ...body, identitySha256: sha256Json(body) };
 }
 
@@ -865,7 +885,10 @@ async function prepareAttempt(
   const viewportWidth = boundedInteger(input.viewportWidth, 800, 2_560, "viewportWidth");
   const viewportHeight = boundedInteger(input.viewportHeight, 600, 1_440, "viewportHeight");
 
-  const baseEnvironment = safeBaseEnvironment(dependencies.hostEnvironment());
+  const baseEnvironment = verifiedExecutionEnvironment(
+    input.executionEnvironment,
+    agentRuntimeExecutable.path,
+  );
   const fixedPythonEnvironment = {
     PYTHONPATH: checkoutPath,
     PYTHONPYCACHEPREFIX: resolve(outputRoot, "pycache"),
@@ -891,6 +914,35 @@ async function prepareAttempt(
   };
   if (existsSync(agentOutputRoot)) throw new Error("agent output root must not already exist");
 
+  const opaqueKeys = new Set(Object.values(OPAQUE_ENVIRONMENT_NAMES));
+  const environmentBindingMap = {
+    server: environmentBindings(
+      serverEnvironment,
+      opaqueKeys,
+      new Set(Object.keys(fixedPythonEnvironment)),
+    ),
+    frontend: environmentBindings(
+      frontendEnvironment,
+      opaqueKeys,
+      new Set(["SENTINEL_API_BASE"]),
+    ),
+    harness: environmentBindings(
+      harnessEnvironment,
+      opaqueKeys,
+      new Set([
+        ...Object.keys(fixedPythonEnvironment),
+        "PM_SENTINEL_ATTEMPT_ID",
+        "PM_SENTINEL_AGENT_OUTPUT_ROOT",
+        "PM_SENTINEL_POLL_INTERVAL_MS",
+        "PM_SENTINEL_ACTIVE_SETTLE_MS",
+        "PM_SENTINEL_MAX_DECISIONS",
+        "PM_SENTINEL_MAX_ACTIVE_ACTIONS",
+        "PM_SENTINEL_VIEWPORT_WIDTH",
+        "PM_SENTINEL_VIEWPORT_HEIGHT",
+      ]),
+    ),
+  } as const;
+
   const runtimeRoot = resolve(outputRoot, "runtime");
   const commands = [
     commandPlan(
@@ -899,6 +951,7 @@ async function prepareAttempt(
       ["-m", "uvicorn", "server.server:app", "--host", "127.0.0.1", "--port", String(serverPort)],
       runtimeRoot,
       serverEnvironment,
+      environmentBindingMap.server,
     ),
     commandPlan(
       "frontend",
@@ -906,6 +959,7 @@ async function prepareAttempt(
       ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(frontendPort), "--strictPort"],
       resolve(checkoutPath, "frontend"),
       frontendEnvironment,
+      environmentBindingMap.frontend,
     ),
     commandPlan(
       "harness",
@@ -928,6 +982,7 @@ async function prepareAttempt(
       ],
       runtimeRoot,
       harnessEnvironment,
+      environmentBindingMap.harness,
     ),
   ] as const;
 
@@ -937,7 +992,6 @@ async function prepareAttempt(
   if (collateralInitial.some(({ sha256: hash }) => hash === null)) {
     throw new Error("required Sentinel database or scenario collateral is missing");
   }
-  const opaqueKeys = new Set(Object.values(OPAQUE_ENVIRONMENT_NAMES));
   const planBody = {
     schemaVersion: "pm.public-eval-corners.sentinel-production-attempt-plan.v1" as const,
     evidenceEligible: false as const,
@@ -954,33 +1008,7 @@ async function prepareAttempt(
     serverUrl,
     frontendUrl,
     commands,
-    environmentBindings: {
-      server: environmentBindings(
-        serverEnvironment,
-        opaqueKeys,
-        new Set(Object.keys(fixedPythonEnvironment)),
-      ),
-      frontend: environmentBindings(
-        frontendEnvironment,
-        opaqueKeys,
-        new Set(["SENTINEL_API_BASE"]),
-      ),
-      harness: environmentBindings(
-        harnessEnvironment,
-        opaqueKeys,
-        new Set([
-          ...Object.keys(fixedPythonEnvironment),
-          "PM_SENTINEL_ATTEMPT_ID",
-          "PM_SENTINEL_AGENT_OUTPUT_ROOT",
-          "PM_SENTINEL_POLL_INTERVAL_MS",
-          "PM_SENTINEL_ACTIVE_SETTLE_MS",
-          "PM_SENTINEL_MAX_DECISIONS",
-          "PM_SENTINEL_MAX_ACTIVE_ACTIONS",
-          "PM_SENTINEL_VIEWPORT_WIDTH",
-          "PM_SENTINEL_VIEWPORT_HEIGHT",
-        ]),
-      ),
-    },
+    environmentBindings: environmentBindingMap,
     collateralInitial,
     collateralInitialRootSha256: sha256Json(collateralInitial),
     checkoutBefore,
@@ -1345,7 +1373,7 @@ export async function superviseSentinelProductionAttempt(
   const startBody = {
     schemaVersion: "pm.public-eval-corners.sentinel-production-attempt-start.v1",
     evidenceEligible: false,
-    startedAt: dependencies.now(),
+    startedAt: parseCanonicalTimestamp(dependencies.now(), "attempt startedAt"),
     plan: prepared.plan,
   };
   let start: { readonly path: string; readonly receiptHash: string };
@@ -1552,6 +1580,29 @@ export async function superviseSentinelProductionAttempt(
       infrastructureIssue ??= "general-agent PID/PPID is not bound to the harness process tree";
     }
 
+    const agentNetworkPath = resolve(
+      prepared.plan.outputRoot,
+      "runtime",
+      "agent",
+      "browser-network.jsonl",
+    );
+    if (existsSync(agentNetworkPath)) {
+      try {
+        sealSentinelBrowserNetworkArtifact(
+          dirname(agentNetworkPath),
+          "supervisor-after-process-reap",
+        );
+      } catch (error) {
+        completion = "infrastructure-incomplete";
+        infrastructureStage ??= "browser-network-seal";
+        infrastructureIssue ??= error instanceof Error ? error.message : String(error);
+      }
+    } else if (completion === "behavioral-complete") {
+      completion = "infrastructure-incomplete";
+      infrastructureStage ??= "browser-network-seal";
+      infrastructureIssue ??= "browser network evidence is missing after process reap";
+    }
+
     try {
       const finalCollateral = snapshotFiles(
         prepared.plan.checkoutPath,
@@ -1606,6 +1657,7 @@ export async function superviseSentinelProductionAttempt(
     evidenceEligible: false as const,
     attemptId: prepared.plan.attemptId,
     taskId: prepared.plan.task.taskId,
+    completedAt: parseCanonicalTimestamp(dependencies.now(), "attempt completedAt"),
     completion,
     infrastructureStage,
     infrastructureIssue,

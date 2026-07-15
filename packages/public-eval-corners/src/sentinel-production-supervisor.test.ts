@@ -3,12 +3,19 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
+
+import { buildSentinelRuntimeSanitizedEnvironment } from "./sentinel-production-plan.js";
+import type { SentinelProductionPreregistration, SentinelProductionTask } from "./sentinel-production-plan.js";
+import type { SentinelProductionCellManifest } from "./sentinel-production-runner.js";
+import type { SentinelRawAgentVerification } from "./sentinel-production-raw-agent.js";
+import { verifySentinelRawSupervisorEvidence } from "./sentinel-production-raw-supervisor.js";
 
 import {
   superviseSentinelProductionAttempt,
@@ -24,6 +31,46 @@ import {
 
 function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function canonical(value: unknown): string {
+  if (value === null || typeof value === "string" || typeof value === "boolean" || typeof value === "number") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (typeof value === "object") {
+    return `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+      left < right ? -1 : left > right ? 1 : 0).map(([key, child]) =>
+      `${JSON.stringify(key)}:${canonical(child)}`).join(",")}}`;
+  }
+  throw new Error("fixture is not canonical JSON");
+}
+
+function syntheticNetworkJsonl(): string {
+  const requestBody = {
+    schemaVersion: "pm.public-eval-corners.sentinel-general-browser-request.v1",
+    sequence: 1,
+    kind: "request",
+    previousRecordSha256: null,
+    requestId: "request-000001",
+    bodyByteLength: null,
+    bodySha256: null,
+    bodyBase64: null,
+  };
+  const request = { ...requestBody, recordSha256: sha256(canonical(requestBody)) };
+  const responseBody = {
+    schemaVersion: "pm.public-eval-corners.sentinel-general-browser-response.v2",
+    sequence: 2,
+    kind: "response",
+    previousRecordSha256: request.recordSha256,
+    requestId: requestBody.requestId,
+    requestRecordSha256: request.recordSha256,
+    bodyByteLength: null,
+    bodySha256: null,
+    bodyBase64: null,
+  };
+  const response = { ...responseBody, recordSha256: sha256(canonical(responseBody)) };
+  return `${JSON.stringify(request)}\n${JSON.stringify(response)}\n`;
 }
 
 function writeIdentity(path: string, bytes: string): { readonly path: string; readonly sha256: string } {
@@ -57,6 +104,7 @@ const DATABASE_PATHS = [
 
 interface TestFixture {
   readonly root: string;
+  readonly cellRoot: string;
   readonly checkoutPath: string;
   readonly mutableDbPath: string;
   readonly input: SentinelProductionSupervisorInput;
@@ -64,6 +112,7 @@ interface TestFixture {
 
 function fixture(attemptId = "sentinel-production-001"): TestFixture {
   const root = mkdtempSync(join(tmpdir(), "pm-sentinel-production-"));
+  const cellRoot = join(root, "cell");
   const checkoutPath = join(root, "checkout");
   mkdirSync(join(checkoutPath, "scenarios", "microhub"), { recursive: true });
   mkdirSync(join(checkoutPath, "frontend"), { recursive: true });
@@ -86,8 +135,12 @@ function fixture(attemptId = "sentinel-production-001"): TestFixture {
   const pythonExecutable = writeIdentity(join(binRoot, "python3"), "synthetic-python");
   const frontendExecutable = writeIdentity(join(binRoot, "npm-cli.js"), "synthetic-npm");
   const agentRuntimeExecutable = writeIdentity(join(binRoot, "node"), "synthetic-node");
+  const executionEnvironment = buildSentinelRuntimeSanitizedEnvironment(
+    agentRuntimeExecutable.path,
+  );
   const agentScript = writeIdentity(join(root, "sentinel-general-agent.js"), "synthetic-agent");
-  const agentConfigPath = join(root, "agent-config.json");
+  const agentConfigPath = join(cellRoot, "input", "agent-config.json");
+  mkdirSync(resolve(agentConfigPath, ".."), { recursive: true });
   const agentConfig = writeIdentity(agentConfigPath, JSON.stringify({
     server_url: "http://127.0.0.1:18080",
     frontend_url: "http://127.0.0.1:15173",
@@ -103,6 +156,7 @@ function fixture(attemptId = "sentinel-production-001"): TestFixture {
   }));
   return {
     root,
+    cellRoot,
     checkoutPath,
     mutableDbPath: join(checkoutPath, "server", "microhub", "microhub.db"),
     input: {
@@ -110,7 +164,7 @@ function fixture(attemptId = "sentinel-production-001"): TestFixture {
       attemptId,
       task: FROZEN_REGISTRATION,
       checkoutPath,
-      outputRoot: join(root, "attempt-output"),
+      outputRoot: join(cellRoot, "upstream"),
       attemptRegistryRoot: join(root, "attempt-registry"),
       agentConfig,
       agentRuntimeExecutable,
@@ -124,6 +178,12 @@ function fixture(attemptId = "sentinel-production-001"): TestFixture {
         stateToken: "state-token-opaque-000000000000000000000000",
         providerOrigin: "http://127.0.0.1:19002",
         providerToken: "provider-token-opaque-00000000000000000000",
+      },
+      executionEnvironment: {
+        schemaVersion: "pm.public-eval-corners.sentinel-sanitized-environment.v2",
+        values: executionEnvironment,
+        environmentSha256: sha256(canonical(executionEnvironment)),
+        inheritsHostEnvironment: false,
       },
       pollIntervalMs: 10_000,
       activeSettleMs: 250,
@@ -148,6 +208,7 @@ interface FakeRuntimeOptions {
   readonly failRole?: SentinelProductionProcessRole;
   readonly holdHarness?: boolean;
   readonly omitAgentTerminal?: boolean;
+  readonly tamperNetworkChain?: boolean;
 }
 
 interface FakeRuntime {
@@ -229,7 +290,10 @@ function fakeRuntime(testFixture: TestFixture, options: FakeRuntimeOptions = {})
       }));
     }
     writeFileSync(join(agentRoot, "agent-events.jsonl"), "{\"decision\":1}\n");
-    writeFileSync(join(agentRoot, "browser-network.jsonl"), "{\"sequence\":1}\n");
+    writeFileSync(
+      join(agentRoot, "browser-network.jsonl"),
+      options.tamperNetworkChain === true ? "{\"sequence\":1}\n" : syntheticNetworkJsonl(),
+    );
     writeFileSync(join(agentRoot, "decision-000001.png"), "synthetic-png");
     if (options.mutateDatabase === true) {
       writeFileSync(testFixture.mutableDbPath, "mutated-runtime-database");
@@ -319,18 +383,129 @@ function fakeRuntime(testFixture: TestFixture, options: FakeRuntimeOptions = {})
   };
 }
 
+function sequencedNow(runtime: FakeRuntime): SentinelProductionSupervisorDependencies {
+  const values = [
+    "2026-07-14T11:59:59.000Z",
+    "2026-07-14T12:00:00.000Z",
+    "2026-07-14T12:10:00.000Z",
+  ];
+  let index = 0;
+  return { ...runtime.dependencies, now: () => values[index++] ?? values.at(-1)! };
+}
+
+function rawSupervisorInput(
+  testFixture: TestFixture,
+  receipt: Awaited<ReturnType<typeof superviseSentinelProductionAttempt>>,
+) {
+  const startedAt = "2026-07-14T12:00:00.000Z";
+  const manifest = {
+    attemptId: testFixture.input.attemptId,
+    taskId: FROZEN_REGISTRATION.taskId,
+    attemptInvokedAt: startedAt,
+    attemptStartedAt: startedAt,
+    agentConfigPath: "input/agent-config.json",
+    agentConfigSha256: testFixture.input.agentConfig.sha256,
+    ports: { server: 18_080, frontend: 15_173, state: 19_001, provider: 19_002 },
+    serviceBinding: {
+      state: {
+        origin: testFixture.input.opaqueEnvironment.stateOrigin,
+        tokenSha256: sha256(testFixture.input.opaqueEnvironment.stateToken),
+      },
+      provider: {
+        origin: testFixture.input.opaqueEnvironment.providerOrigin,
+        tokenSha256: sha256(testFixture.input.opaqueEnvironment.providerToken),
+      },
+    },
+    supervisor: {
+      receiptHash: receipt.receiptHash,
+      completion: receipt.completion,
+    },
+    infrastructureComplete: true,
+  } as unknown as SentinelProductionCellManifest;
+  const task = {
+    taskId: FROZEN_REGISTRATION.taskId,
+    environment: FROZEN_REGISTRATION.environment,
+    scenarioSha256: FROZEN_REGISTRATION.scenarioSha256,
+    role: "state-retention-relative",
+    conditionAtSeconds: 565.42,
+  } as unknown as SentinelProductionTask;
+  const plan = {
+    runtime: {
+      node: {
+        requestedPath: testFixture.input.agentRuntimeExecutable.path,
+        resolvedExecutableSha256: testFixture.input.agentRuntimeExecutable.sha256,
+      },
+      npm: {
+        requestedCliPath: testFixture.input.frontendExecutable.path,
+        resolvedCliSha256: testFixture.input.frontendExecutable.sha256,
+      },
+      python: {
+        requestedVenvPath: testFixture.input.pythonExecutable.path,
+        realExecutableSha256: testFixture.input.pythonExecutable.sha256,
+      },
+      executionEnvironment: testFixture.input.executionEnvironment,
+      agentScriptSha256: testFixture.input.agentScript.sha256,
+    },
+  } as unknown as SentinelProductionPreregistration;
+  const agent = {
+    pid: receipt.agentProcess?.pid ?? null,
+    ppid: receipt.agentProcess?.ppid ?? null,
+    startedAt: receipt.agentProcess?.startedAt ?? null,
+    terminalPresent: true,
+    browserLastRecordedAt: "2026-07-14T12:09:59.000Z",
+    lastDecisionAt: "2026-07-14T12:09:59.000Z",
+  } as unknown as SentinelRawAgentVerification;
+  return { cellRoot: testFixture.cellRoot, manifest, task, plan, agent };
+}
+
+function rewriteSupervisorEvidence(
+  testFixture: TestFixture,
+  receipt: Awaited<ReturnType<typeof superviseSentinelProductionAttempt>>,
+  mutate: (plan: Record<string, unknown>, terminal: Record<string, unknown>) => void,
+): Awaited<ReturnType<typeof superviseSentinelProductionAttempt>> {
+  const receiptRoot = resolve(testFixture.input.outputRoot, "receipts");
+  const startPath = resolve(receiptRoot, `sentinel-production-attempt-start-${receipt.startReceiptHash}.json`);
+  const terminalPath = resolve(receiptRoot, `sentinel-production-attempt-terminal-${receipt.receiptHash}.json`);
+  const start = JSON.parse(readFileSync(startPath, "utf8")) as Record<string, unknown>;
+  const terminal = JSON.parse(readFileSync(terminalPath, "utf8")) as Record<string, unknown>;
+  const plan = structuredClone(start.plan) as Record<string, unknown>;
+  mutate(plan, terminal);
+  const { planHash: _oldPlanHash, ...planBody } = plan;
+  plan.planHash = sha256(canonical(planBody));
+  const { receiptHash: _oldStartHash, ...startWithoutHash } = start;
+  const startBody = { ...startWithoutHash, plan };
+  const startReceiptHash = sha256(canonical(startBody));
+  terminal.startReceiptHash = startReceiptHash;
+  const { receiptHash: _oldTerminalHash, ...terminalBody } = terminal;
+  const terminalReceiptHash = sha256(canonical(terminalBody));
+  rmSync(startPath);
+  rmSync(terminalPath);
+  writeFileSync(
+    resolve(receiptRoot, `sentinel-production-attempt-start-${startReceiptHash}.json`),
+    `${JSON.stringify({ ...startBody, receiptHash: startReceiptHash }, null, 2)}\n`,
+  );
+  writeFileSync(
+    resolve(receiptRoot, `sentinel-production-attempt-terminal-${terminalReceiptHash}.json`),
+    `${JSON.stringify({ ...terminalBody, receiptHash: terminalReceiptHash }, null, 2)}\n`,
+  );
+  return { ...terminalBody, receiptHash: terminalReceiptHash } as unknown as Awaited<
+    ReturnType<typeof superviseSentinelProductionAttempt>
+  >;
+}
+
 describe("Sentinel production attempt supervisor", () => {
   it("retains exact raw evidence while remaining blind to a false benchmark outcome", async () => {
     const testFixture = fixture();
     const runtime = fakeRuntime(testFixture);
     const receipt = await superviseSentinelProductionAttempt(
       testFixture.input,
-      runtime.dependencies,
+      sequencedNow(runtime),
     );
 
     expect(receipt.completion).toBe("behavioral-complete");
     expect(receipt.infrastructureStage).toBeNull();
     expect(receipt.evidenceEligible).toBe(false);
+    expect(receipt.completedAt).toBe("2026-07-14T12:10:00.000Z");
     expect(receipt.processes.map(({ role }) => role)).toEqual(["frontend", "harness", "server"]);
     expect(receipt.agentProcess).toMatchObject({ pid: 51_000, ppid: 41_002 });
     expect(receipt.resultJsonPath).toBe(
@@ -348,7 +523,113 @@ describe("Sentinel production attempt supervisor", () => {
     ]);
     expect(harness?.environment).not.toHaveProperty("ANTHROPIC_API_KEY");
     expect(harness?.environment).not.toHaveProperty("PM_ARM");
+    expect(harness?.environment).toMatchObject(testFixture.input.executionEnvironment.values);
     expect(harness?.environmentSha256).toMatch(/^[a-f0-9]{64}$/u);
+    const raw = verifySentinelRawSupervisorEvidence(rawSupervisorInput(testFixture, receipt));
+    expect(raw.issues).toEqual([]);
+    expect(raw.valid).toBe(true);
+    expect(raw.attemptDurationMs).toBe(600_000);
+  });
+
+  it("rejects a hash-consistent terminal receipt that understates completion before agent activity", async () => {
+    const testFixture = fixture("sentinel-completion-red-001");
+    const runtime = fakeRuntime(testFixture);
+    const receipt = await superviseSentinelProductionAttempt(testFixture.input, sequencedNow(runtime));
+    const receiptRoot = resolve(testFixture.input.outputRoot, "receipts");
+    const oldPath = resolve(receiptRoot, `sentinel-production-attempt-terminal-${receipt.receiptHash}.json`);
+    const retained = JSON.parse(readFileSync(oldPath, "utf8")) as Record<string, unknown>;
+    const { receiptHash: _oldHash, ...oldBody } = retained;
+    const body = { ...oldBody, completedAt: "2026-07-14T11:59:59.000Z" };
+    const receiptHash = sha256(canonical(body));
+    rmSync(oldPath);
+    writeFileSync(
+      resolve(receiptRoot, `sentinel-production-attempt-terminal-${receiptHash}.json`),
+      `${JSON.stringify({ ...body, receiptHash }, null, 2)}\n`,
+    );
+    const input = rawSupervisorInput(testFixture, { ...receipt, completedAt: body.completedAt as string, receiptHash });
+    const raw = verifySentinelRawSupervisorEvidence(input);
+    expect(raw.valid).toBe(false);
+    expect(raw.issues.join(" ")).toMatch(/completedAt predates|duration is invalid/iu);
+  });
+
+  it("rejects a fully rehashed plan that changes the agent polling environment", async () => {
+    const testFixture = fixture("sentinel-environment-rehash-red-001");
+    const runtime = fakeRuntime(testFixture);
+    const receipt = await superviseSentinelProductionAttempt(testFixture.input, sequencedNow(runtime));
+    const tampered = rewriteSupervisorEvidence(testFixture, receipt, (plan, terminal) => {
+      const environments = structuredClone(plan.environmentBindings) as Record<string, Array<Record<string, unknown>>>;
+      environments.harness = environments.harness.map((entry) => entry.name === "PM_SENTINEL_POLL_INTERVAL_MS"
+        ? { ...entry, valueSha256: sha256("9999") }
+        : entry);
+      plan.environmentBindings = environments;
+      const commands = structuredClone(plan.commands) as Array<Record<string, unknown>>;
+      const harnessCommand = commands.find(({ role }) => role === "harness")!;
+      harnessCommand.environmentBindingsSha256 = sha256(canonical(environments.harness));
+      const { identitySha256: _oldIdentity, ...commandBody } = harnessCommand;
+      harnessCommand.identitySha256 = sha256(canonical(commandBody));
+      plan.commands = commands;
+      const processes = structuredClone(terminal.processes) as Array<Record<string, unknown>>;
+      const harnessProcess = processes.find(({ role }) => role === "harness")!;
+      harnessProcess.commandIdentitySha256 = harnessCommand.identitySha256;
+      terminal.processes = processes;
+    });
+    const raw = verifySentinelRawSupervisorEvidence(rawSupervisorInput(testFixture, tampered));
+    expect(raw.valid).toBe(false);
+    expect(raw.issues.join(" ")).toMatch(/environment bindings differ/u);
+  });
+
+  it("rejects a rehashed process record whose top-level exit contradicts tree termination", async () => {
+    const testFixture = fixture("sentinel-process-exit-red-001");
+    const runtime = fakeRuntime(testFixture);
+    const receipt = await superviseSentinelProductionAttempt(testFixture.input, sequencedNow(runtime));
+    const tampered = rewriteSupervisorEvidence(testFixture, receipt, (_plan, terminal) => {
+      const processes = structuredClone(terminal.processes) as Array<Record<string, unknown>>;
+      processes[0] = {
+        ...processes[0],
+        exit: { exitCode: 1, signal: null, spawnError: null },
+      };
+      terminal.processes = processes;
+    });
+    const raw = verifySentinelRawSupervisorEvidence(rawSupervisorInput(testFixture, tampered));
+    expect(raw.valid).toBe(false);
+    expect(raw.issues.join(" ")).toMatch(/process terminal identity|process-tree/u);
+  });
+
+  it("rejects self-consistent empty collateral in both the start and terminal receipts", async () => {
+    const testFixture = fixture("sentinel-collateral-empty-red-001");
+    const runtime = fakeRuntime(testFixture);
+    const receipt = await superviseSentinelProductionAttempt(testFixture.input, sequencedNow(runtime));
+    const tampered = rewriteSupervisorEvidence(testFixture, receipt, (plan, terminal) => {
+      plan.collateralInitial = [];
+      plan.collateralInitialRootSha256 = sha256(canonical([]));
+      terminal.collateral = {
+        initialRootSha256: sha256(canonical([])),
+        finalRootSha256: sha256(canonical([])),
+        mutationDetected: false,
+        initial: [],
+        final: [],
+        changedPaths: [],
+      };
+    });
+    const raw = verifySentinelRawSupervisorEvidence(rawSupervisorInput(testFixture, tampered));
+    expect(raw.valid).toBe(false);
+    expect(raw.issues.join(" ")).toMatch(/database\/scenario inventory/u);
+  });
+
+  it("uses only the signed no-inheritance environment and rejects any altered value", async () => {
+    const alteredFixture = fixture("sentinel-environment-red-001");
+    const alteredRuntime = fakeRuntime(alteredFixture);
+    await expect(superviseSentinelProductionAttempt({
+      ...alteredFixture.input,
+      executionEnvironment: {
+        ...alteredFixture.input.executionEnvironment,
+        values: {
+          ...alteredFixture.input.executionEnvironment.values,
+          HOME: "/leaked-host-home",
+        } as typeof alteredFixture.input.executionEnvironment.values,
+      },
+    }, alteredRuntime.dependencies)).rejects.toThrow(/exact signed no-inheritance/u);
+    expect(alteredRuntime.spawns).toEqual([]);
   });
 
   it("supports a hash-bound non-dev scenario outside the frozen 15-task phase catalog", async () => {
@@ -384,6 +665,26 @@ describe("Sentinel production attempt supervisor", () => {
     expect(receipt.rawArtifacts.map(({ path }) => path)).not.toContain(
       "runtime/agent/agent-terminal.json",
     );
+    expect(receipt.rawArtifacts.map(({ path }) => path)).toContain(
+      "runtime/agent/browser-network-terminal.json",
+    );
+    const networkTerminal = JSON.parse(readFileSync(
+      join(testFixture.input.outputRoot, "runtime", "agent", "browser-network-terminal.json"),
+      "utf8",
+    )) as Record<string, unknown>;
+    expect(networkTerminal).toMatchObject({ sealedBy: "supervisor-after-process-reap" });
+  });
+
+  it("cannot promote a response-only or broken browser network chain", async () => {
+    const testFixture = fixture("sentinel-network-red-001");
+    const runtime = fakeRuntime(testFixture, { tamperNetworkChain: true });
+    const receipt = await superviseSentinelProductionAttempt(
+      testFixture.input,
+      runtime.dependencies,
+    );
+    expect(receipt.completion).toBe("infrastructure-incomplete");
+    expect(receipt.infrastructureStage).toBe("browser-network-seal");
+    expect(receipt.infrastructureIssue).toMatch(/valid hash|hash chain/u);
   });
 
   it("rejects the wrong source revision and a dirty checkout before spawning", async () => {

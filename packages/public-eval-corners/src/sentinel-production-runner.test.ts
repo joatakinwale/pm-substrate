@@ -20,6 +20,7 @@ import {
   SENTINEL_GENERAL_ANTHROPIC_SYSTEM_PROMPT_SHA256,
 } from "./sentinel-general-provider-proxy.js";
 import {
+  buildSentinelRuntimeSanitizedEnvironment,
   createSentinelProductionPreregistration,
   sentinelProductionCanonicalJson,
   sentinelProductionJsonSha256,
@@ -32,11 +33,14 @@ import {
 } from "./sentinel-production-plan.js";
 import {
   runSentinelProductionBatch,
+  runSentinelProductionExcludedSmoke,
   type SentinelProductionCheckoutPreflight,
   type SentinelProductionExternalCommitment,
   type SentinelProductionRunInput,
+  type SentinelProductionRuntimeInspection,
   type SentinelProductionRunnerDependencies,
 } from "./sentinel-production-runner.js";
+import { createSentinelProductionRuntimeLeaseIdentity } from "./sentinel-production-runner-evidence.js";
 import type { SentinelProductionAttemptTerminalReceipt } from "./sentinel-production-supervisor.js";
 
 const roots: string[] = [];
@@ -76,10 +80,11 @@ function runtime(root: string): FixtureRuntime {
   const python = artifact(resolve(root, "python"), "python-runtime");
   const agent = artifact(resolve(root, "sentinel-general-agent.js"), "agent-runtime");
   const dummy = artifact(resolve(root, "dummy"), "dummy");
+  const sanitizedEnvironment = buildSentinelRuntimeSanitizedEnvironment(node.path);
   const closureWithoutHash: SentinelRuntimeClosure = {
     closureSha256: hash("0"),
-    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v1",
-    closureDerivation: "canonical-runtime-fields-with-requested-and-resolved-paths-v1",
+    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2",
+    closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2",
     requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1",
     treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1",
     runnerReconstructsAndVerifiesClosure: true,
@@ -93,6 +98,36 @@ function runtime(root: string): FixtureRuntime {
     agentScriptSha256: agent.sha256,
     providerProxyScriptSha256: hash("8"),
     stateSidecarScriptSha256: hash("9"),
+    executionEnvironment: {
+      schemaVersion: "pm.public-eval-corners.sentinel-sanitized-environment.v2",
+      values: sanitizedEnvironment,
+      environmentSha256: sentinelProductionJsonSha256(sanitizedEnvironment),
+      inheritsHostEnvironment: false,
+    },
+    git: {
+      version: "git version 2.42.0",
+      executablePath: "/usr/bin/git",
+      executableSha256: hash("a"),
+      invocationEnvironmentSha256: sentinelProductionJsonSha256(sanitizedEnvironment),
+    },
+    workspace: {
+      checkoutPath: root,
+      rootPackageJsonSha256: hash("b"),
+      pnpmWorkspaceManifestSha256: hash("c"),
+      rootTsconfigSha256: hash("d"),
+      tsconfigBaseSha256: hash("e"),
+      publicEvalPackageManifestSha256: hash("f"),
+      publicEvalTsconfigSha256: hash("0"),
+      packagesRootPath: root,
+      packagesTreeSha256: hash("1"),
+      packagesTreeEntryCount: 10,
+      installedDependenciesRootPath: root,
+      installedDependenciesTreeSha256: hash("2"),
+      installedDependenciesTreeEntryCount: 20,
+      compiledOutputRootPath: root,
+      compiledOutputTreeSha256: hash("3"),
+      compiledOutputTreeEntryCount: 30,
+    },
     node: {
       version: "v26.0.0",
       requestedPath: node.path,
@@ -117,6 +152,15 @@ function runtime(root: string): FixtureRuntime {
       pipFreezeSha256: hash("1"),
       installedDistributionsManifestSha256: hash("2"),
       installedDistributionsManifestSchema: "canonical-name-version-files-record-sha256-v1",
+      environmentRootPath: root,
+      environmentTreeSha256: hash("3"),
+      environmentTreeEntryCount: 40,
+      runtimeRootPath: root,
+      runtimeTreeSha256: hash("4"),
+      runtimeTreeEntryCount: 50,
+      stdlibRootPath: root,
+      stdlibTreeSha256: hash("5"),
+      stdlibTreeEntryCount: 60,
     },
     browser: {
       playwrightVersion: "1.56.1",
@@ -125,11 +169,28 @@ function runtime(root: string): FixtureRuntime {
       bundleTreeSha256: hash("4"),
       executablePath: dummy.path,
       executableSha256: dummy.sha256,
+      libraryRootPath: root,
+      libraryTreeSha256: hash("6"),
+      libraryTreeEntryCount: 70,
+      coreLibraryRootPath: root,
+      coreLibraryTreeSha256: hash("7"),
+      coreLibraryTreeEntryCount: 80,
+      corePackageMetadataSha256: hash("8"),
     },
     upstream: {
       frontendPackageLockSha256: hash("6"),
       frontendInstalledTreeSha256: hash("7"),
       serverRequirementsSha256: hash("8"),
+    },
+    executionLease: {
+      schemaVersion: "pm.public-eval-corners.sentinel-runtime-execution-lease.v1",
+      boundPathsManifestSha256: hash("9"),
+      exactBoundPathsRequired: true,
+      preAndPostBlockReconstructionRequired: true,
+      mutationInvalidatesBlock: true,
+      immutableSnapshot: false,
+      osBoundaryLimitation:
+        "kernel-dynamic-loader-system-libraries-and-in-process-races-outside-user-space-hash-closure",
     },
   };
   const closure = {
@@ -141,6 +202,15 @@ function runtime(root: string): FixtureRuntime {
     paths: {
       gitExecutablePath: "/usr/bin/git",
       substrateCheckoutPath: root,
+      rootPackageJsonPath: dummy.path,
+      pnpmWorkspaceManifestPath: dummy.path,
+      rootTsconfigPath: dummy.path,
+      tsconfigBasePath: dummy.path,
+      publicEvalPackageJsonPath: dummy.path,
+      publicEvalTsconfigPath: dummy.path,
+      substratePackagesRootPath: root,
+      substrateInstalledDependenciesRootPath: root,
+      publicEvalCompiledOutputRootPath: root,
       pnpmWorkspaceLockPath: dummy.path,
       runnerScriptPath: dummy.path,
       supervisorScriptPath: dummy.path,
@@ -154,10 +224,15 @@ function runtime(root: string): FixtureRuntime {
       npmAllowedRootPath: root,
       pythonRequestedVenvPath: python.path,
       pythonEnvironmentRootPath: root,
+      pythonRuntimeRootPath: root,
+      pythonStdlibRootPath: root,
       pythonExecutableAllowedRootPath: root,
       pythonPyvenvConfigPath: dummy.path,
       pythonSitePackagesRootPaths: [root],
       playwrightPackageMetadataPath: dummy.path,
+      playwrightCorePackageMetadataPath: dummy.path,
+      playwrightLibraryRootPath: root,
+      playwrightCoreLibraryRootPath: root,
       browserBundleRootPath: root,
       browserExecutablePath: dummy.path,
       upstreamCheckoutPath: root,
@@ -250,6 +325,11 @@ interface HarnessOptions {
   readonly nowBeforeSignature?: boolean;
   readonly duplicateAttemptIds?: boolean;
   readonly externalRecordInvalid?: boolean;
+  readonly externalBodyMismatch?: boolean;
+  readonly externalResponseUrlMismatch?: boolean;
+  readonly externalMetadataMutation?: "content-type" | "future-time" | "hash" | "redirect" | "status";
+  readonly invalidRuntimeInspectionCall?: number;
+  readonly tamperedRuntimeArtifact?: boolean;
   readonly startSkewMs?: number;
 }
 
@@ -287,6 +367,7 @@ function fixture(options: HarnessOptions = {}): {
   let opaqueIndex = 0;
   let supervisorCall = 0;
   let stateStopCall = 0;
+  let runtimeInspectionCall = 0;
   const supervisorInputs: unknown[] = [];
   let pendingSupervisors: {
     readonly call: number;
@@ -315,6 +396,21 @@ function fixture(options: HarnessOptions = {}): {
     };
     return { ...body, preflightSha256: sentinelProductionJsonSha256(body) };
   };
+  const artifactBody = {
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3" as const,
+    fixtureIdentity: runtimeFixture.closure.closureSha256,
+  };
+  const runtimeArtifacts = {
+    ...artifactBody,
+    derivationSha256: options.tamperedRuntimeArtifact
+      ? hash("f")
+      : sentinelProductionJsonSha256(artifactBody),
+  } as unknown as NonNullable<SentinelProductionRuntimeInspection["artifacts"]>;
+  const runtimeLeaseIdentity = createSentinelProductionRuntimeLeaseIdentity(
+    runtimeFixture.paths,
+    runtimeFixture.closure,
+    runtimeArtifacts,
+  );
   const dependencies: SentinelProductionRunnerDependencies = {
     now: () => {
       if (options.nowBeforeSignature) return "2026-07-14T22:00:30.000Z";
@@ -322,20 +418,44 @@ function fixture(options: HarnessOptions = {}): {
       nowIndex += 1;
       return value.toISOString();
     },
-    verifyExternalCommitmentRecord: async (record) => ({
-      valid: !options.externalRecordInvalid,
-      locator: record.locator,
-      observedAt: "2026-07-14T22:03:00.000Z",
-      responseSha256: sentinelProductionJsonSha256(record),
-      issues: options.externalRecordInvalid ? ["external receipt unavailable"] : [],
-    }),
-    inspectRuntime: () => ({
-      valid: true,
-      closure: runtimeFixture.closure,
-      closureSha256: runtimeFixture.closure.closureSha256,
-      executableIdentitySha256: hash("e"),
-      issues: [],
-    }),
+    verifyExternalCommitmentRecord: async (record) => {
+      const retained = options.externalBodyMismatch ? { ...record, commitmentId: "substituted" } : record;
+      const bytes = Buffer.from(JSON.stringify(retained));
+      return {
+        valid: !options.externalRecordInvalid,
+        locator: record.locator,
+        responseUrl: options.externalResponseUrlMismatch
+          ? "https://evidence.example.test/substituted"
+          : record.locator,
+        redirected: options.externalMetadataMutation === "redirect",
+        httpStatus: options.externalMetadataMutation === "status" ? 206 : 200,
+        contentType: options.externalMetadataMutation === "content-type"
+          ? "text/plain"
+          : "application/json; charset=utf-8",
+        observedAt: options.externalMetadataMutation === "future-time"
+          ? "2026-07-14T23:03:00.000Z"
+          : "2026-07-14T22:03:02.000Z",
+        responseByteLength: bytes.byteLength,
+        responseSha256: options.externalMetadataMutation === "hash"
+          ? hash("f")
+          : sentinelProductionSha256(bytes),
+        responseBodyBase64: bytes.toString("base64"),
+        issues: options.externalRecordInvalid ? ["external receipt unavailable"] : [],
+      };
+    },
+    inspectRuntime: () => {
+      runtimeInspectionCall += 1;
+      const valid = runtimeInspectionCall !== options.invalidRuntimeInspectionCall;
+      return {
+        valid,
+        closure: runtimeFixture.closure,
+        closureSha256: runtimeFixture.closure.closureSha256,
+        executableIdentitySha256: hash("e"),
+        artifacts: valid ? runtimeArtifacts : null,
+        executionLeaseIdentity: valid ? runtimeLeaseIdentity : null,
+        issues: valid ? [] : ["synthetic runtime mutation"],
+      };
+    },
     inspectCheckout,
     allocatePorts: async (count) => {
       if (options.duplicatePorts) return Array.from({ length: count }, () => 21_000);
@@ -572,6 +692,7 @@ describe("Sentinel production outcome-blind runner", () => {
     const allInputs = test.supervisorInputs as Array<{
       attemptId: string;
       outputRoot: string;
+      executionEnvironment: SentinelRuntimeClosure["executionEnvironment"];
       opaqueEnvironment: {
         stateOrigin: string; stateToken: string; providerOrigin: string; providerToken: string;
       };
@@ -583,6 +704,10 @@ describe("Sentinel production outcome-blind runner", () => {
     expect(new Set(allInputs.flatMap(({ opaqueEnvironment }) => [
       opaqueEnvironment.stateOrigin, opaqueEnvironment.providerOrigin,
     ]))).toHaveLength(72);
+    expect(allInputs.every(({ executionEnvironment }) =>
+      sentinelProductionCanonicalJson(executionEnvironment) ===
+      sentinelProductionCanonicalJson(test.input.preregistration.runtime.executionEnvironment)))
+      .toBe(true);
     for (let index = 0; index < test.supervisorInputs.length; index += 4) {
       const block = test.supervisorInputs.slice(index, index + 4) as Array<{
         opaqueEnvironment: unknown; attemptId: string; checkoutPath: string;
@@ -593,6 +718,69 @@ describe("Sentinel production outcome-blind runner", () => {
     }
     const final = JSON.parse(readFileSync(result.executionFinalManifestPath, "utf8")) as Record<string, unknown>;
     expect(final).toMatchObject({ batchComplete: true, retryCount: 0, rerunCount: 0, replacementCount: 0 });
+    const start = JSON.parse(readFileSync(result.executionStartManifestPath, "utf8")) as {
+      readonly externalCommitmentObservation: {
+        readonly path: string; readonly receiptSha256: string; readonly bodyPath: string; readonly bodySha256: string;
+      };
+      readonly initialRuntimeInspection: {
+        readonly inspectionReceiptPath: string; readonly inspectionReceiptSha256: string;
+      };
+    };
+    const externalBody = readFileSync(
+      resolve(result.batchRoot, start.externalCommitmentObservation.bodyPath),
+    );
+    expect(externalBody.equals(Buffer.from(JSON.stringify(test.input.externalCommitment)))).toBe(true);
+    expect(sentinelProductionSha256(externalBody)).toBe(start.externalCommitmentObservation.bodySha256);
+    const externalReceipt = JSON.parse(readFileSync(
+      resolve(result.batchRoot, start.externalCommitmentObservation.path),
+      "utf8",
+    )) as Record<string, unknown>;
+    const { receiptSha256: externalReceiptSha256, ...externalReceiptBody } = externalReceipt;
+    expect(externalReceiptSha256).toBe(start.externalCommitmentObservation.receiptSha256);
+    expect(sentinelProductionJsonSha256(externalReceiptBody)).toBe(externalReceiptSha256);
+    const firstBlock = JSON.parse(readFileSync(
+      resolve(result.batchRoot, result.blocks[0]!.path),
+      "utf8",
+    )) as {
+      readonly runtimeBefore: { readonly inspectionReceiptPath: string; readonly artifactPath: string };
+      readonly runtimeAfter: { readonly inspectionReceiptPath: string; readonly artifactPath: string };
+    };
+    const runtimePaths = [
+      start.initialRuntimeInspection.inspectionReceiptPath,
+      firstBlock.runtimeBefore.inspectionReceiptPath,
+      firstBlock.runtimeAfter.inspectionReceiptPath,
+    ];
+    for (const path of runtimePaths) {
+      const receipt = JSON.parse(readFileSync(resolve(result.batchRoot, path), "utf8")) as Record<string, unknown>;
+      const { receiptSha256, ...body } = receipt;
+      expect(sentinelProductionJsonSha256(body)).toBe(receiptSha256);
+      expect(body).toMatchObject({ closure: test.input.preregistration.runtime, valid: true });
+    }
+    const runtimeReceiptFiles = readdirSync(resolve(result.batchRoot, "manifests", "runtime"))
+      .filter((name) => name.startsWith("runtime-initial-") || name.startsWith("runtime-block-"));
+    expect(runtimeReceiptFiles).toHaveLength(19);
+    let runtimeHead = start.initialRuntimeInspection.inspectionReceiptSha256;
+    for (const blockReference of result.blocks) {
+      const block = JSON.parse(readFileSync(
+        resolve(result.batchRoot, blockReference.path),
+        "utf8",
+      )) as {
+        readonly runtimeBefore: { readonly inspectionReceiptPath: string; readonly inspectionReceiptSha256: string };
+        readonly runtimeAfter: { readonly inspectionReceiptPath: string; readonly inspectionReceiptSha256: string };
+      };
+      for (const boundary of [block.runtimeBefore, block.runtimeAfter]) {
+        const receipt = JSON.parse(readFileSync(
+          resolve(result.batchRoot, boundary.inspectionReceiptPath),
+          "utf8",
+        )) as { readonly previousInspectionReceiptSha256: string; readonly receiptSha256: string };
+        expect(receipt.previousInspectionReceiptSha256).toBe(runtimeHead);
+        expect(receipt.receiptSha256).toBe(boundary.inspectionReceiptSha256);
+        runtimeHead = receipt.receiptSha256;
+      }
+    }
+    expect(final.runtimeInspectionHeadSha256).toBe(runtimeHead);
+    expect(readFileSync(resolve(result.batchRoot, firstBlock.runtimeBefore.artifactPath), "utf8"))
+      .toContain("pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3");
     const retained = JSON.parse(
       readFileSync(resolve(result.batchRoot, result.cells[0]!.path), "utf8"),
     ) as Record<string, unknown>;
@@ -660,6 +848,24 @@ describe("Sentinel production outcome-blind runner", () => {
     );
   });
 
+  it("rejects substituted external bytes and a mismatched effective response URL before launch", async () => {
+    const substituted = fixture({ externalBodyMismatch: true });
+    await expect(runSentinelProductionBatch(substituted.input, substituted.dependencies)).rejects.toThrow(
+      "observation body differs from the committed receipt",
+    );
+    expect(substituted.supervisorInputs).toHaveLength(0);
+    const redirected = fixture({ externalResponseUrlMismatch: true });
+    await expect(runSentinelProductionBatch(redirected.input, redirected.dependencies)).rejects.toThrow(
+      "external commitment record was not independently retrieved",
+    );
+    expect(redirected.supervisorInputs).toHaveLength(0);
+    for (const mutation of ["content-type", "future-time", "hash", "redirect", "status"] as const) {
+      const test = fixture({ externalMetadataMutation: mutation });
+      await expect(runSentinelProductionBatch(test.input, test.dependencies)).rejects.toThrow();
+      expect(test.supervisorInputs).toHaveLength(0);
+    }
+  });
+
   it("retains a partial block without retries and makes the batch incomplete", async () => {
     const test = fixture({ throwSupervisorCall: 1 });
     const result = await runSentinelProductionBatch(test.input, test.dependencies);
@@ -668,6 +874,38 @@ describe("Sentinel production outcome-blind runner", () => {
     expect(test.supervisorInputs).toHaveLength(36);
     const firstBlock = JSON.parse(readFileSync(resolve(result.batchRoot, result.blocks[0]!.path), "utf8")) as Record<string, unknown>;
     expect(firstBlock).toMatchObject({ completeArmSet: true, infrastructureComplete: false });
+  });
+
+  it("runs one exact four-arm qualification block only as an excluded smoke", async () => {
+    const test = fixture();
+    const result = await runSentinelProductionExcludedSmoke(
+      test.input,
+      {
+        taskId: "microhub-stars-relative-passive",
+        repeatId: "repeat-01",
+      },
+      test.dependencies,
+    );
+    expect(result).toMatchObject({
+      batchComplete: false,
+      evidenceEligible: false,
+      materialBenefit: false,
+    });
+    expect(result.blocks).toHaveLength(1);
+    expect(result.cells).toHaveLength(4);
+    expect(test.supervisorInputs).toHaveLength(4);
+    const final = JSON.parse(
+      readFileSync(result.executionFinalManifestPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(final).toMatchObject({
+      declaredBlockCount: 9,
+      retainedBlockCount: 1,
+      declaredCellCount: 36,
+      retainedCellCount: 4,
+      batchComplete: false,
+      evidenceEligible: false,
+      materialBenefit: false,
+    });
   });
 
   it("uses retained supervisor start receipts to fail excessive four-arm skew", async () => {
@@ -688,6 +926,36 @@ describe("Sentinel production outcome-blind runner", () => {
       readFileSync(resolve(result.batchRoot, result.cells[0]!.path), "utf8"),
     ) as Record<string, unknown>;
     expect(firstCell).toMatchObject({ infrastructureComplete: false, evidenceEligible: false, materialBenefit: false });
+  });
+
+  it("retains a content-addressed invalid post-block runtime inspection", async () => {
+    const test = fixture({ invalidRuntimeInspectionCall: 3 });
+    const result = await runSentinelProductionBatch(test.input, test.dependencies);
+    expect(result.batchComplete).toBe(false);
+    const firstBlock = JSON.parse(readFileSync(
+      resolve(result.batchRoot, result.blocks[0]!.path),
+      "utf8",
+    )) as {
+      readonly runtimeStable: boolean;
+      readonly runtimeAfter: { readonly inspectionReceiptPath: string; readonly inspectionReceiptSha256: string };
+    };
+    expect(firstBlock.runtimeStable).toBe(false);
+    const retained = JSON.parse(readFileSync(
+      resolve(result.batchRoot, firstBlock.runtimeAfter.inspectionReceiptPath),
+      "utf8",
+    )) as Record<string, unknown>;
+    const { receiptSha256, ...body } = retained;
+    expect(receiptSha256).toBe(firstBlock.runtimeAfter.inspectionReceiptSha256);
+    expect(sentinelProductionJsonSha256(body)).toBe(receiptSha256);
+    expect(body).toMatchObject({ boundary: "after", blockSequence: 1, valid: false, artifact: null });
+  });
+
+  it("rejects a valid-claimed runtime inspection with tampered derivation identity", async () => {
+    const test = fixture({ tamperedRuntimeArtifact: true });
+    await expect(runSentinelProductionBatch(test.input, test.dependencies)).rejects.toThrow(
+      "runtime derivation artifact identity is invalid",
+    );
+    expect(test.supervisorInputs).toHaveLength(0);
   });
 
   it("rejects outcome smuggling from the supervisor without serializing upstream fields", async () => {

@@ -22,15 +22,19 @@ import {
 } from "node:path";
 
 import {
+  buildSentinelRuntimeSanitizedEnvironment,
+  isSentinelRuntimeSanitizedEnvironment,
   SENTINEL_PRODUCTION_REVISION,
   SENTINEL_PRODUCTION_SOURCE_TREE,
   sentinelProductionCanonicalJson,
   sentinelProductionRuntimeClosureSha256,
+  type SentinelRuntimeSanitizedEnvironment,
   type SentinelRuntimeClosure,
 } from "./sentinel-production-plan.js";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const GIT_SHA1 = /^[a-f0-9]{40}$/u;
+const GIT_VERSION = /^git version [^\0\r\n]{1,160}$/u;
 const NODE_VERSION = /^v[0-9]+\.[0-9]+\.[0-9]+$/u;
 const NPM_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$/u;
 const PYTHON_VERSION = /^Python [0-9]+\.[0-9]+\.[0-9]+$/u;
@@ -39,6 +43,15 @@ const DISTRIBUTION_FIELD = /^[^\0\r\n]+$/u;
 export interface SentinelRuntimeClosurePaths {
   readonly gitExecutablePath: string;
   readonly substrateCheckoutPath: string;
+  readonly rootPackageJsonPath: string;
+  readonly pnpmWorkspaceManifestPath: string;
+  readonly rootTsconfigPath: string;
+  readonly tsconfigBasePath: string;
+  readonly publicEvalPackageJsonPath: string;
+  readonly publicEvalTsconfigPath: string;
+  readonly substratePackagesRootPath: string;
+  readonly substrateInstalledDependenciesRootPath: string;
+  readonly publicEvalCompiledOutputRootPath: string;
   readonly pnpmWorkspaceLockPath: string;
   readonly runnerScriptPath: string;
   readonly supervisorScriptPath: string;
@@ -52,11 +65,16 @@ export interface SentinelRuntimeClosurePaths {
   readonly npmAllowedRootPath: string;
   readonly pythonRequestedVenvPath: string;
   readonly pythonEnvironmentRootPath: string;
+  readonly pythonRuntimeRootPath: string;
+  readonly pythonStdlibRootPath: string;
   /** The venv launcher normally resolves to an interpreter outside the venv. */
   readonly pythonExecutableAllowedRootPath: string;
   readonly pythonPyvenvConfigPath: string;
   readonly pythonSitePackagesRootPaths: readonly string[];
   readonly playwrightPackageMetadataPath: string;
+  readonly playwrightCorePackageMetadataPath: string;
+  readonly playwrightLibraryRootPath: string;
+  readonly playwrightCoreLibraryRootPath: string;
   readonly browserBundleRootPath: string;
   readonly browserExecutablePath: string;
   readonly upstreamCheckoutPath: string;
@@ -69,6 +87,7 @@ export interface SentinelRuntimeCommandInvocation {
   readonly executablePath: string;
   readonly arguments: readonly string[];
   readonly cwd: string;
+  readonly environment: Readonly<Record<string, string>>;
 }
 
 export interface SentinelRuntimeCommandResult {
@@ -82,12 +101,15 @@ export interface SentinelRuntimeClosureDependencies {
   readonly runCommand: (
     invocation: SentinelRuntimeCommandInvocation,
   ) => SentinelRuntimeCommandResult;
+  /** Test seam only; production must use the exact exported sanitized map. */
+  readonly executionEnvironment?: Readonly<Record<string, string>>;
 }
 
 export interface SentinelRuntimeCommandArtifact {
   readonly executablePath: string;
   readonly arguments: readonly string[];
   readonly cwd: string;
+  readonly environment: Readonly<Record<string, string>>;
   readonly stdoutBase64: string;
   readonly stdoutSha256: string;
   readonly stderrBase64: string;
@@ -110,6 +132,13 @@ export interface SentinelRuntimeFileArtifact {
   readonly size: number;
 }
 
+export interface SentinelRuntimeEntryArtifact {
+  readonly requestedPath: string;
+  readonly requestedEntrySha256: string;
+  readonly resolvedPath: string;
+  readonly resolvedSha256: string;
+}
+
 export interface SentinelRuntimeGitArtifact {
   readonly checkoutPath: string;
   readonly revision: string;
@@ -119,19 +148,31 @@ export interface SentinelRuntimeGitArtifact {
 }
 
 export interface SentinelRuntimeClosureArtifacts {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v1";
+  readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3";
   readonly substrateGit: SentinelRuntimeGitArtifact;
   readonly upstreamGit: SentinelRuntimeGitArtifact;
   readonly commands: {
+    readonly gitVersion: SentinelRuntimeCommandArtifact;
     readonly nodeVersion: SentinelRuntimeCommandArtifact;
     readonly npmVersion: SentinelRuntimeCommandArtifact;
     readonly pythonVersion: SentinelRuntimeCommandArtifact;
     readonly pipFreeze: SentinelRuntimeCommandArtifact;
   };
   readonly pipFreeze: string;
+  readonly entries: {
+    readonly node: SentinelRuntimeEntryArtifact;
+    readonly npm: SentinelRuntimeEntryArtifact;
+    readonly python: SentinelRuntimeEntryArtifact;
+  };
   readonly files: {
     readonly gitExecutable: SentinelRuntimeFileArtifact;
     readonly pnpmWorkspaceLock: SentinelRuntimeFileArtifact;
+    readonly rootPackageJson: SentinelRuntimeFileArtifact;
+    readonly pnpmWorkspaceManifest: SentinelRuntimeFileArtifact;
+    readonly rootTsconfig: SentinelRuntimeFileArtifact;
+    readonly tsconfigBase: SentinelRuntimeFileArtifact;
+    readonly publicEvalPackageJson: SentinelRuntimeFileArtifact;
+    readonly publicEvalTsconfig: SentinelRuntimeFileArtifact;
     readonly runnerScript: SentinelRuntimeFileArtifact;
     readonly supervisorScript: SentinelRuntimeFileArtifact;
     readonly verifierScript: SentinelRuntimeFileArtifact;
@@ -140,12 +181,23 @@ export interface SentinelRuntimeClosureArtifacts {
     readonly stateSidecarScript: SentinelRuntimeFileArtifact;
     readonly pyvenvConfig: SentinelRuntimeFileArtifact;
     readonly playwrightPackageMetadata: SentinelRuntimeFileArtifact;
+    readonly playwrightCorePackageMetadata: SentinelRuntimeFileArtifact;
     readonly browserExecutable: SentinelRuntimeFileArtifact;
     readonly upstreamFrontendPackageLock: SentinelRuntimeFileArtifact;
     readonly upstreamServerRequirements: SentinelRuntimeFileArtifact;
   };
   readonly installedDistributionsManifest: string;
   readonly installedDistributionsManifestSha256: string;
+  readonly executionEnvironmentManifest: string;
+  readonly boundPathsManifest: string;
+  readonly workspacePackagesTree: SentinelRuntimeTreeArtifact;
+  readonly workspaceInstalledDependenciesTree: SentinelRuntimeTreeArtifact;
+  readonly publicEvalCompiledOutputTree: SentinelRuntimeTreeArtifact;
+  readonly pythonEnvironmentTree: SentinelRuntimeTreeArtifact;
+  readonly pythonRuntimeTree: SentinelRuntimeTreeArtifact;
+  readonly pythonStdlibTree: SentinelRuntimeTreeArtifact;
+  readonly playwrightLibraryTree: SentinelRuntimeTreeArtifact;
+  readonly playwrightCoreLibraryTree: SentinelRuntimeTreeArtifact;
   readonly browserBundleTree: SentinelRuntimeTreeArtifact;
   readonly upstreamFrontendInstalledTree: SentinelRuntimeTreeArtifact;
   readonly derivationSha256: string;
@@ -154,6 +206,33 @@ export interface SentinelRuntimeClosureArtifacts {
 export interface SentinelRuntimeClosureDerivation {
   readonly closure: SentinelRuntimeClosure;
   readonly artifacts: SentinelRuntimeClosureArtifacts;
+}
+
+/**
+ * A user-space execution lease binds the exact path object used by the runner.
+ * It is intentionally not called an immutable OS snapshot: callers must close
+ * it after a block, and any changed byte/tree makes the block ineligible.
+ */
+export interface SentinelRuntimeExecutionLease {
+  readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-execution-lease.v1";
+  readonly paths: SentinelRuntimeClosurePaths;
+  readonly closureSha256: string;
+  readonly declaredClosure: SentinelRuntimeClosure;
+  readonly boundPathsManifestSha256: string;
+  readonly acquiredDerivationSha256: string;
+  readonly exactSupervisorPaths: {
+    readonly nodeExecutablePath: string;
+    readonly npmCliPath: string;
+    readonly pythonExecutablePath: string;
+    readonly agentScriptPath: string;
+  };
+}
+
+function runtimeBoundPathsManifest(paths: SentinelRuntimeClosurePaths): string {
+  return sentinelProductionCanonicalJson({
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-bound-paths.v1",
+    paths,
+  });
 }
 
 interface StableEntry {
@@ -194,6 +273,18 @@ interface DistributionManifestEntry {
 
 function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function executionEnvironment(
+  dependencies: SentinelRuntimeClosureDependencies,
+  nodeExecutablePath: string,
+): SentinelRuntimeSanitizedEnvironment {
+  const environment = dependencies.executionEnvironment ??
+    buildSentinelRuntimeSanitizedEnvironment(nodeExecutablePath);
+  if (!isSentinelRuntimeSanitizedEnvironment(environment, nodeExecutablePath)) {
+    throw new Error("runtime command environment is not the exact Node-derived sanitized environment");
+  }
+  return Object.freeze({ ...environment });
 }
 
 function codeUnitCompare(left: string, right: string): number {
@@ -337,11 +428,15 @@ function validateRelativeName(name: string, label: string): void {
   }
 }
 
-function treeManifestOnce(rootPath: string, label: string): SentinelRuntimeTreeArtifact {
+function treeManifestOnce(
+  rootPath: string,
+  label: string,
+  allowedRootPaths: readonly string[],
+): SentinelRuntimeTreeArtifact {
   assertCanonicalAbsolute(rootPath, label);
   const root = lstatSync(rootPath, { bigint: true });
   if (!root.isDirectory() || root.isSymbolicLink()) throw new Error(`${label} must be a directory`);
-  const rootReal = realpathSync(rootPath);
+  const allowedRoots = allowedRootPaths.map((path) => realpathSync(path));
   const entries: string[] = [];
   const paths = new Set<string>();
   const visit = (directoryPath: string, relativeDirectory: string): void => {
@@ -368,7 +463,7 @@ function treeManifestOnce(rootPath: string, label: string): SentinelRuntimeTreeA
         const target = readlinkSync(childPath, "utf8");
         if (/\0|\r|\n/u.test(target)) throw new Error(`${label} contains an unsafe symlink`);
         const resolvedTarget = realpathSync(childPath);
-        if (!pathWithin(resolvedTarget, rootReal)) {
+        if (!allowedRoots.some((allowedRoot) => pathWithin(resolvedTarget, allowedRoot))) {
           throw new Error(`${label} symlink ${relativePath} escapes its root`);
         }
         const after = lstatSync(childPath, { bigint: true });
@@ -395,9 +490,13 @@ function treeManifestOnce(rootPath: string, label: string): SentinelRuntimeTreeA
   };
 }
 
-function deriveTree(rootPath: string, label: string): SentinelRuntimeTreeArtifact {
-  const first = treeManifestOnce(rootPath, label);
-  const second = treeManifestOnce(rootPath, label);
+function deriveTree(
+  rootPath: string,
+  label: string,
+  allowedRootPaths: readonly string[] = [rootPath],
+): SentinelRuntimeTreeArtifact {
+  const first = treeManifestOnce(rootPath, label, allowedRootPaths);
+  const second = treeManifestOnce(rootPath, label, allowedRootPaths);
   if (first.manifest !== second.manifest || first.entryCount !== second.entryCount) {
     throw new Error(`${label} changed between complete traversals`);
   }
@@ -410,7 +509,7 @@ function defaultRunCommand(
   const result = spawnSync(invocation.executablePath, [...invocation.arguments], {
     cwd: invocation.cwd,
     encoding: null,
-    env: { PATH: "/usr/bin:/bin" },
+    env: { ...invocation.environment },
     maxBuffer: 64 * 1024 * 1024,
   });
   return {
@@ -481,6 +580,7 @@ function validatePipFreeze(bytes: Buffer): {
 function gitArtifact(
   checkoutPath: string,
   gitExecutablePath: string,
+  environment: Readonly<Record<string, string>>,
   dependencies: SentinelRuntimeClosureDependencies,
   expectedRevision?: string,
   expectedTree?: string,
@@ -490,6 +590,7 @@ function gitArtifact(
       executablePath: gitExecutablePath,
       arguments: ["-C", checkoutPath, ...arguments_],
       cwd: checkoutPath,
+      environment,
     }, label);
   const head = invoke(["rev-parse", "--verify", "HEAD"], "git HEAD");
   const tree = invoke(["rev-parse", "--verify", "HEAD^{tree}"], "git tree");
@@ -705,6 +806,12 @@ function distributionManifest(
 function validatePaths(paths: SentinelRuntimeClosurePaths): void {
   const independentPaths: readonly [string, string][] = [
     ["git executable", paths.gitExecutablePath],
+    ["root package.json", paths.rootPackageJsonPath],
+    ["pnpm workspace manifest", paths.pnpmWorkspaceManifestPath],
+    ["root tsconfig", paths.rootTsconfigPath],
+    ["tsconfig base", paths.tsconfigBasePath],
+    ["public eval package.json", paths.publicEvalPackageJsonPath],
+    ["public eval tsconfig", paths.publicEvalTsconfigPath],
     ["pnpm workspace lock", paths.pnpmWorkspaceLockPath],
     ["runner script", paths.runnerScriptPath],
     ["supervisor script", paths.supervisorScriptPath],
@@ -717,6 +824,7 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
     ["Python requested venv entry", paths.pythonRequestedVenvPath],
     ["Python pyvenv.cfg", paths.pythonPyvenvConfigPath],
     ["Playwright package metadata", paths.playwrightPackageMetadataPath],
+    ["Playwright core package metadata", paths.playwrightCorePackageMetadataPath],
     ["browser executable", paths.browserExecutablePath],
     ["upstream frontend package lock", paths.upstreamFrontendPackageLockPath],
     ["upstream server requirements", paths.upstreamServerRequirementsPath],
@@ -724,11 +832,18 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
   assertDistinct(independentPaths);
   const rootPaths: Array<readonly [string, string]> = [
     ["substrate checkout", paths.substrateCheckoutPath],
+    ["substrate packages", paths.substratePackagesRootPath],
+    ["substrate installed dependencies", paths.substrateInstalledDependenciesRootPath],
+    ["public eval compiled output", paths.publicEvalCompiledOutputRootPath],
     ["Node allowed root", paths.nodeAllowedRootPath],
     ["npm allowed root", paths.npmAllowedRootPath],
     ["Python environment root", paths.pythonEnvironmentRootPath],
+    ["Python runtime root", paths.pythonRuntimeRootPath],
+    ["Python stdlib root", paths.pythonStdlibRootPath],
     ["Python executable allowed root", paths.pythonExecutableAllowedRootPath],
     ["browser bundle root", paths.browserBundleRootPath],
+    ["Playwright library root", paths.playwrightLibraryRootPath],
+    ["Playwright core library root", paths.playwrightCoreLibraryRootPath],
     ["upstream checkout", paths.upstreamCheckoutPath],
     ["upstream frontend installed root", paths.upstreamFrontendInstalledRootPath],
   ];
@@ -744,6 +859,31 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
     paths.substrateCheckoutPath,
     "packages/public-eval-corners/dist",
   );
+  assertExactPath(paths.rootPackageJsonPath, resolve(paths.substrateCheckoutPath, "package.json"), "root package.json");
+  assertExactPath(
+    paths.pnpmWorkspaceManifestPath,
+    resolve(paths.substrateCheckoutPath, "pnpm-workspace.yaml"),
+    "pnpm workspace manifest",
+  );
+  assertExactPath(paths.rootTsconfigPath, resolve(paths.substrateCheckoutPath, "tsconfig.json"), "root tsconfig");
+  assertExactPath(paths.tsconfigBasePath, resolve(paths.substrateCheckoutPath, "tsconfig.base.json"), "tsconfig base");
+  assertExactPath(
+    paths.publicEvalPackageJsonPath,
+    resolve(paths.substrateCheckoutPath, "packages/public-eval-corners/package.json"),
+    "public eval package.json",
+  );
+  assertExactPath(
+    paths.publicEvalTsconfigPath,
+    resolve(paths.substrateCheckoutPath, "packages/public-eval-corners/tsconfig.json"),
+    "public eval tsconfig",
+  );
+  assertExactPath(paths.substratePackagesRootPath, resolve(paths.substrateCheckoutPath, "packages"), "substrate packages");
+  assertExactPath(
+    paths.substrateInstalledDependenciesRootPath,
+    resolve(paths.substrateCheckoutPath, "node_modules"),
+    "substrate installed dependencies",
+  );
+  assertExactPath(paths.publicEvalCompiledOutputRootPath, substrateDist, "public eval compiled output");
   assertExactPath(
     paths.pnpmWorkspaceLockPath,
     resolve(paths.substrateCheckoutPath, "pnpm-lock.yaml"),
@@ -761,6 +901,26 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
     paths.playwrightPackageMetadataPath,
     resolve(paths.substrateCheckoutPath, "node_modules/playwright/package.json"),
     "Playwright package metadata",
+  );
+  assertExactPath(
+    paths.playwrightLibraryRootPath,
+    resolve(paths.substrateCheckoutPath, "node_modules/playwright"),
+    "Playwright library root",
+  );
+  assertExactPath(
+    paths.playwrightCoreLibraryRootPath,
+    resolve(paths.substrateCheckoutPath, "node_modules/playwright-core"),
+    "Playwright core library root",
+  );
+  assertExactPath(
+    paths.playwrightCorePackageMetadataPath,
+    resolve(paths.playwrightCoreLibraryRootPath, "package.json"),
+    "Playwright core package metadata",
+  );
+  assertExactPath(
+    paths.pythonRuntimeRootPath,
+    paths.pythonExecutableAllowedRootPath,
+    "Python runtime root",
   );
   assertExactPath(
     paths.pythonPyvenvConfigPath,
@@ -783,6 +943,15 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
     "upstream server requirements",
   );
   for (const [label, path, root] of [
+    ["root package.json", paths.rootPackageJsonPath, paths.substrateCheckoutPath],
+    ["pnpm workspace manifest", paths.pnpmWorkspaceManifestPath, paths.substrateCheckoutPath],
+    ["root tsconfig", paths.rootTsconfigPath, paths.substrateCheckoutPath],
+    ["tsconfig base", paths.tsconfigBasePath, paths.substrateCheckoutPath],
+    ["public eval package.json", paths.publicEvalPackageJsonPath, paths.substrateCheckoutPath],
+    ["public eval tsconfig", paths.publicEvalTsconfigPath, paths.substrateCheckoutPath],
+    ["substrate packages", paths.substratePackagesRootPath, paths.substrateCheckoutPath],
+    ["substrate installed dependencies", paths.substrateInstalledDependenciesRootPath, paths.substrateCheckoutPath],
+    ["public eval compiled output", paths.publicEvalCompiledOutputRootPath, paths.substrateCheckoutPath],
     ["pnpm workspace lock", paths.pnpmWorkspaceLockPath, paths.substrateCheckoutPath],
     ["runner script", paths.runnerScriptPath, paths.substrateCheckoutPath],
     ["supervisor script", paths.supervisorScriptPath, paths.substrateCheckoutPath],
@@ -791,7 +960,11 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
     ["provider proxy script", paths.providerProxyScriptPath, paths.substrateCheckoutPath],
     ["state sidecar script", paths.stateSidecarScriptPath, paths.substrateCheckoutPath],
     ["Playwright package metadata", paths.playwrightPackageMetadataPath, paths.substrateCheckoutPath],
+    ["Playwright core package metadata", paths.playwrightCorePackageMetadataPath, paths.substrateCheckoutPath],
+    ["Playwright library root", paths.playwrightLibraryRootPath, paths.substrateInstalledDependenciesRootPath],
+    ["Playwright core library root", paths.playwrightCoreLibraryRootPath, paths.substrateInstalledDependenciesRootPath],
     ["pyvenv.cfg", paths.pythonPyvenvConfigPath, paths.pythonEnvironmentRootPath],
+    ["Python stdlib", paths.pythonStdlibRootPath, paths.pythonRuntimeRootPath],
     ["upstream frontend package lock", paths.upstreamFrontendPackageLockPath, paths.upstreamCheckoutPath],
     ["upstream frontend installed dependencies", paths.upstreamFrontendInstalledRootPath, paths.upstreamCheckoutPath],
     ["upstream server requirements", paths.upstreamServerRequirementsPath, paths.upstreamCheckoutPath],
@@ -810,15 +983,27 @@ export function deriveSentinelRuntimeClosure(
   if (dependencies.runCommand === defaultRunCommand && paths.gitExecutablePath !== "/usr/bin/git") {
     throw new Error("production runtime closure requires the system /usr/bin/git executable");
   }
+  const environment = executionEnvironment(dependencies, paths.nodeRequestedPath);
+  const executionEnvironmentManifest = sentinelProductionCanonicalJson(environment);
+  const boundPathsManifest = runtimeBoundPathsManifest(paths);
   const gitExecutable = readStableRegular(paths.gitExecutablePath, "git executable");
+  const gitVersion = runCaptured(dependencies, {
+    executablePath: paths.gitExecutablePath,
+    arguments: ["--version"],
+    cwd: paths.substrateCheckoutPath,
+    environment,
+  }, "git version");
+  const gitVersionValue = strictLine(gitVersion.stdout, GIT_VERSION, "git version");
   const substrateGit = gitArtifact(
     paths.substrateCheckoutPath,
     paths.gitExecutablePath,
+    environment,
     dependencies,
   );
   const upstreamGit = gitArtifact(
     paths.upstreamCheckoutPath,
     paths.gitExecutablePath,
+    environment,
     dependencies,
     SENTINEL_PRODUCTION_REVISION,
     SENTINEL_PRODUCTION_SOURCE_TREE,
@@ -834,21 +1019,25 @@ export function deriveSentinelRuntimeClosure(
     executablePath: paths.nodeRequestedPath,
     arguments: ["--version"],
     cwd: paths.substrateCheckoutPath,
+    environment,
   }, "Node version");
   const npmVersion = runCaptured(dependencies, {
     executablePath: paths.nodeRequestedPath,
     arguments: [paths.npmRequestedCliPath, "--version"],
     cwd: paths.substrateCheckoutPath,
+    environment,
   }, "npm version");
   const pythonVersion = runCaptured(dependencies, {
     executablePath: paths.pythonRequestedVenvPath,
     arguments: ["--version"],
     cwd: paths.upstreamCheckoutPath,
+    environment,
   }, "Python version");
   const pipFreeze = runCaptured(dependencies, {
     executablePath: paths.pythonRequestedVenvPath,
     arguments: ["-m", "pip", "freeze", "--all"],
     cwd: paths.upstreamCheckoutPath,
+    environment,
   }, "pip freeze");
   const nodeVersionValue = strictLine(nodeVersion.stdout, NODE_VERSION, "Node version");
   const npmVersionValue = strictLine(npmVersion.stdout, NPM_VERSION, "npm version");
@@ -864,6 +1053,36 @@ export function deriveSentinelRuntimeClosure(
   ) {
     throw new Error("pip freeze does not exactly match independently installed distributions");
   }
+  const workspacePackagesTree = deriveTree(
+    paths.substratePackagesRootPath,
+    "substrate workspace packages",
+    [paths.substratePackagesRootPath, paths.substrateInstalledDependenciesRootPath],
+  );
+  const workspaceInstalledDependenciesTree = deriveTree(
+    paths.substrateInstalledDependenciesRootPath,
+    "substrate installed dependencies",
+    [paths.substrateInstalledDependenciesRootPath, paths.substratePackagesRootPath],
+  );
+  const publicEvalCompiledOutputTree = deriveTree(
+    paths.publicEvalCompiledOutputRootPath,
+    "public eval compiled output",
+    [paths.publicEvalCompiledOutputRootPath],
+  );
+  const pythonEnvironmentTree = deriveTree(
+    paths.pythonEnvironmentRootPath,
+    "Python virtual environment",
+    [paths.pythonEnvironmentRootPath, paths.pythonRuntimeRootPath],
+  );
+  const pythonRuntimeTree = deriveTree(
+    paths.pythonRuntimeRootPath,
+    "Python interpreter runtime",
+    [paths.pythonRuntimeRootPath],
+  );
+  const pythonStdlibTree = deriveTree(
+    paths.pythonStdlibRootPath,
+    "Python standard library",
+    [paths.pythonRuntimeRootPath],
+  );
   const packageMetadata = readStableRegular(
     paths.playwrightPackageMetadataPath,
     "Playwright package metadata",
@@ -883,6 +1102,35 @@ export function deriveSentinelRuntimeClosure(
   ) {
     throw new Error("Playwright package metadata must declare playwright version 1.56.1");
   }
+  const corePackageMetadata = readStableRegular(
+    paths.playwrightCorePackageMetadataPath,
+    "Playwright core package metadata",
+  );
+  let corePackageJson: unknown;
+  try {
+    corePackageJson = JSON.parse(corePackageMetadata.bytes.toString("utf8"));
+  } catch {
+    throw new Error("Playwright core package metadata is not JSON");
+  }
+  if (
+    typeof corePackageJson !== "object" ||
+    corePackageJson === null ||
+    Array.isArray(corePackageJson) ||
+    (corePackageJson as { name?: unknown }).name !== "playwright-core" ||
+    (corePackageJson as { version?: unknown }).version !== "1.56.1"
+  ) {
+    throw new Error("Playwright core package metadata must declare playwright-core version 1.56.1");
+  }
+  const playwrightLibraryTree = deriveTree(
+    paths.playwrightLibraryRootPath,
+    "Playwright library",
+    [paths.substrateInstalledDependenciesRootPath],
+  );
+  const playwrightCoreLibraryTree = deriveTree(
+    paths.playwrightCoreLibraryRootPath,
+    "Playwright core library",
+    [paths.substrateInstalledDependenciesRootPath],
+  );
   const browserTree = deriveTree(paths.browserBundleRootPath, "browser bundle");
   const browserRootReal = realpathSync(paths.browserBundleRootPath);
   const browserExecutableReal = realpathSync(paths.browserExecutablePath);
@@ -894,6 +1142,21 @@ export function deriveSentinelRuntimeClosure(
   const frontendTree = deriveTree(
     paths.upstreamFrontendInstalledRootPath,
     "upstream frontend installed dependencies",
+  );
+  const rootPackageJson = readStableRegular(paths.rootPackageJsonPath, "root package.json");
+  const pnpmWorkspaceManifest = readStableRegular(
+    paths.pnpmWorkspaceManifestPath,
+    "pnpm workspace manifest",
+  );
+  const rootTsconfig = readStableRegular(paths.rootTsconfigPath, "root tsconfig");
+  const tsconfigBase = readStableRegular(paths.tsconfigBasePath, "tsconfig base");
+  const publicEvalPackageJson = readStableRegular(
+    paths.publicEvalPackageJsonPath,
+    "public eval package.json",
+  );
+  const publicEvalTsconfig = readStableRegular(
+    paths.publicEvalTsconfigPath,
+    "public eval tsconfig",
   );
   const lock = readStableRegular(paths.pnpmWorkspaceLockPath, "pnpm workspace lock");
   const runner = readStableRegular(paths.runnerScriptPath, "runner script");
@@ -913,8 +1176,8 @@ export function deriveSentinelRuntimeClosure(
   );
   const withoutHash: SentinelRuntimeClosure = {
     closureSha256: "0".repeat(64),
-    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v1",
-    closureDerivation: "canonical-runtime-fields-with-requested-and-resolved-paths-v1",
+    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2",
+    closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2",
     requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1",
     treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1",
     runnerReconstructsAndVerifiesClosure: true,
@@ -928,6 +1191,36 @@ export function deriveSentinelRuntimeClosure(
     agentScriptSha256: sha256(agent.bytes),
     providerProxyScriptSha256: sha256(provider.bytes),
     stateSidecarScriptSha256: sha256(sidecar.bytes),
+    executionEnvironment: {
+      schemaVersion: "pm.public-eval-corners.sentinel-sanitized-environment.v2",
+      values: environment,
+      environmentSha256: sha256(executionEnvironmentManifest),
+      inheritsHostEnvironment: false,
+    },
+    git: {
+      version: gitVersionValue,
+      executablePath: paths.gitExecutablePath,
+      executableSha256: sha256(gitExecutable.bytes),
+      invocationEnvironmentSha256: sha256(executionEnvironmentManifest),
+    },
+    workspace: {
+      checkoutPath: paths.substrateCheckoutPath,
+      rootPackageJsonSha256: sha256(rootPackageJson.bytes),
+      pnpmWorkspaceManifestSha256: sha256(pnpmWorkspaceManifest.bytes),
+      rootTsconfigSha256: sha256(rootTsconfig.bytes),
+      tsconfigBaseSha256: sha256(tsconfigBase.bytes),
+      publicEvalPackageManifestSha256: sha256(publicEvalPackageJson.bytes),
+      publicEvalTsconfigSha256: sha256(publicEvalTsconfig.bytes),
+      packagesRootPath: paths.substratePackagesRootPath,
+      packagesTreeSha256: workspacePackagesTree.manifestSha256,
+      packagesTreeEntryCount: workspacePackagesTree.entryCount,
+      installedDependenciesRootPath: paths.substrateInstalledDependenciesRootPath,
+      installedDependenciesTreeSha256: workspaceInstalledDependenciesTree.manifestSha256,
+      installedDependenciesTreeEntryCount: workspaceInstalledDependenciesTree.entryCount,
+      compiledOutputRootPath: paths.publicEvalCompiledOutputRootPath,
+      compiledOutputTreeSha256: publicEvalCompiledOutputTree.manifestSha256,
+      compiledOutputTreeEntryCount: publicEvalCompiledOutputTree.entryCount,
+    },
     node: {
       version: nodeVersionValue,
       requestedPath: node.requestedPath,
@@ -952,6 +1245,15 @@ export function deriveSentinelRuntimeClosure(
       pipFreezeSha256: sha256(pipFreeze.stdout),
       installedDistributionsManifestSha256: distributions.sha256,
       installedDistributionsManifestSchema: "canonical-name-version-files-record-sha256-v1",
+      environmentRootPath: paths.pythonEnvironmentRootPath,
+      environmentTreeSha256: pythonEnvironmentTree.manifestSha256,
+      environmentTreeEntryCount: pythonEnvironmentTree.entryCount,
+      runtimeRootPath: paths.pythonRuntimeRootPath,
+      runtimeTreeSha256: pythonRuntimeTree.manifestSha256,
+      runtimeTreeEntryCount: pythonRuntimeTree.entryCount,
+      stdlibRootPath: paths.pythonStdlibRootPath,
+      stdlibTreeSha256: pythonStdlibTree.manifestSha256,
+      stdlibTreeEntryCount: pythonStdlibTree.entryCount,
     },
     browser: {
       playwrightVersion: "1.56.1",
@@ -960,11 +1262,28 @@ export function deriveSentinelRuntimeClosure(
       bundleTreeSha256: browserTree.manifestSha256,
       executablePath: paths.browserExecutablePath,
       executableSha256: sha256(browserExecutable.bytes),
+      libraryRootPath: paths.playwrightLibraryRootPath,
+      libraryTreeSha256: playwrightLibraryTree.manifestSha256,
+      libraryTreeEntryCount: playwrightLibraryTree.entryCount,
+      coreLibraryRootPath: paths.playwrightCoreLibraryRootPath,
+      coreLibraryTreeSha256: playwrightCoreLibraryTree.manifestSha256,
+      coreLibraryTreeEntryCount: playwrightCoreLibraryTree.entryCount,
+      corePackageMetadataSha256: sha256(corePackageMetadata.bytes),
     },
     upstream: {
       frontendPackageLockSha256: sha256(frontendLock.bytes),
       frontendInstalledTreeSha256: frontendTree.manifestSha256,
       serverRequirementsSha256: sha256(requirements.bytes),
+    },
+    executionLease: {
+      schemaVersion: "pm.public-eval-corners.sentinel-runtime-execution-lease.v1",
+      boundPathsManifestSha256: sha256(boundPathsManifest),
+      exactBoundPathsRequired: true,
+      preAndPostBlockReconstructionRequired: true,
+      mutationInvalidatesBlock: true,
+      immutableSnapshot: false,
+      osBoundaryLimitation:
+        "kernel-dynamic-loader-system-libraries-and-in-process-races-outside-user-space-hash-closure",
     },
   };
   const closure: SentinelRuntimeClosure = {
@@ -972,19 +1291,46 @@ export function deriveSentinelRuntimeClosure(
     closureSha256: sentinelProductionRuntimeClosureSha256(withoutHash),
   };
   const artifactWithoutHash = {
-    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v1" as const,
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3" as const,
     substrateGit,
     upstreamGit,
     commands: {
+      gitVersion: gitVersion.artifact,
       nodeVersion: nodeVersion.artifact,
       npmVersion: npmVersion.artifact,
       pythonVersion: pythonVersion.artifact,
       pipFreeze: pipFreeze.artifact,
     },
     pipFreeze: pipFreezeValue.value,
+    entries: {
+      node: {
+        requestedPath: node.requestedPath,
+        requestedEntrySha256: node.requestedEntrySha256,
+        resolvedPath: node.resolvedPath,
+        resolvedSha256: node.resolvedSha256,
+      },
+      npm: {
+        requestedPath: npm.requestedPath,
+        requestedEntrySha256: npm.requestedEntrySha256,
+        resolvedPath: npm.resolvedPath,
+        resolvedSha256: npm.resolvedSha256,
+      },
+      python: {
+        requestedPath: python.requestedPath,
+        requestedEntrySha256: python.requestedEntrySha256,
+        resolvedPath: python.resolvedPath,
+        resolvedSha256: python.resolvedSha256,
+      },
+    },
     files: {
       gitExecutable: fileArtifact(paths.gitExecutablePath, gitExecutable),
       pnpmWorkspaceLock: fileArtifact(paths.pnpmWorkspaceLockPath, lock),
+      rootPackageJson: fileArtifact(paths.rootPackageJsonPath, rootPackageJson),
+      pnpmWorkspaceManifest: fileArtifact(paths.pnpmWorkspaceManifestPath, pnpmWorkspaceManifest),
+      rootTsconfig: fileArtifact(paths.rootTsconfigPath, rootTsconfig),
+      tsconfigBase: fileArtifact(paths.tsconfigBasePath, tsconfigBase),
+      publicEvalPackageJson: fileArtifact(paths.publicEvalPackageJsonPath, publicEvalPackageJson),
+      publicEvalTsconfig: fileArtifact(paths.publicEvalTsconfigPath, publicEvalTsconfig),
       runnerScript: fileArtifact(paths.runnerScriptPath, runner),
       supervisorScript: fileArtifact(paths.supervisorScriptPath, supervisor),
       verifierScript: fileArtifact(paths.verifierScriptPath, verifier),
@@ -993,12 +1339,26 @@ export function deriveSentinelRuntimeClosure(
       stateSidecarScript: fileArtifact(paths.stateSidecarScriptPath, sidecar),
       pyvenvConfig: fileArtifact(paths.pythonPyvenvConfigPath, pyvenv),
       playwrightPackageMetadata: fileArtifact(paths.playwrightPackageMetadataPath, packageMetadata),
+      playwrightCorePackageMetadata: fileArtifact(
+        paths.playwrightCorePackageMetadataPath,
+        corePackageMetadata,
+      ),
       browserExecutable: fileArtifact(browserExecutableReal, browserExecutable),
       upstreamFrontendPackageLock: fileArtifact(paths.upstreamFrontendPackageLockPath, frontendLock),
       upstreamServerRequirements: fileArtifact(paths.upstreamServerRequirementsPath, requirements),
     },
     installedDistributionsManifest: distributions.manifest,
     installedDistributionsManifestSha256: distributions.sha256,
+    executionEnvironmentManifest,
+    boundPathsManifest,
+    workspacePackagesTree,
+    workspaceInstalledDependenciesTree,
+    publicEvalCompiledOutputTree,
+    pythonEnvironmentTree,
+    pythonRuntimeTree,
+    pythonStdlibTree,
+    playwrightLibraryTree,
+    playwrightCoreLibraryTree,
     browserBundleTree: browserTree,
     upstreamFrontendInstalledTree: frontendTree,
   };
@@ -1009,11 +1369,13 @@ export function deriveSentinelRuntimeClosure(
   const substrateAfter = gitArtifact(
     paths.substrateCheckoutPath,
     paths.gitExecutablePath,
+    environment,
     dependencies,
   );
   const upstreamAfter = gitArtifact(
     paths.upstreamCheckoutPath,
     paths.gitExecutablePath,
+    environment,
     dependencies,
     SENTINEL_PRODUCTION_REVISION,
     SENTINEL_PRODUCTION_SOURCE_TREE,
@@ -1050,4 +1412,51 @@ export function verifySentinelRuntimeClosure(
     );
   }
   return reconstructed;
+}
+
+/** Acquire immediately before launching a block and pass only these paths onward. */
+export function acquireSentinelRuntimeExecutionLease(
+  paths: SentinelRuntimeClosurePaths,
+  declared: SentinelRuntimeClosure,
+  dependencies: SentinelRuntimeClosureDependencies = { runCommand: defaultRunCommand },
+): SentinelRuntimeExecutionLease {
+  const verification = verifySentinelRuntimeClosure(paths, declared, dependencies);
+  const frozenPaths = Object.freeze({
+    ...paths,
+    pythonSitePackagesRootPaths: Object.freeze([...paths.pythonSitePackagesRootPaths]),
+  });
+  return Object.freeze({
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-execution-lease.v1" as const,
+    paths: frozenPaths,
+    closureSha256: verification.closure.closureSha256,
+    declaredClosure: verification.closure,
+    boundPathsManifestSha256: sha256(runtimeBoundPathsManifest(frozenPaths)),
+    acquiredDerivationSha256: verification.artifacts.derivationSha256,
+    exactSupervisorPaths: Object.freeze({
+      nodeExecutablePath: frozenPaths.nodeRequestedPath,
+      npmCliPath: frozenPaths.npmRequestedCliPath,
+      pythonExecutablePath: frozenPaths.pythonRequestedVenvPath,
+      agentScriptPath: frozenPaths.agentScriptPath,
+    }),
+  });
+}
+
+/**
+ * Close after all child processes have exited. Any byte, tree, environment,
+ * symlink, or bound-path change throws and must invalidate the whole block.
+ */
+export function closeSentinelRuntimeExecutionLease(
+  lease: SentinelRuntimeExecutionLease,
+  dependencies: SentinelRuntimeClosureDependencies = { runCommand: defaultRunCommand },
+): SentinelRuntimeClosureDerivation {
+  if (
+    sha256(runtimeBoundPathsManifest(lease.paths)) !== lease.boundPathsManifestSha256 ||
+    lease.boundPathsManifestSha256 !== lease.declaredClosure.executionLease.boundPathsManifestSha256 ||
+    lease.closureSha256 !== lease.declaredClosure.closureSha256
+  ) throw new Error("Sentinel runtime execution lease path binding changed");
+  const closed = verifySentinelRuntimeClosure(lease.paths, lease.declaredClosure, dependencies);
+  if (closed.artifacts.derivationSha256 !== lease.acquiredDerivationSha256) {
+    throw new Error("Sentinel runtime changed after execution lease acquisition");
+  }
+  return closed;
 }

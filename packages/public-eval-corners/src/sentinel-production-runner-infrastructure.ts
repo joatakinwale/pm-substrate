@@ -15,6 +15,7 @@ import {
   type SentinelRuntimeClosure,
 } from "./sentinel-production-plan.js";
 import { verifySentinelRuntimeClosure } from "./sentinel-runtime-closure.js";
+import { createSentinelProductionRuntimeLeaseIdentity } from "./sentinel-production-runner-evidence.js";
 import type {
   SentinelProductionArtifactIdentity,
   SentinelProductionCheckoutPreflight,
@@ -109,7 +110,18 @@ export function inspectSentinelProductionRuntime(
 ): SentinelProductionRuntimeInspection {
   const issues: string[] = [];
   let closure = declared;
-  try { closure = verifySentinelRuntimeClosure(bindings.paths, declared).closure; }
+  let artifacts: SentinelProductionRuntimeInspection["artifacts"] = null;
+  let executionLeaseIdentity: SentinelProductionRuntimeInspection["executionLeaseIdentity"] = null;
+  try {
+    const verification = verifySentinelRuntimeClosure(bindings.paths, declared);
+    closure = verification.closure;
+    artifacts = verification.artifacts;
+    executionLeaseIdentity = createSentinelProductionRuntimeLeaseIdentity(
+      bindings.paths,
+      closure,
+      artifacts,
+    );
+  }
   catch (error) { issues.push(error instanceof Error ? error.message : String(error)); }
   return {
     valid: issues.length === 0,
@@ -121,6 +133,8 @@ export function inspectSentinelProductionRuntime(
       python: { path: bindings.paths.pythonRequestedVenvPath, sha256: closure.python.realExecutableSha256 },
       npm: { path: bindings.paths.npmRequestedCliPath, sha256: closure.npm.resolvedCliSha256 },
     }),
+    artifacts,
+    executionLeaseIdentity,
     issues,
   };
 }

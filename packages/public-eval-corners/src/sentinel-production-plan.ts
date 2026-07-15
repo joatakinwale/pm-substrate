@@ -3,6 +3,7 @@ import {
   createPublicKey,
   verify as verifySignature,
 } from "node:crypto";
+import { basename, dirname, isAbsolute, normalize } from "node:path";
 
 export const SENTINEL_PRODUCTION_OWNER_OBJECTIVE =
   "Stress-test pm-substrate hard against real, publicly documented agent-state failure scenarios; demonstrate the failures under matched native and sham controls; test whether pm-substrate materially improves the benchmark’s real outcome; identify observed gaps; use Arrowsmith to research the smallest general repair; then rerun the exact failure and clean controls while aggressively excluding false positives." as const;
@@ -23,6 +24,65 @@ export const SENTINEL_POWERED_CONFIRMATORY_MANIFEST_SHA256 =
   "48e1695b0728000c8f8e738f9d72273861bf6216e4c609935650a09067d87bc6" as const;
 export const SENTINEL_POWERED_CONFIRMATORY_FULL_CATALOG_SHA256 =
   "c834011c79c134ed14c17ecbca312934de22054c77dd5fbb000ad5ae0560c132" as const;
+
+/**
+ * The closure probes run with this complete environment, never a filtered copy
+ * of the caller's environment. The same values are signed so a reconstruction
+ * cannot silently inherit a user site, git config, locale, timezone, or secret.
+ */
+export const SENTINEL_RUNTIME_SANITIZED_ENVIRONMENT_BASE = Object.freeze({
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_TERMINAL_PROMPT: "0",
+  HOME: "/dev/null",
+  LANG: "C",
+  LC_ALL: "C",
+  PYTHONDONTWRITEBYTECODE: "1",
+  PYTHONHASHSEED: "0",
+  PYTHONNOUSERSITE: "1",
+  PYTHONUTF8: "1",
+  TZ: "UTC",
+} as const);
+
+export type SentinelRuntimeSanitizedEnvironment = Readonly<
+  typeof SENTINEL_RUNTIME_SANITIZED_ENVIRONMENT_BASE & { readonly PATH: string }
+>;
+
+function canonicalNodeExecutablePath(nodeExecutablePath: string): string {
+  if (
+    !isAbsolute(nodeExecutablePath) ||
+    normalize(nodeExecutablePath) !== nodeExecutablePath ||
+    /[:\0\r\n\t]/u.test(nodeExecutablePath) ||
+    basename(nodeExecutablePath) !== "node"
+  ) throw new Error("pinned Node executable path must be canonical absolute and PATH-safe");
+  return nodeExecutablePath;
+}
+
+/** Build the only accepted no-inheritance environment from the pinned Node entry. */
+export function buildSentinelRuntimeSanitizedEnvironment(
+  nodeExecutablePath: string,
+): SentinelRuntimeSanitizedEnvironment {
+  const nodeDirectory = dirname(canonicalNodeExecutablePath(nodeExecutablePath));
+  const searchPath = [...new Set([nodeDirectory, "/usr/bin", "/bin"])].join(":");
+  return Object.freeze({
+    ...SENTINEL_RUNTIME_SANITIZED_ENVIRONMENT_BASE,
+    PATH: searchPath,
+  });
+}
+
+/** Exact validator shared by preregistration, reconstruction, and execution. */
+export function isSentinelRuntimeSanitizedEnvironment(
+  value: unknown,
+  nodeExecutablePath: string,
+): value is SentinelRuntimeSanitizedEnvironment {
+  try {
+    return sentinelProductionCanonicalJson(value) === sentinelProductionCanonicalJson(
+      buildSentinelRuntimeSanitizedEnvironment(nodeExecutablePath),
+    );
+  } catch {
+    return false;
+  }
+}
 
 export type SentinelProductionPhase =
   | "qualification"
@@ -496,8 +556,8 @@ SentinelPoweredConfirmatoryUniverse = Object.freeze({
 
 export interface SentinelRuntimeClosure {
   readonly closureSha256: string;
-  readonly closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v1";
-  readonly closureDerivation: "canonical-runtime-fields-with-requested-and-resolved-paths-v1";
+  readonly closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2";
+  readonly closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2";
   readonly requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1";
   readonly treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1";
   readonly runnerReconstructsAndVerifiesClosure: true;
@@ -511,6 +571,36 @@ export interface SentinelRuntimeClosure {
   readonly agentScriptSha256: string;
   readonly providerProxyScriptSha256: string;
   readonly stateSidecarScriptSha256: string;
+  readonly executionEnvironment: {
+    readonly schemaVersion: "pm.public-eval-corners.sentinel-sanitized-environment.v2";
+    readonly values: SentinelRuntimeSanitizedEnvironment;
+    readonly environmentSha256: string;
+    readonly inheritsHostEnvironment: false;
+  };
+  readonly git: {
+    readonly version: string;
+    readonly executablePath: string;
+    readonly executableSha256: string;
+    readonly invocationEnvironmentSha256: string;
+  };
+  readonly workspace: {
+    readonly checkoutPath: string;
+    readonly rootPackageJsonSha256: string;
+    readonly pnpmWorkspaceManifestSha256: string;
+    readonly rootTsconfigSha256: string;
+    readonly tsconfigBaseSha256: string;
+    readonly publicEvalPackageManifestSha256: string;
+    readonly publicEvalTsconfigSha256: string;
+    readonly packagesRootPath: string;
+    readonly packagesTreeSha256: string;
+    readonly packagesTreeEntryCount: number;
+    readonly installedDependenciesRootPath: string;
+    readonly installedDependenciesTreeSha256: string;
+    readonly installedDependenciesTreeEntryCount: number;
+    readonly compiledOutputRootPath: string;
+    readonly compiledOutputTreeSha256: string;
+    readonly compiledOutputTreeEntryCount: number;
+  };
   readonly node: {
     readonly version: string;
     readonly requestedPath: string;
@@ -535,6 +625,15 @@ export interface SentinelRuntimeClosure {
     readonly pipFreezeSha256: string;
     readonly installedDistributionsManifestSha256: string;
     readonly installedDistributionsManifestSchema: "canonical-name-version-files-record-sha256-v1";
+    readonly environmentRootPath: string;
+    readonly environmentTreeSha256: string;
+    readonly environmentTreeEntryCount: number;
+    readonly runtimeRootPath: string;
+    readonly runtimeTreeSha256: string;
+    readonly runtimeTreeEntryCount: number;
+    readonly stdlibRootPath: string;
+    readonly stdlibTreeSha256: string;
+    readonly stdlibTreeEntryCount: number;
   };
   readonly browser: {
     readonly playwrightVersion: "1.56.1";
@@ -543,11 +642,28 @@ export interface SentinelRuntimeClosure {
     readonly bundleTreeSha256: string;
     readonly executablePath: string;
     readonly executableSha256: string;
+    readonly libraryRootPath: string;
+    readonly libraryTreeSha256: string;
+    readonly libraryTreeEntryCount: number;
+    readonly coreLibraryRootPath: string;
+    readonly coreLibraryTreeSha256: string;
+    readonly coreLibraryTreeEntryCount: number;
+    readonly corePackageMetadataSha256: string;
   };
   readonly upstream: {
     readonly frontendPackageLockSha256: string;
     readonly frontendInstalledTreeSha256: string;
     readonly serverRequirementsSha256: string;
+  };
+  readonly executionLease: {
+    readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-execution-lease.v1";
+    readonly boundPathsManifestSha256: string;
+    readonly exactBoundPathsRequired: true;
+    readonly preAndPostBlockReconstructionRequired: true;
+    readonly mutationInvalidatesBlock: true;
+    readonly immutableSnapshot: false;
+    readonly osBoundaryLimitation:
+      "kernel-dynamic-loader-system-libraries-and-in-process-races-outside-user-space-hash-closure";
   };
 }
 
@@ -707,6 +823,7 @@ export interface CreateSentinelProductionPreregistrationInput {
 const PRODUCTION_ARMS = ["native", "sham", "plain-kv", "substrate"] as const;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const GIT_SHA1 = /^[a-f0-9]{40}$/u;
+const GIT_VERSION = /^git version [^\0\r\n]{1,160}$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u;
 const NODE_VERSION = /^v[0-9]+\.[0-9]+\.[0-9]+$/u;
 const PYTHON_VERSION = /^Python [0-9]+\.[0-9]+\.[0-9]+$/u;
@@ -1097,14 +1214,33 @@ function validateExactShape(plan: unknown, signature: unknown): readonly string[
     "provider", "providerSeed", "systemPromptSha256", "temperature",
   ], "model");
   check(plan.runtime, [
-    "agentScriptSha256", "browser", "closureDerivation", "closureSchemaVersion", "closureSha256", "node", "npm",
-    "pnpmWorkspaceLockSha256", "providerProxyScriptSha256", "python", "runnerReconstructsAndVerifiesClosure",
+    "agentScriptSha256", "browser", "closureDerivation", "closureSchemaVersion", "closureSha256", "executionEnvironment",
+    "executionLease", "git", "node", "npm", "pnpmWorkspaceLockSha256", "providerProxyScriptSha256", "python", "runnerReconstructsAndVerifiesClosure",
     "requestedEntryHashSemantics", "runnerScriptSha256", "sourceTreeHash", "stateSidecarScriptSha256",
     "substrateRevision", "supervisorScriptSha256", "treeHashSemantics", "upstream", "verifierScriptSha256",
-    "workingTreeClean",
+    "workingTreeClean", "workspace",
   ], "runtime");
   const runtime = plan.runtime;
   if (isRecord(runtime)) {
+    check(runtime.executionEnvironment, [
+      "environmentSha256", "inheritsHostEnvironment", "schemaVersion", "values",
+    ], "runtime.executionEnvironment");
+    if (isRecord(runtime.executionEnvironment)) {
+      check(runtime.executionEnvironment.values, [
+        ...Object.keys(SENTINEL_RUNTIME_SANITIZED_ENVIRONMENT_BASE), "PATH",
+      ],
+        "runtime.executionEnvironment.values");
+    }
+    check(runtime.git, [
+      "executablePath", "executableSha256", "invocationEnvironmentSha256", "version",
+    ], "runtime.git");
+    check(runtime.workspace, [
+      "checkoutPath", "compiledOutputRootPath", "compiledOutputTreeEntryCount", "compiledOutputTreeSha256",
+      "installedDependenciesRootPath", "installedDependenciesTreeEntryCount", "installedDependenciesTreeSha256",
+      "packagesRootPath", "packagesTreeEntryCount", "packagesTreeSha256", "pnpmWorkspaceManifestSha256",
+      "publicEvalPackageManifestSha256", "publicEvalTsconfigSha256", "rootPackageJsonSha256",
+      "rootTsconfigSha256", "tsconfigBaseSha256",
+    ], "runtime.workspace");
     check(runtime.node, [
       "requestedEntrySha256", "requestedPath", "resolvedExecutableSha256", "resolvedPath", "version",
     ], "runtime.node");
@@ -1112,17 +1248,24 @@ function validateExactShape(plan: unknown, signature: unknown): readonly string[
       "requestedCliEntrySha256", "requestedCliPath", "resolvedCliPath", "resolvedCliSha256", "version",
     ], "runtime.npm");
     check(runtime.python, [
+      "environmentRootPath", "environmentTreeEntryCount", "environmentTreeSha256",
       "installedDistributionsManifestSchema", "installedDistributionsManifestSha256", "pipFreezeSha256",
       "pyvenvConfigSha256", "realExecutableSha256", "requestedVenvPath", "resolvedExecutablePath",
-      "venvEntrySha256", "version",
+      "runtimeRootPath", "runtimeTreeEntryCount", "runtimeTreeSha256", "stdlibRootPath",
+      "stdlibTreeEntryCount", "stdlibTreeSha256", "venvEntrySha256", "version",
     ], "runtime.python");
     check(runtime.browser, [
       "bundleRootPath", "bundleTreeSha256", "executablePath", "executableSha256", "packageMetadataSha256",
-      "playwrightVersion",
+      "playwrightVersion", "libraryRootPath", "libraryTreeSha256", "libraryTreeEntryCount",
+      "coreLibraryRootPath", "coreLibraryTreeSha256", "coreLibraryTreeEntryCount", "corePackageMetadataSha256",
     ], "runtime.browser");
     check(runtime.upstream, [
       "frontendInstalledTreeSha256", "frontendPackageLockSha256", "serverRequirementsSha256",
     ], "runtime.upstream");
+    check(runtime.executionLease, [
+      "boundPathsManifestSha256", "exactBoundPathsRequired", "immutableSnapshot", "mutationInvalidatesBlock",
+      "osBoundaryLimitation", "preAndPostBlockReconstructionRequired", "schemaVersion",
+    ], "runtime.executionLease");
   }
   check(plan.evidence, [
     "exactUpstreamTaskInvocation", "resultPathsAttemptBound", "retainProcessIdentityAndExit",
@@ -1205,6 +1348,18 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.agentScriptSha256,
     runtime.providerProxyScriptSha256,
     runtime.stateSidecarScriptSha256,
+    runtime.executionEnvironment.environmentSha256,
+    runtime.git.executableSha256,
+    runtime.git.invocationEnvironmentSha256,
+    runtime.workspace.rootPackageJsonSha256,
+    runtime.workspace.pnpmWorkspaceManifestSha256,
+    runtime.workspace.rootTsconfigSha256,
+    runtime.workspace.tsconfigBaseSha256,
+    runtime.workspace.publicEvalPackageManifestSha256,
+    runtime.workspace.publicEvalTsconfigSha256,
+    runtime.workspace.packagesTreeSha256,
+    runtime.workspace.installedDependenciesTreeSha256,
+    runtime.workspace.compiledOutputTreeSha256,
     runtime.node.requestedEntrySha256,
     runtime.node.resolvedExecutableSha256,
     runtime.npm.requestedCliEntrySha256,
@@ -1214,26 +1369,45 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.python.pyvenvConfigSha256,
     runtime.python.pipFreezeSha256,
     runtime.python.installedDistributionsManifestSha256,
+    runtime.python.environmentTreeSha256,
+    runtime.python.runtimeTreeSha256,
+    runtime.python.stdlibTreeSha256,
     runtime.browser.packageMetadataSha256,
     runtime.browser.bundleTreeSha256,
     runtime.browser.executableSha256,
+    runtime.browser.libraryTreeSha256,
+    runtime.browser.coreLibraryTreeSha256,
+    runtime.browser.corePackageMetadataSha256,
     runtime.upstream.frontendPackageLockSha256,
     runtime.upstream.frontendInstalledTreeSha256,
     runtime.upstream.serverRequirementsSha256,
+    runtime.executionLease.boundPathsManifestSha256,
   ];
   return (
     hashes.every((hash) => SHA256.test(hash)) &&
     GIT_SHA1.test(runtime.substrateRevision) &&
     GIT_SHA1.test(runtime.sourceTreeHash) &&
     runtime.workingTreeClean === true &&
-    runtime.closureSchemaVersion === "pm.public-eval-corners.sentinel-runtime-closure.v1" &&
+    runtime.closureSchemaVersion === "pm.public-eval-corners.sentinel-runtime-closure.v2" &&
     runtime.closureDerivation ===
-      "canonical-runtime-fields-with-requested-and-resolved-paths-v1" &&
+      "canonical-runtime-and-transitive-tree-fields-v2" &&
     runtime.requestedEntryHashSemantics ===
       "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1" &&
     runtime.treeHashSemantics ===
       "sha256-canonical-relative-path-mode-type-contenthash-v1" &&
     runtime.runnerReconstructsAndVerifiesClosure === true &&
+    runtime.executionEnvironment.schemaVersion ===
+      "pm.public-eval-corners.sentinel-sanitized-environment.v2" &&
+    runtime.executionEnvironment.inheritsHostEnvironment === false &&
+    isSentinelRuntimeSanitizedEnvironment(
+      runtime.executionEnvironment.values,
+      runtime.node.requestedPath,
+    ) &&
+    runtime.executionEnvironment.environmentSha256 ===
+      sentinelProductionJsonSha256(runtime.executionEnvironment.values) &&
+    GIT_VERSION.test(runtime.git.version) &&
+    runtime.git.invocationEnvironmentSha256 ===
+      runtime.executionEnvironment.environmentSha256 &&
     NODE_VERSION.test(runtime.node.version) &&
     NPM_VERSION.test(runtime.npm.version) &&
     PYTHON_VERSION.test(runtime.python.version) &&
@@ -1241,14 +1415,42 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
       "canonical-name-version-files-record-sha256-v1" &&
     runtime.browser.playwrightVersion === "1.56.1" &&
     [
+      runtime.workspace.packagesTreeEntryCount,
+      runtime.workspace.installedDependenciesTreeEntryCount,
+      runtime.workspace.compiledOutputTreeEntryCount,
+      runtime.python.environmentTreeEntryCount,
+      runtime.python.runtimeTreeEntryCount,
+      runtime.python.stdlibTreeEntryCount,
+      runtime.browser.libraryTreeEntryCount,
+      runtime.browser.coreLibraryTreeEntryCount,
+    ].every((count) => Number.isSafeInteger(count) && count > 0) &&
+    runtime.executionLease.schemaVersion ===
+      "pm.public-eval-corners.sentinel-runtime-execution-lease.v1" &&
+    runtime.executionLease.exactBoundPathsRequired === true &&
+    runtime.executionLease.preAndPostBlockReconstructionRequired === true &&
+    runtime.executionLease.mutationInvalidatesBlock === true &&
+    runtime.executionLease.immutableSnapshot === false &&
+    runtime.executionLease.osBoundaryLimitation ===
+      "kernel-dynamic-loader-system-libraries-and-in-process-races-outside-user-space-hash-closure" &&
+    [
+      runtime.git.executablePath,
+      runtime.workspace.checkoutPath,
+      runtime.workspace.packagesRootPath,
+      runtime.workspace.installedDependenciesRootPath,
+      runtime.workspace.compiledOutputRootPath,
       runtime.node.requestedPath,
       runtime.node.resolvedPath,
       runtime.npm.requestedCliPath,
       runtime.npm.resolvedCliPath,
       runtime.python.requestedVenvPath,
       runtime.python.resolvedExecutablePath,
+      runtime.python.environmentRootPath,
+      runtime.python.runtimeRootPath,
+      runtime.python.stdlibRootPath,
       runtime.browser.bundleRootPath,
       runtime.browser.executablePath,
+      runtime.browser.libraryRootPath,
+      runtime.browser.coreLibraryRootPath,
     ].every((path) => ABSOLUTE_PATH.test(path))
     && runtime.closureSha256 === sentinelProductionRuntimeClosureSha256(runtime)
   );

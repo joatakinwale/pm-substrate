@@ -56,6 +56,16 @@ import {
   type SentinelRuntimeClosurePaths,
 } from "./sentinel-runtime-closure.js";
 import {
+  assertSentinelProductionRuntimeInspectionEvidence,
+  prepareSentinelProductionExternalObservation,
+  retainSentinelProductionExternalObservation,
+  retainSentinelProductionRuntimeInspection,
+  verifySentinelProductionExternalCommitmentRecord,
+  type SentinelProductionExternalCommitmentVerification,
+  type SentinelProductionRuntimeInspection,
+  type SentinelProductionRuntimeInspectionReference,
+} from "./sentinel-production-runner-evidence.js";
+import {
   allocateSentinelProductionPorts,
   createSentinelProductionContinuityTenant,
   exportSentinelProductionContinuityReplay,
@@ -146,21 +156,11 @@ export interface SentinelProductionRunInput {
   readonly anthropicApiKey: string;
 }
 
-export interface SentinelProductionRuntimeInspection {
-  readonly valid: boolean;
-  readonly closure: SentinelRuntimeClosure;
-  readonly closureSha256: string;
-  readonly executableIdentitySha256: string;
-  readonly issues: readonly string[];
-}
-
-export interface SentinelProductionExternalCommitmentVerification {
-  readonly valid: boolean;
-  readonly locator: string;
-  readonly observedAt: string;
-  readonly responseSha256: string | null;
-  readonly issues: readonly string[];
-}
+export type {
+  SentinelProductionExternalCommitmentVerification,
+  SentinelProductionRuntimeInspection,
+  SentinelProductionRuntimeInspectionReference,
+} from "./sentinel-production-runner-evidence.js";
 
 export interface SentinelProductionCheckoutPreflight {
   readonly schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v1";
@@ -306,14 +306,8 @@ export interface SentinelProductionBlockManifest {
   readonly simultaneousLaunch: boolean;
   readonly maximumObservedStartSkewMs: number | null;
   readonly maximumAllowedStartSkewMs: number;
-  readonly runtimeBefore: {
-    readonly closureSha256: string;
-    readonly executableIdentitySha256: string;
-  };
-  readonly runtimeAfter: {
-    readonly closureSha256: string;
-    readonly executableIdentitySha256: string;
-  } | null;
+  readonly runtimeBefore: SentinelProductionRuntimeInspectionReference;
+  readonly runtimeAfter: SentinelProductionRuntimeInspectionReference | null;
   readonly runtimeStable: boolean;
   readonly checkoutRootsStable: boolean;
   readonly infrastructureComplete: boolean;
@@ -339,6 +333,7 @@ export interface SentinelProductionExecutionManifest {
   readonly noOutcomeInspectionDuringExecution: true;
   readonly batchComplete: boolean;
   readonly blockManifestHeadSha256: string;
+  readonly runtimeInspectionHeadSha256: string;
   readonly blocks: readonly { readonly path: string; readonly sha256: string }[];
   readonly finalizedAt: string;
 }
@@ -824,6 +819,7 @@ function assertRuntimeInspection(
   plan: SentinelProductionPreregistration,
   expectedExecutableIdentitySha256?: string,
 ): void {
+  assertSentinelProductionRuntimeInspectionEvidence(inspection);
   if (!inspection.valid) throw new Error(`runtime closure failed: ${inspection.issues.join("; ")}`);
   if (
     sentinelProductionCanonicalJson(inspection.closure) !==
@@ -1279,6 +1275,7 @@ function supervisorInput(
     frontendExecutable: executables.frontendExecutable,
     serverPort: context.ports.server,
     frontendPort: context.ports.frontend,
+    executionEnvironment: input.preregistration.runtime.executionEnvironment,
     opaqueEnvironment: {
       stateOrigin: context.state.endpoint,
       stateToken: context.stateToken,
@@ -1649,54 +1646,10 @@ function validatePortAllocation(
   }
 }
 
-async function verifyExternalCommitmentRecord(
-  commitment: SentinelProductionExternalCommitment,
-): Promise<SentinelProductionExternalCommitmentVerification> {
-  const issues: string[] = [];
-  let responseSha256: string | null = null;
-  try {
-    const response = await fetch(commitment.locator, {
-      method: "GET",
-      redirect: "error",
-      signal: AbortSignal.timeout(30_000),
-      headers: { accept: "application/json", "cache-control": "no-cache" },
-    });
-    const length = response.headers.get("content-length");
-    const contentType = response.headers.get("content-type")?.split(";", 1)[0]?.trim();
-    if (
-      !response.ok ||
-      response.url !== commitment.locator ||
-      contentType !== "application/json" ||
-      (length !== null && (!/^\d+$/u.test(length) || Number(length) > 64 * 1024))
-    ) {
-      throw new Error(`external commitment fetch failed with HTTP ${response.status}`);
-    }
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.byteLength === 0 || bytes.byteLength > 64 * 1024) {
-      throw new Error("external commitment response size is invalid");
-    }
-    responseSha256 = sentinelProductionSha256(bytes);
-    const parsed = JSON.parse(bytes.toString("utf8")) as unknown;
-    if (
-      sentinelProductionCanonicalJson(parsed) !==
-      sentinelProductionCanonicalJson(commitment)
-    ) throw new Error("external locator did not return the exact commitment receipt");
-  } catch (error) {
-    issues.push(error instanceof Error ? error.message : String(error));
-  }
-  return {
-    valid: issues.length === 0,
-    locator: commitment.locator,
-    observedAt: new Date().toISOString(),
-    responseSha256,
-    issues,
-  };
-}
-
 export function createSentinelProductionRunnerDependencies(): SentinelProductionRunnerDependencies {
   return {
     now: () => new Date().toISOString(),
-    verifyExternalCommitmentRecord,
+    verifyExternalCommitmentRecord: verifySentinelProductionExternalCommitmentRecord,
     inspectRuntime: inspectSentinelProductionRuntime,
     inspectCheckout: inspectSentinelProductionCheckout,
     allocatePorts: allocateSentinelProductionPorts,
@@ -1718,31 +1671,46 @@ export function createSentinelProductionRunnerDependencies(): SentinelProduction
   };
 }
 
-export async function runSentinelProductionBatch(
+interface SentinelProductionDiagnosticSelection {
+  readonly taskId: string;
+  readonly repeatId: string;
+}
+
+async function runSentinelProductionBatchInternal(
   input: SentinelProductionRunInput,
-  dependencies: SentinelProductionRunnerDependencies =
-    createSentinelProductionRunnerDependencies(),
+  dependencies: SentinelProductionRunnerDependencies,
+  diagnosticSelection?: SentinelProductionDiagnosticSelection,
 ): Promise<SentinelProductionBatchResult> {
   const runStartedAt = canonicalTimestamp(dependencies.now(), "runStartedAt");
   const verified = verifySentinelProductionRunInputs(input, runStartedAt, dependencies);
+  const indexedBlocks = verified.blocks.map((block, index) => ({ block, blockSequence: index + 1 }));
+  const executionBlocks = diagnosticSelection === undefined
+    ? indexedBlocks
+    : indexedBlocks.filter(({ block }) =>
+        block[0]?.taskId === diagnosticSelection.taskId &&
+        block[0]?.repeatId === diagnosticSelection.repeatId);
+  if (diagnosticSelection !== undefined) {
+    if (
+      input.preregistration.registration.selectedPhase !== "qualification" ||
+      executionBlocks.length !== 1 ||
+      executionBlocks[0]?.block[0]?.taskRole !== "state-retention-relative"
+    ) {
+      throw new Error("excluded smoke must select exactly one qualification state-retention block");
+    }
+  }
+  const initialRuntimeInspectedAt = canonicalTimestamp(
+    dependencies.now(),
+    "initial runtime inspectedAt",
+  );
   const externalObservation = await dependencies.verifyExternalCommitmentRecord(
     input.externalCommitment,
   );
-  if (
-    !externalObservation.valid ||
-    externalObservation.locator !== input.externalCommitment.locator ||
-    externalObservation.responseSha256 === null ||
-    !SHA256.test(externalObservation.responseSha256) ||
-    externalObservation.issues.length !== 0
-  ) {
-    throw new Error(
-      `external commitment record was not independently retrieved: ${externalObservation.issues.join("; ")}`,
-    );
-  }
-  canonicalTimestamp(externalObservation.observedAt, "external commitment observedAt");
-  if (Date.parse(externalObservation.observedAt) < Date.parse(runStartedAt)) {
-    throw new Error("external commitment observation predates local run-start preflight");
-  }
+  const preparedExternalObservation = prepareSentinelProductionExternalObservation(
+    input.externalCommitment,
+    externalObservation,
+    runStartedAt,
+    canonicalTimestamp(dependencies.now(), "external commitment locallyValidatedAt"),
+  );
   const batchRoot = resolve(input.batchRoot);
   const registryRoot = resolve(input.attemptRegistryRoot);
   mkdirSync(batchRoot, { mode: 0o700 });
@@ -1752,6 +1720,7 @@ export async function runSentinelProductionBatch(
   mkdirSync(resolve(batchRoot, "manifests"), { mode: 0o700 });
   mkdirSync(resolve(batchRoot, "manifests", "cells"), { mode: 0o700 });
   mkdirSync(resolve(batchRoot, "manifests", "blocks"), { mode: 0o700 });
+  mkdirSync(resolve(batchRoot, "manifests", "runtime"), { mode: 0o700 });
 
   writeExclusiveJson(resolve(batchRoot, "inputs", "preregistration.json"), input.preregistration);
   writeExclusiveJson(resolve(batchRoot, "inputs", "signature.json"), input.signature);
@@ -1760,6 +1729,21 @@ export async function runSentinelProductionBatch(
     resolve(batchRoot, "inputs", "external-commitment.json"),
     input.externalCommitment,
   );
+  const externalObservationReceipt = retainSentinelProductionExternalObservation(
+    batchRoot,
+    preparedExternalObservation,
+  );
+  let runtimeInspectionHeadSha256 = HASH_GENESIS;
+  const initialRuntimeInspection = retainSentinelProductionRuntimeInspection({
+    batchRoot,
+    inspection: verified.runtime,
+    boundary: "initial",
+    blockSequence: null,
+    inspectedAt: initialRuntimeInspectedAt,
+    preregistrationClosureSha256: input.preregistration.runtime.closureSha256,
+    previousInspectionReceiptSha256: runtimeInspectionHeadSha256,
+  });
+  runtimeInspectionHeadSha256 = initialRuntimeInspection.inspectionReceiptSha256;
   const signatureSha256 = sentinelProductionJsonSha256(input.signature);
   const startBody = {
     schemaVersion: "pm.public-eval-corners.sentinel-production-execution-start.v1",
@@ -1768,14 +1752,19 @@ export async function runSentinelProductionBatch(
     preregistrationSha256: verified.preregistrationSha256,
     signatureSha256,
     externalCommitmentSha256: verified.commitmentSha256,
-    externalCommitmentObservation: externalObservation,
+    externalCommitmentObservation: {
+      path: relative(batchRoot, externalObservationReceipt.path),
+      receiptSha256: externalObservationReceipt.sha256,
+      bodyPath: preparedExternalObservation.receiptBody.bodyPath,
+      bodySha256: preparedExternalObservation.receiptBody.bodySha256,
+      observedAt: preparedExternalObservation.receiptBody.observedAt,
+    },
     runStartedAt,
     phase: input.preregistration.registration.selectedPhase,
     declaredBlockCount: verified.blocks.length,
     declaredCellCount: verified.blocks.length * 4,
     maximumArmStartSkewMs: maximumArmStartSkewMs(input.preregistration),
-    runtimeClosureSha256: verified.runtime.closureSha256,
-    runtimeExecutableIdentitySha256: verified.runtime.executableIdentitySha256,
+    initialRuntimeInspection,
     checkoutPreflights: Object.fromEntries(ARMS.map((arm) => [arm, verified.checkouts[arm]])),
     schedule: verified.blocks.flat(),
     noAutomaticRetries: true,
@@ -1797,9 +1786,18 @@ export async function runSentinelProductionBatch(
   let previousBlockManifestSha256 = HASH_GENESIS;
   let allBlocksComplete = true;
 
-  for (const [blockIndex, block] of verified.blocks.entries()) {
-    const blockSequence = blockIndex + 1;
+  for (const { block, blockSequence } of executionBlocks) {
     const runtimeBefore = dependencies.inspectRuntime(input.runtime, input.preregistration.runtime);
+    const runtimeBeforeReference = retainSentinelProductionRuntimeInspection({
+      batchRoot,
+      inspection: runtimeBefore,
+      boundary: "before",
+      blockSequence,
+      inspectedAt: canonicalTimestamp(dependencies.now(), "runtime-before inspectedAt"),
+      preregistrationClosureSha256: input.preregistration.runtime.closureSha256,
+      previousInspectionReceiptSha256: runtimeInspectionHeadSha256,
+    });
+    runtimeInspectionHeadSha256 = runtimeBeforeReference.inspectionReceiptSha256;
     assertRuntimeInspection(
       runtimeBefore,
       input.preregistration,
@@ -1849,10 +1847,21 @@ export async function runSentinelProductionBatch(
     cellReferences.push(...references);
 
     let runtimeAfter: SentinelProductionRuntimeInspection | null = null;
+    let runtimeAfterReference: SentinelProductionRuntimeInspectionReference | null = null;
     let runtimeStable = false;
     let checkoutRootsStable = false;
     try {
       runtimeAfter = dependencies.inspectRuntime(input.runtime, input.preregistration.runtime);
+      runtimeAfterReference = retainSentinelProductionRuntimeInspection({
+        batchRoot,
+        inspection: runtimeAfter,
+        boundary: "after",
+        blockSequence,
+        inspectedAt: canonicalTimestamp(dependencies.now(), "runtime-after inspectedAt"),
+        preregistrationClosureSha256: input.preregistration.runtime.closureSha256,
+        previousInspectionReceiptSha256: runtimeInspectionHeadSha256,
+      });
+      runtimeInspectionHeadSha256 = runtimeAfterReference.inspectionReceiptSha256;
       assertRuntimeInspection(
         runtimeAfter,
         input.preregistration,
@@ -1893,16 +1902,8 @@ export async function runSentinelProductionBatch(
       simultaneousLaunch: launch.simultaneous,
       maximumObservedStartSkewMs: launch.startSkewMs,
       maximumAllowedStartSkewMs: maximumArmStartSkewMs(input.preregistration),
-      runtimeBefore: {
-        closureSha256: runtimeBefore.closureSha256,
-        executableIdentitySha256: runtimeBefore.executableIdentitySha256,
-      },
-      runtimeAfter: runtimeAfter === null
-        ? null
-        : {
-            closureSha256: runtimeAfter.closureSha256,
-            executableIdentitySha256: runtimeAfter.executableIdentitySha256,
-          },
+      runtimeBefore: runtimeBeforeReference,
+      runtimeAfter: runtimeAfterReference,
       runtimeStable,
       checkoutRootsStable,
       infrastructureComplete: blockComplete,
@@ -1919,6 +1920,7 @@ export async function runSentinelProductionBatch(
   }
 
   const batchComplete =
+    diagnosticSelection === undefined &&
     allBlocksComplete &&
     blockReferences.length === verified.blocks.length &&
     cellReferences.length === verified.blocks.length * 4;
@@ -1940,6 +1942,7 @@ export async function runSentinelProductionBatch(
     noOutcomeInspectionDuringExecution: true,
     batchComplete,
     blockManifestHeadSha256: previousBlockManifestSha256,
+    runtimeInspectionHeadSha256,
     blocks: blockReferences.map((reference) => ({
       path: relative(batchRoot, reference.path),
       sha256: reference.sha256,
@@ -1971,4 +1974,22 @@ export async function runSentinelProductionBatch(
     })),
     cells: cellReferences.sort((left, right) => left.sequence - right.sequence),
   };
+}
+
+export async function runSentinelProductionBatch(
+  input: SentinelProductionRunInput,
+  dependencies: SentinelProductionRunnerDependencies =
+    createSentinelProductionRunnerDependencies(),
+): Promise<SentinelProductionBatchResult> {
+  return runSentinelProductionBatchInternal(input, dependencies);
+}
+
+/** Run one four-arm qualification block; the declared full schedule stays incomplete. */
+export async function runSentinelProductionExcludedSmoke(
+  input: SentinelProductionRunInput,
+  selection: SentinelProductionDiagnosticSelection,
+  dependencies: SentinelProductionRunnerDependencies =
+    createSentinelProductionRunnerDependencies(),
+): Promise<SentinelProductionBatchResult> {
+  return runSentinelProductionBatchInternal(input, dependencies, selection);
 }

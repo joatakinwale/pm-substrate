@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { fork, type ChildProcess } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -81,6 +82,66 @@ interface Invocation {
   readonly body: ReturnType<typeof parseProductionStateResponse>;
 }
 
+interface CrashChildReady {
+  readonly schemaVersion: "pm.public-eval-corners.production-state-crash-child-ready.v1";
+  readonly endpoint: string;
+  readonly pid: number;
+  readonly readyReceipt: RunningProductionStateSidecar["readyReceipt"];
+}
+
+async function startCrashChild(
+  input: Parameters<typeof startProductionStateSidecar>[0],
+): Promise<{ readonly child: ChildProcess; readonly ready: CrashChildReady }> {
+  const fixture = join(import.meta.dirname, "production-state-sidecar-crash-child.ts");
+  const encoded = Buffer.from(JSON.stringify(input), "utf8").toString("base64url");
+  const child = fork(fixture, [encoded], {
+    cwd: process.cwd(),
+    execArgv: ["--import", "tsx"],
+    silent: true,
+  });
+  const ready = await new Promise<CrashChildReady>((resolvePromise, rejectPromise) => {
+    let stderr = "";
+    child.stderr?.on("data", (chunk: Buffer | string) => {
+      stderr += chunk.toString();
+    });
+    const timeout = setTimeout(() => {
+      rejectPromise(new Error(`crash child did not become ready: ${stderr}`));
+    }, 10_000);
+    child.once("message", (message: unknown) => {
+      clearTimeout(timeout);
+      if (
+        message === null ||
+        typeof message !== "object" ||
+        (message as { schemaVersion?: unknown }).schemaVersion !==
+          "pm.public-eval-corners.production-state-crash-child-ready.v1"
+      ) {
+        rejectPromise(new Error("crash child emitted an invalid ready message"));
+        return;
+      }
+      resolvePromise(message as CrashChildReady);
+    });
+    child.once("exit", (code, signal) => {
+      clearTimeout(timeout);
+      rejectPromise(
+        new Error(`crash child exited before ready (code=${String(code)}, signal=${String(signal)}): ${stderr}`),
+      );
+    });
+  });
+  return { child, ready };
+}
+
+async function killWithoutShutdown(child: ChildProcess): Promise<void> {
+  if (child.pid === undefined) throw new Error("crash child has no pid");
+  const exited = new Promise<{ readonly code: number | null; readonly signal: NodeJS.Signals | null }>(
+    (resolvePromise) => {
+      child.once("exit", (code, signal) => resolvePromise({ code, signal }));
+    },
+  );
+  process.kill(child.pid, "SIGKILL");
+  const terminal = await exited;
+  expect(terminal).toEqual({ code: null, signal: "SIGKILL" });
+}
+
 async function invoke(
   sidecar: RunningProductionStateSidecar,
   route: "write" | "read",
@@ -111,6 +172,7 @@ async function startPlain(input: {
   readonly scope?: string;
   readonly mode?: "native" | "plain-kv";
   readonly token?: string;
+  readonly responseDeadlineMs?: number;
 }): Promise<{ readonly sidecar: RunningProductionStateSidecar; readonly token: string; readonly evidence: string }> {
   const token = input.token ?? bearer(input.label);
   const evidence = temporaryDirectory(`${input.label}-evidence`);
@@ -123,7 +185,9 @@ async function startPlain(input: {
     tenant: input.tenant ?? "tenant-one",
     agentId: input.agentId ?? "agent-one",
     scope: input.scope ?? "scope-one",
-    minimumLatencyMs: 0,
+    ...(input.responseDeadlineMs === undefined
+      ? { minimumLatencyMs: 0 }
+      : { responseDeadlineMs: input.responseDeadlineMs }),
   });
   return { sidecar, token, evidence };
 }
@@ -211,6 +275,90 @@ describe("generic production state sidecar", () => {
     ).toBe(true);
   });
 
+  it("fails closed on forged binding, initial-state, timing, and deadline fields", async () => {
+    const stateDirectory = temporaryDirectory("strict-receipts-state");
+    const running = await startPlain({
+      label: "strict-receipts",
+      stateDirectory,
+      mode: "native",
+      responseDeadlineMs: 10,
+    });
+    await invoke(running.sidecar, "read", readRequest(30), running.token);
+    const final = await running.sidecar.stop();
+    const entries = readProductionStateAudit(running.sidecar.auditPath);
+    const verify = (
+      ready: RunningProductionStateSidecar["readyReceipt"],
+      finalReceipt: typeof final,
+      audit: typeof entries,
+    ) => verifyProductionStateEvidence(running.evidence, ready, finalReceipt, audit);
+
+    expect(verify(running.sidecar.readyReceipt, final, entries).valid).toBe(true);
+    expect(running.sidecar.readyReceipt.evidenceBindingSha256).toBe(
+      createHash("sha256").update("test:strict-receipts").digest("hex"),
+    );
+    expect(entries[0]?.timing).toMatchObject({
+      responseDeadlineMs: 10,
+      deadlineMissed: false,
+    });
+
+    const forgedBinding = verify(
+      running.sidecar.readyReceipt,
+      { ...final, evidenceBindingSha256: "f".repeat(64) },
+      entries,
+    );
+    expect(forgedBinding.valid).toBe(false);
+    expect(forgedBinding.issues).toContain("ready/final evidence binding mismatch");
+
+    const forgedInitial = verify(
+      { ...running.sidecar.readyReceipt, initialScopeRecordCount: 1 },
+      final,
+      entries,
+    );
+    expect(forgedInitial.valid).toBe(false);
+    expect(forgedInitial.issues).toContain("ready initial backend or response deadline is invalid");
+
+    const forgedTimingEntries = entries.map((entry, index) => index === 0
+      ? {
+          ...entry,
+          timing: {
+            ...entry.timing,
+            releaseDeadlineMonotonicMs: entry.timing.releaseDeadlineMonotonicMs + 2,
+          },
+        }
+      : entry);
+    const forgedTiming = verify(
+      running.sidecar.readyReceipt,
+      final,
+      forgedTimingEntries,
+    );
+    expect(forgedTiming.valid).toBe(false);
+    expect(forgedTiming.issues).toContain("entry 1: response timing receipt is invalid");
+
+    const forgedDeadline = verify(
+      {
+        ...running.sidecar.readyReceipt,
+        responseDeadlineMs: running.sidecar.readyReceipt.responseDeadlineMs + 1,
+      },
+      final,
+      entries,
+    );
+    expect(forgedDeadline.valid).toBe(false);
+    expect(forgedDeadline.issues).toContain("entry 1: response timing receipt is invalid");
+
+    const forgedReplay = verifyProductionStateBackendReplay({
+      ready: {
+        ...running.sidecar.readyReceipt,
+        initialBackendHeadSha256: "f".repeat(64),
+      },
+      entries,
+      identity: { tenant: "tenant-one", agentId: "agent-one", scope: "scope-one" },
+    });
+    expect(forgedReplay.valid).toBe(false);
+    expect(forgedReplay.issues).toContain(
+      "native initial backend receipt is not the exact empty discard state",
+    );
+  });
+
   it("keeps plain-kv state restart-safe with latest-write semantics", async () => {
     const stateDirectory = temporaryDirectory("restart-state");
     const first = await startPlain({ label: "restart-a", stateDirectory });
@@ -232,6 +380,109 @@ describe("generic production state sidecar", () => {
       expect(verified.records).toHaveLength(2);
     } finally {
       await restarted.sidecar.stop();
+    }
+  });
+
+  it("survives SIGKILL after an acknowledged plain-kv write without an orderly stop", async () => {
+    const stateDirectory = temporaryDirectory("crash-durable-state");
+    const evidenceDirectory = temporaryDirectory("crash-durable-evidence");
+    const token = bearer("crash-durable");
+    const identity = {
+      tenant: "tenant-crash",
+      agentId: "agent-crash",
+      scope: "scope-crash",
+    } as const;
+    const evidenceBinding = "test:crash-durable-child";
+    const { child, ready } = await startCrashChild({
+      mode: "plain-kv",
+      evidenceBinding,
+      evidenceDirectory,
+      stateDirectory,
+      bearerToken: token,
+      ...identity,
+      responseDeadlineMs: 0,
+    });
+    try {
+      expect(ready.pid).toBe(child.pid);
+      expect(ready.readyReceipt).toMatchObject({
+        mode: "plain-kv",
+        initialBackend: "plain-kv",
+        initialAgentChainRecordCount: 0,
+        initialScopeRecordCount: 0,
+      });
+      expect(ready.readyReceipt.evidenceBindingSha256).toBe(
+        createHash("sha256").update(evidenceBinding).digest("hex"),
+      );
+      const acknowledged = await fetch(`${ready.endpoint}/write`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(writeRequest(40, "acknowledged before ungraceful process death")),
+      });
+      expect(acknowledged.status).toBe(200);
+      expect(parseProductionStateResponse(await acknowledged.json())).toMatchObject({
+        status: "ok",
+        operationId: operationId(40),
+      });
+
+      await killWithoutShutdown(child);
+
+      const durable = verifyPlainKvStateFile(
+        join(stateDirectory, `production-state-${ready.readyReceipt.identitySha256}.ndjson`),
+        identity,
+      );
+      expect(durable.valid, durable.issues.join("\n")).toBe(true);
+      expect(durable.records).toHaveLength(1);
+      expect(durable.records[0]?.stateSummary).toBe(
+        fixedStateSummary("acknowledged before ungraceful process death"),
+      );
+
+      const restarted = await startPlain({
+        label: "crash-durable-restart",
+        stateDirectory,
+        ...identity,
+      });
+      try {
+        expect(restarted.sidecar.readyReceipt).toMatchObject({
+          initialBackend: "plain-kv",
+          initialAgentChainRecordCount: 1,
+          initialScopeRecordCount: 1,
+          initialBackendHeadSha256: durable.headSha256,
+        });
+        expect(restarted.sidecar.readyReceipt.initialRelevantStateSha256).toBe(
+          createHash("sha256").update(durable.records[0]!.stateSummary).digest("hex"),
+        );
+        const recalled = await invoke(
+          restarted.sidecar,
+          "read",
+          readRequest(41),
+          restarted.token,
+        );
+        expect(recalled.status).toBe(200);
+        expect(recalled.body.stateSummary).toBe(
+          fixedStateSummary("acknowledged before ungraceful process death"),
+        );
+        const entries = readProductionStateAudit(restarted.sidecar.auditPath);
+        const replay = verifyProductionStateBackendReplay({
+          ready: restarted.sidecar.readyReceipt,
+          entries,
+          identity,
+          plainKvStatePath: restarted.sidecar.plainKvStatePath,
+        });
+        expect(replay.valid, replay.issues.join("\n")).toBe(true);
+        expect(replay).toMatchObject({
+          finalRecordCount: 1,
+          finalHeadSha256: durable.headSha256,
+        });
+      } finally {
+        await restarted.sidecar.stop();
+      }
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) {
+        await killWithoutShutdown(child);
+      }
     }
   });
 

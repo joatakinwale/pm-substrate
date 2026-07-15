@@ -34,9 +34,14 @@ matrix is excluded from efficacy use. The replacement uses the published
 speed-1 horizon, one task-agnostic browser agent, and identical native, sham,
 plain-KV, and production-continuity interfaces. MicroHub is qualification-only;
 a frozen 12-task cross-application set is procedural holdout validation, not a
-powered confirmatory result. No replacement benchmark cell has yet established
-benefit. D7 remains `not_eligible` pending raw outcomes, a powered task-clustered
-confirmation, external trust, replication, and a separate owner decision. See the
+powered confirmatory result. The untouched 50-task catalog is content-frozen,
+but its proposed 19-relative-task × 3-repeat power declaration was also
+falsified before execution: under its declared independent-binomial planning
+model, the necessary two-control 10-point-lift gate reaches at most 0.5112,
+before the stricter Holm, bootstrap, or clean-control gates. No replacement
+benchmark cell has yet established benefit. D7 remains `not_eligible` pending
+an honestly powered task-clustered confirmation, external trust, replication,
+and a separate owner decision. See the
 exact run results and blockers in
 [`docs/public-benchmark-status-2026-07-13.md`](./docs/public-benchmark-status-2026-07-13.md).
 

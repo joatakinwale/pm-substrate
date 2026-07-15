@@ -19,7 +19,7 @@ import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
-import { chromium, type Page, type Response as PlaywrightResponse } from "playwright";
+import { chromium, type Page } from "playwright";
 
 import {
   PRODUCTION_STATE_READ_SCHEMA_VERSION,
@@ -30,6 +30,10 @@ import {
   type ProductionStateResponse,
   type ProductionStateWriteRequest,
 } from "./production-state-sidecar.js";
+import {
+  installSentinelBrowserNetworkCapture,
+  type SentinelBrowserNetworkCapture,
+} from "./sentinel-browser-network-capture.js";
 
 const OPERATION_ID = /^[a-f0-9]{32}$/u;
 const ATTEMPT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u;
@@ -37,7 +41,6 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 const ARM_IDENTITY = /\b(?:native|sham|plain[ -]?kv|substrate|treatment|control[ -]?arm)\b/iu;
 const SAFE_MEMORY_NOTE = /^[\x20-\x21\x23-\x5b\x5d-\x7e]{1,512}$/u;
 const MAX_HTTP_RESPONSE_BYTES = 12 * 1024 * 1024;
-const MAX_PASSIVE_BODY_BYTES = 16 * 1024 * 1024;
 const SAFE_PRESS_KEYS = new Set([
   "ArrowDown",
   "ArrowLeft",
@@ -694,57 +697,6 @@ async function strictPost(
   };
 }
 
-interface PassiveNetworkCapture {
-  flush(): Promise<void>;
-}
-
-function installPassiveNetworkCapture(page: Page, outputRoot: string): PassiveNetworkCapture {
-  const path = resolve(outputRoot, "browser-network.jsonl");
-  let sequence = 0;
-  let serial: Promise<void> = Promise.resolve();
-  let failure: unknown;
-  page.on("response", (response: PlaywrightResponse) => {
-    const current = sequence + 1;
-    sequence = current;
-    serial = serial.then(async () => {
-      let body: Buffer | null = null;
-      let bodyFailureSha256: string | null = null;
-      try {
-        body = Buffer.from(await response.body());
-        if (body.byteLength > MAX_PASSIVE_BODY_BYTES) {
-          throw new Error("passive response body exceeds capture limit");
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "unknown passive capture failure";
-        bodyFailureSha256 = sha256(message);
-      }
-      const headers = await response.allHeaders();
-      appendJsonLine(path, {
-        schemaVersion: "pm.public-eval-corners.sentinel-general-browser-response.v1",
-        sequence: current,
-        recordedAt: new Date().toISOString(),
-        url: response.url(),
-        method: response.request().method(),
-        resourceType: response.request().resourceType(),
-        status: response.status(),
-        headers,
-        bodyByteLength: body?.byteLength ?? null,
-        bodySha256: body === null ? null : sha256(body),
-        bodyBase64: body?.toString("base64") ?? null,
-        bodyFailureSha256,
-      });
-    }).catch((error: unknown) => {
-      failure ??= error;
-    });
-  });
-  return {
-    async flush(): Promise<void> {
-      await serial;
-      if (failure !== undefined) throw failure;
-    },
-  };
-}
-
 async function applyBrowserAction(
   page: Page,
   action: SentinelGeneralAgentDecision,
@@ -811,11 +763,11 @@ export async function runSentinelGeneralAgent(): Promise<void> {
   });
 
   const browser = await chromium.launch({ headless: true });
-  let passiveCapture: PassiveNetworkCapture | undefined;
+  let passiveCapture: SentinelBrowserNetworkCapture | undefined;
   try {
     const context = await browser.newContext({ viewport: config.viewport });
     const page = await context.newPage();
-    passiveCapture = installPassiveNetworkCapture(page, config.outputRoot);
+    passiveCapture = installSentinelBrowserNetworkCapture(page, config.outputRoot);
     await page.goto(config.startUrl, { waitUntil: "networkidle", timeout: 60_000 });
     await passiveCapture.flush();
 
