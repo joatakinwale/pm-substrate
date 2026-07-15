@@ -132,9 +132,13 @@ now frozen, but its first power declaration is not: with 19 relative tasks and
 three repeats, true lift equal to the 0.10 claim threshold, and the declared
 independent-binomial planning model, the exact necessary two-control point-lift
 gate reaches at most 0.511210781855188 on the baseline grid before Holm,
-bootstrap, raw-completeness, or guardrail losses. A redesigned, externally
-verified, task-clustered power artifact is mandatory before confirmatory
-execution.
+bootstrap, raw-completeness, or guardrail losses. A deterministic redesign uses
+a separate 0.35 planning alternative and replays the full Holm/bootstrap/
+guardrail rule. An independent Python implementation reproduced all 56 cells,
+but the 0.80 target holds only conditionally for listed ICC 0 and 0.10; listed
+ICC 0.25 and 1 fail, and endpoints do not cover a continuous range. Powered
+execution therefore requires independently justified dependence assumptions
+with full accepted-range coverage, or more untouched independent tasks.
 Any missing or inconsistent cell blocks the phase conclusion. Local
 verification alone remains ineligible; external trust and replication are
 required even after a powered speed-1 confirmation.
@@ -154,6 +158,9 @@ A clean verifier recomputes every metric from content-resolved raw artifacts.
 Its Ed25519 key and source revision must be selected in an out-of-bundle trust
 policy, the verifier owner must differ from the experiment producer, and the
 owner/CI-pinned policy hash must be supplied outside the result bundle. A
+pre-run commitment alone is insufficient: an independently owned append-only
+post-run receipt must bind attempt IDs and times, cell/raw roots, the block-chain
+head, and the final manifest hash. Local replay stays `not_eligible` without it. A
 second benchmark or model must preserve the direction. Even then, automation
 reports only conditional evidence eligibility; a separately authenticated
 owner must sign the exact report hash before D7 can decide or unfreeze apps.
