@@ -10,6 +10,11 @@
  *     --url https://api.app.example/customers --entity Customer --external-id id \
  *     [--endpoint /customers] [--liquid-cmd "uvx liquid-mcp"]
  *
+ * D6 objective evidence (all four flags are required together):
+ *   --app-revision app@commit --substrate-revision pm-substrate@commit \
+ *   --run-manifest-ref artifact:run.json \
+ *   --boundary-conformance-ref artifact:boundary.json
+ *
  * `mapping.json` is the app's declarative EntityMapping; `records.json` is
  * an array of { sourceName, externalId, row } — export it from the app's
  * EXISTING endpoints. Zero app edits either way; re-running is always safe.
@@ -27,6 +32,8 @@ import { PostgresGraph } from "../packages/graph/src/index.js";
 import {
   runEntityMappingSync,
   syncFromLiquid,
+  parseIntegrationEvidenceContext,
+  type IntegrationEvidenceContext,
   type SourceRecord,
 } from "../packages/integration-kit/src/index.js";
 import type { TenantId } from "../packages/types/src/index.js";
@@ -38,6 +45,24 @@ function argValue(flag: string): string | undefined {
   const args = process.argv.slice(2);
   const i = args.indexOf(flag);
   return i >= 0 ? args[i + 1] : undefined;
+}
+
+function evidenceContextFromArgs(): IntegrationEvidenceContext | undefined {
+  const values = {
+    appRevision: argValue("--app-revision"),
+    substrateRevision: argValue("--substrate-revision"),
+    runManifestRef: argValue("--run-manifest-ref"),
+    boundaryConformanceRef: argValue("--boundary-conformance-ref"),
+  };
+  if (Object.values(values).every((value) => value === undefined)) {
+    return undefined;
+  }
+  if (Object.values(values).some((value) => value === undefined)) {
+    throw new Error(
+      "pm:sync: --app-revision, --substrate-revision, --run-manifest-ref, and --boundary-conformance-ref are required together",
+    );
+  }
+  return parseIntegrationEvidenceContext(values);
 }
 
 async function main(): Promise<void> {
@@ -56,6 +81,7 @@ async function main(): Promise<void> {
   );
 
   const dryRun = process.argv.includes("--dry-run");
+  const evidenceContext = evidenceContextFromArgs();
   const pool = new pg.Pool({ connectionString: databaseUrl });
   const deps = {
     graph: new PostgresGraph(pool),
@@ -121,6 +147,7 @@ async function main(): Promise<void> {
           externalIdField,
           ...(endpoint ? { endpoint } : {}),
           syncedBy: AGENT,
+          ...(evidenceContext === undefined ? {} : { evidenceContext }),
           ...(dryRun ? { dryRun } : {}),
         });
         console.log(
@@ -149,6 +176,7 @@ async function main(): Promise<void> {
         mapping,
         records,
         syncedBy: AGENT,
+        ...(evidenceContext === undefined ? {} : { evidenceContext }),
         ...(dryRun ? { dryRun } : {}),
       });
     }

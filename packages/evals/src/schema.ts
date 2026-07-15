@@ -49,6 +49,10 @@ export const RUN_ARMS = ["baseline", "substrate"] as const;
 
 export type RunArm = (typeof RUN_ARMS)[number];
 
+export const EVAL_EXPECTED_ADMISSIONS = ["allow", "block"] as const;
+
+export type EvalExpectedAdmission = (typeof EVAL_EXPECTED_ADMISSIONS)[number];
+
 export const STATE_BENCH_CATEGORIES = [
   "stateful",
   "procedural_execution",
@@ -134,6 +138,11 @@ export interface EvalEvent {
   readonly substrateRefs: readonly EvalEvidenceRef[];
   readonly runArm?: RunArm;
   readonly pairedRunGroup?: string;
+  /** Exact identities for one mechanism-control attempt and its suite. */
+  readonly suiteRunId?: string;
+  readonly attemptId?: string;
+  readonly controlGroup?: string;
+  readonly expectedAdmission?: EvalExpectedAdmission;
   readonly stateBenchCategory?: StateBenchCategory;
   readonly memoryBenchmarkBridge?: MemoryBenchmarkBridge;
   readonly mastCategory?: MastCategory;
@@ -171,6 +180,7 @@ const OPERATIONAL_TERMINAL_OUTCOME_SET = new Set<string>(
 );
 const EVIDENCE_STAGE_SET = new Set<string>(EVAL_EVIDENCE_STAGES);
 const RUN_ARM_SET = new Set<string>(RUN_ARMS);
+const EXPECTED_ADMISSION_SET = new Set<string>(EVAL_EXPECTED_ADMISSIONS);
 const STATE_BENCH_CATEGORY_SET = new Set<string>(STATE_BENCH_CATEGORIES);
 const MEMORY_BENCHMARK_BRIDGE_SET = new Set<string>(MEMORY_BENCHMARK_BRIDGES);
 const MAST_CATEGORY_SET = new Set<string>(MAST_CATEGORIES);
@@ -227,6 +237,16 @@ export function validateEvalEvent(input: unknown): ValidationResult {
   validateOptionalPairedRunGroup(
     input["pairedRunGroup"],
     "/pairedRunGroup",
+    issues,
+  );
+  validateOptionalNonEmptyString(input["suiteRunId"], "/suiteRunId", issues);
+  validateOptionalNonEmptyString(input["attemptId"], "/attemptId", issues);
+  validateOptionalNonEmptyString(input["controlGroup"], "/controlGroup", issues);
+  validateOptionalEnum(
+    input["expectedAdmission"],
+    "/expectedAdmission",
+    EXPECTED_ADMISSION_SET,
+    EVAL_EXPECTED_ADMISSIONS,
     issues,
   );
   validateOptionalEnum(
@@ -293,6 +313,25 @@ export function validateEvalEvent(input: unknown): ValidationResult {
         "finance eval events require non-empty pairedRunGroup",
       );
     }
+  }
+
+  const mechanismIdentityFields = [
+    input["suiteRunId"],
+    input["attemptId"],
+    input["controlGroup"],
+    input["expectedAdmission"],
+  ];
+  if (
+    input["axis"] === "local_lab" &&
+    input["evidenceStage"] === "live_run" &&
+    mechanismIdentityFields.some((value) => value !== undefined) &&
+    mechanismIdentityFields.some((value) => value === undefined)
+  ) {
+    push(
+      issues,
+      "/attemptId",
+      "identified local_lab live runs require suiteRunId, attemptId, controlGroup, and expectedAdmission together",
+    );
   }
 
   const result = input["result"];
@@ -373,6 +412,17 @@ function validateOptionalPairedRunGroup(
   if (value === undefined) {
     return;
   }
+  if (!isNonEmptyString(value)) {
+    push(issues, path, "expected non-empty string when present");
+  }
+}
+
+function validateOptionalNonEmptyString(
+  value: unknown,
+  path: string,
+  issues: ValidationIssue[],
+): void {
+  if (value === undefined) return;
   if (!isNonEmptyString(value)) {
     push(issues, path, "expected non-empty string when present");
   }

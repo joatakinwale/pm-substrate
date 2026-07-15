@@ -9,6 +9,8 @@ import type { EntityMapping } from "@pm/entity-mapping";
 import type { EventPublisher, EventReader } from "@pm/events";
 import type { TenantId } from "@pm/types";
 
+import type { IntegrationEvidenceContext } from "./evidence-context.js";
+
 import {
   fetchLiquidRecords,
   type LiquidFetchOptions,
@@ -36,6 +38,7 @@ export interface LiquidSyncInput extends LiquidFetchOptions {
   readonly mapping: EntityMapping;
   readonly syncedBy: string;
   readonly authority?: string;
+  readonly evidenceContext?: IntegrationEvidenceContext;
   /**
    * Shadow mode: zero writes, zero events, AND the approval gate reports
    * its verdict instead of enforcing it — so a dry run previews both the
@@ -89,6 +92,9 @@ export async function syncFromLiquid(
     records: fetched.records,
     syncedBy: input.syncedBy,
     ...(input.authority !== undefined ? { authority: input.authority } : {}),
+    ...(input.evidenceContext !== undefined
+      ? { evidenceContext: input.evidenceContext }
+      : {}),
     ...(input.dryRun !== undefined ? { dryRun: input.dryRun } : {}),
   });
   return {

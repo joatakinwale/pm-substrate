@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-07-01
+Last updated: 2026-07-13
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -10,6 +10,34 @@ Each daily research continuation must begin by fetching `origin/main` and checki
 The run is not complete until the intended research slice is committed on `main`, pushed to `origin/main`, and the local and remote SHAs are rechecked. If parallel research creates duplicate version numbers, preserve the branch artifact when useful, mark the canonical version, and record the reconciliation in the ledger.
 
 ## Current Strongest Thesis
+
+v232 update: the first fresh deterministic ToolSandbox lost-response/process-
+restart derivative falsified the substrate arm at the boundary: a raw
+concatenated outcome idempotency key was 136 characters and exceeded the
+sidecar's 128-character limit, producing HTTP `400` and an official score of
+`0.25`. A bounded, domain-separated SHA-256 client key repaired the exact
+failure; the retest scored `1.0` in all arms while substrate kept one unique
+target send and blocked the exact retry, versus two sends in native and sham.
+The official oracle also scored those duplicate controls `1.0`, so retained
+state-effect replay is a required companion metric. This is deterministic
+qualification/mechanism evidence only; a post-verifier-change raw cross-
+verified artifact is still pending.
+
+v231 update: red-team review found that internally valid signatures under a
+caller-supplied, self-hashed policy could still manufacture a false KEEP. The
+repair maps to `authority_topology` and `admission_calculus`: exact pre-run
+preregistration and attempt-time/raw-root receipts may establish conditional
+evidence eligibility, but the automated evaluator has no KEEP output and a
+separate authenticated owner must authorize the exact report hash. This closes
+an evaluation-integrity gap; it is not public-benchmark efficacy.
+
+v230 update: a real concurrent-agent dogfood run forked the continuity ledger
+because row-locking the old tail could not lock the not-yet-created next child.
+The repair maps to `obstruction_evidence` and `replay_semantics`: a
+tenant/agent transaction advisory lock serializes append, while an explicit
+hash-bound merge makes all historical branch heads reachable without rewriting
+them. A 24-writer ablation is red without the repair and green with it. This is
+mechanism repair evidence only; public-benchmark efficacy remains unproven.
 
 LLM agents are statistical predictors promoted into actors. The state problem appears when parametric model state, prompt/inference state, memory/RAG state, tool-observation state, or inter-agent communication state is treated as current, sufficient, authoritative operational state. pm-substrate is the governed operational-state layer between statistical prediction and valid action.
 

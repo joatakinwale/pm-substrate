@@ -21,13 +21,35 @@ Work moves through many tools, teams, and AI agents that each hold a partial mod
 
 pm-substrate is that enforcement medium: what the workspace accepts as actionable, where each claim came from, how fresh it is, who may change it, which gate it passed, and how agents resume after context loss.
 
-**The immediate objective (see ROADMAP):** make two agent-run businesses viable — the marketing lab (PluggedInSocial) and the hedge-fund lab (ArrowHedge) — with the substrate managing its own development as the first proof. Keep/kill gate: 2026-07-16.
+**The immediate objective (see ROADMAP):** prove—or falsify—the substrate's causal benefit on pinned public tasks that are already known to expose agent-state failure. Official benchmark task completion is the outcome; native and equal-overhead sham arms are the controls; internal events, blocks, and receipts are mechanism diagnostics only. PluggedInSocial and ArrowHedge are frozen until the public claim passes held-out evaluation, anti-degenerate controls, clean artifact verification, and replication. The executable protocol is [`docs/objective-falsification.md`](./docs/objective-falsification.md).
+
+**Current public-proof status (2026-07-14):** causal benefit remains unproven.
+An adversarial audit rejected the first Sentinel 27-cell design before any
+headline execution: useful state lived in a task-specific adapter `Map`, all
+arms used the same core only for evidence admission, the native arm was an
+independent discard control rather than Microsoft's unpublished paper agent,
+speed factor 4 made the positive MicroHub trajectories unreachable, and the
+upstream no-op oracle rewards an agent that exits without monitoring. That
+matrix is excluded from efficacy use. The replacement uses the published
+speed-1 horizon, one task-agnostic browser agent, and identical native, sham,
+plain-KV, and production-continuity interfaces. MicroHub is qualification-only;
+a frozen 12-task cross-application set is procedural holdout validation, not a
+powered confirmatory result. The untouched 50-task catalog is content-frozen,
+but its proposed 19-relative-task × 3-repeat power declaration was also
+falsified before execution: under its declared independent-binomial planning
+model, the necessary two-control 10-point-lift gate reaches at most 0.5112,
+before the stricter Holm, bootstrap, or clean-control gates. No replacement
+benchmark cell has yet established benefit. D7 remains `not_eligible` pending
+an honestly powered task-clustered confirmation, external trust, replication,
+and a separate owner decision. See the
+exact run results and blockers in
+[`docs/public-benchmark-status-2026-07-13.md`](./docs/public-benchmark-status-2026-07-13.md).
 
 ## The product shape (decided 2026-07-02)
 
 A **sidecar**, not a platform: Docker + Postgres running next to the system it governs. The adopting system is **never rewritten** — it authors a thin integration kit: `mapping.yaml` (its tables → the seven primitives), a sync adapter (webhook/poll/CDC, state flows in read-only), and an action executor (admitted actions flow back through the app's *existing* API). Agents mount five MCP tools — `resume`, `observe`, `propose`, `admit`, `checkpoint` — so any Claude/GPT/local agent integrates with a config line. Adoption is shadow-first: observe and warn, report what *would* have been blocked, then gate one action type at a time.
 
-Kernel: TypeScript (the type system is load-bearing — cardinality, freshness, and contract rules are compile-time-unrepresentable-when-illegal). Edges: protocol (HTTP/MCP/SQL), any language; a thin Python client SDK ships when the labs need it.
+Kernel: TypeScript (the type system is load-bearing — cardinality, freshness, and contract rules are compile-time-unrepresentable-when-illegal). Edges: protocol (HTTP/MCP/SQL), any language; public benchmark adapters and any future Python client remain peripheral.
 
 ## The control plane
 
@@ -38,10 +60,24 @@ Five questions, answered only from the admitted log — never from self-report:
 | What is being done? | open `work` checkpoints + last `handoff` (`pnpm dev:status`) |
 | What did governance do? | admitted events by type, stage-gate applications, procedure admissions, blocks |
 | What did it cost? | `dev.session.cost` events (tokens per session/agent/model) |
-| What are the results? | eval metrics in CI (`pnpm evals:amnesia`: baseline 0% vs substrate 100% recall; 12-metric lanes as they light up) |
+| What are the results? | independent public-benchmark task outcomes when available (currently none), reliability, collateral-state guardrails, and cost/latency; local evals are labeled conformance diagnostics |
 | What got optimized? | closed work items + superseding decisions in the ledger |
 
-v0 is the `dev:status` CLI; the dashboard page is phase D4.
+v0 is the `dev:status` CLI; the D4 dashboard control-plane page is shipped.
+Benchmark receipts are independently verifiable only when their adapter retains
+the exact raw/provider/oracle bytes and external trust evidence required by the
+public gate; current ToolSandbox and STATE-Bench artifacts deliberately do not
+qualify. Admitting any receipt does not turn the substrate log into its own
+oracle.
+
+The D7 gate additionally requires one canonical, versioned semantic
+observation per check. It reopens the bytes, enforces the exact
+kind/check/subject/procedure and fact schema, and recomputes the check result;
+opaque bytes and signer-supplied result shortcuts reject. The external verifier
+is still accountable for deriving those facts from the real benchmark records.
+Because the current generic procedures do not derive them from the bound raw
+records, D7 report v4 classifies every such structured assertion as diagnostic
+only and always returns `not_eligible`.
 
 ## Architecture (reference)
 
@@ -52,7 +88,7 @@ v0 is the `dev:status` CLI; the dashboard page is phase D4.
 5. **Agent operational state** — `CurrentStateView`, `ObservationContract`, warn-first `ActionProposalReview`, `StateReviewArtifact` with hash replay, `ActionOutcomeEnvelope`, role projections, amnesiac recovery, external-evidence admission (evidence, never authority). (`packages/agent-state-core`, 97 pinned exports; the witness/quorum tower is quarantined in `packages/agent-state-provenance`, frozen, opt-in SQL via `PM_ENABLE_AGENT_STATE_PROVENANCE=1`)
 6. **Procedure admission** — scripts/harness runs become operational only after authority-scoped admission and replay. (`packages/procedure-admission`, HTTP in `substrate-http`)
 7. **Continuity** — hash-chained checkpoints; conclusions become queryable state. Powers the dev-session loop. (`packages/continuity`, `scripts/dev-session.ts`)
-8. **Evals + lab** — paired baseline/substrate scenarios, measured metrics, live two-arm agent lab (real local LLM, oracle reads the admitted log). (`packages/evals`, `packages/local-agent-lab`, `packages/substrate-dashboard`)
+8. **Evals + validation** — local paired scenarios diagnose mechanism conformance and cannot establish efficacy; peripheral public adapters preserve upstream tasks/oracles and compare native, sham, and substrate arms. (`packages/evals`, `packages/local-agent-lab`, public-eval packages, `packages/substrate-dashboard`)
 
 **Ontology:** Tier 1 — seven universal primitives (`Counterparty, Engagement, Transaction, Resource, Communication, Document, Event` in `packages/types`). Tier 2 — profiles installed per tenant at runtime: `profile-pmgovernance` (PM methodology as governance: RACI single-accountability via `exactly:1` edge cardinality, stage-gate lifecycles, approval-gated advancement via `capability-pmgovernance-stage-gate`), `profile-agency`, `profile-finance-research`. Tier 3 — tenant customizations. The substrate names no profile; CI-enforced.
 
@@ -67,6 +103,14 @@ export PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate
 pnpm db:migrate && pnpm db:seed && pnpm dev:seed-dogfood
 pnpm build && pnpm typecheck && pnpm test
 pnpm dev:resume        # ← the session briefing; start every session here
+pnpm pm:boundary -- --app <id> --app-dir <checkout> --out <artifact.json> \
+  --check 'contract::your-existing-conformance-command'
+pnpm public-eval:toolsandbox manifest
+pnpm public-eval:state-bench manifest
+pnpm public-eval:corners list
+pnpm public-eval:decide path/to/decision-bundle.json \
+  path/to/trust-policy.json "$PM_PUBLIC_EVAL_TRUST_POLICY_SHA256"
+pnpm pm:memo -- --stdout  # never authorizes KEEP; owner authorization is separate
 ```
 
 Environment knobs: `PM_DATABASE_URL` (unset ⇒ DB-gated tests skip), `PM_DEV_TENANT_ID` (`tenant_dev`), `PM_ENABLE_AGENT_STATE_PROVENANCE`, `PM_PLUGGED_IN_SOCIAL_DIR` (external app checkout; unset ⇒ conformance tests skip).
@@ -79,9 +123,9 @@ Environment knobs: `PM_DATABASE_URL` (unset ⇒ DB-gated tests skip), `PM_DEV_TE
 | Budgets, name-depth, provenance isolation, explicit core surface | `pnpm validate:budgets` |
 | Anti-fixation / zero-edit plug-in rule | `pnpm validate:zero-edit` |
 | Primitive back-map (recursion stop) | `pnpm validate:arrowsmith-primitives` |
-| Amnesia headline number | `pnpm evals:amnesia` |
+| Amnesia mechanism diagnostic | `pnpm evals:amnesia` |
 
-Verification baseline 2026-07-02: build + typecheck clean; **875 passed / 7 env-gated skips**, identical on core-only and tower-enabled databases (`docs/state-validation/verification-baseline-2026-07-02.md`).
+Baseline before the public-proof reset (2026-07-13): build + typecheck clean; **967 passed / 7 external-app skips** in the default suite; strict contracts, budgets, zero-edit, and primitive back-map gates green. This proves repository conformance, not public-task benefit. The original core/tower parity baseline is preserved in [`docs/state-validation/verification-baseline-2026-07-02.md`](./docs/state-validation/verification-baseline-2026-07-02.md); new benchmark evidence must carry its own pinned manifest and independently verifiable receipt.
 
 ## Repository layout
 
@@ -96,7 +140,7 @@ docs/                        ADRs, validation, state-validation, history/ (super
 research/                    claim ledger + daily chains (proposes; only consumed code counts)
 ```
 
-External testbeds (separate checkouts — **no app code in this repo**): PluggedInSocial (`../plugged_in_social`) and ArrowHedgeLabs (`../arrowhedgelab`, vanilla upstream + read-only integration endpoints). See `docs/validation.md` for T1–T8 and the 12 behavior metrics.
+Deferred transfer testbeds (separate checkouts; frozen during D6/D7 and **no app code in this repo**): PluggedInSocial (`../plugged_in_social`) and ArrowHedgeLabs (`../arrowhedgelab`). See [`docs/validation.md`](./docs/validation.md) for the public-proof order, local conformance status, and deferred business-transfer criteria.
 
 ## License
 

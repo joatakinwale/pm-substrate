@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "pm.boundary-conformance.v1",
+  "appId": "plugged_in_social",
+  "observedAt": "2026-07-13T12:40:49.168Z",
+  "appRevision": "plugged_in_social@tree-sha256:5e43c9dda81ed5114c704ef74d9b97ba4a3e9f97a058179fc9eb38f29d181faa;scope:AGENTS.md,agents/packages/browser-runner/README.md,agents/packages/browser-runner/src/index.mjs,agents/packages/browser-runner/test/browser-runner.test.mjs,agents/packages/pi-runner/README.md,agents/packages/pi-runner/src/index.mjs,agents/packages/pi-runner/test/pi-runner.test.mjs,agents/packages/shared/src/messages.ts,agents/scripts/deploy.sh,agents/workers,backend/alembic/versions,backend/app,backend/tests,frontend/src/app/admin/agency/page.tsx,frontend/src/app/admin/page.tsx,frontend/src/lib/api.ts,frontend/tests/test_agency_command_center_contract.py",
+  "substrateRevision": "pm-substrate@f923ae9e0ae82acd07ebd49fe3f13a543214ce06+dirty-sha256:8e7cc1c5ee8899834d55d1db5d1c470f14a99e338576b4b7395edf3ada87340d",
+  "ready": false,
+  "blockers": [
+    "live-source-axis-b: exit 1"
+  ],
+  "checks": [
+    {
+      "name": "live-source-axis-b",
+      "command": "PM_PLUGGED_IN_SOCIAL_DIR=/Volumes/WD_BLACK/JoatLabs/plugged_in_social pnpm exec vitest run packages/profile-agency/src/plugged-in-social-manifest.test.ts packages/profile-agency/src/plugged-in-social-integration-audit.test.ts packages/profile-agency/src/plugged-in-social-audit-script.test.ts packages/profile-agency/src/plugged-in-social-axis-b-adapter.test.ts packages/profile-agency/src/plugged-in-social-axis-b-proof-packet.test.ts",
+      "exitCode": 1,
+      "signal": null,
+      "durationMs": 14426,
+      "stdoutBytes": 2046,
+      "stdoutSha256": "a94d02076ce473d7f0aae172ba8e440e042a8df73c1f71f4c57a293bead08e11",
+      "stderrBytes": 4519,
+      "stderrSha256": "b9e02c8b1b8276149bd650dc8270ec9560380b65ec91eb02bd56073a66a43a7f"
+    }
+  ],
+  "contentHash": "81da6d387359f0dda3fb23036242b83f0f5f48ea5ed4c452263061dcc5425e93"
+}

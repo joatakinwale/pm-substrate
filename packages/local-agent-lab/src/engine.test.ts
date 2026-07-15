@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { verifyActionOutcomeEnvelopeHash } from "@pm/agent-state-core";
 
 import { buildLocalAgentLabActionOutcomeEnvelope } from "./engine.js";
-import { SCENARIOS } from "./registry.js";
+import { EVIDENCE_SCENARIOS, SCENARIOS } from "./registry.js";
 
 const FAILURE_CLASSES = [
   "partial_observation",
@@ -26,6 +26,20 @@ describe("local-agent-lab action outcome packets", () => {
     // scenarios may share a class (e.g. pm-governance-approval-gate is a
     // second, governance-flavored workflow_invalidation probe).
     for (const c of classes) expect(FAILURE_CLASSES).toContain(c);
+  });
+
+  it("matches every expected-block failure class with an expected-allow control", () => {
+    for (const failureClass of FAILURE_CLASSES) {
+      const controls = EVIDENCE_SCENARIOS.filter(
+        (scenario) => scenario.failureClass === failureClass,
+      );
+      expect(controls.some((scenario) => scenario.expectedAdmission === "block"))
+        .toBe(true);
+      expect(controls.some((scenario) => scenario.expectedAdmission === "allow"))
+        .toBe(true);
+      expect(controls.every((scenario) => scenario.controlGroup === failureClass))
+        .toBe(true);
+    }
   });
 
   it("builds hash-valid accepted packets from admitted dynamic runs", () => {
@@ -130,5 +144,51 @@ describe("local-agent-lab action outcome packets", () => {
       ),
     ).toBe(true);
     expect(verifyActionOutcomeEnvelopeHash(envelope).valid).toBe(true);
+  });
+
+  it("content-separates repeated attempts of the same scenario", () => {
+    const base = {
+      spec: {
+        scenarioId: "stale-observation",
+        failureClass: "stale_observation",
+      },
+      arm: "substrate" as const,
+      tenantId: "tnt_lab_test",
+      decidedAt: "2026-06-25T18:00:00.000Z" as const,
+      observation: {
+        key: "AAPL",
+        perceivedValue: 100,
+        basisPosition: 1,
+      },
+      action: {
+        key: "AAPL",
+        actedValue: 100,
+        rawText: "ACT AAPL=100",
+      },
+      outcome: {
+        admitted: false,
+        refusedReason: "stale_basis position=1 < head=2",
+      },
+      result: "blocked" as const,
+      suiteRunId: "suite_identity_test",
+    };
+    const first = buildLocalAgentLabActionOutcomeEnvelope({
+      ...base,
+      attemptId: "attempt_1",
+    });
+    const second = buildLocalAgentLabActionOutcomeEnvelope({
+      ...base,
+      attemptId: "attempt_2",
+    });
+    const refId = (envelope: typeof first): string =>
+      envelope.substrateRefs.find(
+        (ref) => ref.kind === "action_outcome_envelope",
+      )!.id;
+
+    expect(first.actionId).not.toBe(second.actionId);
+    expect(refId(first)).not.toBe(refId(second));
+    expect(first.outcomeHash).not.toBe(second.outcomeHash);
+    expect(verifyActionOutcomeEnvelopeHash(first).valid).toBe(true);
+    expect(verifyActionOutcomeEnvelopeHash(second).valid).toBe(true);
   });
 });

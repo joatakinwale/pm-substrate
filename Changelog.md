@@ -1,5 +1,151 @@
 # Changelog
 
+## 2026-07-14 - Sentinel causal-design falsification and production replacement
+
+- Adversarially rejected the unexecuted 27-cell MicroHub causal design. Its
+  useful memory was a task-specific adapter `Map`; all arms used
+  `@pm/agent-state-core` only for evidence admission; a plain-KV comparator was
+  absent; and the independent discard arm could not be called Microsoft's
+  unreleased paper agent. The design is retained only as excluded harness code.
+- Proved from the pinned upstream timeline that speed factor 4 scales the top-
+  level trigger but not nested star waypoints, making both positive MicroHub
+  tasks unreachable. Restored published speed 1 and added strict no-op liveness
+  because the unchanged oracle otherwise rewards immediate exit.
+- Hardened raw verification around exact Anthropic response schemas and IDs,
+  provider/state origins and tokens, ports, agent/process trees, result paths,
+  monitoring cadence, PNG decoding, provider shutdown, and unique batch
+  identities. Split the verifier to preserve the CI file budget.
+- Added a generic fixed-width four-arm state service. `native` discards,
+  `sham` performs production continuity work but returns irrelevant state,
+  `plain-kv` provides minimal durable memory, and `substrate` uses
+  `PostgresContinuityLedger`. Live-Postgres tests cover restart/latest recall,
+  tenant-agent-scope isolation, concurrent appends, raw request/response replay,
+  and DB/file tamper fail-closed behavior.
+- Froze MicroHub as qualification-only and a 12-task, four-application
+  procedural holdout (`f24feec…`) that may test execution but cannot emit
+  material benefit: it contains only four independent relative tasks and is not
+  powered to exclude no lift. A separately anchored powered task-clustered
+  confirmation is required. No accepted replacement cell has run; causal
+  benefit remains unproven.
+- OpenAI quota and Codex usage-limit probes, plus the successful Anthropic
+  capacity/vision probe, remain explicitly excluded from behavioral evidence.
+
+## 2026-07-13 - Public-proof reset and first observed repair loop
+
+- Replaced the app-first D6/D7 claim with independent public-benchmark causal
+  proof over native, sham, and substrate arms; froze PluggedInSocial and
+  ArrowHedge until confirmation and replication pass.
+- Reclassified local agent labs as mechanism conformance, added exact suite and
+  attempt identities, expected-allow controls, and allow-all/block-all mutant
+  sensitivity so a deny-all policy cannot look successful.
+- Added peripheral pinned adapters for ToolSandbox, STATE-Bench, and four
+  public corner scenarios plus hash-bound task-clustered analysis with frozen
+  lift, reliability, collateral, cost, latency, and distinct-model replication
+  criteria. Adapter readiness remains separate from benchmark outcome.
+- Red-teamed the D7 gate before use: canonical-task aliases and a missing
+  latency-ratio ceiling are rejected; task-content/universe membership,
+  original/derivative identity, arm interventions, environment snapshots,
+  randomized execution order, and individual configuration hashes are bound;
+  simultaneous inference must beat native and sham separately; and zero
+  false-block/collateral plus fixed absolute/relative economics fail closed.
+  Signed preregistration and per-attempt time/raw-root receipts are required.
+  The analyzer computes the predeclared statistical/guardrail criteria, but D7
+  report v4 currently emits only `not_eligible`, always requires separate owner
+  authorization, and has no KEEP output.
+- Closed two further D7 false-positive paths: decision-phase tasks must be the
+  exact deterministic SHA-256 top-ranked subset for a predeclared count, and
+  every required check must resolve non-empty kind-specific canonical JSON plus
+  embedded raw observation bytes. Empty, malformed, irrelevant, unresolved, or
+  unreferenced evidence now fails before signatures can make it look eligible.
+- Closed the follow-up structured-assertion exploit: evidence schema v2 requires
+  one canonical observation for each of 31 checks, pins its
+  kind/check/subject/procedure and exact fact keys, and validates an internal
+  predicate. Report v4 recognizes that self-consistent facts are not derived
+  from the subject and therefore keeps every current bundle diagnostic-only and
+  ineligible—even the adversarial 363-attempt fixture that claims `1/1` counts.
+  Opaque `banana` bytes, unsupported procedures, and signer-claimed results that
+  disagree with the structured facts also reject. A future eligibility path
+  must derive facts from bound raw provider/oracle records.
+- Recorded Arrowsmith v231 after the same review showed that valid signatures
+  under a caller-supplied policy still amount to self-attestation. in-toto,
+  Sigstore/OSF preregistration, and the supplied NASA PM Handbook all support
+  the repair boundary: an externally anchored plan and independent assessment
+  inform a distinct owner decision; they do not authorize themselves.
+- Recorded Arrowsmith v232 after the first fresh deterministic ToolSandbox
+  lost-response/process-restart derivative exposed a substrate-specific
+  protocol bug: a 136-character concatenated idempotency key exceeded the
+  sidecar's 128-character limit and produced HTTP `400`. The peripheral runner
+  now derives bounded domain-separated SHA-256 keys while the sidecar retains
+  its safety bound and request-byte conflict checks. Final post-change
+  qualification artifacts now bind the pinned Apple oracle replay, exact task
+  and starting context, raw provider frames, authenticated loopback sidecar,
+  runtime closure, trajectory/state deltas, and real provider-process lifecycle.
+  The unchanged headline batch (`7ad2c0e8…`) and lost-response derivative
+  (`0043af27…`) each scored `1.0` in all three arms. The derivative applied an
+  actual process-group `SIGKILL`, reap, and fresh-process retry in every arm:
+  substrate blocked the retry and retained zero duplicate target effects while
+  native and sham each executed it successfully and retained one duplicate.
+  The verifier is outcome-neutral, including semantically valid
+  `review.valid=false` blocks, so counterevidence is retained rather than
+  selected away. Because Apple's strict score also remained `1.0` for the two
+  duplicate controls, state-effect safety is now a required separate metric.
+  Raw verification hashes are `36318957…` (headline) and `673963f0…`
+  (derivative); 75 focused tests and a later 30-test final regression subset
+  passed. This is deterministic `PmScriptedStateProbe` qualification/mechanism
+  evidence, not agent efficacy, and both eligibility assessments remain false.
+- Recorded Arrowsmith v230 after concurrent dogfood writers forked the
+  continuity ledger. A tenant/agent transaction advisory lock now serializes
+  append; fork verification and `dev:repair-chain` preserve both historical
+  heads through an explicit append-only merge. Sequence-backed graph-head
+  selection rejects silent fork choice, two-genesis/ancestor fake merges, and
+  repair over unrelated tampering. One strict shared merge parser now rejects
+  malformed reserved merge payloads before insertion as well as during replay.
+  The 24-writer, malformed-admission, and killed-connection regressions are
+  green after repair.
+- Hardened the public corner harness after a constant-output wrapper showed
+  that bundling pinned oracle bytes did not prove they were invoked. Local
+  plans/receipts now carry a content-resolved but explicitly unverified oracle
+  invocation boundary and are always analysis-ineligible until an independent
+  invocation-proof format and verifier exist.
+- Claim boundary: public causal benefit is still unproven until real official
+  confirmatory artifacts and distinct-model or second-benchmark replication
+  pass the sealed analysis gate and a separately authenticated owner decides
+  the narrow operational consequence.
+- Final verification: build and typecheck clean; 1,059 tests passed with 11
+  expected external/credential skips; strict contracts, budgets, zero-edit,
+  Arrowsmith primitive guard, and amnesia diagnostic green; pinned STATE-Bench
+  upstream suite 148 passed with 1 live credential skip.
+
+## 2026-07-13 - Business-operability objective made executable
+
+- Separated technical substrate viability from the stronger claim that the two
+  labs are operationally worth running. A green ledger, fixture sync, or blocked
+  seeded failure can no longer produce a full keep verdict by itself.
+- Added `pm.objective.lab-measured.v1` validation and a six-dimension evaluator
+  for technical baseline, adoption, correct end-to-end outcomes, governance
+  quality, cost/owner effort, and external validity. Measurements bind a run
+  manifest plus app/substrate revisions and reject placeholders or impossible
+  counts.
+- Added `pnpm pm:objective` template/record/list commands and wired the scorecard
+  into `pnpm pm:memo`. The memo independently derives live attachment/dispatch
+  evidence and refuses to preserve a human verdict above the admitted-evidence
+  ceiling.
+- Corrected roadmap truth drift: authenticated HTTP MCP, D5, and Liquid L1–L5
+  were already shipped. D6 is now the next evidence phase with explicit paired,
+  held-out, write-coverage, cost, owner-effort, and acceptance thresholds.
+- Rechecked current external boundaries. PluggedInSocial is blocked by missing
+  `browser_qa_harness` and `operatorRunMonitorSurface`; ArrowHedge current main
+  no longer mounts the `/integration/v1` contract used by the 2026-07-07 live
+  rehearsal. Historical evidence remains valid only for its recorded revision.
+- Repaired a merge regression that copied all 122 quarantined provenance
+  migrations back into the default core directory. Fresh core installs had
+  failed at 0053, and existing installs aborted on a checksum mismatch. The
+  intended two-tier split is restored without rewriting applied migrations;
+  a new boundary test prevents filename overlap or agent-state migrations in
+  core. Existing DBs migrate idempotently, fresh core applies 26 migrations,
+  fresh provenance applies 149, and the 957-test suite passes on both.
+
+
 ## 2026-07-08 - ArrowHedge viewer removed from the substrate dashboard
 
 - Owner decision "No lab-app content in the substrate dashboard": the legacy ArrowHedge validation-metrics view (`live.ts` two-domain story page), its replay fixture corpus (`data.ts`, `story.ts`), and the `/api/dashboard` aggregator are deleted. ArrowHedge and PluggedInSocial are separate external systems; their metrics belong in their own surfaces and attach later through the integration kit (D6).

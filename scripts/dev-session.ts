@@ -12,6 +12,7 @@
  *   checkpoint --kind K --title T --summary S [--status open|closed] [--refs a,b]
  *   handoff --summary S [--title T]   session-end handoff for the next session
  *   cost --prompt N --completion N [--model M] [--source reported|measured] [--label L]
+ *   repair-chain --reason R        append-only merge of concurrent ledger heads
  *   status                       control plane: work, governance, costs, integrity
  *   seed-dogfood                 one-time seed of the real engagement decisions
  *
@@ -25,6 +26,7 @@ import pg from "pg";
 
 import {
   PostgresContinuityLedger,
+  buildContinuityChainRepairPlan,
   buildContinuityContext,
   findContinuityContradictions,
   resolveOpenWork,
@@ -89,11 +91,9 @@ const main = async (): Promise<void> => {
         scope: SCOPE,
         limit: 500,
       });
-      const chain = verifyContinuityCheckpointChain({
-        tenantId: TENANT,
-        agentId: AGENT,
-        checkpoints: all,
-      });
+      // The hash chain is tenant+agent-wide even when the briefing is scoped.
+      // Verify the full chain so an omitted scope cannot look like corruption.
+      const chain = await ledger.verify(TENANT, AGENT);
       const handoffs = all
         .filter((c) => c.kind === "handoff")
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -272,6 +272,77 @@ const main = async (): Promise<void> => {
       return;
     }
 
+    if (cmd === "repair-chain") {
+      await ensureTenant();
+      const reason = arg("reason");
+      if (!reason) {
+        console.error("usage: dev-session repair-chain --reason R");
+        exit(1);
+      }
+      const before = await ledger.list({
+        tenantId: TENANT,
+        agentId: AGENT,
+        limit: 100_000,
+      });
+      const beforeReport = verifyContinuityCheckpointChain({
+        tenantId: TENANT,
+        agentId: AGENT,
+        checkpoints: before,
+      });
+      const plan = buildContinuityChainRepairPlan(before, reason);
+      if (!plan.needed) {
+        console.log(
+          `repair-chain: no forked heads found; chainValid=${beforeReport.valid}`,
+        );
+        if (!beforeReport.valid) {
+          for (const issue of beforeReport.errors) console.error(issue);
+          exit(2);
+        }
+        return;
+      }
+      const onlyRepairableFork =
+        beforeReport.brokenCheckpointIds.length === 0 &&
+        beforeReport.errors.length === 1 &&
+        /^continuity chain has [2-9][0-9]* unmerged heads:/.test(
+          beforeReport.errors[0] ?? "",
+        );
+      if (!onlyRepairableFork) {
+        console.error(
+          "repair-chain: REFUSING — history has errors beyond concurrent sibling heads",
+        );
+        for (const issue of beforeReport.errors) console.error(issue);
+        exit(2);
+      }
+      const recorded = await ledger.record({
+        tenantId: TENANT,
+        agentId: AGENT,
+        scope: SCOPE,
+        kind: "lesson",
+        title: "Continuity chain fork recovered without rewriting history",
+        summary: `${reason} Preserved ${plan.mergedHeadHashes.length} orphan head hash(es) in an explicit append-only merge.`,
+        status: "closed",
+        payload: plan.payload,
+      });
+      const after = await ledger.list({
+        tenantId: TENANT,
+        agentId: AGENT,
+        limit: 100_000,
+      });
+      const report = verifyContinuityCheckpointChain({
+        tenantId: TENANT,
+        agentId: AGENT,
+        checkpoints: after,
+      });
+      console.log(
+        `repair-chain: recorded ${recorded.id}; merged=${plan.mergedHeadHashes.length}; chainValid=${report.valid}`,
+      );
+      if (!report.valid) {
+        for (const issue of report.errors) console.error(issue);
+        exit(2);
+      }
+      return;
+    }
+
     if (cmd === "cost") {
       await ensureTenant();
       const prompt = Number(arg("prompt") ?? 0);
@@ -306,11 +377,7 @@ const main = async (): Promise<void> => {
         scope: SCOPE,
         limit: 1000,
       });
-      const chain = verifyContinuityCheckpointChain({
-        tenantId: TENANT,
-        agentId: AGENT,
-        checkpoints: all,
-      });
+      const chain = await ledger.verify(TENANT, AGENT);
       const byKind = new Map<string, number>();
       for (const c of all) byKind.set(c.kind, (byKind.get(c.kind) ?? 0) + 1);
       const openWork = resolveOpenWork(all);
@@ -465,7 +532,7 @@ const main = async (): Promise<void> => {
       return;
     }
 
-    console.error(`unknown command: ${cmd} (resume|checkpoint|handoff|cost|status|metrics|seed-dogfood)`);
+    console.error(`unknown command: ${cmd} (resume|checkpoint|handoff|cost|repair-chain|status|metrics|seed-dogfood)`);
     exit(1);
   } finally {
     await events.close().catch(() => {});

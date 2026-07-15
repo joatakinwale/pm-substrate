@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "pm.public-eval-corner-synthetic-fixture.v1",
+  "fixtureId": "mab-factconsolidation-6k-synthetic-v1",
+  "cornerId": "memoryagentbench-factconsolidation-6k",
+  "label": "pm-synthetic-conformance",
+  "claimScope": "adapter-conformance",
+  "distribution": "package-synthetic",
+  "containsUpstreamTaskData": false,
+  "containsProtectedContent": false,
+  "nonGating": true,
+  "syntheticNotice": "PM-authored synthetic values; no upstream task data.",
+  "content": {
+    "scenarios": [
+      {
+        "scenarioId": "synthetic-single-hop-supersession",
+        "timeline": [
+          { "serial": 1, "fact": "The storage code for Lab North is amber." },
+          { "serial": 2, "fact": "The storage code for Lab North is now cobalt." }
+        ],
+        "question": "What is the current storage code for Lab North?",
+        "expectedAnswers": ["cobalt"],
+        "candidates": [
+          {
+            "candidateId": "current-exact",
+            "output": "cobalt",
+            "expectCompatibleSubstringMatch": true,
+            "expectExactMatchDiagnostic": true
+          },
+          {
+            "candidateId": "current-verbose",
+            "output": "The current storage code is cobalt.",
+            "expectCompatibleSubstringMatch": true,
+            "expectExactMatchDiagnostic": false
+          },
+          {
+            "candidateId": "stale",
+            "output": "amber",
+            "expectCompatibleSubstringMatch": false,
+            "expectExactMatchDiagnostic": false
+          }
+        ]
+      },
+      {
+        "scenarioId": "synthetic-multi-hop-supersession",
+        "timeline": [
+          { "serial": 1, "fact": "Unit R maps to group Cedar." },
+          { "serial": 2, "fact": "The coordinator for group Cedar is Mira." },
+          { "serial": 3, "fact": "Unit R now maps to group Basalt." },
+          { "serial": 4, "fact": "The coordinator for group Basalt is Noor." }
+        ],
+        "question": "Who is the current coordinator for Unit R?",
+        "expectedAnswers": ["Noor"],
+        "candidates": [
+          {
+            "candidateId": "current-chain",
+            "output": "Noor",
+            "expectCompatibleSubstringMatch": true,
+            "expectExactMatchDiagnostic": true
+          },
+          {
+            "candidateId": "stale-chain",
+            "output": "Mira",
+            "expectCompatibleSubstringMatch": false,
+            "expectExactMatchDiagnostic": false
+          }
+        ]
+      }
+    ]
+  }
+}

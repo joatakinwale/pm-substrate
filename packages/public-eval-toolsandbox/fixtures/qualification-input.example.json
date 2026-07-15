@@ -1,0 +1,28 @@
+{
+  "checkoutPath": "/absolute/path/to/clean/ToolSandbox",
+  "pythonExecutable": "/absolute/path/to/python",
+  "outputRoot": "/absolute/path/to/empty/output-directory",
+  "agent": "Unhelpful",
+  "user": "Cli",
+  "preferredToolBackend": "DEFAULT",
+  "scriptedStdin": ["end"],
+  "timeoutMs": 600000,
+  "attempt": {
+    "batchId": "qualification-smoke-001",
+    "attemptId": "qualification-native-001",
+    "arm": "native",
+    "execution": {
+      "agentModel": "Unhelpful",
+      "userSimulatorModel": "Cli",
+      "toolBackend": "DEFAULT",
+      "seed": "42",
+      "maxTurns": 30
+    },
+    "internalOutcome": {
+      "admittedActionCount": 0,
+      "blockedActionCount": 0,
+      "haltedByInternalBlock": false,
+      "blockReasonCodes": []
+    }
+  }
+}

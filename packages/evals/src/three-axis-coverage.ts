@@ -310,11 +310,32 @@ function groupByPairedRun(events: readonly EvalEvent[]): Map<string, readonly Ev
 }
 
 function hasBothArms(events: readonly EvalEvent[]): boolean {
-  return hasArm(events, "baseline") && hasArm(events, "substrate");
-}
+  if (events.length !== 2) return false;
+  const baseline = events.filter((event) => event.runArm === "baseline");
+  const substrate = events.filter((event) => event.runArm === "substrate");
+  if (baseline.length !== 1 || substrate.length !== 1) return false;
+  if (baseline[0]!.runId === substrate[0]!.runId) return false;
+  if (baseline[0]!.scenarioId !== substrate[0]!.scenarioId) return false;
 
-function hasArm(events: readonly EvalEvent[], arm: RunArm): boolean {
-  return events.some((event) => event.runArm === arm);
+  const identity = [
+    baseline[0]!.suiteRunId,
+    baseline[0]!.attemptId,
+    baseline[0]!.controlGroup,
+    baseline[0]!.expectedAdmission,
+    substrate[0]!.suiteRunId,
+    substrate[0]!.attemptId,
+    substrate[0]!.controlGroup,
+    substrate[0]!.expectedAdmission,
+  ];
+  if (identity.every((value) => value === undefined)) return true;
+  return baseline[0]!.suiteRunId !== undefined &&
+    baseline[0]!.suiteRunId === substrate[0]!.suiteRunId &&
+    baseline[0]!.attemptId !== undefined &&
+    baseline[0]!.attemptId === substrate[0]!.attemptId &&
+    baseline[0]!.controlGroup !== undefined &&
+    baseline[0]!.controlGroup === substrate[0]!.controlGroup &&
+    baseline[0]!.expectedAdmission !== undefined &&
+    baseline[0]!.expectedAdmission === substrate[0]!.expectedAdmission;
 }
 
 function hasProtectivePair(events: readonly EvalEvent[]): boolean {

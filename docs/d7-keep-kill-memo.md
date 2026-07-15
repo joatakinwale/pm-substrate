@@ -1,48 +1,92 @@
-# D7 keep/kill memo — pm-substrate (gate: 2026-07-16)
+# D7 public-proof decision memo — pm-substrate
 
-*Generated 2026-07-11T02:15:53.889Z by `pnpm pm:memo` from the admitted log — regenerate any time; only the Verdict section is hand-written. North star: did the substrate make the two labs worth operating (via the generic kit), and does the loop itself run better on it than off it?*
+*Generated 2026-07-13T20:05:50.665Z by `pnpm pm:memo`. The north star is a causal one: does pm-substrate improve strict outcomes on independent public agent-state tasks over both native and sham controls? There is no calendar waiver. Repository-authored fixtures, event counts, and blocked actions never substitute for the benchmark oracle.*
 
 **Evidence coordinates:** db postgres://pm@127.0.0.1:5432/pm_substrate · tenant tenant_dev · agent joat-dev · scope pm-substrate-dev
 
-## 1 · Resume fidelity (the original problem)
+## 1 · Public causal decision gate
 
-- Sessions resumed from the ledger: **1**, handoff coverage: **100%**, hash chain: **VALID**
-- Standing decisions: **8** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
+- **Current status:** `unproven`
+- **Decision:** No verified public evidence bundle was supplied. Harness and conformance work cannot decide efficacy.
+- **Evidence input:** none
+- **Exact-pair admission:** not evaluated
+- **Verification evidence (non-authoritative):** not admitted
 
-## 2 · Throughput and cost
+- **qualification:** no verified phase report supplied
+- **confirmatory:** no verified phase report supplied
+- **replication:** no verified phase report supplied
 
-- Work closed: **8** of 17 opened (1 open) — **8/session**
-- Tokens: **2,290,000** across 1 costed sessions → **286,250 per closed item** (pre-reset loop trend was 88,750 → 72,944 → 60,917 → 55,833 → 45,857; the DB was reset and the ledger reseeded 2026-07-08, so the post-reset series restarts at this number)
+Qualification is exploratory. Sealed confirmation, distinct-model replication, signed preregistration/timestamp bindings, and all six bound verification receipts can at most set `evidenceEligibleUnderSuppliedPolicy=true`. That report is non-authoritative and cannot emit KEEP; a separate owner authorization over the exact decision-report hash is mandatory. Per-strict-success cost and latency are decision criteria, not diagnostics.
 
-## 3 · Governance did real work?
+## 2 · Continuity and evidence integrity
 
-- MCP gate: **19** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
+- Sessions resumed from the ledger: **13**, handoff coverage: **100%**, hash chain: **VALID**
+- Standing decisions: **18** · superseded (re-decided with a paper trail): **0** · re-litigated from chat memory: **0 observed**
+- Work closed: **17** of 37 opened (5 open) — **1.31/session**
+- Tokens: **4,980,000** across 2 costed sessions → **292,941 per closed item**
+
+## 3 · Runtime technical baseline (not public efficacy)
+
+- MCP gate: **70** admitted · **0** blocked (block rate 0) — ✅ live propose→admit traffic outside tests
 - Executor bridge: **1** dispatched · **5** refused · **8** failed
 - Shadow verdict: advisory would-have-blocked **0** · enforced blocks **5** · data rejections **0** · pending drift obstructions **7**
 - Work dispatched to roles: **0**
-
-## 4 · Zero-rewrite integration held?
-
 - Registered adapters: **3** (canary_web_inspector@36a29a05 v1 · liquid@c904bd82 v1 · pi_harness@e285e90f v1)
 - Sync lanes: **2** upserted · **0** rejected — fixture-proven idempotent; Liquid lanes L2–L4 CI-proven against the real `liquid-mcp` vocabulary
 - ✅ L1: sidecar run once in the owner's environment (runbook smoke)
 - ✅ L5 / D6 read attach: one real lab endpoint attached through the kit
 - ✅ L4 governed write: blocked envelope refused, accepted envelope dispatched, replay deduped
 
-## 5 · Live lab evidence (Axis C — local-agent-lab, paired arms)
+Technical ledger evidence gaps, which do not alter the public decision:
 
-- Latest live run **2026-07-10** on **llama3.2:3b**: **12** scenarios, paired baseline-vs-substrate
-- Baseline arm: **12** failed · 0 passed — every seeded failure class reproduced without the substrate
-- Substrate arm: **12** blocked at the gate · 0 passed — **every baseline failure was caught before it landed**
+No open technical-substrate evidence gaps remain in this ledger fold. This does not imply the business objective is met.
 
-## 6 · Evidence gaps before the gate
+## 4 · Internal mechanism/conformance evidence (Axis C — not efficacy proof)
 
-The memo is honest only if these are either filled or explicitly waived on 07-16:
+- Classification: `mechanism_conformance_only`. These repository-authored controls test mechanism behavior only; they cannot establish benefit on an independent task.
+- Latest suite: **2026-07-13** on **llama3.2:3b** · suite **suite_6cf46d7e-a3fe-46ce-a5dc-4fc57f2a8ed8** · **22** exact pair(s) across 22 scenario(s)
+- Pair integrity: **PASS** · 0 imbalanced, duplicate, or identity-mismatched pair group(s)
+- Expected-block controls: **12/12** produced the predeclared baseline-fail/substrate-block pattern
+- Expected-allow controls: **10/10** remained accepted in both arms
+- Mutant sensitivity: allow-all **REJECTED** · block-all **REJECTED** · gate **PASS**
 
-No open D7 evidence gaps remain in this ledger fold. Re-run from the same coordinates before the gate if new evidence is admitted.
+## 5 · Deferred app-transfer scorecard (excluded from D6/D7 efficacy)
 
-## 7 · Verdict (hand-written at the gate — owner + agent)
+PluggedInSocial and ArrowHedge remain frozen. Their historical business-operability scorecard is preserved for a possible post-keep transfer phase, but neither app may design, tune, score, or rescue the public causal claim.
 
-- **Keep / kill / keep-with-scope-cut:** keep-with-scope-cut.
-- **If keep:** next falsification window runs to 2026-07-16. Criteria: one live MCP observe→propose→admit session; one governed write/action rehearsal through an accepted envelope with replay dedupe; Liquid external-id obstruction when the fetched rows omit the approved id field; `pm:memo` must refuse ambiguous tenant/scope instead of emitting a misleading zero snapshot.
-- **If kill:** salvage the entity-mapping approval gate, idempotent sync runner, executor bridge, adapter registry, and Liquid sidecar process-boundary pattern. Kill only the claim that Liquid is ready as a broad default adapter until L1/L5 evidence repeats on a second real surface and the write path is proven live.
+- **Historical transfer verdict ceiling:** `keep_with_scope_cut`
+- **Historical transfer objective ready:** NO
+- **Objective measurement events:** 0 valid latest lab record(s) · 0 invalid event(s)
+
+- ✅ **technical_baseline**: threshold met
+- ❌ **adoption**:
+  - plugged_in_social: no revision-bound admitted read attachment
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no revision-bound admitted read attachment
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **operational_outcomes**:
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **governance_quality**:
+  - plugged_in_social: no revision-bound governed action was dispatched
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no revision-bound governed action was dispatched
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **economic_value**:
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no validated lab measurement was admitted
+- ❌ **external_validity**:
+  - plugged_in_social: no validated lab measurement was admitted
+  - arrowhedge: no validated lab measurement was admitted
+
+## 6 · Open public-proof gates
+
+1. No complete verified public evidence bundle was supplied to this memo.
+
+Use `pnpm pm:memo -- --public-decision-bundle path/to/decision-bundle.json --public-trust-policy path/to/trust-policy.json --public-trust-policy-hash OWNER_PINNED_SHA256` to verify the sealed manifest, 31 procedure-versioned structured assertions, preregistration/timestamp attestations, and six signed receipts. The current D7 v4 path remains diagnostic-only and always `not_eligible` until adapter-specific procedures derive each fact from bound raw records. The expected policy hash must come from an owner/CI channel outside the bundle. `--public-analysis` remains diagnostic-only. Neither this command nor a hand-written verdict can authorize KEEP; owner authorization is a separate trust boundary.
+
+## 7 · Operational consequence
+
+- **Apps:** remain frozen; this evidence report cannot authorize PluggedInSocial or ArrowHedge transfer work.
+- **Claim:** no demonstrated public causal benefit yet.
+- **Next action:** complete real public matched-arm execution and distinct-model replication.

@@ -2,9 +2,10 @@
  * ScenarioSpec — the dynamic contract. The engine never changes to add a
  * failure class; you register a new ScenarioSpec. Each spec defines: how to
  * seed the world, how the agent observes, how the failure is induced (a world
- * mutation AFTER observation), how the agent acts, and the ORACLE that returns
- * the verdict by reading the admitted log (never hardcoded, never from model
- * text). See docs/state-validation/local-agent-lab-scenarios.md.
+ * mutation AFTER observation), how the agent acts, and the repository-authored
+ * ORACLE that returns the verdict from operational state rather than model
+ * prose. This is mechanism/conformance evidence, not an independent efficacy
+ * oracle. See docs/state-validation/local-agent-lab-scenarios.md.
  */
 
 import type { World } from "./world.js";
@@ -12,6 +13,7 @@ import type { LabAgent } from "./agent.js";
 
 export type Arm = "no_substrate" | "substrate";
 export type EvalResult = "pass" | "fail" | "blocked";
+export type ExpectedAdmission = "allow" | "block";
 
 /** What the agent perceived + the causal basis position at read time. */
 export interface Observation {
@@ -45,6 +47,15 @@ export interface ScenarioSpec {
   readonly scenarioId: string;
   readonly failureClass: string;
   readonly realityQualities: readonly number[];
+
+  /**
+   * Mechanism-control expectation for evidence runs. `block` cases reproduce
+   * a seeded hazard; matched `allow` controls prove that a deny-all gate cannot
+   * satisfy the lab's coverage claim. Ordinary scenario callers may omit both
+   * fields; the evidence registry supplies them explicitly.
+   */
+  readonly expectedAdmission?: ExpectedAdmission;
+  readonly controlGroup?: string;
 
   /** Seed initial admitted state. */
   seed(ctx: ScenarioContext): Promise<void>;

@@ -4,17 +4,189 @@
 
 ## The objective
 
-The substrate is validated when **two claims hold simultaneously** on the ArrowHedgeLabs sandbox (a multi-agent research project used strictly for research/education — the *agents and their operational state* are the subject, not finance):
+Validation now proceeds through three claims in order; evidence cannot skip a
+layer:
 
-1. **Plug-in claim** — ArrowHedgeLabs onboards through mapping/profile/capability files with **zero substrate-package edits and zero changes to existing providers**.
-2. **Agent-state claim** — agents resuming from substrate state outperform chat-history baselines on staleness, authority, evidence, replay, and continuity.
+1. **Mechanism conformance** — deterministic runtime tests show that the PM
+   state boundary, recovery, replay, and admission rules behave as specified.
+2. **Public causal efficacy** — on pinned independent tasks, the same agent with
+   real substrate state beats both native and equal-overhead sham controls on
+   the benchmark's unchanged strict outcome while reliability, collateral
+   state, false-block, cost, and latency guardrails hold. A matched plain-KV
+   arm determines whether any lift is substrate-specific or merely durable
+   memory.
+3. **Deferred transfer/business operability** — only after public efficacy is
+   kept, external apps onboard with zero substrate edits and demonstrate useful
+   operating outcomes at acceptable owner effort and cost.
 
-The agent-state work is not a pivot from the PM-layer thesis; it is the harder validation surface for it (see `artifacts/pm_substrate_rewrite.md`).
+The local suite currently supports claim 1, not claim 2. The existing app and
+business scorecard supports a future claim 3 but is frozen during D6/D7. A
+passing lower layer never proves the next one. The executable scorecards,
+non-claims, and verdict ceilings are in
+[`objective-falsification.md`](./objective-falsification.md). Agent state is an
+extension and proof of the PM-layer thesis, not a pivot: the hypothesis is that
+explicit current state, provenance, decisions, recovery cuts, and admission at
+the tool boundary improve project execution.
 
 ---
 
-## Axis B - PluggedInSocial marketing-engine validation
+## Axis P — public agent-state validation (active)
 
+### P0: evidence integrity
+
+- Existing local agent-lab and synthetic paired evals are **conformance-only**.
+  Their oracles may diagnose whether the intended gate fired, but may not be
+  cited as independent outcome evidence.
+- Every attempt has a unique identity. Pairing requires exact benchmark,
+  revision, task content and eligible-universe membership, split, model,
+  prompt/tool/runner configuration, provider sampling seed when supported (or
+  an explicit no-seed declaration plus stochastic repeat identity), initial
+  environment, typed arm intervention, deterministic randomized order, and
+  fault-injection coordinates.
+- Benchmark oracles cannot import the substrate's admission predicate. A block
+  counts only through the unchanged external task oracle.
+- Expected-allow/no-op and expected-block cases are both mandatory. `block-all`
+  and `allow-all` mutants must fail qualification.
+
+### P1: ToolSandbox vertical slice
+
+Pin the public multi-turn scenario in which the agent must clarify a message,
+look up a contact, encounter disabled cellular service, enable it, and retry.
+The original milestone DAG and minefields remain the primary oracle. Compare
+native, sham, and substrate arms with identical model and tool affordances. A
+separate derivative loses a tool response and restarts the agent process; pass
+requires exactly one intended message and no unrelated state mutation. The
+adapter may translate public tool calls at the periphery, but the substrate path
+must consume the real HTTP/MCP sidecar protocol. The final deterministic
+qualification uses an authenticated HTTP sidecar, real process-group kill/reap,
+and a fresh provider-process retry while retaining the pinned Apple oracle,
+starting context, scripted-provider frames, trajectories, and state effects.
+It remains mechanism evidence: the probe is scripted, provider
+usage/cost/latency and independently anchored runtime/oracle trust are absent,
+and the unchanged headline score did not distinguish duplicate control effects.
+Conversion to `PublicEvalAttemptArtifact` therefore remains closed.
+
+### P2: STATE-Bench held-out headline
+
+Use the Agent Learning Track with its official training/held-out separation,
+domain tools, simulator, judge, prompt hashes, and score. Substrate learnings are
+exposed only through the track's permitted read-only
+`retrieve_learnings(query, top_k=3)` seam; test definitions never enter the
+learning store. A deterministic 20-task/domain train qualification is disjoint
+from the remaining 80-task/domain extraction inventory. The decision bridge
+then freezes all 150 test tasks, five stochastic repeat identities, three arms,
+a randomized per-cell schedule, and a distinct-model replication. Because
+upstream accepts exact `--tasks` selection only with `--split all`, the hashed
+command contract treats that value as a parser sentinel while the verified test
+inventory remains selection authority. The confirmatory manifest is sealed and
+externally preregistered before held-out results are inspected.
+Official simulator/judge credentials are an execution prerequisite, not a
+reason to substitute a local self-judge or claim success from adapter tests.
+Output that merely matches the expected score-file shape is conformance only.
+The package emits and verifies an exact command plan and a strict raw schema,
+but not the instrumented executor or transport capture. It must refuse D7
+conversion without command-bound raw runner, agent-provider, simulator, and
+judge bytes; every hidden retry and terminal failure; actual model/request IDs;
+usage, cost, and latency; treatment uptake; independently replayed state; an
+externally pinned trust policy; and official scores derived from those records.
+
+### P3: independent corner battery
+
+Use separately owned public tasks to cover:
+
+- contradiction and supersession (including value-reversion/ABA);
+- restart between dependent writes, lost responses, idempotency, and collateral
+  state preservation;
+- changing-world state, relative queries, and correct no-op behavior.
+
+Original benchmark results remain separate from derivative fault injection.
+Where a benchmark contains UI or perception variance, use its deterministic DB
+or task-state oracle for the state claim and report perception failures as a
+separate confound.
+
+Behavioral trials use one shared runner, non-treatment configuration, model,
+and supporting-file identity; each arm supplies only a registered typed
+treatment delta. The oracle executes from a fresh neutral view containing only
+the task output and receives no arm/treatment metadata. This reduces accidental
+leakage but is not an OS sandbox: independent review and execution receipts must
+still rule out host inspection, order inference, covert output channels, and a
+runner that did not invoke the pinned oracle.
+
+The first attempted live corner was the pinned Sentinel MicroHub star monitor.
+Its unexecuted 27-cell design is excluded from causal use: useful state lived in
+a task-specific adapter `Map`, speed factor 4 made both positive star
+trajectories unreachable, and the no-op oracle could pass immediate exit. The
+release also does not contain the exact Microsoft paper agent/configuration/raw
+logs, so the discard control is labeled an independent matched control.
+
+The production replacement uses published speed 1, one task-agnostic real-
+Chromium/Claude agent, strict monitoring through 630 seconds, and four fixed-
+width state arms: no durable state, continuity-backed sham, minimal durable
+plain KV, and production continuity. Raw replay must bind browser screenshots
+and passive network bytes, exact provider IDs/schema/usage, state requests and
+responses, process identities, collateral, timing, and the unchanged upstream
+result. MicroHub is qualification-only. The frozen 12-task cross-application
+procedural holdout is also ineligible for material benefit because it contains
+only four independent relative tasks. The 50-task untouched content catalog is
+now frozen, but its first power declaration is not: with 19 relative tasks and
+three repeats, true lift equal to the 0.10 claim threshold, and the declared
+independent-binomial planning model, the exact necessary two-control point-lift
+gate reaches at most 0.511210781855188 on the baseline grid before Holm,
+bootstrap, raw-completeness, or guardrail losses. A redesigned, externally
+verified, task-clustered power artifact is mandatory before confirmatory
+execution.
+Any missing or inconsistent cell blocks the phase conclusion. Local
+verification alone remains ineligible; external trust and replication are
+required even after a powered speed-1 confirmation.
+
+### P4: analysis and decision
+
+Primary analysis is task-level paired strict completion with simultaneous
+inference against the maximum of native and sham inside each bootstrap draw.
+Repeats are clustered within task. Reliable lift and economics pass separately
+against both controls; missing comparisons fail. Report paired uncertainty,
+false blocks, collateral changes, absolute and relative cost per strict
+success, and absolute and relative latency per strict success. Preserve every
+failure and exclusion. Qualification, confirmatory, and replication artifacts
+use different IDs and may not be pooled. The exact manifest is signed before
+execution, and one signed receipt binds each attempt's timestamps and raw root.
+A clean verifier recomputes every metric from content-resolved raw artifacts.
+Its Ed25519 key and source revision must be selected in an out-of-bundle trust
+policy, the verifier owner must differ from the experiment producer, and the
+owner/CI-pinned policy hash must be supplied outside the result bundle. A
+second benchmark or model must preserve the direction. Even then, automation
+reports only conditional evidence eligibility; a separately authenticated
+owner must sign the exact report hash before D7 can decide or unfreeze apps.
+Analysis files, unsigned/hash-only receipts, and caller-selected trust alone are
+diagnostic/non-authoritative.
+
+### P5: Arrowsmith repair
+
+Research begins only after a public failure is captured. Map the trace to the
+existing state-identity, replay, recovery, evidence, settlement, or procedure
+primitive; document the missing behavior and falsifier; implement the smallest
+general change with a non-test runtime consumer; ablate it; rerun the exact task
+and clean controls. A non-causal or non-improving change is reverted or narrows
+the claim.
+
+The first real dogfood failure in this program was a concurrent continuity
+append fork. Its preserved trace, cause, advisory-lock repair, append-only merge,
+and ablation are documented in
+[`state-validation/continuity-concurrency-failure-2026-07-13.md`](./state-validation/continuity-concurrency-failure-2026-07-13.md).
+It validates a repair loop, not public task benefit.
+
+Adversarial review then found a false-KEEP authority gap: valid signatures under
+a caller-supplied policy could be mistaken for a decision. Arrowsmith
+[v231](../research/daily-arrowsmith-agent-state/v231-externally-anchored-evaluation-authority-2026-07-13.md)
+separates preregistered evidence eligibility from owner decision authority. It
+is evaluation-integrity hardening, not a public behavioral repair or benefit.
+
+---
+
+## Axis B — PluggedInSocial marketing-engine validation (deferred)
+
+This axis is frozen until a D7 public-proof keep decision. Historical evidence
+remains revision-bound and auditable but cannot score Axis P. When reopened,
 PluggedInSocial is the marketing-operations validation lane. Its test is whether
 the substrate can observe and govern a complete agency loop without prompt-memory
 shortcuts:
@@ -63,6 +235,9 @@ pnpm vitest run \
 
 ## Test plan T1–T8 (from the rewrite thesis)
 
+These tests remain mechanism-conformance history. “Implemented” or “measured”
+in this table does not mean independently validated public efficacy.
+
 | Test | Pass condition | Status / executable proof |
 |---|---|---|
 | T1 Source mapping | ArrowHedge tickers/signals/risk/decisions map into substrate entities/events; mapping validates structurally + semantically; no substrate edits | **Implemented** — `ARROWHEDGE_ENTITY_MAPPING`, `@pm/entity-mapping` structural + semantic validators, ingestion-plan tests |
@@ -78,7 +253,40 @@ pnpm vitest run \
 
 Time-to-plugin · substrate edit count (target: zero) · mapping coverage · validator rejection rate · evidence coverage · state disagreement rate · stale action rate · agent resume success · replay fidelity · unauthorized action block rate · cross-tool outcome success · mean time to reconcile.
 
-Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover the staleness/evidence/replay/policy lanes, catalog-verification failures, and selected write-gate outcomes. The plug-in lane (time-to-plugin, substrate edit count, mapping coverage) is **not yet instrumented** — tracked in `research/index.md` → remaining frontier.
+Instrumentation today: artifact-derived metrics (`analyzeStateReviewArtifacts`, evidence-admission metrics, run groups) plus write-binding replay metrics cover staleness/evidence/replay/policy mechanisms, catalog-verification failures, and selected write-gate outcomes. They are diagnostic drivers, not Axis P endpoints. `pm.objective.lab-measured.v2` instruments the deferred transfer gate and remains revision-bound; a schema or local fixture with no independent outcome evidence is a gap, not a pass.
+
+## Business-operability gate (deferred)
+
+Do not execute new app-bound work under this section until D7 keeps the public
+claim. These commands and criteria remain documented for historical
+reproducibility and later transfer.
+
+Generate a template, replace every placeholder with source-cited observations,
+and admit it:
+
+```bash
+pnpm pm:boundary -- --app <lab-id> --app-dir <checkout> \
+  --out <boundary-artifact.json> \
+  --check 'contract::your-existing-conformance-command'
+pnpm pm:objective -- template plugged_in_social --out /tmp/pis-objective.json
+pnpm pm:objective -- record /tmp/pis-objective.json
+pnpm pm:objective -- list
+pnpm pm:memo -- --stdout
+```
+
+The evaluator requires both labs to pass six dimensions: technical baseline,
+adoption, operational outcomes, governance quality, economic value, and
+external validity. A full `keep` requires at least five matched attempts per
+arm per lab, at least 80% correct substrate outcomes without regression, a
+holdout, full in-scope write governance with zero pilot false positives and
+false negatives, no increase in owner minutes per correct outcome, no more than
+a 1.25x cash-cost premium, a production-like shadow run, and owner acceptance.
+See [`objective-falsification.md`](./objective-falsification.md) for exact
+definitions and the research basis.
+
+The measurement command opens and recomputes its content-addressed boundary
+artifact before admission. A failed/tampered artifact, hash mismatch, different
+lab ID, or different app/substrate revision is a hard refusal.
 
 Market-win claims require a saved paired run with:
 
@@ -89,6 +297,13 @@ Market-win claims require a saved paired run with:
 - backtest/PnL deltas reported separately from governance deltas.
 
 Current ArrowHedgeLab status after the 2026-07-01 upstream reset:
+
+> **Revision warning (2026-07-13):** the detailed adapter evidence below was
+> produced against the revision rehearsed on 2026-07-07. Current ArrowHedge
+> `main@6713139` does not mount an `/integration/v1` router. The admitted
+> historical rehearsal remains evidence for that revision, but current D6
+> readiness is blocked until the neutral boundary is restored and revalidated.
+> Every new objective measurement must bind its app revision and run manifest.
 
 - `arrowhedgelab` is now a submodule-style external repo reference to
   `https://github.com/virattt/ai-hedge-fund.git` at commit `65a0349`.
@@ -188,6 +403,12 @@ current adapter contract and integration review.
 6. **Hash-chain or replay failure** — an event chain or artifact that cannot replay to the same hashes without a deterministic explanation.
 7. **Two-state divergence** — agent memory acted on without rebase against substrate state. The review layer makes this visible (warn-first); once runtime wiring lands, blockable by invariant-class policy.
 8. **The second profile stops being free.** If `profile-agency` (or any future profile) requires substrate diffs to coexist with `finance-research`, the universality claim is dead.
+9. **Technical success substitutes for useful outcomes.** If the project claims “worth operating” from event counts, fixture passes, or blocks without matched correct outcomes, cost, owner effort, and acceptance, the objective claim is falsified even when the substrate remains salvageable.
+10. **Governance is bypassable or unusably conservative.** Any in-scope direct write path, false-negative allow, or gate that avoids errors by blocking valid pilot actions fails the operational claim.
+11. **The public oracle is not independent.** If gate logic supplies the task verdict, or a block is counted as success without the upstream oracle, the efficacy result is invalid.
+12. **Placebo explains the lift.** If the real substrate does not beat an equal-overhead sham, the state-specific causal claim is not supported.
+13. **The result depends on tuned or leaked test tasks.** Split leakage, post-result exclusions, reuse of qualification tasks, or silent task mutation invalidates confirmatory evidence.
+14. **The result cannot replicate.** If a clean verifier cannot recompute it or the direction disappears on the declared second benchmark/model, D7 cannot keep the general claim.
 
 ---
 
@@ -212,6 +433,9 @@ No multi-region; no managed-service abstraction before the migration triggers; n
 ---
 
 ## Changelog
+
+- **2026-07-13** — superseded the app-first execution order with Axis P: independent public oracles, native/sham/substrate controls, ToolSandbox first slice, STATE-Bench held-out headline, public corner battery, failure-driven Arrowsmith repair, and clean replication. Lab apps are frozen until D7.
+- **2026-07-13** — separated technical substrate viability from business operability; added the admitted `pm.objective.lab-measured.v2` scorecard, matched outcome/cost/owner-effort thresholds, held-out/production-like requirements, exact revision/run-bound integration receipts, and D7 verdict ceilings.
 
 - **2026-05-03** — initial framework written (wedding-era P3/P4 plan; superseded).
 - **2026-06-10** — re-anchored to the rewrite thesis: ArrowHedge T1–T8 + 12 metrics replace the P3/P4 wedding plan; falsification modes updated to the live enforcement tests; wedding-era packages removed from the workspace (history preserved in git and ADRs).

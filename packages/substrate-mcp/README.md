@@ -23,8 +23,10 @@ Design rules: agents get **no write path that bypasses the gate**; proposals are
 stateless (carried by their artifact events, so restarts/other instances can
 admit them); warn-first at propose, enforced at admit.
 
-Transport: stdio (OS-user trust boundary). The streamable-HTTP transport with
-bearer-token auth is a recorded open work item.
+Transports: stdio (OS-user trust boundary) and streamable HTTP. The HTTP server
+refuses to start without a bearer token of at least 16 characters; transport
+tests cover unauthenticated refusal and all five tools over an authenticated
+client.
 
 Verified by `src/server.test.ts` against a real Postgres substrate, including
 the paired stale-basis case: warned at propose, blocked at admit, not executed.

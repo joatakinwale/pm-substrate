@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "pm.public-eval-corner-synthetic-fixture.v1",
+  "fixtureId": "appworld-22cc237_2-synthetic-v1",
+  "cornerId": "appworld-22cc237_2",
+  "label": "pm-synthetic-conformance",
+  "claimScope": "adapter-conformance",
+  "distribution": "package-synthetic",
+  "containsUpstreamTaskData": false,
+  "containsProtectedContent": false,
+  "nonGating": true,
+  "syntheticNotice": "PM-authored synthetic values; no upstream task data.",
+  "content": {
+    "cases": [
+      {
+        "caseId": "synthetic-exact-request-set",
+        "expectedByReceiver": {
+          "synth_friend_a": 31.25,
+          "synth_friend_b": 18.5
+        },
+        "addedRequests": [
+          { "receiverId": "synth_friend_a", "amount": 31.25 },
+          { "receiverId": "synth_friend_b", "amount": 18.5 }
+        ],
+        "amountTolerance": 0,
+        "expectProjectionMatch": true,
+        "expectMultiplicityMatch": true,
+        "expectWeakness": false
+      },
+      {
+        "caseId": "synthetic-duplicate-collapses-in-projection",
+        "expectedByReceiver": {
+          "synth_friend_a": 31.25,
+          "synth_friend_b": 18.5
+        },
+        "addedRequests": [
+          { "receiverId": "synth_friend_a", "amount": 31.25 },
+          { "receiverId": "synth_friend_a", "amount": 31.25 },
+          { "receiverId": "synth_friend_b", "amount": 18.5 }
+        ],
+        "amountTolerance": 0,
+        "expectProjectionMatch": true,
+        "expectMultiplicityMatch": false,
+        "expectWeakness": true
+      },
+      {
+        "caseId": "synthetic-wrong-amount-does-not-project",
+        "expectedByReceiver": {
+          "synth_friend_a": 31.25,
+          "synth_friend_b": 18.5
+        },
+        "addedRequests": [
+          { "receiverId": "synth_friend_a", "amount": 31.25 },
+          { "receiverId": "synth_friend_b", "amount": 20 }
+        ],
+        "amountTolerance": 0,
+        "expectProjectionMatch": false,
+        "expectMultiplicityMatch": true,
+        "expectWeakness": false
+      }
+    ]
+  }
+}

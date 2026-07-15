@@ -24,6 +24,13 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 const now = (): Timestamp => new Date().toISOString() as Timestamp;
 
+const EVIDENCE_CONTEXT = {
+  appRevision: "fixture-app@abc1234",
+  substrateRevision: "pm-substrate@def5678",
+  runManifestRef: "artifact:fixture-app:run-manifest",
+  boundaryConformanceRef: "artifact:fixture-app:boundary-conformance",
+} as const;
+
 function makeEnvelope(
   tenantId: TenantId,
   outcome: "accepted" | "blocked",
@@ -101,6 +108,7 @@ describeIfDb("executor bridge (admitted envelope → existing app API)", () => {
       envelope: blocked,
       target: { name: "fixture_api", endpoint },
       executedBy: "executor-bridge-test",
+      evidenceContext: EVIDENCE_CONTEXT,
     });
     expect(result).toEqual({ executed: false, reason: "not_accepted" });
     expect(seen).toHaveLength(0);
@@ -113,6 +121,9 @@ describeIfDb("executor bridge (admitted envelope → existing app API)", () => {
       (refusals[0]?.payload as { blockingCauseCodes: string[] })
         .blockingCauseCodes,
     ).toContain("stale_basis");
+    expect(
+      (refusals[0]?.payload as { evidenceContext: unknown }).evidenceContext,
+    ).toEqual(EVIDENCE_CONTEXT);
   });
 
   it("an accepted envelope dispatches exactly once (outcomeHash dedupe)", async () => {
@@ -123,15 +134,18 @@ describeIfDb("executor bridge (admitted envelope → existing app API)", () => {
       target: { name: "fixture_api", endpoint },
       executedBy: "executor-bridge-test",
       body: { command: "publish_post", postId: "p-1" },
+      evidenceContext: EVIDENCE_CONTEXT,
     });
     expect(first).toMatchObject({ executed: true, reason: "dispatched", httpStatus: 200 });
     expect(seen).toHaveLength(1);
     const request = JSON.parse(seen[0]!.body) as {
       outcomeHash: string;
       body: { command: string };
+      evidenceContext?: unknown;
     };
     expect(request.outcomeHash).toBe(accepted.outcomeHash);
     expect(request.body.command).toBe("publish_post");
+    expect(request.evidenceContext).toBeUndefined();
 
     const replay = await executeAdmittedAction(events, {
       tenantId,
@@ -147,6 +161,9 @@ describeIfDb("executor bridge (admitted envelope → existing app API)", () => {
       typePattern: EXECUTOR_DISPATCHED_EVENT_TYPE,
     });
     expect(receipts).toHaveLength(1);
+    expect(
+      (receipts[0]?.payload as { evidenceContext: unknown }).evidenceContext,
+    ).toEqual(EVIDENCE_CONTEXT);
   });
 
   it("endpoint failure is recorded, does not count as dispatched, and a retry succeeds", async () => {

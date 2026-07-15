@@ -1,0 +1,28 @@
+{
+  "per_scenario_results": [
+    {
+      "name": "send_message_with_contact_content_cellular_off_multiple_user_turn",
+      "categories": ["STATE_DEPENDENCY"],
+      "traceback": null,
+      "exception_type": null,
+      "milestone_similarity": 1,
+      "minefield_similarity": 0,
+      "similarity": 1,
+      "turn_count": 14,
+      "milestone_mapping": {
+        "0": [5, 1],
+        "1": [7, 1],
+        "2": [10, 1],
+        "3": [12, 1]
+      },
+      "minefield_mapping": {}
+    }
+  ],
+  "category_aggregated_results": {
+    "STATE_DEPENDENCY": {
+      "similarity": 1,
+      "turn_count": 14
+    }
+  },
+  "git_sha": "165848b9a78cead7ca7fe7c89c688b58e6501219"
+}

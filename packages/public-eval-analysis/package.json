@@ -1,0 +1,30 @@
+{
+  "name": "@pm/public-eval-analysis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Benchmark-agnostic, task-clustered analysis for public pm-substrate evaluations.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "pm-public-eval-analysis": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true",
+    "analyze": "node dist/cli.js analyze",
+    "decide": "node dist/cli.js decide"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}
