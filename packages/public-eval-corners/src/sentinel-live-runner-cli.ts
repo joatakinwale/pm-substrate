@@ -6,9 +6,9 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
-  resolve,
   writeFileSync,
 } from "node:fs";
+import { resolve } from "node:path";
 
 import {
   createSignedSentinelLivePreregistration,
@@ -16,6 +16,7 @@ import {
   verifyContentAddressedSentinelManifest,
   verifySentinelLiveRunInputs,
   type SentinelLivePreregistrationInput,
+  type SentinelLivePostRunVerificationResult,
   type SentinelLiveRunInput,
   type SentinelLiveRuntimePaths,
 } from "./sentinel-live-runner.js";
@@ -23,6 +24,7 @@ import type {
   SentinelLivePreregistration,
   SentinelPreregistrationSignature,
 } from "./sentinel-live-plan.js";
+import { verifySentinelLiveBatchEvidence } from "./sentinel-live-verification.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -105,6 +107,8 @@ function optionalInteger(record: JsonRecord, key: string): number | undefined {
 
 function parsePreregisterRequest(value: unknown): SentinelLivePreregistrationInput {
   if (!isRecord(value)) throw new Error("preregister input must be an object");
+  const pollIntervalMs = optionalInteger(value, "pollIntervalMs");
+  const maxCompletionTokens = optionalInteger(value, "maxCompletionTokens");
   return {
     registrationId: requiredString(value, "registrationId"),
     ...(typeof value.registeredAt === "string" ? { registeredAt: value.registeredAt } : {}),
@@ -112,17 +116,16 @@ function parsePreregisterRequest(value: unknown): SentinelLivePreregistrationInp
     pricingAccessedAt: requiredString(value, "pricingAccessedAt"),
     checkoutPath: requiredString(value, "checkoutPath"),
     runtimePaths: runtimePaths(value.runtimePaths),
-    ...(optionalInteger(value, "pollIntervalMs") === undefined
-      ? {}
-      : { pollIntervalMs: optionalInteger(value, "pollIntervalMs") }),
-    ...(optionalInteger(value, "maxCompletionTokens") === undefined
-      ? {}
-      : { maxCompletionTokens: optionalInteger(value, "maxCompletionTokens") }),
+    ...(pollIntervalMs === undefined ? {} : { pollIntervalMs }),
+    ...(maxCompletionTokens === undefined ? {} : { maxCompletionTokens }),
   };
 }
 
 function parseRunRequest(value: unknown): RunRequest {
   if (!isRecord(value)) throw new Error("run input must be an object");
+  const startupTimeoutMs = optionalInteger(value, "startupTimeoutMs");
+  const attemptTimeoutMs = optionalInteger(value, "attemptTimeoutMs");
+  const shutdownGraceMs = optionalInteger(value, "shutdownGraceMs");
   return {
     preregistrationPath: requiredString(value, "preregistrationPath"),
     signaturePath: requiredString(value, "signaturePath"),
@@ -134,15 +137,9 @@ function parseRunRequest(value: unknown): RunRequest {
     batchRoot: requiredString(value, "batchRoot"),
     attemptRegistryRoot: requiredString(value, "attemptRegistryRoot"),
     runtimePaths: runtimePaths(value.runtimePaths),
-    ...(optionalInteger(value, "startupTimeoutMs") === undefined
-      ? {}
-      : { startupTimeoutMs: optionalInteger(value, "startupTimeoutMs") }),
-    ...(optionalInteger(value, "attemptTimeoutMs") === undefined
-      ? {}
-      : { attemptTimeoutMs: optionalInteger(value, "attemptTimeoutMs") }),
-    ...(optionalInteger(value, "shutdownGraceMs") === undefined
-      ? {}
-      : { shutdownGraceMs: optionalInteger(value, "shutdownGraceMs") }),
+    ...(startupTimeoutMs === undefined ? {} : { startupTimeoutMs }),
+    ...(attemptTimeoutMs === undefined ? {} : { attemptTimeoutMs }),
+    ...(shutdownGraceMs === undefined ? {} : { shutdownGraceMs }),
   };
 }
 
@@ -208,6 +205,8 @@ async function run(): Promise<void> {
     attemptRegistryRoot: request.attemptRegistryRoot,
     runtimePaths: request.runtimePaths,
     anthropicApiKey,
+    postRunVerify: async (verificationInput) =>
+      verifySentinelLiveBatchEvidence(verificationInput) as unknown as SentinelLivePostRunVerificationResult,
     ...(request.startupTimeoutMs === undefined
       ? {}
       : { startupTimeoutMs: request.startupTimeoutMs }),

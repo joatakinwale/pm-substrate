@@ -23,18 +23,20 @@ pm-substrate is that enforcement medium: what the workspace accepts as actionabl
 
 **The immediate objective (see ROADMAP):** prove—or falsify—the substrate's causal benefit on pinned public tasks that are already known to expose agent-state failure. Official benchmark task completion is the outcome; native and equal-overhead sham arms are the controls; internal events, blocks, and receipts are mechanism diagnostics only. PluggedInSocial and ArrowHedge are frozen until the public claim passes held-out evaluation, anti-degenerate controls, clean artifact verification, and replication. The executable protocol is [`docs/objective-falsification.md`](./docs/objective-falsification.md).
 
-**Current public-proof status (2026-07-13):** each of the six program steps now
-has a concrete repository artifact, but that is not the same as an executed
-proof. ToolSandbox completed a deterministic real-sidecar/process-restart
-qualification: every arm received the unchanged upstream score of `1.0`, even
-though native and sham duplicated the target side effect in the derivative.
-That is mechanism evidence plus an oracle blind spot, not agent efficacy.
-STATE-Bench now has disjoint train qualification/extraction plans, a complete
-test decision bridge, exact per-cell command planning, oracle-context redaction,
-and a strict raw-evidence contract, but zero official trajectories and no raw
-transport capture. The corner battery has no real matched-agent run, and D7
-still reports `not_eligible` pending raw-derived facts, external trust,
-replication, and a separate owner decision. Causal benefit is unproven. See the
+**Current public-proof status (2026-07-14):** causal benefit remains unproven.
+An adversarial audit rejected the first Sentinel 27-cell design before any
+headline execution: useful state lived in a task-specific adapter `Map`, all
+arms used the same core only for evidence admission, the native arm was an
+independent discard control rather than Microsoft's unpublished paper agent,
+speed factor 4 made the positive MicroHub trajectories unreachable, and the
+upstream no-op oracle rewards an agent that exits without monitoring. That
+matrix is excluded from efficacy use. The replacement uses the published
+speed-1 horizon, one task-agnostic browser agent, and identical native, sham,
+plain-KV, and production-continuity interfaces. MicroHub is qualification-only;
+a frozen 12-task cross-application set is procedural holdout validation, not a
+powered confirmatory result. No replacement benchmark cell has yet established
+benefit. D7 remains `not_eligible` pending raw outcomes, a powered task-clustered
+confirmation, external trust, replication, and a separate owner decision. See the
 exact run results and blockers in
 [`docs/public-benchmark-status-2026-07-13.md`](./docs/public-benchmark-status-2026-07-13.md).
 

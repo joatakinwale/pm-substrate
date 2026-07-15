@@ -12,6 +12,7 @@ import {
   buildSentinelStateWriteRequest,
   createPendingWriteBarrier,
   extractContactUrl,
+  nextSentinelPollDeadline,
   parseAgentDecision,
   parseAgentStateResponse,
   parseSafeNumericBrowserObservation,
@@ -81,6 +82,13 @@ async function listen(server: Server): Promise<string> {
 }
 
 describe("Sentinel live agent state boundary", () => {
+  it("keeps a monotonic poll cadence without accumulating provider latency", () => {
+    expect(nextSentinelPollDeadline(1_000, 1_400, 1_000)).toBe(2_000);
+    expect(nextSentinelPollDeadline(1_000, 2_000, 1_000)).toBe(3_000);
+    expect(nextSentinelPollDeadline(1_000, 4_250, 1_000)).toBe(5_000);
+    expect(() => nextSentinelPollDeadline(0, 1, 0)).toThrow(/positive/u);
+  });
+
   it("derives deterministic, purpose-separated 32-character lowercase hex operation IDs", () => {
     const attemptId = "opaque-attempt-0001";
     const read = sentinelOperationId(attemptId, 1, "state-read");
@@ -141,17 +149,17 @@ describe("Sentinel live agent state boundary", () => {
   });
 
   it("binds the independent browser-origin response to one canonical star observation", () => {
-    const body = JSON.stringify({ success: true, repository: { stars: 1847 } });
+    const body = JSON.stringify({ repository: { stars: 1847 } });
     const observation = parseSentinelBrowserStarResponse(body);
     expect(observation.value).toBe("1847");
     expect(observation.responseSha256).toMatch(/^[a-f0-9]{64}$/u);
     expect(parseSentinelBrowserStarResponse(body)).toEqual(observation);
     for (const invalid of [
       "not json",
-      JSON.stringify({ success: false, repository: { stars: 1847 } }),
-      JSON.stringify({ success: true, repository: { stars: "1847" } }),
-      JSON.stringify({ success: true, repository: { stars: -1 } }),
-      JSON.stringify({ success: true, repository: { stars: 1_000_000_000 } }),
+      JSON.stringify({ success: true, repository: { stars: 1847 } }),
+      JSON.stringify({ repository: { stars: "1847" } }),
+      JSON.stringify({ repository: { stars: -1 } }),
+      JSON.stringify({ repository: { stars: 1_000_000_000 } }),
     ]) {
       expect(() => parseSentinelBrowserStarResponse(invalid)).toThrow();
     }

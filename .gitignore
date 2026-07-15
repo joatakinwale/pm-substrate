@@ -13,6 +13,8 @@ node_modules/
 .vscode/
 .idea/
 *.tsbuildinfo
+**/__pycache__/
+*.py[cod]
 pgdata/
 trash/
 

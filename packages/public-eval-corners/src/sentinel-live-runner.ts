@@ -44,6 +44,12 @@ import {
   type SentinelStateFinalReceipt,
   type StartSentinelStateSidecarInput,
 } from "./sentinel-state-sidecar.js";
+import {
+  startSentinelAnthropicProviderProxy,
+  type SentinelAnthropicProviderProxy as RunningSentinelAnthropicProviderProxy,
+  type SentinelAnthropicProviderProxyFinalReceipt as SentinelAnthropicProviderFinalReceipt,
+  type StartSentinelAnthropicProviderProxyInput,
+} from "./sentinel-anthropic-provider-proxy.js";
 
 const SENTINEL_MANIFEST_SHA256 =
   "9da3305715740840299a1acc8b47bacf9a706eb293ad0cde3aee5d7e3adf1989";
@@ -139,23 +145,6 @@ export interface SignedSentinelLivePreregistration {
   readonly expectedPreregistrationSha256: string;
 }
 
-export interface SentinelAnthropicProviderFinalReceipt {
-  readonly receiptHash: string;
-}
-
-export interface RunningSentinelAnthropicProviderProxy {
-  readonly origin: string;
-  readonly authorizationToken: string;
-  close(): Promise<SentinelAnthropicProviderFinalReceipt>;
-}
-
-export interface StartSentinelAnthropicProviderProxyInput {
-  readonly outputRoot: string;
-  readonly anthropicApiKey: string;
-  readonly authorizationToken?: string;
-  readonly port?: number;
-}
-
 export interface SentinelLivePostRunVerificationInput {
   readonly batchRoot: string;
   readonly executionManifestPath: string;
@@ -223,6 +212,11 @@ export interface SentinelLiveRunnerDependencies {
   readonly opaqueAttemptId: () => string;
   readonly opaqueToken: () => string;
   readonly now: () => string;
+  readonly retainScenarioDefinition: (
+    checkoutPath: string,
+    inputRoot: string,
+    taskId: SentinelLiveCell["taskId"],
+  ) => void;
   readonly startStateSidecar: (
     input: StartSentinelStateSidecarInput,
   ) => Promise<RunningSentinelStateSidecar>;
@@ -262,11 +256,16 @@ function sha256(value: string | Uint8Array): string {
 }
 
 function exactRegularFile(path: string, role: SentinelRuntimeArtifactRole): SentinelLiveRuntimeArtifact {
-  const actualPath = realpathSync(resolve(path));
+  const requestedPath = resolve(path);
+  const actualPath = realpathSync(requestedPath);
   const stat = statSync(actualPath);
   if (!stat.isFile()) throw new Error(`${role} must resolve to a regular file`);
   const bytes = readFileSync(actualPath);
-  return { role, path: actualPath, byteLength: bytes.byteLength, sha256: sha256(bytes) };
+  // Preserve executable symlink paths (notably a Python virtual environment's
+  // bin/python). Invoking the realpath can bypass the virtual environment even
+  // though the retained bytes are identical. The target bytes still define the
+  // content identity recorded in the runtime closure.
+  return { role, path: requestedPath, byteLength: bytes.byteLength, sha256: sha256(bytes) };
 }
 
 function command(repositoryRoot: string, executable: string, args: readonly string[]): string {
@@ -532,7 +531,7 @@ export function createSignedSentinelLivePreregistration(
       repositoryUrl: "https://github.com/microsoft/sentinel_environments",
       revision: EXPECTED_SENTINEL_REVISION,
       manifestSha256: SENTINEL_MANIFEST_SHA256,
-      speedFactor: 4,
+      speedFactor: 1,
       publishedDefaultSpeedFactor: 1,
       qualificationOnly: true,
     },
@@ -761,10 +760,22 @@ function createAgentConfig(
   return { path, sha256: sha256(readFileSync(path)) };
 }
 
-async function absentDefaultProvider(
-  _input: StartSentinelAnthropicProviderProxyInput,
-): Promise<RunningSentinelAnthropicProviderProxy> {
-  throw new Error("Anthropic Sentinel provider proxy is not linked into this runtime");
+function retainPinnedScenarioDefinition(
+  checkoutPath: string,
+  inputRoot: string,
+  taskId: SentinelLiveCell["taskId"],
+): void {
+  const sourcePath = resolve(checkoutPath, "scenarios", "microhub", `${taskId.replace(/^microhub-/u, "")}.json`);
+  const sourceStat = lstatSync(sourcePath);
+  if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+    throw new Error("pinned Sentinel scenario must be a regular non-symlink file");
+  }
+  const bytes = readFileSync(sourcePath);
+  const expected = sentinelLiveRequiredTasks[taskId].scenarioSha256;
+  if (sha256(bytes) !== expected) throw new Error("pinned Sentinel scenario bytes changed");
+  const targetPath = resolve(inputRoot, "scenario-definition.json");
+  writeFileSync(targetPath, bytes, { flag: "wx", mode: 0o400 });
+  chmodSync(targetPath, 0o400);
 }
 
 export function createSentinelLiveRunnerDependencies(): SentinelLiveRunnerDependencies {
@@ -775,8 +786,9 @@ export function createSentinelLiveRunnerDependencies(): SentinelLiveRunnerDepend
     opaqueAttemptId: () => `slc-${randomBytes(20).toString("hex")}`,
     opaqueToken: () => randomBytes(32).toString("base64url"),
     now: () => new Date().toISOString(),
+    retainScenarioDefinition: retainPinnedScenarioDefinition,
     startStateSidecar: startSentinelStateSidecar,
-    startProviderProxy: absentDefaultProvider,
+    startProviderProxy: startSentinelAnthropicProviderProxy,
     superviseAttempt: superviseSentinelAttempt,
   };
 }
@@ -863,6 +875,7 @@ export async function runSentinelLiveBatch(
       if (portFromOrigin(provider.origin) !== providerPort) {
         throw new Error("provider proxy did not bind its assigned port");
       }
+      dependencies.retainScenarioDefinition(input.checkoutPath, inputRoot, cell.taskId);
       const configPath = resolve(inputRoot, "agent-config.json");
       const agentConfig = createAgentConfig(
         configPath,

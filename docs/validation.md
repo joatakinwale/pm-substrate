@@ -12,7 +12,9 @@ layer:
 2. **Public causal efficacy** — on pinned independent tasks, the same agent with
    real substrate state beats both native and equal-overhead sham controls on
    the benchmark's unchanged strict outcome while reliability, collateral
-   state, false-block, cost, and latency guardrails hold.
+   state, false-block, cost, and latency guardrails hold. A matched plain-KV
+   arm determines whether any lift is substrate-specific or merely durable
+   memory.
 3. **Deferred transfer/business operability** — only after public efficacy is
    kept, external apps onboard with zero substrate edits and demonstrate useful
    operating outcomes at acceptable owner effort and cost.
@@ -109,6 +111,27 @@ the task output and receives no arm/treatment metadata. This reduces accidental
 leakage but is not an OS sandbox: independent review and execution receipts must
 still rule out host inspection, order inference, covert output channels, and a
 runner that did not invoke the pinned oracle.
+
+The first attempted live corner was the pinned Sentinel MicroHub star monitor.
+Its unexecuted 27-cell design is excluded from causal use: useful state lived in
+a task-specific adapter `Map`, speed factor 4 made both positive star
+trajectories unreachable, and the no-op oracle could pass immediate exit. The
+release also does not contain the exact Microsoft paper agent/configuration/raw
+logs, so the discard control is labeled an independent matched control.
+
+The production replacement uses published speed 1, one task-agnostic real-
+Chromium/Claude agent, strict monitoring through 630 seconds, and four fixed-
+width state arms: no durable state, continuity-backed sham, minimal durable
+plain KV, and production continuity. Raw replay must bind browser screenshots
+and passive network bytes, exact provider IDs/schema/usage, state requests and
+responses, process identities, collateral, timing, and the unchanged upstream
+result. MicroHub is qualification-only. The frozen 12-task cross-application
+procedural holdout is also ineligible for material benefit because it contains
+only four independent relative tasks. A separately powered, externally
+anchored, task-clustered confirmatory universe is mandatory.
+Any missing or inconsistent cell blocks the phase conclusion. Local
+verification alone remains ineligible; external trust and replication are
+required even after a powered speed-1 confirmation.
 
 ### P4: analysis and decision
 

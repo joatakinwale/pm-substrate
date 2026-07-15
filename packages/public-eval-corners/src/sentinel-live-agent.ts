@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { resolve } from "node:path";
+import { performance } from "node:perf_hooks";
 import { setImmediate as waitForImmediate } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
@@ -59,6 +60,7 @@ interface AgentRuntimeConfig {
 }
 
 export interface SentinelBrowserStarObservation {
+  readonly captureId: string;
   readonly value: string;
   readonly responseSha256: string;
 }
@@ -68,6 +70,22 @@ export type SentinelOperationKind = "state-read" | "provider-decision" | "state-
 export interface PendingWriteBarrier {
   track(work: Promise<void>): void;
   flush(): Promise<void>;
+}
+
+export function nextSentinelPollDeadline(
+  previousDeadlineMs: number,
+  completedAtMs: number,
+  intervalMs: number,
+): number {
+  if (![previousDeadlineMs, completedAtMs, intervalMs].every(Number.isFinite) || intervalMs <= 0) {
+    throw new Error("poll deadline inputs must be finite and intervalMs must be positive");
+  }
+  let nextDeadlineMs = previousDeadlineMs + intervalMs;
+  if (nextDeadlineMs <= completedAtMs) {
+    const missedIntervals = Math.floor((completedAtMs - nextDeadlineMs) / intervalMs) + 1;
+    nextDeadlineMs += missedIntervals * intervalMs;
+  }
+  return nextDeadlineMs;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -257,7 +275,11 @@ export function parseSafeNumericBrowserObservation(value: unknown): string {
 
 export function parseSentinelBrowserStarResponse(
   body: string,
+  captureId = "test-capture",
 ): SentinelBrowserStarObservation {
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/u.test(captureId)) {
+    throw new Error("browser star observation capture ID is invalid");
+  }
   if (Buffer.byteLength(body, "utf8") > MAX_RESPONSE_BYTES) {
     throw new Error("browser star observation response size is invalid");
   }
@@ -267,7 +289,11 @@ export function parseSentinelBrowserStarResponse(
   } catch {
     throw new Error("browser star observation response is not JSON");
   }
-  if (!isRecord(parsed) || parsed.success !== true || !isRecord(parsed.repository)) {
+  if (!isRecord(parsed)) {
+    throw new Error("browser star observation response is invalid");
+  }
+  exactKeys(parsed, ["repository"], "browser star observation response");
+  if (!isRecord(parsed.repository)) {
     throw new Error("browser star observation response is invalid");
   }
   const stars = parsed.repository.stars;
@@ -275,15 +301,18 @@ export function parseSentinelBrowserStarResponse(
     throw new Error("browser star observation is not a safe numeric value");
   }
   return {
+    captureId,
     value: String(stars),
     responseSha256: sha256(Buffer.from(body, "utf8")),
   };
 }
 
-async function observeBrowserStars(page: Page): Promise<SentinelBrowserStarObservation> {
-  const result = await page.evaluate(async () => {
-    const response = await fetch("/api/data/microhub-repository", {
-      cache: "no-store",
+async function observeBrowserStars(
+  page: Page,
+  captureId: string,
+): Promise<SentinelBrowserStarObservation> {
+  const result = await page.evaluate(async (id) => {
+    const response = await fetch(`/api/data/microhub-repository?pm_capture=${encodeURIComponent(id)}`, {
       headers: { accept: "application/json" },
       method: "GET",
     });
@@ -293,16 +322,18 @@ async function observeBrowserStars(page: Page): Promise<SentinelBrowserStarObser
       status: response.status,
       url: response.url,
     };
-  });
+  }, captureId);
   const url = new URL(result.url);
   if (
     url.pathname !== "/api/data/microhub-repository" ||
+    url.searchParams.get("pm_capture") !== captureId ||
+    [...url.searchParams.keys()].some((key) => key !== "pm_capture") ||
     result.status !== 200 ||
     result.contentType.split(";", 1)[0]?.trim().toLowerCase() !== "application/json"
   ) {
     throw new Error("browser star observation did not use the expected read-only endpoint");
   }
-  return parseSentinelBrowserStarResponse(result.body);
+  return parseSentinelBrowserStarResponse(result.body, captureId);
 }
 
 export function buildSentinelStateReadRequest(operationId: string): SentinelStateReadRequest {
@@ -514,6 +545,7 @@ async function run(): Promise<void> {
     attemptId: config.attemptId,
     pid: process.pid,
     ppid: process.ppid,
+    startedAt: new Date().toISOString(),
     taskUrlSha256: sha256(config.taskUrl),
     taskPromptSha256: sha256(config.taskPrompt),
     pollIntervalMs: config.pollIntervalMs,
@@ -533,11 +565,12 @@ async function run(): Promise<void> {
     const contactUrl = extractContactUrl(config.taskPrompt);
 
     let poll = 0;
+    let nextPollDeadlineMs = performance.now();
     while (true) {
       poll += 1;
       const pollId = String(poll).padStart(4, "0");
       const screenshotPath = resolve(config.outputRoot, `poll-${pollId}.png`);
-      const browserObservation = await observeBrowserStars(page);
+      const browserObservation = await observeBrowserStars(page, `poll-${pollId}`);
       await networkCapture.flush();
       const screenshot = await page.screenshot({
         path: screenshotPath,
@@ -584,6 +617,7 @@ async function run(): Promise<void> {
         poll,
         screenshotPath: `poll-${pollId}.png`,
         screenshotSha256,
+        browserObservationCaptureId: browserObservation.captureId,
         browserObservationValue: browserObservation.value,
         browserObservationResponseSha256: browserObservation.responseSha256,
         observedAt,
@@ -609,7 +643,13 @@ async function run(): Promise<void> {
         });
         return;
       }
-      await page.waitForTimeout(config.pollIntervalMs);
+      const afterPollMs = performance.now();
+      nextPollDeadlineMs = nextSentinelPollDeadline(
+        nextPollDeadlineMs,
+        afterPollMs,
+        config.pollIntervalMs,
+      );
+      await page.waitForTimeout(Math.max(0, nextPollDeadlineMs - performance.now()));
       await page.reload({ waitUntil: "networkidle", timeout: 60_000 });
     }
   } finally {

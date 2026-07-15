@@ -236,6 +236,35 @@ describe("Sentinel live state sidecar", () => {
     }
   });
 
+  it("drains an in-flight request before closing the audit and sealing final counts", async () => {
+    const bearerToken = token("drain-in-flight");
+    const sidecar = await startSentinelStateSidecar({
+      mode: "substrate",
+      outputDirectory: temporaryDirectory("drain-in-flight"),
+      bearerToken,
+      tenant: "sentinel-public-eval",
+      minimumLatencyMs: 200,
+    });
+    const pending = invoke(
+      sidecar,
+      "write",
+      canonicalWrite(new Date().toISOString()),
+      bearerToken,
+    );
+    const deadline = performance.now() + 2_000;
+    while (readFileSync(sidecar.auditPath).byteLength === 0 && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect(readFileSync(sidecar.auditPath).byteLength).toBeGreaterThan(0);
+
+    const final = await sidecar.stop();
+    expect((await pending).status).toBe(200);
+    expect(final.requestCounts).toMatchObject({ total: 1, writes: 1, rejected: 0 });
+    const entries = readSentinelStateAuditFile(sidecar.auditPath);
+    expect(entries).toHaveLength(1);
+    expect(verifySentinelStateSidecarEvidence(sidecar.readyReceipt, final, entries).valid).toBe(true);
+  });
+
   it("rejects unauthenticated, duplicate, and unknown-key requests and detects tampering", async () => {
     const bearerToken = token("do-not-persist-this-secret");
     const sidecar = await startSentinelStateSidecar({

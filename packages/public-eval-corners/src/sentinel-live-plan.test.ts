@@ -39,7 +39,7 @@ function preregistration(): SentinelLivePreregistration {
       repositoryUrl: "https://github.com/microsoft/sentinel_environments",
       revision: "0faca33cc58ea62e97a928b67cd3beec7176b408",
       manifestSha256: "9da3305715740840299a1acc8b47bacf9a706eb293ad0cde3aee5d7e3adf1989",
-      speedFactor: 4,
+      speedFactor: 1,
       publishedDefaultSpeedFactor: 1,
       qualificationOnly: true,
     },
@@ -163,6 +163,14 @@ describe("Sentinel live preregistration", () => {
     expect(verification.cells.map(({ sequence }) => sequence)).toEqual(
       Array.from({ length: 27 }, (_, index) => index + 1),
     );
+    for (let index = 0; index < verification.cells.length; index += 3) {
+      const block = verification.cells.slice(index, index + 3);
+      expect(new Set(block.map(({ taskId }) => taskId))).toHaveLength(1);
+      expect(new Set(block.map(({ repeatId }) => repeatId))).toHaveLength(1);
+      expect(new Set(block.map(({ arm }) => arm))).toEqual(
+        new Set(["native", "sham", "substrate"]),
+      );
+    }
   });
 
   it("builds a deterministic but seed-sensitive complete schedule", () => {

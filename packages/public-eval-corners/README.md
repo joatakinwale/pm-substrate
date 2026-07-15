@@ -9,12 +9,13 @@ corner evaluations:
 - AppWorld task `22cc237_2`
 - SentinelBench MicroHub relative, no-op, and absolute star monitoring
 
-The package does **not** include a benchmark agent, credentials, or a claim that
-the substrate improves behavior. Live agent and oracle commands are supplied by
-an external experiment manifest. The harness executes them and preserves raw
-evidence without interpreting the oracle outcome. The existing JSON fixtures
-are original, PM-authored synthetic examples. They contain no upstream task
-records, answers, prompts, databases, or protected AppWorld material.
+The package includes one narrowly scoped, real-browser Sentinel qualification
+agent but no credentials and no claim that the substrate improves behavior.
+Other live agent and oracle commands are supplied by an external experiment
+manifest. The harness executes them and preserves raw evidence without
+interpreting the oracle outcome. The existing JSON fixtures are original,
+PM-authored synthetic examples. They contain no upstream task records, answers,
+prompts, databases, or protected AppWorld material.
 
 There are three intentionally separate evidence classes:
 
@@ -85,6 +86,51 @@ no-op task plus rejection of a false contact, and the absolute-threshold
 expected-allow control. The absolute control must pass after its authored
 threshold and reject a premature contact. This is still manual-clock oracle
 qualification, not a browser-agent efficacy result.
+
+## Sentinel causal stress test
+
+The original `pm-sentinel-live` 27-cell MicroHub design is retained only as
+excluded harness history. It cannot establish attribution: the useful baseline
+lived in an adapter-owned in-memory `Map`, all arms used the substrate core only
+for evidence admission, the discard arm was not Microsoft's unpublished paper
+agent, and a plain KV store was never tested. Its speed-factor-4 schedule also
+made the pinned positive star trajectories unreachable, while the upstream
+no-op evaluator could pass an agent that exited immediately. No result from
+that design may be promoted.
+
+The production replacement is fail-closed and uses:
+
+- the exact pinned Microsoft source at
+  `0faca33cc58ea62e97a928b67cd3beec7176b408` and published speed factor `1`;
+- one task-agnostic real-Chromium agent with a fresh stateless model call at
+  each decision and no scenario JSON, SQL, trigger time, task ID, or arm label;
+- four identical fixed-width state interfaces: `native` discards, `sham`
+  performs continuity work but returns irrelevant state, `plain-kv` persists
+  useful state in a minimal durable file, and `substrate` uses the production
+  `PostgresContinuityLedger` with full-chain verification;
+- raw browser, provider, state, process, upstream-oracle, cost, and timing
+  evidence, plus strict no-op liveness through the 630-second horizon;
+- zero retries, no task replacement, and block randomization by task and repeat.
+
+MicroHub's relative/absolute/no-op triplet is qualification-only. The frozen
+12-task procedural holdout spans MicroHood, MicroMail, MicroScholar, and
+MicroTube and has sorted task/hash manifest
+`f24feec519f0eb90bebaefd8d2c4c72cab9b208e6e6f2ec6629f49adeb9b2576`.
+It contains only four independent relative tasks, so it may validate execution
+and controls but may never emit material benefit. A later powered-confirmatory
+phase must externally freeze a larger untouched task catalog, its sample-size
+justification, task-clustered analysis, and multiplicity rule before execution.
+That catalog is now pre-outcome frozen to all 50 scenarios in the five untouched
+environments MicroChat, MicroDin, MicroFy, MicroGram, and MicroLendar: 19
+relative, 21 absolute, and 10 no-op tasks; sorted task/hash manifest
+`48e1695b0728000c8f8e738f9d72273861bf6216e4c609935650a09067d87bc6`.
+
+Provider failures, timeouts, missing artifacts, deliberate early termination,
+and every terminal error stay attached to the declared cell. Infrastructure
+incompleteness blocks a conclusion and never authorizes a replacement. A
+substrate win over native and sham shows that useful durable state mattered;
+substrate-specific attribution additionally requires a declared contrast over
+plain KV on integrity, isolation, conflict, or recovery behavior.
 
 ## Behavioral matched-arm protocol
 

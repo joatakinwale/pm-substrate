@@ -66,7 +66,7 @@ function fixture(attemptId = "sentinel-attempt-001"): TestFixture {
   const configBytes = JSON.stringify({
     server_url: "http://127.0.0.1:18080",
     frontend_url: "http://127.0.0.1:15173",
-    speed_factor: 4,
+    speed_factor: 1,
     agent_subprocess: ["/synthetic-agent", "--url", "__TASK_URL__", "--prompt", "__TASK_PROMPT__"],
   });
   const agentConfig = writeIdentity(agentConfigPath, configBytes);
@@ -98,7 +98,7 @@ function fixture(attemptId = "sentinel-attempt-001"): TestFixture {
       viewportWidth: 1_280,
       viewportHeight: 720,
       startupTimeoutMs: 1_000,
-      attemptTimeoutMs: 1_000,
+      attemptTimeoutMs: 720_000,
       shutdownGraceMs: 100,
     },
   };
@@ -231,7 +231,7 @@ describe("Sentinel upstream attempt supervisor", () => {
       "--frontend-url",
       "http://127.0.0.1:15173",
       "--speed-factor",
-      "4",
+      "1",
       "--task",
       "microhub-stars-relative-passive",
     ]);
@@ -250,6 +250,9 @@ describe("Sentinel upstream attempt supervisor", () => {
     expect(harness?.environment).not.toHaveProperty("MODE");
     const server = runtime.spawns.find(({ role }) => role === "server");
     const frontend = runtime.spawns.find(({ role }) => role === "frontend");
+    expect(frontend?.arguments).toEqual([
+      "run", "dev", "--", "--host", "127.0.0.1", "--port", "15173", "--strictPort",
+    ]);
     expect(server?.environment).not.toHaveProperty("PM_SENTINEL_PROVIDER_TOKEN");
     expect(frontend?.environment).toMatchObject({ SENTINEL_API_BASE: "http://127.0.0.1:18080" });
     expect(runtime.terminatedRoles.sort()).toEqual(["frontend", "harness", "server"]);
@@ -310,7 +313,7 @@ describe("Sentinel upstream attempt supervisor", () => {
     const configBytes = JSON.stringify({
       server_url: "http://127.0.0.1:18080",
       frontend_url: "http://127.0.0.1:15173",
-      speed_factor: 4,
+      speed_factor: 1,
       agent_subprocess: ["/synthetic-agent", "--arm", "substrate"],
     });
     writeFileSync(testFixture.input.agentConfig.path, configBytes);
@@ -324,6 +327,27 @@ describe("Sentinel upstream attempt supervisor", () => {
         runtime.dependencies,
       ),
     ).rejects.toThrow("discloses treatment");
+    expect(runtime.spawns).toEqual([]);
+  });
+
+  it("rejects pnpm because its run separator leaves Vite on the public default bind", async () => {
+    const testFixture = fixture("sentinel-pnpm-red-001");
+    const pnpm = writeIdentity(join(testFixture.root, "bin", "pnpm"), "synthetic-pnpm");
+    const runtime = fakeRuntime(testFixture);
+    await expect(superviseSentinelAttempt(
+      { ...testFixture.input, frontendExecutable: pnpm },
+      runtime.dependencies,
+    )).rejects.toThrow("frontendExecutable must resolve to npm");
+    expect(runtime.spawns).toEqual([]);
+  });
+
+  it("rejects an early caller-selected timeout that could manufacture control failures", async () => {
+    const testFixture = fixture("sentinel-timeout-pin-red-001");
+    const runtime = fakeRuntime(testFixture);
+    await expect(superviseSentinelAttempt(
+      { ...testFixture.input, attemptTimeoutMs: 629_000 },
+      runtime.dependencies,
+    )).rejects.toThrow("attemptTimeoutMs must remain pinned to 720000");
     expect(runtime.spawns).toEqual([]);
   });
 });

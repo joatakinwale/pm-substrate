@@ -203,7 +203,7 @@ export interface SentinelAttemptPlan {
   readonly outputRoot: string;
   readonly scenario: SentinelExecutableIdentity;
   readonly agentConfig: SentinelExecutableIdentity;
-  readonly speedFactor: 4;
+  readonly speedFactor: 1;
   readonly serverUrl: string;
   readonly frontendUrl: string;
   readonly commands: readonly SentinelCommandPlan[];
@@ -469,7 +469,7 @@ function verifyAgentConfig(
   if (parsed.server_url !== serverUrl || parsed.frontend_url !== frontendUrl) {
     throw new Error("agentConfig loopback URLs do not match reserved ports");
   }
-  if (parsed.speed_factor !== 4) throw new Error("agentConfig speed_factor must be exactly 4");
+  if (parsed.speed_factor !== 1) throw new Error("agentConfig speed_factor must be exactly 1");
   if (!Array.isArray(parsed.agent_subprocess) || parsed.agent_subprocess.length === 0) {
     throw new Error("agentConfig.agent_subprocess must be a non-empty direct argv array");
   }
@@ -615,8 +615,8 @@ async function prepareAttempt(
   if (!/^python(?:3(?:\.\d+)?)?$/u.test(basename(realpathSync(pythonExecutable.path)))) {
     throw new Error("pythonExecutable must resolve to a Python executable name");
   }
-  if (!/^(?:npm|npm-cli\.js|pnpm(?:\.c?js)?)$/u.test(basename(realpathSync(frontendExecutable.path)))) {
-    throw new Error("frontendExecutable must resolve to npm or pnpm");
+  if (!/^(?:npm|npm-cli\.js)$/u.test(basename(realpathSync(frontendExecutable.path)))) {
+    throw new Error("frontendExecutable must resolve to npm");
   }
   const stateToken = requiredOpaqueToken(input.opaqueEnvironment.stateToken, "stateToken");
   const providerToken = requiredOpaqueToken(input.opaqueEnvironment.providerToken, "providerToken");
@@ -679,7 +679,7 @@ async function prepareAttempt(
         "--frontend-url",
         frontendUrl,
         "--speed-factor",
-        "4",
+        "1",
         "--task",
         input.taskId,
       ],
@@ -698,7 +698,10 @@ async function prepareAttempt(
     throw new Error("required Sentinel runtime collateral is missing");
   }
   const startupMs = boundedTimeout(input.startupTimeoutMs, 60_000, "startupTimeoutMs");
-  const attemptMs = boundedTimeout(input.attemptTimeoutMs, 300_000, "attemptTimeoutMs");
+  if (input.attemptTimeoutMs !== undefined && input.attemptTimeoutMs !== 720_000) {
+    throw new Error("attemptTimeoutMs must remain pinned to 720000 for speed factor 1");
+  }
+  const attemptMs = 720_000;
   const shutdownGraceMs = boundedTimeout(input.shutdownGraceMs, 5_000, "shutdownGraceMs");
   const opaqueKeys = new Set(Object.values(OPAQUE_ENVIRONMENT_NAMES));
   const planBody = {
@@ -710,7 +713,7 @@ async function prepareAttempt(
     outputRoot,
     scenario,
     agentConfig,
-    speedFactor: 4 as const,
+    speedFactor: 1 as const,
     serverUrl,
     frontendUrl,
     commands,

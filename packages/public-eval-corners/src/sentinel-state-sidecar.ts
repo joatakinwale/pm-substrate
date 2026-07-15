@@ -455,6 +455,8 @@ export async function startSentinelStateSidecar(
   const entries: SentinelStateAuditEntry[] = [];
   let auditHead = HASH_GENESIS;
   let stopped: Promise<SentinelStateFinalReceipt> | undefined;
+  const inFlightRequests = new Set<Promise<void>>();
+  let acceptingRequests = true;
 
   const stateSha256 = (): string =>
     sha256Hex(canonicalJson(persistedWrites as unknown as JsonValue));
@@ -470,8 +472,13 @@ export async function startSentinelStateSidecar(
   };
 
   const server = createServer((request, response) => {
+    if (!acceptingRequests) {
+      response.writeHead(503, { connection: "close", "content-length": "0" });
+      response.end();
+      return;
+    }
     const beganAt = performance.now();
-    void handleRequest({
+    const body = handleRequest({
       request,
       bearerToken: config.bearerToken,
       tenant: config.tenant,
@@ -537,6 +544,10 @@ export async function startSentinelStateSidecar(
           config.minimumLatencyMs,
         );
       });
+    let operation!: Promise<void>;
+    operation = body.finally(() => inFlightRequests.delete(operation));
+    inFlightRequests.add(operation);
+    void operation;
   });
 
   try {
@@ -576,7 +587,11 @@ export async function startSentinelStateSidecar(
 
   const stop = (): Promise<SentinelStateFinalReceipt> => {
     stopped ??= (async () => {
-      await closeServer(server);
+      acceptingRequests = false;
+      const serverClosing = closeServer(server);
+      await Promise.allSettled([...inFlightRequests]);
+      await serverClosing;
+      await Promise.allSettled([...inFlightRequests]);
       fsyncSync(auditFd);
       closeSync(auditFd);
       const finalBody = {

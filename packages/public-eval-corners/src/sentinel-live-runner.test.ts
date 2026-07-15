@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,14 +13,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   createSignedSentinelLivePreregistration,
+  inspectSentinelLiveRuntime,
   runSentinelLiveBatch,
   verifyContentAddressedSentinelManifest,
-  type RunningSentinelAnthropicProviderProxy,
   type SentinelLiveRunInput,
   type SentinelLiveRunnerDependencies,
   type SentinelLiveRuntimePaths,
   type SentinelLiveRuntimeSnapshot,
 } from "./sentinel-live-runner.js";
+import type { SentinelAnthropicProviderProxy as RunningSentinelAnthropicProviderProxy } from "./sentinel-anthropic-provider-proxy.js";
 import type {
   RunningSentinelStateSidecar,
   StartSentinelStateSidecarInput,
@@ -188,6 +190,9 @@ function syntheticDependencies(
     },
     opaqueToken: () => `opaque-${"x".repeat(40)}-${attemptSequence}`,
     now: () => "2026-07-13T22:00:00.000Z",
+    retainScenarioDefinition: (_checkoutPath, inputRoot, taskId) => {
+      writeFileSync(resolve(inputRoot, "scenario-definition.json"), `${taskId}\n`);
+    },
     startStateSidecar: async (input) => {
       stateStarts.push(input);
       lifecycle.push(`state:${stateStarts.length}`);
@@ -229,7 +234,7 @@ function syntheticDependencies(
       ]);
       expect(config.speed_factor).toBe(4);
       expect(JSON.stringify(input)).not.toContain("anthropic-test-secret");
-      expect(JSON.stringify(input)).not.toMatch(/\"(?:arm|mode|treatment)\"/iu);
+      expect(JSON.stringify(input)).not.toMatch(/"(?:arm|mode|treatment)"/iu);
       expect(JSON.stringify(input)).not.toMatch(/\b(?:native|sham|substrate)\b/iu);
       if (supervised.length === failureCall) throw new Error("synthetic terminal infrastructure failure");
       mkdirSync(input.outputRoot);
@@ -255,6 +260,36 @@ function runInput(fixture_: Fixture): SentinelLiveRunInput {
 }
 
 describe("live Sentinel batch runner", () => {
+  it("preserves a virtual-environment executable symlink while hashing its target", () => {
+    const root = mkdtempSync(resolve(tmpdir(), "pm-sentinel-runtime-symlink-"));
+    const pythonLink = resolve(root, "python");
+    symlinkSync(process.execPath, pythonLink);
+    const placeholder = (name: string, body = `${name}\n`): string => {
+      const path = resolve(root, name);
+      writeFileSync(path, body, { mode: 0o700 });
+      return path;
+    };
+    const snapshot = inspectSentinelLiveRuntime({
+      repositoryRoot: process.cwd(),
+      packageLockPath: resolve(process.cwd(), "pnpm-lock.yaml"),
+      runnerScriptPath: placeholder("runner.js"),
+      supervisorScriptPath: placeholder("supervisor.js"),
+      verifierScriptPath: placeholder("verifier.js"),
+      agentScriptPath: placeholder("agent.js"),
+      sidecarScriptPath: placeholder("sidecar.js"),
+      providerProxyScriptPath: placeholder("provider.js"),
+      playwrightPackageJsonPath: placeholder("playwright-package.json", '{"version":"1.56.1"}\n'),
+      nodeExecutablePath: process.execPath,
+      pythonExecutablePath: pythonLink,
+      frontendExecutablePath: placeholder("frontend"),
+    });
+
+    expect(snapshot.pythonExecutable.path).toBe(pythonLink);
+    expect(snapshot.pythonExecutable.sha256).toBe(
+      snapshot.artifacts.find(({ role }) => role === "node-executable")?.sha256,
+    );
+  });
+
   it("signs with a transient Ed25519 key and returns no private material", () => {
     const testFixture = fixture("sign");
     const result = signed(testFixture);

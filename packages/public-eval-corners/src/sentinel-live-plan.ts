@@ -37,7 +37,7 @@ export interface SentinelLivePreregistration {
     readonly repositoryUrl: "https://github.com/microsoft/sentinel_environments";
     readonly revision: "0faca33cc58ea62e97a928b67cd3beec7176b408";
     readonly manifestSha256: string;
-    readonly speedFactor: 4;
+    readonly speedFactor: 1;
     readonly publishedDefaultSpeedFactor: 1;
     readonly qualificationOnly: true;
   };
@@ -280,27 +280,38 @@ function validateExactPreregistrationShape(
 export function buildSentinelLiveSchedule(
   preregistration: SentinelLivePreregistration,
 ): readonly SentinelLiveCell[] {
-  const cells = preregistration.repeatIds.flatMap((repeatId) =>
-    preregistration.tasks.flatMap((task) =>
-      preregistration.arms.map((arm) => ({
+  const blocks = preregistration.repeatIds.flatMap((repeatId) =>
+    preregistration.tasks.map((task) => ({
+      blockId: `${repeatId}:${task.taskId}`,
+      cells: preregistration.arms.map((arm) => ({
         cellId: `${preregistration.registrationId}:${repeatId}:${task.taskId}:${arm}`,
         taskId: task.taskId,
         taskRole: task.role,
         arm,
         repeatId,
       })),
-    ),
+    })),
   );
-  return cells
-    .map((cell) => ({
-      cell,
-      orderHash: sentinelSha256(`${preregistration.randomizationSeed}\0${cell.cellId}`),
+  const cells = blocks
+    .map((block) => ({
+      ...block,
+      orderHash: sentinelSha256(`${preregistration.randomizationSeed}\0block\0${block.blockId}`),
     }))
     .sort((left, right) =>
       compareCodeUnits(left.orderHash, right.orderHash) ||
-      compareCodeUnits(left.cell.cellId, right.cell.cellId),
+      compareCodeUnits(left.blockId, right.blockId),
     )
-    .map(({ cell }, index) => ({ ...cell, sequence: index + 1 }));
+    .flatMap(({ cells: blockCells }) => blockCells
+      .map((cell) => ({
+        cell,
+        orderHash: sentinelSha256(`${preregistration.randomizationSeed}\0arm\0${cell.cellId}`),
+      }))
+      .sort((left, right) =>
+        compareCodeUnits(left.orderHash, right.orderHash) ||
+        compareCodeUnits(left.cell.cellId, right.cell.cellId),
+      )
+      .map(({ cell }) => cell));
+  return cells.map((cell, index) => ({ ...cell, sequence: index + 1 }));
 }
 
 export function verifySentinelPreregistration(
@@ -343,7 +354,7 @@ export function verifySentinelPreregistration(
       "https://github.com/microsoft/sentinel_environments" ||
     preregistration.benchmark.revision !== "0faca33cc58ea62e97a928b67cd3beec7176b408" ||
     preregistration.benchmark.manifestSha256 !== SENTINEL_MANIFEST_SHA256 ||
-    preregistration.benchmark.speedFactor !== 4 ||
+    preregistration.benchmark.speedFactor !== 1 ||
     preregistration.benchmark.publishedDefaultSpeedFactor !== 1 ||
     preregistration.benchmark.qualificationOnly !== true
   ) {
@@ -382,9 +393,7 @@ export function verifySentinelPreregistration(
     preregistration.model.model !== "claude-sonnet-4-5-20250929" ||
     preregistration.model.temperature !== 0 ||
     preregistration.model.automaticRetries !== 0 ||
-    !Number.isSafeInteger(preregistration.model.maxCompletionTokens) ||
-    preregistration.model.maxCompletionTokens < 64 ||
-    preregistration.model.maxCompletionTokens > 2_048 ||
+    preregistration.model.maxCompletionTokens !== 256 ||
     preregistration.model.pricing.sourceUrl !==
       "https://platform.claude.com/docs/en/about-claude/pricing" ||
     !Number.isFinite(Date.parse(preregistration.model.pricing.accessedAt)) ||

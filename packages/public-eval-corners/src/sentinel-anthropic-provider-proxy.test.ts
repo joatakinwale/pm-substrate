@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  parseSentinelAnthropicResponse,
   startSentinelAnthropicProviderProxy,
   verifySentinelAnthropicProviderEvidence,
   type SentinelAnthropicProviderProxy,
@@ -199,6 +200,34 @@ afterEach(async () => {
 });
 
 describe("Sentinel harness-owned Anthropic provider capture proxy", () => {
+  it("exposes one exact Anthropic response contract for runtime and raw verification", () => {
+    const parsed = parseSentinelAnthropicResponse(JSON.parse(providerResponse()) as unknown);
+    expect(parsed).toMatchObject({
+      providerMessageId: "msg_test_1",
+      returnedModel: PINNED_MODEL,
+      usage: { input_tokens: 101, output_tokens: 17 },
+      action: { action: "wait", stateWrite: "1725" },
+    });
+    const fabricated = {
+      model: PINNED_MODEL,
+      content: [{ type: "text", text: JSON.stringify({ action: "wait", stateWrite: "1725", reason: "wait" }) }],
+      usage: { input_tokens: 1, output_tokens: 1 },
+    };
+    expect(() => parseSentinelAnthropicResponse(fabricated)).toThrow("provider-response-invalid");
+    expect(() => parseSentinelAnthropicResponse({
+      ...JSON.parse(providerResponse()) as JsonRecord,
+      stop_sequence: "invented",
+    })).toThrow("provider-stop-sequence-invalid");
+    expect(() => parseSentinelAnthropicResponse({
+      ...JSON.parse(providerResponse()) as JsonRecord,
+      fabricated: true,
+    })).toThrow("provider-response-invalid");
+    expect(() => parseSentinelAnthropicResponse({
+      ...JSON.parse(providerResponse()) as JsonRecord,
+      usage: { input_tokens: 1, output_tokens: 1, invented_tokens: 999 },
+    })).toThrow("provider-usage-invalid");
+  });
+
   it("sends one pinned stateless image-first structured-output call and captures its evidence", async () => {
     const calls: CapturedCall[] = [];
     const raw = providerResponse();
@@ -227,15 +256,13 @@ describe("Sentinel harness-owned Anthropic provider capture proxy", () => {
       model: PINNED_MODEL,
       max_tokens: 256,
       temperature: 0,
-      system: expect.stringContaining("if the state context has no relevant prior baseline, choose wait"),
+      system: expect.stringContaining("the supplied prior-state context, and the current screenshot"),
     });
     expect(request.system).toEqual(expect.stringContaining(
-      "current visible count is at least the retained baseline plus 200",
+      "Never invent an unavailable historical observation",
     ));
-    expect(request.system).toEqual(expect.stringContaining(
-      "Never substitute the current count for a missing baseline",
-    ));
-    expect(request.system).toEqual(expect.stringContaining("For absolute and no-op tasks"));
+    expect(request.system).not.toEqual(expect.stringContaining("plus 200"));
+    expect(request.system).not.toEqual(expect.stringContaining("absolute and no-op"));
     const messages = request.messages as unknown[];
     expect(messages).toHaveLength(1);
     const content = record(messages[0], "message").content as unknown[];
@@ -331,10 +358,48 @@ describe("Sentinel harness-owned Anthropic provider capture proxy", () => {
     });
   });
 
+  it("aborts and drains an in-flight provider call before sealing the final receipt", async () => {
+    let signal: AbortSignal | undefined;
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const fetchImpl = (async (_input: string | URL | globalThis.Request, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      markStarted();
+      return await new Promise<Response>((_resolve, reject) => {
+        if (signal?.aborted === true) {
+          reject(new Error("provider call aborted"));
+          return;
+        }
+        signal?.addEventListener("abort", () => reject(new Error("provider call aborted")), {
+          once: true,
+        });
+      });
+    }) as typeof fetch;
+    const { root, proxy } = await fixture(fetchImpl);
+    const agentResponse = postAgent(proxy, agentRequest("sentinel-anthropic:shutdown"));
+    await started;
+
+    const final = await proxy.close();
+    expect(signal?.aborted).toBe(true);
+    expect((await agentResponse).status).toBe(502);
+    expect(final).toMatchObject({
+      acceptedOperationCount: 1,
+      successfulOperationCount: 0,
+      terminalFailureCount: 1,
+      auditRecordCount: 2,
+    });
+    expect(auditRecords(root).at(-1)).toMatchObject({
+      stage: "attempt-terminal",
+      terminalStatus: "failed",
+      terminalCode: "provider-network-error",
+    });
+  });
+
   it.each([
     ["wrong model", providerResponse({ model: "claude-sonnet-4-5" }), "provider-model-mismatch"],
     ["refusal", providerResponse({ stop_reason: "refusal" }), "provider-refusal"],
     ["wrong stop reason", providerResponse({ stop_reason: "max_tokens" }), "provider-stop-reason-invalid"],
+    ["non-null stop sequence", providerResponse({ stop_sequence: "invented" }), "provider-stop-sequence-invalid"],
     ["malformed content", providerResponse({ content: [{ type: "text", text: "{}", extra: true }] }), "provider-content-invalid"],
     ["schema violation", providerResponse({ content: [{ type: "text", text: JSON.stringify({ action: "wait", stateWrite: "01725", reason: "wait" }) }] }), "provider-output-invalid"],
     ["malformed usage", providerResponse({ usage: { input_tokens: "101", output_tokens: 17 } }), "provider-usage-invalid"],
@@ -342,7 +407,8 @@ describe("Sentinel harness-owned Anthropic provider capture proxy", () => {
   ])("fails closed on %s", async (_name, raw, code) => {
     const calls: CapturedCall[] = [];
     const { root, proxy } = await fixture(capturingFetch(calls, () => successResponse(raw)));
-    const result = await postAgent(proxy, agentRequest(`sentinel-anthropic:failure:${String(code)}`));
+    const neutralCode = Buffer.from(String(code), "utf8").toString("hex");
+    const result = await postAgent(proxy, agentRequest(`sentinel-anthropic:failure:${neutralCode}`));
     expect(result.status).toBe(502);
     expect(result.json).not.toHaveProperty("action");
     expect(calls).toHaveLength(1);

@@ -580,9 +580,15 @@ importers:
       '@pm/agent-state-core':
         specifier: workspace:*
         version: link:../agent-state-core
+      '@pm/continuity':
+        specifier: workspace:*
+        version: link:../continuity
       '@pm/types':
         specifier: workspace:*
         version: link:../types
+      pg:
+        specifier: ^8.13.0
+        version: 8.20.0
       playwright:
         specifier: 1.56.1
         version: 1.56.1
@@ -590,6 +596,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.17
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.20.0
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

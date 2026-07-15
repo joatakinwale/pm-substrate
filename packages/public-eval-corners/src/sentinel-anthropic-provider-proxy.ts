@@ -18,7 +18,8 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 const LOOPBACK_HOST = "127.0.0.1";
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
-const PINNED_MODEL = "claude-sonnet-4-5-20250929";
+export const SENTINEL_ANTHROPIC_PINNED_MODEL = "claude-sonnet-4-5-20250929";
+const PINNED_MODEL = SENTINEL_ANTHROPIC_PINNED_MODEL;
 const ENDPOINT_PATH = "/v1/decide";
 const MAX_OBSERVATION_BYTES = 8 * 1024 * 1024;
 const MAX_AGENT_BODY_BYTES = 12 * 1024 * 1024;
@@ -37,12 +38,12 @@ const ARM_CONTEXT_PATTERN = /\b(?:arm|mode|native|sham|substrate|treatment)\b|ag
 
 const SYSTEM_PROMPT = [
   "You are the stateless decision boundary for one SentinelBench browser poll.",
-  "Use only the current task, supplied state context, and current screenshot.",
-  "For a relative plus-200 task, if the state context has no relevant prior baseline, choose wait and write the current visible count as the baseline.",
-  "If a relative-task baseline is present, choose contact if and only if the current visible count is at least the retained baseline plus 200.",
-  "Never substitute the current count for a missing baseline to manufacture a trigger, and never replace a retained baseline before applying the trigger.",
-  "For absolute and no-op tasks, apply only the threshold or condition in the task prompt rather than the relative-task rule.",
-  "For every task, choose contact only when its real trigger is satisfied; otherwise choose wait.",
+  "The task prompt is the sole authority for the condition that must be monitored.",
+  "Use only that task, the supplied prior-state context, and the current screenshot.",
+  "Never invent an unavailable historical observation or substitute the current observation for a historical one.",
+  "If the task requires a historical comparison and the relevant prior observation is unavailable, choose wait and record the current observation.",
+  "When relevant prior state is available, evaluate the task's exact condition against it before recording the current observation.",
+  "Choose contact if and only if the task's real condition is satisfied; otherwise choose wait.",
   "Read the current visible star count from the screenshot and always write that count as a canonical nonnegative decimal with at most nine digits, independent of whether the action is wait or contact.",
   "The state context is exactly 512 printable ASCII characters and right-space-padded; use its non-padding prefix only as prior durable task state.",
   "Never mention experimental metadata or execution-path identity.",
@@ -60,6 +61,9 @@ const ACTION_SCHEMA = {
   required: ["action", "stateWrite", "reason"],
 } as const;
 
+export const SENTINEL_ANTHROPIC_SYSTEM_PROMPT_SHA256 = sha256(SYSTEM_PROMPT);
+export const SENTINEL_ANTHROPIC_ACTION_SCHEMA_SHA256 = sha256(canonical(ACTION_SCHEMA));
+
 type JsonRecord = Record<string, unknown>;
 
 interface AgentPollRequest {
@@ -74,10 +78,17 @@ interface AgentPollRequest {
   readonly stateContext: string;
 }
 
-interface ModelAction {
+export interface SentinelAnthropicModelAction {
   readonly action: "wait" | "contact";
   readonly stateWrite: string;
   readonly reason: string;
+}
+
+export interface SentinelAnthropicParsedResponse {
+  readonly providerMessageId: string;
+  readonly returnedModel: typeof SENTINEL_ANTHROPIC_PINNED_MODEL;
+  readonly usage: JsonRecord;
+  readonly action: SentinelAnthropicModelAction;
 }
 
 interface ArtifactReference {
@@ -154,11 +165,13 @@ class RequestValidationError extends Error {
   }
 }
 
-class ProviderTerminalError extends Error {
+export class SentinelAnthropicResponseValidationError extends Error {
   constructor(readonly terminalCode: string) {
     super(terminalCode);
   }
 }
+
+class ProviderTerminalError extends SentinelAnthropicResponseValidationError {}
 
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -473,9 +486,20 @@ function nonNegativeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
+const ANTHROPIC_USAGE_KEYS = new Set([
+  "cache_creation",
+  "cache_creation_input_tokens",
+  "cache_read_input_tokens",
+  "input_tokens",
+  "output_tokens",
+  "server_tool_use",
+  "service_tier",
+]);
+
 function parseUsage(value: unknown): JsonRecord {
   if (
     !isRecord(value) ||
+    Object.keys(value).some((key) => !ANTHROPIC_USAGE_KEYS.has(key)) ||
     !nonNegativeInteger(value.input_tokens) ||
     !nonNegativeInteger(value.output_tokens)
   ) throw new ProviderTerminalError("provider-usage-invalid");
@@ -491,7 +515,11 @@ function parseUsage(value: unknown): JsonRecord {
     throw new ProviderTerminalError("provider-usage-invalid");
   }
   if (value.cache_creation !== undefined) {
-    if (!isRecord(value.cache_creation)) throw new ProviderTerminalError("provider-usage-invalid");
+    if (
+      !isRecord(value.cache_creation) ||
+      Object.keys(value.cache_creation).some((key) =>
+        key !== "ephemeral_5m_input_tokens" && key !== "ephemeral_1h_input_tokens")
+    ) throw new ProviderTerminalError("provider-usage-invalid");
     for (const field of ["ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens"] as const) {
       if (value.cache_creation[field] !== undefined && !nonNegativeInteger(value.cache_creation[field])) {
         throw new ProviderTerminalError("provider-usage-invalid");
@@ -499,7 +527,17 @@ function parseUsage(value: unknown): JsonRecord {
     }
   }
   if (value.server_tool_use !== undefined) {
-    if (!isRecord(value.server_tool_use)) throw new ProviderTerminalError("provider-usage-invalid");
+    if (
+      !isRecord(value.server_tool_use) ||
+      Object.keys(value.server_tool_use).some((key) =>
+        ![
+          "bash_code_execution_tool_requests",
+          "code_execution_requests",
+          "text_editor_code_execution_tool_requests",
+          "web_fetch_requests",
+          "web_search_requests",
+        ].includes(key))
+    ) throw new ProviderTerminalError("provider-usage-invalid");
     for (const count of Object.values(value.server_tool_use)) {
       if (!nonNegativeInteger(count)) throw new ProviderTerminalError("provider-usage-invalid");
     }
@@ -507,13 +545,23 @@ function parseUsage(value: unknown): JsonRecord {
   return value;
 }
 
-function parseModelAction(providerResponse: unknown): {
-  readonly providerMessageId: string;
-  readonly returnedModel: string;
-  readonly usage: JsonRecord;
-  readonly action: ModelAction;
-} {
+export function parseSentinelAnthropicResponse(
+  providerResponse: unknown,
+): SentinelAnthropicParsedResponse {
   if (!isRecord(providerResponse)) throw new ProviderTerminalError("provider-response-invalid");
+  if (
+    Object.keys(providerResponse).sort(compareCodeUnits).join(",") !==
+    [
+      "content",
+      "id",
+      "model",
+      "role",
+      "stop_reason",
+      "stop_sequence",
+      "type",
+      "usage",
+    ].sort(compareCodeUnits).join(",")
+  ) throw new ProviderTerminalError("provider-response-invalid");
   if (
     providerResponse.type !== "message" ||
     providerResponse.role !== "assistant" ||
@@ -528,6 +576,9 @@ function parseModelAction(providerResponse: unknown): {
   }
   if (providerResponse.stop_reason !== "end_turn") {
     throw new ProviderTerminalError("provider-stop-reason-invalid");
+  }
+  if (providerResponse.stop_sequence !== null) {
+    throw new ProviderTerminalError("provider-stop-sequence-invalid");
   }
   const usage = parseUsage(providerResponse.usage);
   if (!Array.isArray(providerResponse.content) || providerResponse.content.length !== 1) {
@@ -717,6 +768,8 @@ export async function startSentinelAnthropicProviderProxy(
   let ready = false;
   let finalReceipt: SentinelAnthropicProviderProxyFinalReceipt | null = null;
   let closing: Promise<SentinelAnthropicProviderProxyFinalReceipt> | null = null;
+  const inFlightOperations = new Set<Promise<void>>();
+  const operationAbortControllers = new Set<AbortController>();
 
   const appendAudit = (body: JsonRecord): string => {
     const sequence = auditSequence + 1;
@@ -740,6 +793,7 @@ export async function startSentinelAnthropicProviderProxy(
   const processOperation = async (
     agentRequest: AgentPollRequest,
     response: ServerResponse,
+    shutdownSignal: AbortSignal,
   ): Promise<void> => {
     const operationRoot = resolve(outputRoot, "operations", sha256(agentRequest.operationId));
     mkdirSync(operationRoot, { mode: 0o700 });
@@ -805,7 +859,7 @@ export async function startSentinelAnthropicProviderProxy(
     let usage: JsonRecord | null = null;
     let responseRef: ArtifactReference | null = null;
     let responseHeadersRef: ArtifactReference | null = null;
-    let action: ModelAction | null = null;
+    let action: SentinelAnthropicModelAction | null = null;
     let terminalCode = "provider-network-error";
     try {
       const providerResponse = await fetchImpl(ANTHROPIC_MESSAGES_URL, {
@@ -817,7 +871,7 @@ export async function startSentinelAnthropicProviderProxy(
         },
         body: exactProviderRequest,
         redirect: "error",
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.any([shutdownSignal, AbortSignal.timeout(120_000)]),
       });
       providerHttpStatus = providerResponse.status;
       providerRequestId = providerResponse.headers.get("request-id");
@@ -853,7 +907,7 @@ export async function startSentinelAnthropicProviderProxy(
         providerMessageId = typeof parsedResponse.id === "string" ? parsedResponse.id : null;
         usage = isRecord(parsedResponse.usage) ? parsedResponse.usage : null;
       }
-      const parsed = parseModelAction(parsedResponse);
+      const parsed = parseSentinelAnthropicResponse(parsedResponse);
       returnedModel = parsed.returnedModel;
       providerMessageId = parsed.providerMessageId;
       usage = parsed.usage;
@@ -908,7 +962,9 @@ export async function startSentinelAnthropicProviderProxy(
   };
 
   const server = createServer((request, response) => {
-    void (async () => {
+    const abortController = new AbortController();
+    operationAbortControllers.add(abortController);
+    const body = (async () => {
       if (!ready) {
         errorResponse(response, 503, "provider_failure");
         return;
@@ -945,15 +1001,24 @@ export async function startSentinelAnthropicProviderProxy(
           return;
         }
         operationIds.add(agentRequest.operationId);
-        await processOperation(agentRequest, response);
+        await processOperation(agentRequest, response, abortController.signal);
       } catch (error) {
-        if (error instanceof RequestValidationError) {
-          errorResponse(response, error.statusCode, "invalid_request");
-        } else {
-          errorResponse(response, 500, "provider_failure");
+        if (!response.writableEnded && !response.destroyed) {
+          if (error instanceof RequestValidationError) {
+            errorResponse(response, error.statusCode, "invalid_request");
+          } else {
+            errorResponse(response, 500, "provider_failure");
+          }
         }
       }
     })();
+    let operation!: Promise<void>;
+    operation = body.finally(() => {
+      operationAbortControllers.delete(abortController);
+      inFlightOperations.delete(operation);
+    });
+    inFlightOperations.add(operation);
+    void operation;
   });
   server.requestTimeout = 30_000;
   server.headersTimeout = 10_000;
@@ -992,7 +1057,14 @@ export async function startSentinelAnthropicProviderProxy(
     if (closing !== null) return closing;
     ready = false;
     closing = (async () => {
-      await closeServer(server);
+      const serverClosing = closeServer(server);
+      for (const controller of operationAbortControllers) controller.abort();
+      await Promise.allSettled([...inFlightOperations]);
+      await serverClosing;
+      // A request already queued by Node when close() began can enter the
+      // handler after the first snapshot. It sees ready=false and must also
+      // finish before the evidence inventory is sealed.
+      await Promise.allSettled([...inFlightOperations]);
       const finalBody = {
         schemaVersion: "pm.public-eval-corners.sentinel-anthropic-provider-proxy-final.v1",
         evidenceEligible: false,

@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-07-14 - Sentinel causal-design falsification and production replacement
+
+- Adversarially rejected the unexecuted 27-cell MicroHub causal design. Its
+  useful memory was a task-specific adapter `Map`; all arms used
+  `@pm/agent-state-core` only for evidence admission; a plain-KV comparator was
+  absent; and the independent discard arm could not be called Microsoft's
+  unreleased paper agent. The design is retained only as excluded harness code.
+- Proved from the pinned upstream timeline that speed factor 4 scales the top-
+  level trigger but not nested star waypoints, making both positive MicroHub
+  tasks unreachable. Restored published speed 1 and added strict no-op liveness
+  because the unchanged oracle otherwise rewards immediate exit.
+- Hardened raw verification around exact Anthropic response schemas and IDs,
+  provider/state origins and tokens, ports, agent/process trees, result paths,
+  monitoring cadence, PNG decoding, provider shutdown, and unique batch
+  identities. Split the verifier to preserve the CI file budget.
+- Added a generic fixed-width four-arm state service. `native` discards,
+  `sham` performs production continuity work but returns irrelevant state,
+  `plain-kv` provides minimal durable memory, and `substrate` uses
+  `PostgresContinuityLedger`. Live-Postgres tests cover restart/latest recall,
+  tenant-agent-scope isolation, concurrent appends, raw request/response replay,
+  and DB/file tamper fail-closed behavior.
+- Froze MicroHub as qualification-only and a 12-task, four-application
+  procedural holdout (`f24feec…`) that may test execution but cannot emit
+  material benefit: it contains only four independent relative tasks and is not
+  powered to exclude no lift. A separately anchored powered task-clustered
+  confirmation is required. No accepted replacement cell has run; causal
+  benefit remains unproven.
+- OpenAI quota and Codex usage-limit probes, plus the successful Anthropic
+  capacity/vision probe, remain explicitly excluded from behavioral evidence.
+
 ## 2026-07-13 - Public-proof reset and first observed repair loop
 
 - Replaced the app-first D6/D7 claim with independent public-benchmark causal

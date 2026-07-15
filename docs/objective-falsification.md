@@ -54,6 +54,7 @@ performance or financial-advice claim.
 | Repeats masquerade as sample size | Five runs of one task are treated as five independent tasks | Task-level paired analysis; repeats/seeds clustered within task |
 | Identity collisions hide failures | Fixed run/pair IDs overwrite or merge attempts | Unique attempt ID plus exact benchmark, split, model, config, seed, and revision binding |
 | State benefit is really extra context | A larger prompt or extra tool call creates the lift | Equal-overhead sham sidecar with irrelevant but structurally equivalent state |
+| Durable memory is mislabeled as substrate benefit | Substrate beats an amnesiac control, but a plain file or KV store would do the same | Add a shape-matched plain durable-KV arm; attribute substrate-specific benefit only on declared integrity, isolation, conflict, or recovery contrasts where substrate also beats plain KV |
 | Infrastructure changes move the score | Model, simulator, prompt, or tool changes are mistaken for substrate lift | Content-addressed run manifests and matched arms; mismatches are refused, not adjusted away |
 | Correct work is uneconomic | Extra retries/tokens buy a small completion gain | Cost and latency per strict success, with a declared premium ceiling |
 | Receipt is self-asserted | The producer writes both result and proof, or selects the verifier policy after seeing results | Pre-run registration under an externally pinned authority; independent verifier recomputes raw evidence; separate owner authorizes the exact report hash |
@@ -75,12 +76,22 @@ changes, cost per strict success, and latency per strict success. Substrate
 event counts, blocks, warnings, and receipt counts never appear above the
 diagnostic layer.
 
-Every comparison has at least three matched arms:
+Every Sentinel comparison has four matched arms:
 
-1. `native` — the benchmark's default state path;
-2. `sham` — the same sidecar/tool/token/latency shape but irrelevant state and
-   no useful substrate decision;
-3. `substrate` — the real read/observe/review path.
+1. `native` — the independent matched agent with the common state API but no
+   durable state. This is not described as Microsoft's paper baseline because
+   the release does not contain that exact agent/configuration or its raw logs;
+2. `sham` — the same continuity write, admission, tool, token, and response
+   shape while returning fixed-width irrelevant state;
+3. `plain-kv` — the same useful model-authored state persisted by a minimal
+   durable hash-chained file store;
+4. `substrate` — the same state persisted and recalled through the production
+   `PostgresContinuityLedger`, with full-chain verification and scoped identity.
+
+`substrate > native/sham` can show that useful durable state matters.
+`substrate > plain-kv` is required before attributing a contrast to substrate-
+specific continuity semantics rather than ordinary memory. A tie with plain KV
+narrows the claim; it is not hidden or promoted into substrate-specific proof.
 
 An enforced-admission arm may be added for tool-use tasks, but is reported
 separately because preventing a tool call changes task affordances. A block is
@@ -171,10 +182,25 @@ mechanism and exposes an oracle blind spot; the scripted probe, missing provider
 economics, and absent external trust keep it ineligible for efficacy. The
 headline held-out program is STATE-Bench Agent Learning Track. Its phase-safe
 plan uses stochastic repeat identities because the pinned upstream exposes no
-sampling seed. Independent
-corners add public fact-supersession, restart/idempotency/collateral, and
-dynamic-state tasks. Exact pinned revisions and licenses are recorded by the
-adapter manifests rather than copied into this prose.
+sampling seed. The first attempted independent-corner runtime pinned Sentinel's
+MicroHub relative-star failure plus no-op and absolute controls. It was rejected
+before headline execution because useful state lived in an adapter-owned `Map`,
+speed factor 4 did not scale nested star trajectories, and the upstream no-op
+oracle can pass an agent that exits immediately. Its 27 planned cells are
+permanently excluded from efficacy use. The replacement uses the published
+speed-1 horizon, a task-agnostic Chromium/Claude agent, the four arms above,
+strict monitoring liveness, and raw browser/provider/state/process replay.
+MicroHub remains qualification-only. A frozen 12-task set spanning MicroHood,
+MicroMail, MicroScholar, and MicroTube is procedural holdout validation; with
+only four independent relative tasks it is not powered to exclude no lift and
+therefore cannot emit a material-benefit claim. A separately preregistered,
+task-clustered confirmatory universe and external trust anchor are required
+before efficacy. It is frozen before outcomes to all 50 scenarios from the five
+untouched environments MicroChat, MicroDin, MicroFy, MicroGram, and
+MicroLendar—19 relative, 21 absolute, and 10 no-op—with sorted task/hash
+manifest `48e1695b0728000c8f8e738f9d72273861bf6216e4c609935650a09067d87bc6`.
+Exact pinned revisions and licenses are recorded by adapter manifests rather
+than copied into this prose.
 
 ### Failure-driven repair (Arrowsmith)
 
@@ -264,8 +290,8 @@ and primitive back-map gates). Live MCP traffic, generic sync, executor
 rehearsal, and local paired scenarios show that mechanisms can execute. The new
 public packages harden matching, provenance, transition replay, and decision
 authority, but deliberately refuse to manufacture eligible attempts from the
-available ToolSandbox and STATE-Bench artifacts. The corner harness has no real
-matched-agent result. There is no externally preregistered held-out run,
+available ToolSandbox and STATE-Bench artifacts. The Sentinel corner now has a
+real matched-agent execution path but no completed signed matrix. There is no externally preregistered held-out run,
 provider-complete public score, replicated evidence bundle, or owner
 authorization. The current public-efficacy verdict is therefore **unproven**,
 not `keep`.

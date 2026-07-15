@@ -15,6 +15,25 @@ all current signed structured assertions
 diagnostic-only and `not_eligible`. PluggedInSocial and ArrowHedge therefore
 remain frozen.
 
+### 2026-07-14 Sentinel audit correction
+
+The previously described 27-cell Sentinel runtime is not queued for causal
+execution. An adversarial pre-outcome audit excluded it: useful memory was an
+adapter-owned task-specific `Map`; speed factor 4 did not scale the nested
+MicroHub star trajectory and made both positive tasks unreachable; the no-op
+oracle could reward immediate exit; and the release does not contain the exact
+Microsoft paper agent/configuration/raw logs. These are design failures, not
+observed substrate gaps, so they do not trigger Arrowsmith.
+
+The replacement runs at published speed 1 with a task-agnostic agent and four
+arms: no durable state, continuity-backed sham, plain durable KV, and production
+continuity. MicroHub is qualification-only. A frozen 12-task cross-application
+set is procedural holdout validation, not powered confirmation. No replacement
+cell has produced benefit evidence. Before any outcome, the confirmatory
+universe was frozen to every one of the 50 scenarios in the five untouched
+environments MicroChat, MicroDin, MicroFy, MicroGram, and MicroLendar (19
+relative, 21 absolute, 10 no-op), manifest `48e1695b…`.
+
 Full content hashes for the executed qualifications, failed provider batch,
 and continuity repair are preserved in
 [`evidence/public-proof-run-register-2026-07-13.json`](./evidence/public-proof-run-register-2026-07-13.json).
@@ -40,8 +59,8 @@ This distinction is deliberate:
 |---|---|---|
 | PM-layer/product thesis | Coherent, still falsifiable | A protocol sidecar that makes current project state and admission explicit is a plausible mechanism; the roadmap now states a causal task-outcome claim rather than treating governance activity as value |
 | Core engineering/conformance | Strong | Typed boundaries, replay, migration isolation, zero-edit checks, and the focused ToolSandbox hardening suite make accidental regressions visible; the live continuity fork and bounded-key `400` also proved dogfooding can expose real defects |
-| Evaluation integrity | Improving, not decision-grade | V3 closes the known v2 detached-summary exploit by replaying Apple's pinned oracle, provider frames, sidecar lifecycle, runtime closure, trajectory/state effects, restart successor, and pinned starting context. The verifier is outcome-neutral, but its runtime and signatures are not independently trusted, and D7 adapter-specific semantic evidence remains incomplete |
-| Public causal evidence | Qualification only | One fully retained deterministic headline triplet and one derivative triplet reached the public oracle. They show the mechanism can suppress an exact duplicate, but a scripted probe is not agent-efficacy evidence and the upstream task score showed no arm difference |
+| Evaluation integrity | Improving, not decision-grade | ToolSandbox V3 closes its known detached-summary exploit. The Sentinel audit then caught adapter-owned memory, impossible accelerated trajectories, no-op liveness, baseline-identity, and plain-KV attribution gaps before provider spend. The production replacement and external trust boundary are not yet complete |
+| Public causal evidence | Qualification only | One fully retained deterministic ToolSandbox headline triplet and derivative reached the public oracle. They show a mechanism can suppress an exact duplicate, but a scripted probe is not agent efficacy. Sentinel has no accepted matched behavioral result |
 | Generalization/replication | Absent | There is no confirmatory set, second model/benchmark result, or clean independent reproduction |
 | Business readiness | Intentionally unevaluated | The two apps are frozen; even a future public result would justify only a separately scoped transfer test, not demand, revenue, or investment-performance claims |
 
@@ -82,7 +101,7 @@ a 30-test final regression subset passed.
 | 1. Evidence integrity reset | Local labs are `mechanism_conformance_only`; exact pair identity, expected-allow checks, allow-all/block-all mutants, deterministic top-ranked task selection, immutable arm interventions, initial environment, randomized order, signed preregistration/attempt-time bindings, versioned structured assertions, and fixed guardrails ship | Live Ollama suite `suite_6cf46d7e-a3fe-46ce-a5dc-4fc57f2a8ed8`: 22 scenarios/22 exact pairs; expected-block 12/12; expected-allow 10/10; both mutants rejected. Analysis/decision adversarial suite: 30/30 | Conformance and gate integrity only. Internally consistent signed facts remain diagnostic-only and `not_eligible`; no local result can establish public efficacy or authorize KEEP |
 | 2. ToolSandbox slice | Pinned `apple/ToolSandbox@165848b9…`; matched-batch/raw-verification v3; verifier-selected Apple oracle replay; raw provider/trajectory/sidecar/state cross-binding; authenticated HTTP sidecar; runtime closure; pinned starting context; real OS-process restart; outcome-neutral replay | Preserved history: quota-failed v1 batch, then a deterministic derivative that exposed a 136-character idempotency-key `400`, then pre-final repair retest `90a8e03a…`. Final headline `7ad2c0e8…` and derivative `0043af27…` both scored `1.0` in every arm. In the derivative, native/sham duplicated the target side effect and substrate did not | Strong qualification/mechanism evidence for one known scenario, not efficacy. Eligibility remains false for missing provider usage/cost/latency, trusted oracle runtime/environment, non-scripted public-agent execution, and independent trust anchor. The upstream score's duplicate-send blind spot requires a separate state-effect metric |
 | 3. STATE-Bench held-out proof | Pinned `microsoft/STATE-Bench@fd980728…`; deterministic 20/80 train qualification/extraction partition; exact 150-task test confirmation and replication inventories; five stochastic repeat identities; randomized arm schedule; v3 bound configs; exact 2,250-command phase plans; oracle-field redaction; one-attempt policy; external preregistration preflight; command-bound raw transport/retry/treatment/state schema; score conversion refuses by design | STATE adversarial suite: 62/62; pinned upstream plus adapter Python suite: 150 passed, 1 credential-dependent skip. Official scored trajectories: 0 | Planning and schemas are controls, not execution. No instrumented executor captures runner/agent/simulator/judge transports, independently replays state, or derives official scores from raw judge bytes. Official credentials and external command/trust pins are absent; local “perfect” JSON cannot substitute |
-| 4. Independent corner battery | Four source-pinned adapters plus a matched-arm protocol with one shared runner/config/model, typed treatment deltas, recomputed matching proof, and a fresh arm-blind oracle view | Harness adversarial suite: 24/24. Oracle qualifications: MAB (`399b2534…`), tau2 (`89c5fa85…`), Sentinel (`3a80a27…`), AppWorld (`febefba7…`); no behavioral triplet ran | Every locally produced plan/receipt/verifier result is analysis-ineligible because no independent oracle-invocation proof format/verifier exists. Neutral temp views are not OS sandboxes; future independent review/provider receipts must also rule out host/order/covert-channel leakage |
+| 4. Independent corner battery | Four source-pinned adapters plus the generic matched-arm protocol. The first Sentinel implementation added Chromium/provider/state/process capture, but its causal design is now excluded. The replacement uses one task-agnostic agent, speed 1, strict liveness, and no-state/sham/plain-KV/production-continuity arms | The legacy focused/adversarial tests remain harness diagnostics. New production state-sidecar tests cover fixed-shape responses, restart, isolation, concurrent append, raw replay, and DB/file tamper fail-closed. Completed accepted Sentinel cells: 0 | MicroHub can qualify only. The 12-task procedural holdout cannot emit material benefit. A powered task-clustered manifest, external anchor, complete raw execution, clean replay, and replication gate any efficacy claim |
 | 5. Failure-driven Arrowsmith loop | v230 repaired an observed continuity fork; v231 repaired the false-KEEP authority boundary; v232 repaired the observed ToolSandbox bounded-idempotency composition failure without weakening the sidecar's limit or request-byte conflict check | Continuity concurrency ablation passed; fabricated signed D7 facts remain ineligible; v232 preserves the failing `d9cf73c3…` batch and final derivative shows the bounded digest survives restart and suppresses the exact duplicate | Integrity and mechanism evidence, not public benefit. A general substrate repair still requires a non-scripted behavioral failure trace, minimal consumed primitive, ablation, exact rerun, and clean controls |
 | 6. Replicate and decide | Task-clustered analysis uses ≥20 deterministic top-ranked tasks/decision phase, ≥3 predeclared repeats/task (provider-seeded only when the runtime supports it), 10,000 bootstrap draws, simultaneous ≥0.10 lift over both controls, positive lower bound, ≥0.5 reliability, zero deterministic false blocks/collateral, ≤$10/≤300s absolute and ≤1.25× per-control economics. Future eligibility additionally requires adapter-specific derivation of all 31 facts from bound raw records plus six signed receipts | Analysis/decision suite: 30/30. The generated memo reports `unproven` | Current v4 automation always emits `not_eligible`, with structured assertions diagnostic-only and `ownerAuthorizationRequired=true`. No raw-derived semantic evidence, external preregistration/trust anchor, confirmation, replication, or owner authorization exists |
 
@@ -102,9 +121,10 @@ a 30-test final regression subset passed.
    does not yet contain the instrumented executor/transport capture required to
    turn its verified command plan and raw schema into independently replayable
    attempts.
-3. **Corner execution:** no matched model/provider run or independently
-   verified OS-isolated oracle execution exists. The local harness cannot prove
-   its own semantic parity or absence of covert leakage.
+3. **Corner execution:** the legacy Sentinel real-browser/model path is excluded
+   from causal use. The production four-arm replacement, powered confirmatory
+   manifest, externally anchored attempt roots, and clean independent replay
+   must exist before any matched result can count.
 4. **Trust and decision authority:** the repository has no externally witnessed
    preregistration, owner-configured trust root, adapter-specific producer and
    reviewer that derive the v2 semantic facts from real benchmark records,
@@ -131,9 +151,13 @@ a 30-test final regression subset passed.
    Then provision locked credentials, externally pin preregistration/trust and
    command-plan hashes, seal the learning artifact, and execute without
    post-result exclusions.
-3. Execute the four corner triplets with provider-resolved model/config/usage
-   evidence, independent harness/oracle review, and stronger process isolation.
-   Keep untouched headline scores separate from fault injection.
+3. Commit and clean-room verify the production Sentinel runtime. At speed 1,
+   run the MicroHub triplet as qualification only, then the frozen 12-task
+   procedural holdout across all four arms without replacement or outcome
+   inspection. Use its predeclared economics/infrastructure facts—not its score—
+   to freeze a powered task-clustered confirmatory catalog. Externally anchor
+   that catalog and every attempt root before executing and raw-replaying the
+   complete universe.
 4. Feed only an observed public failure into the Arrowsmith loop. Implement the
    smallest general, runtime-consumed repair; ablate it; rerun the exact case
    and clean controls.
