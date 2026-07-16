@@ -41,6 +41,7 @@
     "dev:resume": "tsx scripts/dev-session.ts resume",
     "dev:checkpoint": "tsx scripts/dev-session.ts checkpoint",
     "dev:handoff": "tsx scripts/dev-session.ts handoff",
+    "witness:anchor": "tsx scripts/witness-anchor.ts",
     "dev:cost": "tsx scripts/dev-session.ts cost",
     "dev:status": "tsx scripts/dev-session.ts status",
     "dev:repair-chain": "tsx scripts/dev-session.ts repair-chain",
