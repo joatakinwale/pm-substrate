@@ -123,13 +123,17 @@ a 30-test final regression subset passed.
    non-scripted provider, retained usage/cost/latency, a trusted oracle replay
    runtime/environment, and an independent verifier signature anchored outside
    the producer bundle.
-2. **STATE-Bench:** `STATE_BENCH_EVAL_ENDPOINT`,
-   `STATE_BENCH_EVAL_DEPLOYMENTS`, `STATE_BENCH_EVAL_API_KEY`, and the declared
-   `STATE_BENCH_AGENT_*` runtime identities are unavailable. A generic API key
-   is not substituted for the locked official evaluator. The repository also
-   does not yet contain the instrumented executor/transport capture required to
-   turn its verified command plan and raw schema into independently replayable
-   attempts.
+2. **STATE-Bench:** two different kinds of blocker, not one. (a) *Purchasable,
+   not gatekept:* the locked official evaluator is self-provisioned — upstream's
+   `docs/setup/eval-client.md` has the submitter configure their own GPT-5.4
+   deployment via `STATE_BENCH_EVAL_ENDPOINT`, `STATE_BENCH_EVAL_DEPLOYMENTS`,
+   and `STATE_BENCH_EVAL_API_KEY` in `.env`; no Microsoft-issued credential
+   exists to wait for. This is a funding/setup task. A generic API key is still
+   not substituted for the locked evaluator, and the declared
+   `STATE_BENCH_AGENT_*` runtime identities remain undeclared until that
+   deployment exists. (b) *Engineering:* the repository does not yet contain
+   the instrumented executor/transport capture required to turn its verified
+   command plan and raw schema into independently replayable attempts.
 3. **Corner execution:** the legacy Sentinel real-browser/model path is excluded
    from causal use. The production four-arm replacement still needs a clean
    excluded smoke. Its 50-task catalog is frozen, but the 19×3/10-point power

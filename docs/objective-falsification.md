@@ -7,8 +7,14 @@ transfer gate and cannot currently produce a full keep decision.*
 
 ## Why the current evidence is insufficient
 
-The objective is to prove—or falsify—pm-substrate on real, publicly documented
-agent-state failures. PluggedInSocial and ArrowHedge are frozen future transfer
+The objective is to prove—or falsify—pm-substrate on public benchmarks designed
+to expose agent-state failure. (Earlier drafts said "real, publicly documented
+agent-state failures", which over-suggested documented production incidents;
+what exists is purpose-built public benchmarks whose papers document that agents
+exhibit state failures on them. The phrase survives verbatim inside already
+hash-bound owner-objective constants and is not edited there retroactively; it
+is corrected at the next plan-version rev.)
+PluggedInSocial and ArrowHedge are frozen future transfer
 targets; making those labs worth operating is not the current objective. The
 earlier validation path often mixed four different evidence layers:
 

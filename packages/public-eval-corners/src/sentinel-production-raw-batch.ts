@@ -477,7 +477,6 @@ function parseBlockManifest(
   blockSequence: number,
   expectedBlock: readonly SentinelProductionCell[],
   previousBlockManifestSha256: string,
-  expectedRuntimePrevious: string,
   maximumAllowedStartSkewMs: number,
 ): SentinelProductionBlockManifest {
   sentinelRawExactKeys(value, [
@@ -501,7 +500,8 @@ function parseBlockManifest(
   sentinelRawExactKeys(value.modeToCell, ARMS, `block ${blockSequence} arm map`);
   runtimeReference(value.runtimeBefore, `block ${blockSequence} runtime-before reference`);
   runtimeReference(value.runtimeAfter, `block ${blockSequence} runtime-after reference`);
-  void expectedRuntimePrevious;
+  // The runtime receipt chain is enforced by verifySentinelRawRuntimeBoundary
+  // (expectedPreviousReceiptSha256) at the call site, not here.
   return value as unknown as SentinelProductionBlockManifest;
 }
 
@@ -716,7 +716,6 @@ export function verifySentinelProductionRawBatch(
         blockSequence,
         expectedBlock,
         previousBlockManifestSha256,
-        previousRuntimeReceiptSha256,
         MAXIMUM_ARM_START_SKEW_MS,
       );
       expectedPaths.add(blockRecord.path);

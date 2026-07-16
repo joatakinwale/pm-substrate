@@ -1,5 +1,11 @@
 {
-  "_doc": "Guardrail ratchet (refactor plan \u00a75). frozenFiles: files over budget at adoption, pinned at their adoption-day size \u2014 they may shrink, never grow. allowedDeepNames: exported identifiers over the 63-char Postgres ceiling that predate the v229 recursion-stop rule \u2014 the list may shrink, never grow. NEW violations are CI failures.",
+  "_doc": "Guardrail ratchet (refactor plan \u00a75). frozenFiles: files over budget at adoption, pinned at their adoption-day size \u2014 they may shrink, never grow. allowedDeepNames: exported identifiers over the 63-char Postgres ceiling that predate the v229 recursion-stop rule \u2014 the list may shrink, never grow. evalPackageTotals: aggregate src-line ceilings for the public-eval-* measurement apparatus, pinned 2026-07-15 after the external review measured a ~42:1 instrument-to-treatment ratio \u2014 raising a ceiling requires recording, in the same change, which completed run's failure or named external skeptic demanded the new code. NEW violations are CI failures.",
+  "evalPackageTotals": {
+    "public-eval-analysis": 7391,
+    "public-eval-corners": 46035,
+    "public-eval-state-bench": 12328,
+    "public-eval-toolsandbox": 16525
+  },
   "frozenFiles": {
     "packages/agent-state-provenance/src/index.ts": 77832,
     "packages/agent-state-provenance/src/index.test.ts": 53445,

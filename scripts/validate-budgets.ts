@@ -15,6 +15,13 @@
  *      package other than the quarantine itself may import the quarantine.
  *   4. NO export * — @pm/agent-state-core's surface is explicit; wildcard
  *      re-exports are how surfaces silently balloon.
+ *   5. EVAL-PACKAGE AGGREGATE RATCHET — the public-eval-* measurement
+ *      apparatus is ceiling-ratcheted as whole packages, not just per file.
+ *      The per-file budget (rule 1) let the instrument grow to ~42× the
+ *      treatment under test across many small files (2026-07-15 external
+ *      review). Raising a ceiling is a deliberate act: edit the ratchet in
+ *      the same change and record which completed run's failure or named
+ *      external skeptic demanded the new code.
  */
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -37,9 +44,11 @@ const RATCHET = JSON.parse(
 ) as {
   frozenFiles: Record<string, number>;
   allowedDeepNames: string[];
+  evalPackageTotals: Record<string, number>;
 };
 const FROZEN: Record<string, number> = RATCHET.frozenFiles;
 const ALLOWED_DEEP_NAMES = new Set(RATCHET.allowedDeepNames);
+const EVAL_PACKAGE_TOTALS: Record<string, number> = RATCHET.evalPackageTotals;
 
 /** Packages whose exported names skip the 63-char rule (quarantine only). */
 const NAME_RULE_EXEMPT_PKGS = new Set(["agent-state-provenance"]);
@@ -71,6 +80,7 @@ const walk = (dir: string): string[] =>
   });
 
 const failures: string[] = [];
+const packageLineTotals = new Map<string, number>();
 const files = readdirSync(PKGS)
   .filter((p) => statSync(join(PKGS, p)).isDirectory())
   .flatMap((pkg) => {
@@ -87,6 +97,7 @@ for (const { pkg, path } of files) {
   const text = readFileSync(path, "utf8");
   const lineCount = text.split("\n").length;
   const isTest = path.endsWith(".test.ts");
+  packageLineTotals.set(pkg, (packageLineTotals.get(pkg) ?? 0) + lineCount);
 
   // Rule 1 — budgets & frozen ratchet.
   const frozen = FROZEN[rel];
@@ -157,6 +168,19 @@ for (const pkg of RUNTIME_CORE) {
     }
   } catch {
     /* package absent — fine */
+  }
+}
+
+// Rule 5 — eval-package aggregate ratchet.
+for (const [pkg, ceiling] of Object.entries(EVAL_PACKAGE_TOTALS)) {
+  const total = packageLineTotals.get(pkg) ?? 0;
+  if (total > ceiling) {
+    failures.push(
+      `packages/${pkg}: ${total} total src lines exceeds its aggregate ceiling of ${ceiling}. ` +
+        `The measurement apparatus may not grow silently: raise the ceiling in ` +
+        `scripts/guardrail-ratchet.json in the same change and record which completed ` +
+        `run's failure or named external skeptic demanded the new code.`,
+    );
   }
 }
 
