@@ -1,0 +1,61 @@
+Review verdict: the critic is ~85% right, its central recommendation ("run the experiment") is correct — but its most alarming finding (red working tree) is already stale, and its strongest statistical claim is contradicted by the repo's own replayed artifact.
+I verified every code-level claim directly, recomputed the frozen hashes, ran the test suites, and web-checked the benchmark claims against primary sources. Two environment notes first: (1) the pm-substrate Postgres doesn't exist on this machine (no container, no pgdata, and a native Postgres without the pm role occupies 5432), so dev:resume fails and I could not verify the ledger-level claims (checkpoints 1435/1436, stage-gate activity, 119 agent_state tables) — those become verify-then-fix plan items. (2) Everything else was verified against code on main.
+
+What I confirmed (the critic is right)
+Anti-fabrication architecture is as described. valid: false is hard-coded on every structurally complete path (sentinel-production-raw-batch.ts:942), evidenceEligible/materialBenefit are literal-false types across producer schemas, FORBIDDEN_OUTCOME_KEYS exists and is enforced (sentinel-production-runner.ts:492), and the sidecar uses fixed-width space-padded encodings so arms can't leak.
+All named trust seams are real: custodian "independence" is string comparison on owner IDs (sentinel-production-runner.ts:711-713); the in-repo caller pins powerArtifactExternallyVerified: false but the function accepts caller-supplied booleans (sentinel-production-raw-batch.ts:929-934); parseBlockManifest literally discards its parameter via void expectedRuntimePrevious; (sentinel-production-raw-batch.ts:504).
+The scale imbalance is real. The four public-eval-* packages total 82,158 lines vs 1,961 in packages/continuity — a 42:1 instrument-to-treatment ratio (critic said ~43:1; their 85–92k range was slightly high but immaterial). And the per-file 2,000-line budget in validate-budgets.ts can't see aggregate growth — the exact gap the tower exploited twice.
+The phrasing exists — "real, publicly documented agent-state failure scenarios" is in objective-falsification.md:10 and baked into the frozen owner-objective constant (sentinel-production-plan.ts:9). The critic's proposed honest phrasing is better.
+All three benchmarks are real, verified against primary sources: microsoft/STATE-Bench (announced 2026-05-19), SentinelBench, arXiv 2606.05342 (MSR publication), ToolSandbox, arXiv 2408.04682. Critically, the Microsoft blog confirms the critic's most important methodological point: STATE-Bench's deterministic scorer "compares the final environment state to ground truth" — so the D6-B class of benefit (blocked duplicate side effect) is scorable there, while ToolSandbox strict score was blind to it.
+The power hashes reproduce. I recomputed all three SHA-256s in sentinel-production-power-redesign.md — exact matches.
+The D6-B endpoint amendment, external witnessing via OSF/Rekor, the interpretation-preregistration, and the "no new verification code" standing rule are all sound — and notably, the repo already cites Sigstore Rekor and OSF preregistration as its own research basis (objective-falsification.md:309-314); it just hasn't operationalized them.
+Where I disagree with the critic
+1. "The working tree is RED" — stale. On current main (post-merge of PR #33), the full suite is green: 1,187 passed, 237 skipped, 0 failed; the runner tests pass 13/13; producer and verifier agree on closure-artifacts.v3 (sentinel-runtime-closure.ts:1294 ↔ sentinel-production-raw-runtime.ts:285). The critic reviewed the branch mid-migration; their recommendation #1 is already done and should be dropped from the plan.
+
+2. "19 binary paired clusters cannot detect even 0.35 … at 80% power" — contradicted by the artifact the critic's own reviewer replayed. The frozen 56-cell calculation (sentinel-production-power-redesign.md, table at lines 48–53) shows the complete rule (both point lifts ≥0.10 + Holm + bootstrap + guardrails) at true lift 0.35 achieves worst-case estimated power 0.94 at ρ=0, 0.90 at ρ=0.10, 0.81 at ρ=0.25. It fails only at ρ=1 (0.36). So the blocker is "unsatisfiable" only if the accepted dependence range must include ρ=1 — and the doc's own remedy clause ("independent, predeclared evidence supports the repeat-dependence… assumptions") is exactly the internal pilot the critic recommends. They agree more than the critic admits. Where the critic is right: at ρ=1, three repeats collapse to one effective observation per task — the design effect is 1+(m−1)ρ (Kish, Survey Sampling, 1965; Donner & Klar, Design and Analysis of Cluster Randomization Trials, 2000), and the doc concedes this. One refinement the critic's "estimated-ICC-plus-margin" hand-waves: ICC estimates from ~31 tasks × 3 repeats are notoriously imprecise (Eldridge, Ashby & Kerry, Int J Epidemiol 35(5):1292–1300, 2006), so the powered calculation should be signed at the pilot ICC's upper confidence limit, the standard practice for pilot-based variance estimation (Browne, Stat Med 14(17):1933–40, 1995; internal-pilot framework: Wittes & Brittain, Stat Med 9:65–72, 1990; CONSORT pilot extension: Eldridge et al., BMJ 2016;355:i5239). The critic's other math point — power ≈ 0.5 when true effect equals the observation threshold — is correct and standard (Bloom, "Minimum Detectable Effects," Evaluation Review 19(5):547–556, 1995); the audit's exact 0.5112 matches.
+
+3. "describe.skip is a silent coverage gate" — overstated. ci.yml provisions a Postgres service and sets PM_DATABASE_URL, so every push/PR runs the DB-gated tests. The gap is local-dev only. A cheap CI skip-count assertion is still worth adding, but this is not a live trust seam.
+
+4. "Zero behavioral outcome observations across the entire program" — self-contradicted. The critic elsewhere calls D6-B "the program's most important finding" — and D6-B was a behavioral observation from real four-arm runs (native/sham duplicated the side effect; substrate blocked it). The accurate statement is "zero eligible confirmatory outcome cells," which is what the repo itself reports. The distinction matters because "produced zero data" powers the critic's harshest rhetoric.
+
+5. "The status doc's framing quietly overstates the STATE-Bench blocker" — partially disagree. Blocker #2 in public-benchmark-status-2026-07-13.md:126-132 names the missing credentials and, in the same item, the missing self-owned instrumented executor. It never claims Microsoft gatekeeping. Agree with the action (provision the gpt-5.4 judge deployment — it's a funding task); disagree it was framed deceptively. Also: the critic's "self-provisionable" claim itself is not confirmed by primary sources I could reach (the repo README and MS blog don't document evaluator provisioning; the docs path I tried 404'd) — verify against STATE-Bench's eval docs before rewriting ours.
+
+6. "Cancel the custom raw-head witness service" — no such service exists in the repo. The only witness references are citations to Rekor as the model. If it exists, it's a ledger work item I can't see from this machine — verify at next resume before "cancelling" anything.
+
+7. Minor stale-tree artifacts: 82k actual vs "85–92k" lines; 13 runner tests vs "16"; SentinelBench "110 scenario JSONs" vs the paper's "100 tasks" (likely repo-vs-paper counting; unverifiable here). None change conclusions.
+
+The plan
+Phase 0 — Unblock the protocol + hygiene (hours)
+
+Fix local DB access: the compose file binds 127.0.0.1:5432, which collides with your native Postgres. Make the port configurable (e.g. 5433 via env) in docker-compose.yml + .env + CLAUDE.md so dev:resume works on this machine. Without this, the repo's own session protocol is dead here.
+With the ledger up: verify and close checkpoint 1435 (superseded duplicate); confirm/deny zero stage-gate + procedure-admission activity and the 119 agent_state tables; record this plan as a decision checkpoint.
+Delete the dead expectedRuntimePrevious param (or actually enforce it) in sentinel-production-raw-batch.ts:475-505.
+Add a CI assertion that skipped-test count ≤ expected when PM_DATABASE_URL is set.
+Phase 1 — Honest phrasing (same day)
+5. In docs, change "real, publicly documented agent-state failure scenarios" → "public benchmarks designed to expose agent-state failure." Trap: the same phrase lives inside the hash-bound owner-objective constants (sentinel-production-plan.ts:9) — do not edit those retroactively; rev them with the next plan version via a decision checkpoint.
+6. Restructure status-doc blocker #2 into "(a) purchasable: judge deployment + config; (b) engineering: instrumented executor" — after first confirming from microsoft/STATE-Bench primary docs that the official evaluator is genuinely self-provisioned.
+
+Phase 2 — External witnessing (an afternoon, not a milestone)
+7. Operationalize what objective-falsification.md already cites: OSF registration or public git tag + Rekor entry of the preregistration hash before any run; raw-root hashes after. One thin script invoking rekor-cli; no new verifier framework (Phase 6 rule applies).
+8. If the ledger contains a witness-service work item, close it as superseded.
+
+Phase 3 — First behavioral data (this week; the centerpiece)
+9. Preregister the interpretation matrix first (which outcome patterns — including substrate ≈ plain-KV > native ≈ sham — count as product win / claim-narrowing / kill), witnessed via Phase 2.
+10. Run the clean excluded-environment smoke (the status doc's own prerequisite, blocker #3).
+11. Fund the Anthropic API; run the MicroHub qualification triplet + frozen 12-task procedural holdout, all four arms, 3 repeats, speed 1 (~180 cells, ~$200–600). Explicitly non-confirmatory per the roadmap's own step 3.
+12. Estimate repeat ICC from that data; re-sign the power calculation at the ICC upper confidence limit (Browne 1995). If powered ≥0.80 fails within the frozen 19-task universe, the redesign doc's own branch applies: add independent relative tasks or re-aim (Phase 5).
+13. Fund and run the ToolSandbox non-scripted triplet (blocker is literally credits).
+
+Phase 4 — Endpoint amendment (before any confirmatory run)
+14. Amend the analysis plan: benchmark strict score becomes a non-inferiority guard; a preregistered state-effect endpoint computed from the benchmark's own environment becomes the superiority claim. STATE-Bench's deterministic final-state scorer already sees duplicated writes (confirmed by the MS blog), so oracle independence (hard req 8) is preserved.
+
+Phase 5 — Owner decision (record as decision-needed: checkpoint, don't unilaterally change)
+15. Re-aim the powered confirmatory at STATE-Bench's 150 held-out tasks; demote Sentinel to qualification + corner battery. Note this largely restores the roadmap's own structure (D6-C is already the "headline held-out proof"; D6-D the "corner battery") — but a standing owner decision currently directs the Sentinel stress test, so this needs the owner, informed by Phase 3's ICC data.
+
+Phase 6 — Standing rule against instrument regrowth
+16. Record as a decision checkpoint: no new verification code until the next outcome cell completes; gating question for any future verifier feature: "did a completed run's failure or a named external skeptic demand this check?"
+17. Enforce structurally: add an aggregate line ratchet for the public-eval-* packages to guardrail-ratchet.json (frozen at today's 82,158; may shrink, never grow) — the per-file budget demonstrably didn't stop 42:1.
+
+The critic's bottom line survives verification: the machinery is honest to a fault, and the binding constraint is now data, not rigor. The plan's center of gravity is Phase 3 — everything else exists to make that run's result witnessed, interpretable, and terminal.
+
+Sources: microsoft/STATE-Bench · Microsoft Open Source Blog — STATE-Bench · SentinelBench (arXiv 2606.05342) · SentinelBench — Microsoft Research · ToolSandbox (arXiv 2408.04682) · Sigstore Rekor · OSF Registrations · Wittes & Brittain 1990, Stat Med 9:65–72 · Browne 1995, Stat Med 14:1933–40 · Eldridge, Ashby & Kerry 2006, Int J Epidemiol 35:1292–1300 · Eldridge et al. 2016, BMJ 355:i5239 · Donner & Klar 2000 · Kish 1965 · Bloom 1995, Evaluation Review 19:547–556
