@@ -17,6 +17,7 @@
     "pm-sentinel-anthropic-provider": "./dist/sentinel-anthropic-provider-proxy-cli.js",
     "pm-sentinel-live": "./dist/sentinel-live-runner-cli.js",
     "pm-sentinel-production-smoke": "./dist/sentinel-production-excluded-smoke-cli.js",
+    "pm-sentinel-production-batch": "./dist/sentinel-production-batch-cli.js",
     "pm-sentinel-power-audit": "./dist/sentinel-production-power-audit-cli.js",
     "pm-sentinel-production-verify": "./dist/sentinel-production-raw-verifier-cli.js",
     "pm-sentinel-state-sidecar": "./dist/sentinel-state-sidecar-cli.js"

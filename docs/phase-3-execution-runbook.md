@@ -71,11 +71,16 @@ The invocation JSON's exact keys are enforced by
 Then:
 
 - **4c. MicroHub qualification triplet** (relative / absolute / no-op), all
-  four arms, 3 repeats, speed 1 — via `runSentinelProductionBatch`
-  (`sentinel-production-runner.ts:1979`; a batch CLI wrapper around it is the
-  one piece of *execution* code still missing — building it pays the
-  `evalPackageTotals` ratchet toll visibly and is authorized by the plan as
-  execution, not verification).
+  four arms, 3 repeats, speed 1:
+
+  ```bash
+  node packages/public-eval-corners/dist/sentinel-production-batch-cli.js <invocation.json>
+  ```
+
+  Same invocation shape as the smoke minus `taskId`/`repeatId` (the full
+  declared schedule comes from the preregistration; the transport refuses
+  selection keys). `evidenceEligible`/`materialBenefit` stay literal false
+  regardless of outcome.
 - **4d. Frozen 12-task procedural holdout**, same shape. No replacement, no
   outcome inspection during execution.
 - Neither phase may emit a material-benefit claim (protocol; the schemas make
