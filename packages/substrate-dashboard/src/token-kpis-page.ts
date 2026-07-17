@@ -64,19 +64,16 @@ const pct = (v: number | null): string => (v === null ? "–" : `${(v * 100).toF
 const num1 = (v: number | null): string => (v === null ? "–" : v.toFixed(1));
 const credits = (v: number | null): string => (v === null ? "–" : v.toFixed(6));
 
-const tile = (opts: {
-  label: string;
-  value: string;
-  sub?: string;
-  cell?: string;
-  tone?: "good" | "critical";
-}): string => `
-  <div class="cp-tile" data-kpi="${esc(opts.cell ?? opts.label)}">
-    <span class="cp-tile-label">${esc(opts.label)}${
-      opts.cell ? ` <code class="tk-cell">${esc(opts.cell)}</code>` : ""
-    }</span>
-    <span class="cp-tile-value${opts.tone ? ` cp-${opts.tone}` : ""}">${opts.value}</span>
-    ${opts.sub ? `<span class="cp-tile-sub">${esc(opts.sub)}</span>` : ""}
+const gaugeStat = (
+  label: string,
+  value: string,
+  tone: "good" | "bad" | "neutral",
+  hint: string,
+): string => `
+  <div class="gauge" data-tone="${tone}" title="${esc(hint)}">
+    <div class="gauge-label">${esc(label)}</div>
+    <div class="gauge-read"><span class="gauge-big gauge-${tone}">${esc(value)}</span></div>
+    <div class="gauge-hint">${esc(hint)}</div>
   </div>`;
 
 /** The empty state teaches the loop: run → events → this page + workbook. */
@@ -120,57 +117,35 @@ export function renderTokenKpisHtml(
 
   return `
 <section class="cp-root" data-view="token-kpis">
-  <header class="cp-head">
-    <div>
-      <h1>Token KPIs</h1>
-      <p>Monitoring &amp; control — token efficiency: retry rate with vs. without read-set
-      validation; tokens wasted per retry. These KPIs feed the budgeting benefit model
-      (Token Savings Model workbook).</p>
+  <div class="gate-console">
+    <div class="gate-bar">
+      <span class="gate-led" aria-hidden="true" style="animation-duration: 4.8s;"></span>
+      <span class="gate-status">Token efficiency telemetry</span>
+      <span class="gate-run">run ${esc(d.runLabel)}</span>
+      <details class="bm-honesty">
+         <summary>?</summary>
+         <p>Derived from the same raw telemetry used in the Token Savings Model workbook.</p>
+      </details>
     </div>
-    <label class="tk-run-picker">Run
-      <select data-tk-run>${options}</select>
-    </label>
-  </header>
+    
+    <div class="gate-hero" style="padding-bottom: 20px">
+      <span class="bm-kicker">Budgeting</span>
+      <div style="display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 16px;">
+        <h1 style="margin:0">Token Savings &amp; Efficiency</h1>
+        <label class="tk-run-picker">
+          <select data-tk-run>${options}</select>
+        </label>
+      </div>
+    </div>
 
-  <div class="cp-tiles">
-    ${tile({
-      label: "Retry rate — validation OFF",
-      cell: "C7",
-      value: pct(d.c7BaselineRetryRate),
-      sub: "baseline arm (no substrate)",
-    })}
-    ${tile({
-      label: "Retry rate — validation ON",
-      cell: "C8",
-      value: pct(d.c8SubstrateRetryRate),
-      sub: "substrate arm (read-set validation)",
-    })}
-    ${tile({
-      label: "Tokens wasted per retry",
-      cell: "C9",
-      value: num1(d.c9MeanTokensPerWastedAttempt),
-      sub: `baseline ${num1(d.c9ByMode.no_substrate)} · substrate ${num1(d.c9ByMode.substrate)}`,
-    })}
-    ${tile({
-      label: "Wrong-state writes shipped",
-      value: `${baselineShipped} → ${substrateShipped}`,
-      sub: "baseline vs substrate (admitted but wrong)",
-      ...(substrateShipped > 0
-        ? { tone: "critical" as const }
-        : baselineShipped > 0
-          ? { tone: "good" as const }
-          : {}),
-    })}
-    ${tile({
-      label: "Tokens metered",
-      value: compactNumber(d.totals.totalTokens),
-      sub: `${compactNumber(d.totals.promptTokens)} prompt · ${compactNumber(d.totals.completionTokens)} completion`,
-    })}
-    ${tile({
-      label: "Metered cost",
-      value: d.totals.costCredits === null ? "free (local)" : credits(d.totals.costCredits),
-      sub: d.totals.costCredits === null ? "Ollama run" : "OpenRouter credits (≈ USD)",
-    })}
+    <div class="tk-gauges" style="margin-bottom: 20px;">
+      ${gaugeStat("Retry rate — val OFF (C7)", pct(d.c7BaselineRetryRate), "neutral", "baseline arm (no substrate)")}
+      ${gaugeStat("Retry rate — val ON (C8)", pct(d.c8SubstrateRetryRate), "neutral", "substrate arm (read-set validation)")}
+      ${gaugeStat("Tokens wasted per retry (C9)", num1(d.c9MeanTokensPerWastedAttempt), "neutral", `baseline ${num1(d.c9ByMode.no_substrate)} · substrate ${num1(d.c9ByMode.substrate)}`)}
+      ${gaugeStat("Wrong-state shipped", `${baselineShipped} → ${substrateShipped}`, substrateShipped > 0 ? "bad" : baselineShipped > 0 ? "good" : "neutral", "baseline vs substrate (admitted but wrong)")}
+      ${gaugeStat("Tokens metered", compactNumber(d.totals.totalTokens), "neutral", `${compactNumber(d.totals.promptTokens)} prompt · ${compactNumber(d.totals.completionTokens)} completion`)}
+      ${gaugeStat("Metered cost", d.totals.costCredits === null ? "free (local)" : credits(d.totals.costCredits), "neutral", d.totals.costCredits === null ? "Ollama run" : "OpenRouter credits (≈ USD)")}
+    </div>
   </div>
 
   <div class="cp-grid tk-charts">
