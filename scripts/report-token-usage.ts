@@ -18,7 +18,7 @@ import {
   computeTokenUsage,
   renderTokenUsageCsv,
   renderTokenUsageTable,
-} from "./token-usage-metrics.js";
+} from "../packages/local-agent-lab/src/index.js";
 
 const databaseUrl = env["PM_DATABASE_URL"];
 if (!databaseUrl) {

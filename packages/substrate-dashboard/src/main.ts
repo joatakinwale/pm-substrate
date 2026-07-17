@@ -1,6 +1,8 @@
 import "./styles.css";
 
+import { mountBenchmarks } from "./benchmarks-page.js";
 import { mountControlPlane } from "./control-plane-page.js";
+import { mountTokenKpis } from "./token-kpis-page.js";
 import { mountIntegrationWorkbench } from "./integration-workbench-page.js";
 
 type Mode = "substrate" | "no_substrate" | "ab_pair";
@@ -83,13 +85,25 @@ interface SessionDetail {
 const appRoot = document.querySelector<HTMLDivElement>("#app")!;
 if (!appRoot) throw new Error("missing #app root");
 
-type DashboardView = "lab" | "control-plane" | "integrations";
+type DashboardView =
+  | "benchmarks"
+  | "lab"
+  | "token-kpis"
+  | "control-plane"
+  | "integrations";
 type LabTab = "run" | "sessions" | "evidence" | "settings";
 
 function currentView(): DashboardView {
   const raw = window.location.hash.replace(/^#\/?/, "");
-  if (raw === "control-plane" || raw === "integrations") return raw;
-  return "lab";
+  if (
+    raw === "lab" ||
+    raw === "control-plane" ||
+    raw === "token-kpis" ||
+    raw === "integrations"
+  ) {
+    return raw;
+  }
+  return "benchmarks";
 }
 
 let mountedShellView: DashboardView | null = null;
@@ -120,9 +134,10 @@ function renderShell(active: DashboardView): void {
           <strong class="rail-brand">pm-substrate</strong>
         </div>
         <nav class="dashboard-nav" aria-label="Primary dashboard views">
-          ${link("lab", "Lab", "lab")}
+          ${link("benchmarks", "Benchmarks", "benchmarks")}
+          ${link("lab", "Local Agent Lab", "lab")}
+          ${link("token-kpis", "Token KPIs", "tokens")}
           ${link("control-plane", "Control Plane", "control")}
-          ${link("integrations", "Integrations", "integrations")}
         </nav>
       </aside>
       <section class="dashboard-view"></section>
@@ -299,10 +314,22 @@ async function boot(): Promise<void> {
 async function route(): Promise<void> {
   const view = currentView();
   renderShell(view);
+  if (view === "benchmarks") {
+    disconnectStream();
+    viewRoot().innerHTML = `<div id="benchmarks-root"></div>`;
+    await mountBenchmarks(viewRoot().querySelector<HTMLElement>("#benchmarks-root")!);
+    return;
+  }
   if (view === "control-plane") {
     disconnectStream();
     viewRoot().innerHTML = `<div id="control-plane-root"></div>`;
     await mountControlPlane(viewRoot().querySelector<HTMLElement>("#control-plane-root")!);
+    return;
+  }
+  if (view === "token-kpis") {
+    disconnectStream();
+    viewRoot().innerHTML = `<div id="token-kpis-root"></div>`;
+    await mountTokenKpis(viewRoot().querySelector<HTMLElement>("#token-kpis-root")!);
     return;
   }
   if (view === "integrations") {

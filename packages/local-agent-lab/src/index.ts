@@ -22,6 +22,18 @@ export type {
   AttemptOutcome,
   AttemptRecord,
 } from "./attempt-loop.js";
+export {
+  TOKEN_USAGE_EVENT_TYPE,
+  computeTokenUsage,
+  listTokenUsageRuns,
+  renderTokenUsageCsv,
+  renderTokenUsageTable,
+} from "./token-usage-metrics.js";
+export type {
+  TokenUsageMetrics,
+  TokenUsageRunSummary,
+  TokenUsageScenarioRow,
+} from "./token-usage-metrics.js";
 export { World } from "./world.js";
 export type { AdmitInput, KeyView } from "./world.js";
 export { LabAgent } from "./agent.js";

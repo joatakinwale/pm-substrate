@@ -237,7 +237,13 @@ export function renderControlPlaneHtml(d: ControlPlanePayload): string {
           ${barList(d.governance.eventsByType)}
         </article>
 
-        <article class="cp-card" data-q="integration">
+        ${
+          d.integration.adaptersRegistered +
+            d.integration.syncUpserted +
+            d.integration.executorDispatched +
+            d.integration.executorRefused >
+          0
+            ? `<article class="cp-card" data-q="integration">
           <h2>Attached apps</h2>
           <p class="cp-note">Integration-kit activity — external apps governed through mapping + admission.</p>
           <dl class="cp-kvs">
@@ -248,7 +254,13 @@ export function renderControlPlaneHtml(d: ControlPlanePayload): string {
             ${kv("Executor refused", String(d.integration.executorRefused))}
             ${kv("Executor failed", String(d.integration.executorFailed))}
           </dl>
-        </article>
+        </article>`
+            : `<article class="cp-card" data-q="integration">
+          <h2>Attached apps</h2>
+          <p class="cp-empty">No external apps attached — the labs (PluggedInSocial, ArrowHedge)
+          are frozen until a public-benchmark keep decision.</p>
+        </article>`
+        }
       </div>
     </section>
 

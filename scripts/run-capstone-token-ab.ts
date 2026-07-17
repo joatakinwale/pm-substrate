@@ -24,7 +24,11 @@ import pg from "pg";
 
 import {
   EVIDENCE_SCENARIOS,
+  TOKEN_USAGE_EVENT_TYPE,
+  computeTokenUsage,
   defaultLabProvider,
+  renderTokenUsageCsv,
+  renderTokenUsageTable,
   runArmWithRetries,
   type ArmAttemptSeries,
   type Arm,
@@ -34,12 +38,7 @@ import {
 } from "../packages/local-agent-lab/src/index.js";
 import { PostgresEventStore } from "../packages/events/src/index.js";
 import type { EntityId, TenantId } from "../packages/types/src/index.js";
-import {
-  TOKEN_USAGE_EVENT_TYPE,
-  computeTokenUsage,
-  renderTokenUsageCsv,
-  renderTokenUsageTable,
-} from "./token-usage-metrics.js";
+
 
 const ROOT = resolve(import.meta.dirname, "..");
 const EVIDENCE_DIR = resolve(ROOT, "docs", "evidence", "capstone");
