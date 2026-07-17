@@ -20,7 +20,7 @@ import {
 import type { Timestamp } from "@pm/types";
 import { World } from "./world.js";
 import { LabAgent } from "./agent.js";
-import { OllamaClient } from "./ollama.js";
+import { defaultLabProvider, type LabModelClient } from "./provider.js";
 import type {
   AdmitOutcome,
   Arm,
@@ -62,7 +62,7 @@ export interface ScenarioRun {
 
 export interface EngineConfig {
   readonly databaseUrl: string;
-  readonly ollama?: OllamaClient;
+  readonly ollama?: LabModelClient;
   readonly retainWorlds?: boolean;
   readonly actionOutcomeAuthorityProvider?: LocalAgentLabActionOutcomeAuthorityProvider;
   readonly suiteRunIdFactory?: () => string;
@@ -111,7 +111,7 @@ async function runArm(
   identity: { readonly suiteRunId: string; readonly attemptId: string },
 ): Promise<ArmRun> {
   const world = await World.create(cfg.databaseUrl);
-  const agent = new LabAgent(cfg.ollama ?? new OllamaClient());
+  const agent = new LabAgent(cfg.ollama ?? defaultLabProvider());
   const ctx = { world, agent, arm };
   try {
     await spec.seed(ctx);
@@ -178,7 +178,7 @@ async function runScenarioWithIdentity(
   cfg: EngineConfig,
   identity: { readonly suiteRunId: string; readonly attemptId: string },
 ): Promise<ScenarioRun> {
-  const ollama = cfg.ollama ?? new OllamaClient();
+  const ollama = cfg.ollama ?? defaultLabProvider();
   const a = await runArm(spec, "no_substrate", { ...cfg, ollama }, identity);
   const b = await runArm(spec, "substrate", { ...cfg, ollama }, identity);
   return {
@@ -242,7 +242,7 @@ export async function runSuite(
   return {
     suiteRunId,
     runs,
-    model: cfg.ollama?.model ?? new OllamaClient().model,
+    model: cfg.ollama?.model ?? defaultLabProvider().model,
     actionOutcomeEnvelopes: runs.flatMap((run) => run.actionOutcomeEnvelopes),
     substrateProtectedCount,
     noFailureCount,

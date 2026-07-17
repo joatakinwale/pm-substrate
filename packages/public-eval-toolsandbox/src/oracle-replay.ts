@@ -414,12 +414,18 @@ function readStableFile(
 function assertNativeExecutableBytes(runtime: StableFile): void {
   const bytes = runtime.bytes;
   const magic = bytes.subarray(0, 4).toString("hex");
+  // Mach-O universal (fat) binaries share the cafebabe magic with Java class
+  // files; a real fat header carries a small big-endian architecture count
+  // where a class file carries its format version (>= 45), so 1..8 separates
+  // them strictly.
+  const fatArchCount = bytes.byteLength >= 8 ? bytes.readUInt32BE(4) : 0;
   const native =
     magic === "7f454c46" ||
     magic === "feedface" ||
     magic === "feedfacf" ||
     magic === "cefaedfe" ||
     magic === "cffaedfe" ||
+    (magic === "cafebabe" && fatArchCount >= 1 && fatArchCount <= 8) ||
     bytes.subarray(0, 2).toString("ascii") === "MZ";
   if (!native) {
     throw new Error(

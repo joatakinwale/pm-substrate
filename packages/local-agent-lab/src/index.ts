@@ -10,6 +10,18 @@
 
 export { OllamaClient } from "./ollama.js";
 export type { OllamaConfig, OllamaResult } from "./ollama.js";
+export { OpenRouterClient } from "./openrouter.js";
+export type { OpenRouterConfig } from "./openrouter.js";
+export { defaultLabProvider } from "./provider.js";
+export type { LabModelClient, LabProviderName, LabProviderOptions } from "./provider.js";
+export { classifyAttemptCause, runArmWithRetries } from "./attempt-loop.js";
+export type {
+  ArmAttemptSeries,
+  AttemptCause,
+  AttemptLoopConfig,
+  AttemptOutcome,
+  AttemptRecord,
+} from "./attempt-loop.js";
 export { World } from "./world.js";
 export type { AdmitInput, KeyView } from "./world.js";
 export { LabAgent } from "./agent.js";

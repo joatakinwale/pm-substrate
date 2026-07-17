@@ -27,6 +27,9 @@ export interface OllamaResult {
   readonly promptTokens: number;
   readonly completionTokens: number;
   readonly totalTokens: number;
+  /** Provider-reported spend for this call, in the provider's credit unit.
+      Absent for local providers (Ollama is free). */
+  readonly costCredits?: number;
 }
 
 const DEFAULT_BASE = "http://localhost:11434";
@@ -47,6 +50,10 @@ export class OllamaClient {
 
   get model(): string {
     return this.#model;
+  }
+
+  get provider(): "ollama" {
+    return "ollama";
   }
 
   /** Single-turn generation. Throws on transport / non-2xx. */

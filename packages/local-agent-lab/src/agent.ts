@@ -12,17 +12,19 @@
  * real.
  */
 
-import { OllamaClient } from "./ollama.js";
+import type { LabModelClient } from "./provider.js";
 
 export interface AgentTokenLedger {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
   calls: number;
+  /** Provider-reported spend, when the backend bills per call (OpenRouter). */
+  costCredits?: number;
 }
 
 export class LabAgent {
-  readonly #ollama: OllamaClient;
+  readonly #ollama: LabModelClient;
   /** The agent's private representation of the world. Not authority. */
   readonly #memory = new Map<string, unknown>();
   readonly ledger: AgentTokenLedger = {
@@ -32,7 +34,7 @@ export class LabAgent {
     calls: 0,
   };
 
-  constructor(ollama: OllamaClient) {
+  constructor(ollama: LabModelClient) {
     this.#ollama = ollama;
   }
 
@@ -72,10 +74,13 @@ export class LabAgent {
     return r.text;
   }
 
-  #tally(r: { promptTokens: number; completionTokens: number; totalTokens: number }): void {
+  #tally(r: { promptTokens: number; completionTokens: number; totalTokens: number; costCredits?: number }): void {
     this.ledger.promptTokens += r.promptTokens;
     this.ledger.completionTokens += r.completionTokens;
     this.ledger.totalTokens += r.totalTokens;
     this.ledger.calls += 1;
+    if (r.costCredits !== undefined) {
+      this.ledger.costCredits = (this.ledger.costCredits ?? 0) + r.costCredits;
+    }
   }
 }

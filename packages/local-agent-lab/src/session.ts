@@ -9,7 +9,7 @@ import {
 } from "./engine.js";
 import type { LabInjection } from "./injection.js";
 import type { LabMutation } from "./mutation.js";
-import { OllamaClient } from "./ollama.js";
+import { defaultLabProvider, type LabModelClient } from "./provider.js";
 import type { Arm, ScenarioContext, ScenarioSpec } from "./scenario.js";
 import type {
   LabSessionEvent,
@@ -31,7 +31,7 @@ export interface LabSessionRequest {
 
 export interface LabSessionRunnerConfig {
   readonly databaseUrl: string;
-  readonly ollama?: OllamaClient;
+  readonly ollama?: LabModelClient;
   readonly model?: string;
   readonly retainWorlds?: boolean;
   readonly worldFactory?: () => Promise<World>;
@@ -295,7 +295,7 @@ export class LabSessionRunner {
     readonly arm: Arm;
   }): Promise<ArmRun> {
     const world = await (this.#cfg.worldFactory?.() ?? World.create(this.#cfg.databaseUrl));
-    const agent = this.#cfg.agentFactory?.() ?? new LabAgent(this.#cfg.ollama ?? new OllamaClient());
+    const agent = this.#cfg.agentFactory?.() ?? new LabAgent(this.#cfg.ollama ?? defaultLabProvider());
     const ctx: ScenarioContext = { world, agent, arm: input.arm };
 
     this.#emit({
