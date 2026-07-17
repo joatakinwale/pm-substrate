@@ -243,7 +243,7 @@ LOCAL_LAB_PROVIDER=openrouter pnpm evals:local-agent-lab:live   # all failure cl
   const allows = verdicts.filter((v) => v.expectedAdmission === "allow");
 
   const matrixRow = (v: LabScenarioVerdict): string => `
-    <div class="bm-matrix-row">
+    <div class="bm-matrix-row" data-scenario="${esc(v.scenarioId)}" role="button" tabindex="0">
       <span class="bm-matrix-name">${esc(v.scenarioId.replaceAll("-expected-allow", ""))}${
         v.expectedAdmission === "allow" ? ' <em>(control)</em>' : ""
       }<small>${esc(v.failureClass.replaceAll("_", " "))}</small></span>
@@ -330,6 +330,23 @@ export function renderBenchmarksHtml(d: BenchmarksPayload): string {
     </div>
     ${labVerdictBoard(d.labVerdicts)}
   </article>
+
+  <div class="modal-backdrop" id="trace-modal-backdrop" style="display: none;">
+    <div class="start-modal">
+      <header>
+        <div>
+          <h2 id="trace-modal-title">Validation Trace</h2>
+          <p id="trace-modal-desc">Loading session trace...</p>
+        </div>
+        <button class="rail-toggle" type="button" aria-label="Close" data-action="close-trace-modal">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </header>
+      <div class="start-form" id="trace-modal-content">
+        <p class="cp-loading cp-empty">fetching trace...</p>
+      </div>
+    </div>
+  </div>
 </section>`;
 }
 
@@ -369,6 +386,87 @@ export function hydrateBenchmarkCharts(root: HTMLElement, d: BenchmarksPayload):
   }
 }
 
+function bindTraceModal(root: HTMLElement): void {
+  const backdrop = root.querySelector<HTMLElement>("#trace-modal-backdrop");
+  if (!backdrop) return;
+
+  const closeBtn = backdrop.querySelector<HTMLButtonElement>("[data-action='close-trace-modal']");
+  closeBtn?.addEventListener("click", () => {
+    backdrop.style.display = "none";
+  });
+
+  const content = root.querySelector<HTMLElement>("#trace-modal-content");
+  const title = root.querySelector<HTMLElement>("#trace-modal-title");
+
+  root.querySelectorAll<HTMLElement>(".bm-matrix-row[data-scenario]").forEach(row => {
+    // Basic accessibility handlers
+    row.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        row.click();
+      }
+    });
+
+    row.addEventListener("click", async () => {
+      const scenarioId = row.dataset.scenario;
+      if (!scenarioId || !content || !title) return;
+      
+      title.textContent = "Data Trace: " + scenarioId.replaceAll("-expected-allow", "");
+      content.innerHTML = `<p class="cp-loading cp-empty">fetching lab trace bounds...</p>`;
+      backdrop.style.display = "grid";
+
+      try {
+        const res = await fetch("/api/sessions");
+        const data = await res.json() as any;
+        const sessions = data.sessions || [];
+        
+        // Find the latest ab_pair session for this scenario
+        const targetSession = sessions.find((s: any) => s.scenarioId === scenarioId && s.mode === "ab_pair");
+        
+        if (!targetSession) {
+           content.innerHTML = `
+             <div style="padding: 12px; background: #fff8f7; border: 1px solid #ffccd0; border-radius: 8px; color: #b4232d">
+                <strong style="display:block; margin-bottom: 8px;">No matching run found</strong>
+                This benchmark data reflects the latest oracle sync, but the local trace database does not contain the original ab_pair session for this scenario.
+             </div>
+           `;
+           return;
+        }
+
+        // We have a session, fetch its details to present raw trace events
+        const detailRes = await fetch(`/api/sessions/${encodeURIComponent(targetSession.id)}`);
+        const detailData = await detailRes.json() as any;
+        
+        const events = detailData.events || [];
+        const mutations = events.filter((e: any) => e.type === "mutation_applied");
+        const actions = events.filter((e: any) => e.type.includes("action_"));
+
+        content.innerHTML = `
+           <div style="margin-bottom: 16px;">
+             <strong>Selected session ID:</strong> <code class="tk-cell">${esc(targetSession.id)}</code><br/>
+             <strong>Captured events:</strong> ${events.length}
+           </div>
+           
+           <div style="display: grid; gap: 10px; margin-bottom: 20px">
+              ${events.slice(0, 10).map((e: any) => `
+                <div style="font-size: 13px; padding: 10px; border: 1px solid #e1e0d9; background: #fdfdfc; border-radius: 6px;">
+                  <span style="color: #6b6a66; margin-right: 6px">[${new Date(e.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]</span>
+                  <strong>${esc(e.type)}</strong>
+                  ${e.description ? `<p style="margin: 4px 0 0; color: #11181f">${esc(e.description)}</p>` : ""}
+                </div>
+              `).join("")}
+              ${events.length > 10 ? `<div style="padding:4px; text-align: center; color: #898781; font-size: 13px;">...and ${events.length - 10} more events</div>` : ""}
+           </div>
+
+           <a href="/#lab" style="display: inline-block; padding: 8px 16px; background: #11181f; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600" onclick="window.history.pushState(null, '', '/sessions/${encodeURIComponent(targetSession.id)}'); window.dispatchEvent(new PopStateEvent('popstate')); backdrop.style.display='none'; return false;">Open detailed view in Local Agent Lab &rarr;</a>
+        `;
+      } catch (err) {
+        content.innerHTML = `<p class="cp-error">Trace unavailable: ${esc(String(err))}</p>`;
+      }
+    });
+  });
+}
+
 export async function mountBenchmarks(root: HTMLElement): Promise<void> {
   root.innerHTML = `<p class="cp-empty cp-loading">loading benchmark comparison…</p>`;
   try {
@@ -377,6 +475,7 @@ export async function mountBenchmarks(root: HTMLElement): Promise<void> {
     const data = (await res.json()) as BenchmarksPayload;
     root.innerHTML = renderBenchmarksHtml(data);
     hydrateBenchmarkCharts(root, data);
+    bindTraceModal(root);
   } catch (err) {
     root.innerHTML = `<div class="cp-root"><article class="cp-card cp-card-critical">
       <h2>Benchmark comparison unavailable</h2>
