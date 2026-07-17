@@ -52,15 +52,19 @@ const fixture: BenchmarksPayload = {
 };
 
 describe("benchmarks page renderer", () => {
-  it("renders the four-arm comparison and the strict-vs-collateral insight", () => {
+  it("renders the visual strict-vs-state-damage contrast", () => {
     const html = renderBenchmarksHtml(fixture);
     expect(html).toContain("Agent-state benchmarks");
     expect(html).toContain("ToolSandbox");
     expect(html).toContain("Apple");
-    // arms + collateral contrast
-    expect(html).toContain("duplicate side effects");
-    expect(html).toContain("blocked the duplicate");
-    expect(html).toContain("only <strong>substrate</strong> left zero duplicate side effects");
+    // visual contrast: identical strict scores vs diverging state damage
+    expect(html).toContain("Benchmark's strict score");
+    expect(html).toContain("Actual state damage");
+    expect(html).toContain("✓ 0 clean");
+    expect(html).toContain("✗ 1 shipped");
+    expect(html).toContain("Only <strong>substrate</strong> kept state clean");
+    expect(html).toContain("bm-fill-good");
+    expect(html).toContain("bm-fill-bad");
     // honesty rails
     expect(html).toContain("Reading this honestly");
     expect(html).toContain("What blocks an efficacy verdict");
@@ -75,14 +79,17 @@ describe("benchmarks page renderer", () => {
     expect(html).toContain("blind to state damage");
   });
 
-  it("renders the local lab A/B verdict board with protection + control tallies", () => {
+  it("renders the visual verdict matrix with protection meters", () => {
     const html = renderBenchmarksHtml(fixture);
     expect(html).toContain("controlled A/B verdicts");
     expect(html).toContain("Scenarios protected");
-    expect(html).toContain("blocked ✓");
-    expect(html).toContain("protected");
-    expect(html).toContain("control held");
     expect(html).toContain("Substrate leaks");
+    expect(html).toContain("bm-meter-fill");
+    // status matrix cells (teal/red + icon + word, never colour-alone)
+    expect(html).toContain("✗ fail");
+    expect(html).toContain("✓ blocked");
+    expect(html).toContain("bm-cell-fail");
+    expect(html).toContain("bm-cell-blocked");
     expect(html).toContain("validation OFF");
     expect(html).toContain("validation ON");
     expect(html).not.toContain("<script");

@@ -129,45 +129,80 @@ const fmtWhen = (iso: string): string => {
   return m ? m[1]! : iso;
 };
 
-/** Arms table with the strict-vs-collateral contrast made visible. */
+const barRow = (
+  label: string,
+  fillPct: number,
+  tone: "neutral" | "good" | "bad",
+  value: string,
+  strong = false,
+): string => `
+  <div class="bm-bar-row">
+    <span class="bm-bar-name${strong ? " bm-strong" : ""}">${esc(label)}</span>
+    <span class="bm-bar-track"><span class="bm-bar-fill bm-fill-${tone}" style="width:${Math.max(fillPct, tone === "good" ? 0 : 3)}%"></span></span>
+    <span class="bm-bar-val bm-txt-${tone}">${value}</span>
+  </div>`;
+
+/**
+ * The crux, made visual: two stacked mini bar charts. Left — the benchmark's
+ * strict score, identical across arms (looks like a tie). Right — the actual
+ * duplicate side effects, where only substrate stayed at zero. Same data as a
+ * table, but the divergence is seen, not read.
+ */
+function stateDamageContrast(arms: readonly BenchmarkArmOutcome[]): string {
+  return `
+  <div class="bm-contrast">
+    <div class="bm-contrast-panel">
+      <div class="bm-contrast-head">Benchmark's strict score</div>
+      ${arms
+        .map((a) =>
+          barRow(a.arm, (a.strictScore ?? 0) * 100, "neutral", fmtScore(a.strictScore), a.arm === "substrate"),
+        )
+        .join("")}
+      <div class="bm-contrast-note">Identical — the official oracle calls it a tie.</div>
+    </div>
+    <div class="bm-contrast-panel">
+      <div class="bm-contrast-head">Actual state damage <small>duplicate sends after restart</small></div>
+      ${arms
+        .map((a) => {
+          const dup = a.duplicateSideEffects ?? 0;
+          const clean = dup === 0;
+          return barRow(
+            a.arm,
+            clean ? 0 : 100,
+            clean ? "good" : "bad",
+            clean ? "✓ 0 clean" : `✗ ${dup} shipped`,
+            a.arm === "substrate",
+          );
+        })
+        .join("")}
+      <div class="bm-contrast-note">Only <strong>substrate</strong> kept state clean.</div>
+    </div>
+  </div>`;
+}
+
+/** Compact numeric arm row for benchmarks without collateral data. */
 function armsTable(arms: readonly BenchmarkArmOutcome[], seesCollateral: boolean): string {
   const anyCollateral = arms.some((a) => a.duplicateSideEffects !== null);
+  if (anyCollateral) {
+    return `${stateDamageContrast(arms)}${
+      seesCollateral
+        ? ""
+        : `<p class="bm-insight">↑ Strict task completion is <strong>blind</strong> to the state damage the substrate prevented — the crux of the whole comparison.</p>`
+    }`;
+  }
   return `
   <div class="bm-arms-wrap">
     <table class="bm-arms">
-      <thead><tr>
-        <th>arm</th>
-        <th>strict score</th>
-        ${anyCollateral ? "<th>duplicate side effects</th>" : ""}
-        ${arms.some((a) => a.disposition) ? "<th>after restart</th>" : ""}
-      </tr></thead>
+      <thead><tr><th>arm</th><th>strict score</th></tr></thead>
       <tbody>
         ${arms
-          .map((a) => {
-            const isSubstrate = a.arm === "substrate";
-            const cleanState = a.duplicateSideEffects === 0;
-            return `
-        <tr class="${isSubstrate ? "bm-arm-substrate" : ""}">
-          <td>${esc(a.arm)}</td>
-          <td>${fmtScore(a.strictScore)}</td>
-          ${
-            anyCollateral
-              ? `<td class="${a.duplicateSideEffects && a.duplicateSideEffects > 0 ? "bm-bad" : cleanState ? "bm-good" : ""}">${
-                  a.duplicateSideEffects === null ? "–" : a.duplicateSideEffects
-                }</td>`
-              : ""
-          }
-          ${a.disposition ? `<td>${esc(a.disposition)}</td>` : arms.some((x) => x.disposition) ? "<td>–</td>" : ""}
-        </tr>`;
-          })
+          .map(
+            (a) => `<tr class="${a.arm === "substrate" ? "bm-arm-substrate" : ""}">
+          <td>${esc(a.arm)}</td><td>${fmtScore(a.strictScore)}</td></tr>`,
+          )
           .join("")}
       </tbody>
     </table>
-    ${
-      anyCollateral && !seesCollateral
-        ? `<p class="bm-insight">↑ Every arm scores the same on the benchmark's strict oracle, yet only <strong>substrate</strong> left zero duplicate side effects. The official score cannot see the state damage the substrate prevented — the crux of the whole comparison.</p>`
-        : ""
-    }
   </div>`;
 }
 
@@ -211,15 +246,30 @@ function benchmarkCard(status: BenchmarkStatus): string {
   </article>`;
 }
 
-const armCell = (result: LabArmResult): string => {
-  if (result === null) return `<td class="bm-arm-cell">–</td>`;
-  const cls =
-    result === "fail" ? "bm-bad" : result === "blocked" ? "bm-arm-blocked" : "bm-good";
-  const label = result === "blocked" ? "blocked ✓" : result === "pass" ? "pass" : "fail";
-  return `<td class="bm-arm-cell ${cls}">${label}</td>`;
+/** A verdict pill: teal = clean/caught, red = damage — never green (CVD),
+    always with an icon + word so identity is never colour-alone. */
+const verdictCell = (result: LabArmResult): string => {
+  if (result === null) return `<span class="bm-cell bm-cell-none">–</span>`;
+  if (result === "fail") return `<span class="bm-cell bm-cell-fail">✗ fail</span>`;
+  if (result === "blocked") return `<span class="bm-cell bm-cell-blocked">✓ blocked</span>`;
+  return `<span class="bm-cell bm-cell-pass">✓ pass</span>`;
 };
 
-/** The controlled A/B verdict board from the paired local-lab eval ledger. */
+const meterRow = (
+  label: string,
+  n: number,
+  total: number,
+  tone: "good" | "bad",
+  sub: string,
+): string => `
+  <div class="bm-meter-row">
+    <span class="bm-meter-label">${esc(label)} <small>${esc(sub)}</small></span>
+    <span class="bm-meter-track"><span class="bm-meter-fill bm-fill-${tone}" style="width:${total > 0 ? (n / total) * 100 : n === 0 ? 100 : 0}%"></span></span>
+    <strong class="bm-txt-${tone}">${total > 0 ? `${n}/${total}` : String(n)}</strong>
+  </div>`;
+
+/** The controlled A/B verdict board: a protection meter + a status matrix
+    where a column of red baseline failures flips to a column of teal. */
 function labVerdictBoard(verdicts: readonly LabScenarioVerdict[]): string {
   if (verdicts.length === 0) {
     return `
@@ -232,62 +282,35 @@ LOCAL_LAB_PROVIDER=openrouter pnpm evals:local-agent-lab:live   # all failure cl
   const protectedCount = blocks.filter(
     (v) => v.baselineResult === "fail" && v.substrateResult !== "fail",
   ).length;
-  const baselineFailures = blocks.filter((v) => v.baselineResult === "fail").length;
   const leaks = verdicts.filter((v) => v.substrateResult === "fail").length;
   const cleanControls = allows.filter(
     (v) => v.baselineResult !== "fail" && v.substrateResult !== "fail",
   ).length;
 
-  const row = (v: LabScenarioVerdict): string => {
-    const isProtected = v.baselineResult === "fail" && v.substrateResult !== "fail";
-    const verdict =
-      v.substrateResult === "fail"
-        ? `<span class="bm-verdict bm-verdict-leak">substrate leak</span>`
-        : v.expectedAdmission === "allow"
-          ? `<span class="bm-verdict bm-verdict-control">control held</span>`
-          : isProtected
-            ? `<span class="bm-verdict bm-verdict-protected">protected</span>`
-            : `<span class="bm-verdict">–</span>`;
-    return `
-      <tr>
-        <td>${esc(v.scenarioId.replaceAll("-expected-allow", ""))}${
-          v.expectedAdmission === "allow" ? ' <em>(allow-control)</em>' : ""
-        }</td>
-        <td>${esc(v.failureClass.replaceAll("_", " "))}</td>
-        <td>${v.stateBenchCategory ? esc(v.stateBenchCategory.replaceAll("_", " ")) : "–"}</td>
-        ${armCell(v.baselineResult)}
-        ${armCell(v.substrateResult)}
-        <td>${verdict}</td>
-      </tr>`;
-  };
+  const matrixRow = (v: LabScenarioVerdict): string => `
+    <div class="bm-matrix-row">
+      <span class="bm-matrix-name">${esc(v.scenarioId.replaceAll("-expected-allow", ""))}${
+        v.expectedAdmission === "allow" ? ' <em>(control)</em>' : ""
+      }<small>${esc(v.failureClass.replaceAll("_", " "))}</small></span>
+      ${verdictCell(v.baselineResult)}
+      <span class="bm-flip" aria-hidden="true">→</span>
+      ${verdictCell(v.substrateResult)}
+    </div>`;
 
   return `
-    <div class="cp-tiles bm-verdict-tiles">
-      <div class="cp-tile"><span class="cp-tile-label">Scenarios protected</span>
-        <span class="cp-tile-value cp-good">${protectedCount}/${blocks.length}</span>
-        <span class="cp-tile-sub">baseline shipped bad state · substrate caught it</span></div>
-      <div class="cp-tile"><span class="cp-tile-label">Baseline failures</span>
-        <span class="cp-tile-value">${baselineFailures}</span>
-        <span class="cp-tile-sub">validation OFF let the bad action through</span></div>
-      <div class="cp-tile"><span class="cp-tile-label">Substrate leaks</span>
-        <span class="cp-tile-value${leaks === 0 ? " cp-good" : " cp-critical"}">${leaks}</span>
-        <span class="cp-tile-sub">wrong state that passed the gate (want 0)</span></div>
-      <div class="cp-tile"><span class="cp-tile-label">Allow-controls held</span>
-        <span class="cp-tile-value">${cleanControls}/${allows.length}</span>
-        <span class="cp-tile-sub">deny-mutant guard: substrate didn't over-block</span></div>
+    <div class="bm-meters">
+      ${meterRow("Scenarios protected", protectedCount, blocks.length, "good", "baseline shipped bad state · substrate caught it")}
+      ${meterRow("Substrate leaks", leaks, 0, leaks === 0 ? "good" : "bad", "wrong state that passed the gate — want 0")}
+      ${meterRow("Allow-controls held", cleanControls, allows.length, "good", "deny-mutant guard: substrate didn't over-block")}
     </div>
-    <div class="bm-arms-wrap">
-      <table class="bm-verdict-table">
-        <thead><tr>
-          <th>scenario</th><th>failure class</th><th>STATE-Bench category</th>
-          <th>baseline<br><small>validation OFF</small></th>
-          <th>substrate<br><small>validation ON</small></th>
-          <th>verdict</th>
-        </tr></thead>
-        <tbody>
-          ${[...blocks, ...allows].map(row).join("")}
-        </tbody>
-      </table>
+    <div class="bm-matrix">
+      <div class="bm-matrix-legend">
+        <span>scenario</span>
+        <span>baseline <small>validation OFF</small></span>
+        <span></span>
+        <span>substrate <small>validation ON</small></span>
+      </div>
+      ${[...blocks, ...allows].map(matrixRow).join("")}
     </div>`;
 }
 
