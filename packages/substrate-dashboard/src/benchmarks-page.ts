@@ -264,20 +264,22 @@ LOCAL_LAB_PROVIDER=openrouter pnpm evals:local-agent-lab:live   # all failure cl
     </div>`;
 }
 
-/** A glance KPI: number + segmented meter (preattentive count/length). */
-const glanceMeter = (label: string, n: number, total: number, hint: string): string => `
-  <div class="bm-kpi" title="${esc(hint)}">
-    <div class="bm-kpi-label">${esc(label)}</div>
-    <div class="bm-kpi-num"><span class="bm-kpi-big">${n}</span><span class="bm-kpi-tot">/ ${total}</span></div>
-    <div class="bm-kpi-meter" aria-hidden="true">${Array.from({ length: total }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</div>
+/** A gauge KPI: a boundary status-stripe, a mono readout, and a segmented
+    meter (preattentive count/length). The stripe is the admission-boundary
+    signature — teal = clean, red = breach. */
+const gaugeMeter = (label: string, n: number, total: number, hint: string): string => `
+  <div class="gauge" data-tone="good" title="${esc(hint)}">
+    <div class="gauge-label">${esc(label)}</div>
+    <div class="gauge-read"><span class="gauge-big">${n}</span><span class="gauge-tot">/ ${total}</span></div>
+    <div class="gauge-meter" aria-hidden="true">${Array.from({ length: total }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</div>
   </div>`;
 
-/** A glance KPI: one big number, status-toned. */
-const glanceStat = (label: string, value: string, tone: "good" | "bad" | "neutral", hint: string): string => `
-  <div class="bm-kpi" title="${esc(hint)}">
-    <div class="bm-kpi-label">${esc(label)}</div>
-    <div class="bm-kpi-num"><span class="bm-kpi-big bm-kpi-${tone}">${esc(value)}</span></div>
-    <div class="bm-kpi-hint">${esc(hint)}</div>
+/** A gauge KPI: one big mono number, status-toned. */
+const gaugeStat = (label: string, value: string, tone: "good" | "bad" | "neutral", hint: string): string => `
+  <div class="gauge" data-tone="${tone}" title="${esc(hint)}">
+    <div class="gauge-label">${esc(label)}</div>
+    <div class="gauge-read"><span class="gauge-big gauge-${tone}">${esc(value)}</span></div>
+    <div class="gauge-hint">${esc(hint)}</div>
   </div>`;
 
 export function renderBenchmarksHtml(d: BenchmarksPayload): string {
@@ -287,31 +289,36 @@ export function renderBenchmarksHtml(d: BenchmarksPayload): string {
   const leaks = d.labVerdicts.filter((v) => v.substrateResult === "fail").length;
   const controls = allows.filter((v) => v.baselineResult !== "fail" && v.substrateResult !== "fail").length;
   const qualified = d.benchmarks.filter((b) => b.level === "mechanism-qualified").length;
-  const glance =
+  const gauges =
     d.labVerdicts.length > 0
       ? `
-  <div class="bm-glance">
-    ${glanceMeter("Hazards caught", protectedCount, blocks.length, "baseline shipped bad state; substrate blocked it")}
-    ${glanceStat("State leaks", String(leaks), leaks === 0 ? "good" : "bad", "wrong writes that passed the gate — want 0")}
-    ${glanceMeter("Controls held", controls, allows.length, "deny-mutant guard: substrate did not over-block")}
-    ${glanceStat("Benchmarks qualified", `${qualified} / ${d.benchmarks.length}`, "neutral", "mechanism-qualified vs conformance-only")}
-  </div>`
+    <div class="gate-gauges">
+      ${gaugeMeter("Hazards caught", protectedCount, blocks.length, "baseline shipped bad state; substrate blocked it")}
+      ${gaugeStat("State leaks", String(leaks), leaks === 0 ? "good" : "bad", "wrong writes that passed the gate — want 0")}
+      ${gaugeMeter("Controls held", controls, allows.length, "deny-mutant guard: substrate did not over-block")}
+      ${gaugeStat("Benchmarks qualified", `${qualified} / ${d.benchmarks.length}`, "neutral", "mechanism-qualified vs conformance-only")}
+    </div>`
       : "";
 
   return `
 <section class="cp-root bm-root" data-view="benchmarks">
-  <header class="bm-hero">
-    <div class="bm-hero-copy">
+  <div class="gate-console">
+    <div class="gate-bar">
+      <span class="gate-led" aria-hidden="true"></span>
+      <span class="gate-status">Admission gate · live readout</span>
+      <span class="gate-run">run ${esc(fmtWhen(d.recordedAt))}</span>
+      <details class="bm-honesty">
+        <summary>mechanism evidence &middot; not efficacy</summary>
+        <p>${esc(d.claimBoundary)} Everything here is a mechanism or conformance result, plus exactly what still blocks a verdict.</p>
+      </details>
+    </div>
+    <div class="gate-hero">
       <div class="bm-kicker">Agent-state reliability · four-arm evidence</div>
       <h1>Does the substrate catch what the benchmarks can't score?</h1>
     </div>
-    <details class="bm-honesty">
-      <summary>mechanism evidence &middot; not an efficacy claim</summary>
-      <p>${esc(d.claimBoundary)} Everything here is a mechanism or conformance result, plus exactly what still
-      blocks a verdict. Run register ${esc(fmtWhen(d.recordedAt))}.</p>
-    </details>
-  </header>
-${glance}
+    ${gauges}
+  </div>
+
   <div class="bm-cards">
     ${d.benchmarks.map(benchmarkCard).join("")}
   </div>

@@ -64,7 +64,7 @@ describe("benchmarks page renderer", () => {
     expect(html).toContain("Actual state damage");
     expect(html).toContain("Only <strong>substrate</strong> kept state clean");
     // honesty rails (demoted to a details-on-demand chip)
-    expect(html).toContain("not an efficacy claim");
+    expect(html).toContain("not efficacy");
     expect(html).toContain("What blocks an efficacy verdict");
     expect(html).toContain("Mechanism qualified");
     expect(html).toContain("Conformance only");
@@ -77,15 +77,17 @@ describe("benchmarks page renderer", () => {
     expect(html).toContain("blind to state damage");
   });
 
-  it("opens with an overview glance band (numbers + meters), then the status matrix", () => {
+  it("opens with the gate-console gauges, then the status matrix", () => {
     const html = renderBenchmarksHtml(fixture);
-    // overview-first: KPI glance band with preattentive meters, before detail
-    expect(html).toContain("bm-glance");
+    // signature: admission-gate console with instrument gauges up front
+    expect(html).toContain("gate-console");
+    expect(html).toContain("Admission gate");
+    expect(html).toContain("gate-gauges");
     expect(html).toContain("Hazards caught");
     expect(html).toContain("State leaks");
-    expect(html).toContain("bm-kpi-meter");
-    // the glance band precedes the benchmark cards (overview → detail)
-    expect(html.indexOf("bm-glance")).toBeLessThan(html.indexOf("bm-cards"));
+    expect(html).toContain("gauge-meter");
+    // overview console precedes the benchmark cards (overview → detail)
+    expect(html.indexOf("gate-console")).toBeLessThan(html.indexOf("bm-cards"));
     // status matrix cells (teal/red + icon + word, never colour-alone)
     expect(html).toContain("✗ fail");
     expect(html).toContain("✓ blocked");
