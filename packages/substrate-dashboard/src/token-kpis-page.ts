@@ -8,6 +8,7 @@
  * never disagree with a run's printed table or CSV.
  */
 
+import { drawGroupedBars, drawHorizontalBars } from "./charts.js";
 import { compactNumber } from "./control-plane-page.js";
 
 export interface TokenKpiRunSummary {
@@ -172,6 +173,29 @@ export function renderTokenKpisHtml(
     })}
   </div>
 
+  <div class="cp-grid tk-charts">
+    <article class="cp-card">
+      <div class="tk-chart-head">Wrong-state writes shipped</div>
+      <p class="cp-note" style="margin-top:2px">Admitted actions the oracle later judged wrong — validation OFF vs ON.</p>
+      <svg class="tk-svg" data-tk-chart="corrupt" viewBox="0 0 640 150" role="img" aria-label="Corrupt admissions: baseline vs substrate"></svg>
+    </article>
+    <article class="cp-card">
+      <div class="controls">
+        <div class="tk-chart-head">Tokens per hazard scenario</div>
+        <div class="tk-spacer"></div>
+        <div class="tk-seg" role="group" aria-label="Metric">
+          <button type="button" data-tk-metric="wasted" aria-pressed="true">wasted</button>
+          <button type="button" data-tk-metric="total" aria-pressed="false">total</button>
+        </div>
+      </div>
+      <div class="tk-legend">
+        <span><i class="tk-sw" style="background:var(--slate)"></i> baseline (OFF)</span>
+        <span><i class="tk-sw" style="background:var(--teal)"></i> substrate (ON)</span>
+      </div>
+      <svg class="tk-svg" data-tk-chart="tokens" viewBox="0 0 720 260" role="img" aria-label="Tokens per scenario, baseline vs substrate"></svg>
+    </article>
+  </div>
+
   <div class="cp-grid">
     <article class="cp-card" data-kpi="reading">
       <h2>How to read this run</h2>
@@ -234,6 +258,66 @@ export function renderTokenKpisHtml(
 </section>`;
 }
 
+const niceMax = (v: number, step: number): number => Math.max(step, Math.ceil(v / step) * step);
+
+/** Draw the real SVG charts once the HTML is mounted. */
+export function hydrateTokenKpiCharts(root: HTMLElement, d: TokenKpiMetrics): void {
+  const corrupt = root.querySelector<SVGElement>('[data-tk-chart="corrupt"]');
+  if (corrupt) {
+    const b = d.corruptAdmissions.no_substrate;
+    const s = d.corruptAdmissions.substrate;
+    drawHorizontalBars(
+      corrupt,
+      [
+        { name: "baseline", sub: "validation OFF", v: b, tone: "bad", tip: `<b>baseline</b><br>wrong-state writes: <b class="tt-red">${b}</b>` },
+        { name: "substrate", sub: "validation ON", v: s, tone: "good", tip: `<b>substrate</b><br>wrong-state writes: <b class="tt-teal">${s}</b>` },
+      ],
+      { max: niceMax(Math.max(b, s, 1) + 1, 2) },
+    );
+  }
+
+  const tokensSvg = root.querySelector<SVGElement>('[data-tk-chart="tokens"]');
+  if (tokensSvg) {
+    const byScenario = new Map<string, { scenario: string; baseW: number; baseT: number; subW: number; subT: number }>();
+    for (const r of d.rows.filter((x) => x.expectedAdmission === "block")) {
+      const e = byScenario.get(r.scenario) ?? { scenario: r.scenario, baseW: 0, baseT: 0, subW: 0, subT: 0 };
+      if (r.mode === "no_substrate") {
+        e.baseW = r.tokensWasted;
+        e.baseT = r.tokensTotal;
+      } else {
+        e.subW = r.tokensWasted;
+        e.subT = r.tokensTotal;
+      }
+      byScenario.set(r.scenario, e);
+    }
+    const scen = [...byScenario.values()];
+    let metric: "wasted" | "total" = "wasted";
+    const draw = (): void => {
+      const max = niceMax(Math.max(...scen.flatMap((s) => (metric === "wasted" ? [s.baseW, s.subW] : [s.baseT, s.subT])), 1), 100);
+      drawGroupedBars(
+        tokensSvg,
+        scen.map((s) => ({
+          label: s.scenario,
+          a: metric === "wasted" ? s.baseW : s.baseT,
+          b: metric === "wasted" ? s.subW : s.subT,
+          tipA: `<b>${s.scenario}</b><br>baseline ${metric}: <b>${metric === "wasted" ? s.baseW : s.baseT}</b> tokens`,
+          tipB: `<b>${s.scenario}</b><br>substrate ${metric}: <b class="tt-teal">${metric === "wasted" ? s.subW : s.subT}</b> tokens`,
+        })),
+        { max, ticks: 4 },
+      );
+    };
+    draw();
+    root.querySelectorAll<HTMLButtonElement>("[data-tk-metric]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        root.querySelectorAll("[data-tk-metric]").forEach((x) => x.setAttribute("aria-pressed", "false"));
+        btn.setAttribute("aria-pressed", "true");
+        metric = btn.dataset["tkMetric"] === "total" ? "total" : "wasted";
+        draw();
+      }),
+    );
+  }
+}
+
 /** Browser bootstrap: run list → newest run → render; picker re-fetches. */
 export async function mountTokenKpis(root: HTMLElement): Promise<void> {
   root.innerHTML = `<p class="cp-empty cp-loading">loading token KPIs…</p>`;
@@ -250,6 +334,7 @@ export async function mountTokenKpis(root: HTMLElement): Promise<void> {
       if (!res.ok) throw new Error(`token-usage returned ${res.status}`);
       const metrics = (await res.json()) as TokenKpiMetrics;
       root.innerHTML = renderTokenKpisHtml(metrics, runs);
+      hydrateTokenKpiCharts(root, metrics);
       root
         .querySelector<HTMLSelectElement>("[data-tk-run]")
         ?.addEventListener("change", (event) => {

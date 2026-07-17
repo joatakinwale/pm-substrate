@@ -52,19 +52,17 @@ const fixture: BenchmarksPayload = {
 };
 
 describe("benchmarks page renderer", () => {
-  it("renders the visual strict-vs-state-damage contrast", () => {
+  it("renders the visual strict-vs-state-damage contrast with SVG chart mounts", () => {
     const html = renderBenchmarksHtml(fixture);
     expect(html).toContain("Agent-state benchmarks");
     expect(html).toContain("ToolSandbox");
     expect(html).toContain("Apple");
-    // visual contrast: identical strict scores vs diverging state damage
+    // real SVG charts (drawn at hydrate), not CSS-div bars
+    expect(html).toContain('data-bm-chart="strict"');
+    expect(html).toContain('data-bm-chart="dup"');
     expect(html).toContain("Benchmark's strict score");
     expect(html).toContain("Actual state damage");
-    expect(html).toContain("✓ 0 clean");
-    expect(html).toContain("✗ 1 shipped");
     expect(html).toContain("Only <strong>substrate</strong> kept state clean");
-    expect(html).toContain("bm-fill-good");
-    expect(html).toContain("bm-fill-bad");
     // honesty rails
     expect(html).toContain("Reading this honestly");
     expect(html).toContain("What blocks an efficacy verdict");

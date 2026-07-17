@@ -17,6 +17,8 @@
  * pinned constants here.
  */
 
+import { drawVerticalBars, type Tone } from "./charts.js";
+
 export type BenchmarkId = "toolsandbox" | "statebench" | "sentinel" | "corner";
 export type BenchmarkStatusLevel =
   | "mechanism-qualified"
@@ -129,62 +131,34 @@ const fmtWhen = (iso: string): string => {
   return m ? m[1]! : iso;
 };
 
-const barRow = (
-  label: string,
-  fillPct: number,
-  tone: "neutral" | "good" | "bad",
-  value: string,
-  strong = false,
-): string => `
-  <div class="bm-bar-row">
-    <span class="bm-bar-name${strong ? " bm-strong" : ""}">${esc(label)}</span>
-    <span class="bm-bar-track"><span class="bm-bar-fill bm-fill-${tone}" style="width:${Math.max(fillPct, tone === "good" ? 0 : 3)}%"></span></span>
-    <span class="bm-bar-val bm-txt-${tone}">${value}</span>
-  </div>`;
-
 /**
- * The crux, made visual: two stacked mini bar charts. Left — the benchmark's
- * strict score, identical across arms (looks like a tie). Right — the actual
- * duplicate side effects, where only substrate stayed at zero. Same data as a
- * table, but the divergence is seen, not read.
+ * The crux, made visual: two real SVG bar charts side by side (drawn in
+ * hydrateBenchmarkCharts). Left — the benchmark's strict score, identical
+ * across arms. Right — the actual duplicate side effects, where only substrate
+ * stayed at zero. The divergence between a flat chart and a diverging one is
+ * seen, not read.
  */
-function stateDamageContrast(arms: readonly BenchmarkArmOutcome[]): string {
+function stateDamageContrast(): string {
   return `
   <div class="bm-contrast">
     <div class="bm-contrast-panel">
       <div class="bm-contrast-head">Benchmark's strict score</div>
-      ${arms
-        .map((a) =>
-          barRow(a.arm, (a.strictScore ?? 0) * 100, "neutral", fmtScore(a.strictScore), a.arm === "substrate"),
-        )
-        .join("")}
+      <svg class="bm-svg" data-bm-chart="strict" viewBox="0 0 420 200" role="img" aria-label="Strict score by arm — all equal"></svg>
       <div class="bm-contrast-note">Identical — the official oracle calls it a tie.</div>
     </div>
     <div class="bm-contrast-panel">
       <div class="bm-contrast-head">Actual state damage <small>duplicate sends after restart</small></div>
-      ${arms
-        .map((a) => {
-          const dup = a.duplicateSideEffects ?? 0;
-          const clean = dup === 0;
-          return barRow(
-            a.arm,
-            clean ? 0 : 100,
-            clean ? "good" : "bad",
-            clean ? "✓ 0 clean" : `✗ ${dup} shipped`,
-            a.arm === "substrate",
-          );
-        })
-        .join("")}
+      <svg class="bm-svg" data-bm-chart="dup" viewBox="0 0 420 200" role="img" aria-label="Duplicate side effects by arm"></svg>
       <div class="bm-contrast-note">Only <strong>substrate</strong> kept state clean.</div>
     </div>
   </div>`;
 }
 
-/** Compact numeric arm row for benchmarks without collateral data. */
+/** SVG contrast for collateral benchmarks; compact table otherwise. */
 function armsTable(arms: readonly BenchmarkArmOutcome[], seesCollateral: boolean): string {
   const anyCollateral = arms.some((a) => a.duplicateSideEffects !== null);
   if (anyCollateral) {
-    return `${stateDamageContrast(arms)}${
+    return `${stateDamageContrast()}${
       seesCollateral
         ? ""
         : `<p class="bm-insight">↑ Strict task completion is <strong>blind</strong> to the state damage the substrate prevented — the crux of the whole comparison.</p>`
@@ -351,6 +325,42 @@ export function renderBenchmarksHtml(d: BenchmarksPayload): string {
 </section>`;
 }
 
+/** Draw the real SVG charts after the HTML is in the DOM. */
+export function hydrateBenchmarkCharts(root: HTMLElement, d: BenchmarksPayload): void {
+  const ts = d.benchmarks.find((b) => b.id === "toolsandbox");
+  if (!ts?.arms) return;
+  const strict = root.querySelector<SVGElement>('[data-bm-chart="strict"]');
+  const dup = root.querySelector<SVGElement>('[data-bm-chart="dup"]');
+  if (strict) {
+    drawVerticalBars(
+      strict,
+      ts.arms.map((a) => ({
+        label: a.arm,
+        v: a.strictScore ?? 0,
+        tone: "neutral" as const,
+        tip: `<b>${a.arm}</b><br>strict score: <b>${(a.strictScore ?? 0).toFixed(1)}</b>`,
+      })),
+      { max: 1, ticks: 2, fmt: (v) => v.toFixed(1), emphasize: "substrate" },
+    );
+  }
+  if (dup) {
+    drawVerticalBars(
+      dup,
+      ts.arms.map((a) => {
+        const n = a.duplicateSideEffects ?? 0;
+        const tone: Tone = n === 0 ? "good" : "bad";
+        return {
+          label: a.arm,
+          v: n,
+          tone,
+          tip: `<b>${a.arm}</b><br>duplicate sends: <b class="${n === 0 ? "tt-teal" : "tt-red"}">${n}</b>${n === 0 ? " — clean" : " — shipped"}`,
+        };
+      }),
+      { max: 2, ticks: 2, fmt: (v) => String(v), emphasize: "substrate" },
+    );
+  }
+}
+
 export async function mountBenchmarks(root: HTMLElement): Promise<void> {
   root.innerHTML = `<p class="cp-empty cp-loading">loading benchmark comparison…</p>`;
   try {
@@ -358,6 +368,7 @@ export async function mountBenchmarks(root: HTMLElement): Promise<void> {
     if (!res.ok) throw new Error(`benchmarks returned ${res.status}`);
     const data = (await res.json()) as BenchmarksPayload;
     root.innerHTML = renderBenchmarksHtml(data);
+    hydrateBenchmarkCharts(root, data);
   } catch (err) {
     root.innerHTML = `<div class="cp-root"><article class="cp-card cp-card-critical">
       <h2>Benchmark comparison unavailable</h2>
