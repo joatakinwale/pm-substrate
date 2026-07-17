@@ -229,21 +229,9 @@ const verdictCell = (result: LabArmResult): string => {
   return `<span class="bm-cell bm-cell-pass">✓ pass</span>`;
 };
 
-const meterRow = (
-  label: string,
-  n: number,
-  total: number,
-  tone: "good" | "bad",
-  sub: string,
-): string => `
-  <div class="bm-meter-row">
-    <span class="bm-meter-label">${esc(label)} <small>${esc(sub)}</small></span>
-    <span class="bm-meter-track"><span class="bm-meter-fill bm-fill-${tone}" style="width:${total > 0 ? (n / total) * 100 : n === 0 ? 100 : 0}%"></span></span>
-    <strong class="bm-txt-${tone}">${total > 0 ? `${n}/${total}` : String(n)}</strong>
-  </div>`;
-
-/** The controlled A/B verdict board: a protection meter + a status matrix
-    where a column of red baseline failures flips to a column of teal. */
+/** The controlled A/B verdict board: a scannable status matrix where a column
+    of red baseline failures flips to a column of teal (the glance band above
+    carries the summary counts). */
 function labVerdictBoard(verdicts: readonly LabScenarioVerdict[]): string {
   if (verdicts.length === 0) {
     return `
@@ -253,13 +241,6 @@ LOCAL_LAB_PROVIDER=openrouter pnpm evals:local-agent-lab:live   # all failure cl
   }
   const blocks = verdicts.filter((v) => v.expectedAdmission === "block");
   const allows = verdicts.filter((v) => v.expectedAdmission === "allow");
-  const protectedCount = blocks.filter(
-    (v) => v.baselineResult === "fail" && v.substrateResult !== "fail",
-  ).length;
-  const leaks = verdicts.filter((v) => v.substrateResult === "fail").length;
-  const cleanControls = allows.filter(
-    (v) => v.baselineResult !== "fail" && v.substrateResult !== "fail",
-  ).length;
 
   const matrixRow = (v: LabScenarioVerdict): string => `
     <div class="bm-matrix-row">
@@ -272,11 +253,6 @@ LOCAL_LAB_PROVIDER=openrouter pnpm evals:local-agent-lab:live   # all failure cl
     </div>`;
 
   return `
-    <div class="bm-meters">
-      ${meterRow("Scenarios protected", protectedCount, blocks.length, "good", "baseline shipped bad state · substrate caught it")}
-      ${meterRow("Substrate leaks", leaks, 0, leaks === 0 ? "good" : "bad", "wrong state that passed the gate — want 0")}
-      ${meterRow("Allow-controls held", cleanControls, allows.length, "good", "deny-mutant guard: substrate didn't over-block")}
-    </div>
     <div class="bm-matrix">
       <div class="bm-matrix-legend">
         <span>scenario</span>
@@ -288,39 +264,64 @@ LOCAL_LAB_PROVIDER=openrouter pnpm evals:local-agent-lab:live   # all failure cl
     </div>`;
 }
 
+/** A glance KPI: number + segmented meter (preattentive count/length). */
+const glanceMeter = (label: string, n: number, total: number, hint: string): string => `
+  <div class="bm-kpi" title="${esc(hint)}">
+    <div class="bm-kpi-label">${esc(label)}</div>
+    <div class="bm-kpi-num"><span class="bm-kpi-big">${n}</span><span class="bm-kpi-tot">/ ${total}</span></div>
+    <div class="bm-kpi-meter" aria-hidden="true">${Array.from({ length: total }, (_, i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</div>
+  </div>`;
+
+/** A glance KPI: one big number, status-toned. */
+const glanceStat = (label: string, value: string, tone: "good" | "bad" | "neutral", hint: string): string => `
+  <div class="bm-kpi" title="${esc(hint)}">
+    <div class="bm-kpi-label">${esc(label)}</div>
+    <div class="bm-kpi-num"><span class="bm-kpi-big bm-kpi-${tone}">${esc(value)}</span></div>
+    <div class="bm-kpi-hint">${esc(hint)}</div>
+  </div>`;
+
 export function renderBenchmarksHtml(d: BenchmarksPayload): string {
-  const labClasses = [...new Set(d.labScenarios.map((s) => s.failureClass))];
+  const blocks = d.labVerdicts.filter((v) => v.expectedAdmission === "block");
+  const allows = d.labVerdicts.filter((v) => v.expectedAdmission === "allow");
+  const protectedCount = blocks.filter((v) => v.baselineResult === "fail" && v.substrateResult !== "fail").length;
+  const leaks = d.labVerdicts.filter((v) => v.substrateResult === "fail").length;
+  const controls = allows.filter((v) => v.baselineResult !== "fail" && v.substrateResult !== "fail").length;
+  const qualified = d.benchmarks.filter((b) => b.level === "mechanism-qualified").length;
+  const glance =
+    d.labVerdicts.length > 0
+      ? `
+  <div class="bm-glance">
+    ${glanceMeter("Hazards caught", protectedCount, blocks.length, "baseline shipped bad state; substrate blocked it")}
+    ${glanceStat("State leaks", String(leaks), leaks === 0 ? "good" : "bad", "wrong writes that passed the gate — want 0")}
+    ${glanceMeter("Controls held", controls, allows.length, "deny-mutant guard: substrate did not over-block")}
+    ${glanceStat("Benchmarks qualified", `${qualified} / ${d.benchmarks.length}`, "neutral", "mechanism-qualified vs conformance-only")}
+  </div>`
+      : "";
+
   return `
 <section class="cp-root bm-root" data-view="benchmarks">
-  <header class="cp-head">
-    <div>
-      <h1>Agent-state benchmarks</h1>
-      <p>How pm-substrate compares on the public benchmarks built to expose agent-state
-      failure. Every result is a matched four-arm run (native · sham · plain-KV ·
-      <strong>substrate</strong>).</p>
+  <header class="bm-hero">
+    <div class="bm-hero-copy">
+      <div class="bm-kicker">Agent-state reliability · four-arm evidence</div>
+      <h1>Does the substrate catch what the benchmarks can't score?</h1>
     </div>
-    <p class="cp-meta">run register ${esc(fmtWhen(d.recordedAt))}</p>
+    <details class="bm-honesty">
+      <summary>mechanism evidence &middot; not an efficacy claim</summary>
+      <p>${esc(d.claimBoundary)} Everything here is a mechanism or conformance result, plus exactly what still
+      blocks a verdict. Run register ${esc(fmtWhen(d.recordedAt))}.</p>
+    </details>
   </header>
-
-  <div class="bm-boundary">
-    <strong>Reading this honestly.</strong> ${esc(d.claimBoundary)} Nothing below is an efficacy
-    claim — these are mechanism and conformance results, plus exactly what still blocks a verdict.
-  </div>
-
+${glance}
   <div class="bm-cards">
     ${d.benchmarks.map(benchmarkCard).join("")}
   </div>
 
   <article class="cp-card bm-lab-link">
-    <h2>Local Agent Lab — controlled A/B verdicts</h2>
-    <p class="cp-note">Public benchmarks are coarse and expensive. The Local Agent Lab isolates
-    ${d.labScenarios.length} scenarios across ${labClasses.length} agent-state failure classes and
-    runs each one twice — validation OFF (baseline) vs ON (substrate) — so every mechanism gets a
-    deterministic verdict. <strong>fail</strong> = the stale/wrong action became operational;
-    <strong>blocked</strong> = the substrate refused it at the admission boundary.</p>
+    <div class="bm-section-label">Controlled lab
+      <small>${d.labScenarios.length} hazards × 2 arms · deterministic</small>
+      <span class="bm-help" title="Each hazard runs twice — validation OFF (baseline) vs ON (substrate). fail = the stale action became operational; blocked = the substrate refused it at the admission boundary.">?</span>
+    </div>
     ${labVerdictBoard(d.labVerdicts)}
-    <p class="cp-note">Open <a href="/#lab">Local Agent Lab</a> to run new sessions, or
-    <a href="/#token-kpis">Token KPIs</a> for the same runs measured as token cost.</p>
   </article>
 </section>`;
 }

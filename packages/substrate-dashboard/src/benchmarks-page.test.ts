@@ -54,7 +54,7 @@ const fixture: BenchmarksPayload = {
 describe("benchmarks page renderer", () => {
   it("renders the visual strict-vs-state-damage contrast with SVG chart mounts", () => {
     const html = renderBenchmarksHtml(fixture);
-    expect(html).toContain("Agent-state benchmarks");
+    expect(html).toContain("Agent-state reliability");
     expect(html).toContain("ToolSandbox");
     expect(html).toContain("Apple");
     // real SVG charts (drawn at hydrate), not CSS-div bars
@@ -63,8 +63,8 @@ describe("benchmarks page renderer", () => {
     expect(html).toContain("Benchmark's strict score");
     expect(html).toContain("Actual state damage");
     expect(html).toContain("Only <strong>substrate</strong> kept state clean");
-    // honesty rails
-    expect(html).toContain("Reading this honestly");
+    // honesty rails (demoted to a details-on-demand chip)
+    expect(html).toContain("not an efficacy claim");
     expect(html).toContain("What blocks an efficacy verdict");
     expect(html).toContain("Mechanism qualified");
     expect(html).toContain("Conformance only");
@@ -77,19 +77,22 @@ describe("benchmarks page renderer", () => {
     expect(html).toContain("blind to state damage");
   });
 
-  it("renders the visual verdict matrix with protection meters", () => {
+  it("opens with an overview glance band (numbers + meters), then the status matrix", () => {
     const html = renderBenchmarksHtml(fixture);
-    expect(html).toContain("controlled A/B verdicts");
-    expect(html).toContain("Scenarios protected");
-    expect(html).toContain("Substrate leaks");
-    expect(html).toContain("bm-meter-fill");
+    // overview-first: KPI glance band with preattentive meters, before detail
+    expect(html).toContain("bm-glance");
+    expect(html).toContain("Hazards caught");
+    expect(html).toContain("State leaks");
+    expect(html).toContain("bm-kpi-meter");
+    // the glance band precedes the benchmark cards (overview → detail)
+    expect(html.indexOf("bm-glance")).toBeLessThan(html.indexOf("bm-cards"));
     // status matrix cells (teal/red + icon + word, never colour-alone)
     expect(html).toContain("✗ fail");
     expect(html).toContain("✓ blocked");
     expect(html).toContain("bm-cell-fail");
     expect(html).toContain("bm-cell-blocked");
-    expect(html).toContain("validation OFF");
-    expect(html).toContain("validation ON");
+    // honesty demoted to details-on-demand, not an always-open banner
+    expect(html).toContain("<details class=\"bm-honesty\">");
     expect(html).not.toContain("<script");
   });
 
