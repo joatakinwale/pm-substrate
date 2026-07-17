@@ -65,6 +65,57 @@ const RUN_REGISTER_PATH =
   join(HERE, "..", "..", "..", "docs", "evidence", "public-proof-run-register-2026-07-13.json");
 
 /**
+ * Per-scenario A/B verdicts from the paired local-lab eval ledger
+ * (evals.eval_events). Latest run per (scenario, arm); pivoted into one row
+ * with the baseline (validation OFF) and substrate (validation ON) verdicts.
+ * Empty when no DB / no runs — the renderer shows how to populate it.
+ */
+async function buildLabVerdicts() {
+  if (!process.env.PM_DATABASE_URL) return [];
+  let rows;
+  try {
+    const pool = getTokenUsagePool();
+    // Lab eval evidence is keyed by axis, not tenant — each paired run gets a
+    // hermetic ephemeral tenant (tnt_lab_*). Latest verdict per scenario/arm
+    // across all of them.
+    const res = await pool.query(
+      `SELECT DISTINCT ON (scenario_id, run_arm)
+         scenario_id, failure_class, run_arm, result,
+         state_bench_category, coordination_class,
+         event->>'expectedAdmission' AS expected_admission
+       FROM evals.eval_events
+       WHERE axis = 'local_lab' AND run_arm IS NOT NULL
+       ORDER BY scenario_id, run_arm, observed_at DESC, id DESC`,
+    );
+    rows = res.rows;
+  } catch {
+    return [];
+  }
+  const byScenario = new Map();
+  for (const r of rows) {
+    const entry = byScenario.get(r.scenario_id) ?? {
+      scenarioId: r.scenario_id,
+      failureClass: r.failure_class,
+      stateBenchCategory: r.state_bench_category ?? null,
+      coordinationClass: r.coordination_class ?? null,
+      expectedAdmission:
+        r.expected_admission ??
+        (String(r.scenario_id).endsWith("-expected-allow") ? "allow" : "block"),
+      baselineResult: null,
+      substrateResult: null,
+    };
+    if (r.run_arm === "baseline") entry.baselineResult = r.result;
+    if (r.run_arm === "substrate") entry.substrateResult = r.result;
+    byScenario.set(r.scenario_id, entry);
+  }
+  return [...byScenario.values()].sort(
+    (a, b) =>
+      a.failureClass.localeCompare(b.failureClass) ||
+      a.scenarioId.localeCompare(b.scenarioId),
+  );
+}
+
+/**
  * Normalize the pinned run register into the benchmark comparison payload.
  * The register is the source of truth; the arm rows and blockers below are
  * lifted verbatim from it so the dashboard cannot overstate what ran.
@@ -108,10 +159,13 @@ async function buildBenchmarksPayload() {
     labScenarios = [];
   }
 
+  const labVerdicts = await buildLabVerdicts();
+
   return {
     recordedAt: raw.recordedAt ?? "",
     claimBoundary: raw.claimBoundary ?? "",
     labScenarios,
+    labVerdicts,
     benchmarks: [
       {
         id: "toolsandbox",

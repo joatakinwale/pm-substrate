@@ -2677,3 +2677,68 @@ textarea {
   font-size: 0.78rem;
   color: var(--ink);
 }
+
+/* --- Lab verdict board --- */
+
+.bm-verdict-tiles {
+  margin-top: 4px;
+}
+
+.bm-verdict-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+.bm-verdict-table th,
+.bm-verdict-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.bm-verdict-table th {
+  color: var(--muted);
+  font-weight: 600;
+  vertical-align: bottom;
+}
+
+.bm-verdict-table th small {
+  color: var(--line-strong);
+  font-weight: 500;
+}
+
+.bm-arm-cell {
+  font-weight: 700;
+}
+
+.bm-arm-blocked {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.bm-verdict {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #eceff2;
+  color: var(--muted);
+}
+
+.bm-verdict-protected {
+  background: var(--teal-soft);
+  color: #0a4b48;
+}
+
+.bm-verdict-control {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.bm-verdict-leak {
+  background: var(--red-soft);
+  color: var(--red);
+}

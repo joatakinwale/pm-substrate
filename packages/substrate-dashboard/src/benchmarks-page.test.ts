@@ -9,6 +9,26 @@ const fixture: BenchmarksPayload = {
     { scenarioId: "stale-observation", failureClass: "stale_observation" },
     { scenarioId: "memory-drift", failureClass: "memory_drift" },
   ],
+  labVerdicts: [
+    {
+      scenarioId: "stale-observation",
+      failureClass: "stale_observation",
+      stateBenchCategory: "stateful",
+      coordinationClass: "authority_gated_transition",
+      expectedAdmission: "block",
+      baselineResult: "fail",
+      substrateResult: "blocked",
+    },
+    {
+      scenarioId: "stale-observation-expected-allow",
+      failureClass: "stale_observation",
+      stateBenchCategory: "stateful",
+      coordinationClass: "authority_gated_transition",
+      expectedAdmission: "allow",
+      baselineResult: "pass",
+      substrateResult: "pass",
+    },
+  ],
   benchmarks: [
     {
       id: "toolsandbox",
@@ -55,11 +75,22 @@ describe("benchmarks page renderer", () => {
     expect(html).toContain("blind to state damage");
   });
 
-  it("surfaces the local lab failure classes as the controlled complement", () => {
+  it("renders the local lab A/B verdict board with protection + control tallies", () => {
     const html = renderBenchmarksHtml(fixture);
-    expect(html).toContain("Local Agent Lab");
-    expect(html).toContain("stale observation");
-    expect(html).toContain("memory drift");
+    expect(html).toContain("controlled A/B verdicts");
+    expect(html).toContain("Scenarios protected");
+    expect(html).toContain("blocked ✓");
+    expect(html).toContain("protected");
+    expect(html).toContain("control held");
+    expect(html).toContain("Substrate leaks");
+    expect(html).toContain("validation OFF");
+    expect(html).toContain("validation ON");
     expect(html).not.toContain("<script");
+  });
+
+  it("shows an actionable empty state when no paired runs exist", () => {
+    const html = renderBenchmarksHtml({ ...fixture, labVerdicts: [] });
+    expect(html).toContain("No paired eval runs recorded yet");
+    expect(html).toContain("pnpm evals:local-lab");
   });
 });

@@ -40,6 +40,18 @@ export interface BenchmarkStatus {
   readonly stats?: readonly { readonly label: string; readonly value: string }[];
 }
 
+export type LabArmResult = "pass" | "fail" | "blocked" | null;
+
+export interface LabScenarioVerdict {
+  readonly scenarioId: string;
+  readonly failureClass: string;
+  readonly stateBenchCategory: string | null;
+  readonly coordinationClass: string | null;
+  readonly expectedAdmission: "allow" | "block";
+  readonly baselineResult: LabArmResult;
+  readonly substrateResult: LabArmResult;
+}
+
 export interface BenchmarksPayload {
   readonly recordedAt: string;
   readonly claimBoundary: string;
@@ -48,6 +60,7 @@ export interface BenchmarksPayload {
     readonly scenarioId: string;
     readonly failureClass: string;
   }[];
+  readonly labVerdicts: readonly LabScenarioVerdict[];
 }
 
 interface BenchmarkDescriptor {
@@ -198,6 +211,86 @@ function benchmarkCard(status: BenchmarkStatus): string {
   </article>`;
 }
 
+const armCell = (result: LabArmResult): string => {
+  if (result === null) return `<td class="bm-arm-cell">–</td>`;
+  const cls =
+    result === "fail" ? "bm-bad" : result === "blocked" ? "bm-arm-blocked" : "bm-good";
+  const label = result === "blocked" ? "blocked ✓" : result === "pass" ? "pass" : "fail";
+  return `<td class="bm-arm-cell ${cls}">${label}</td>`;
+};
+
+/** The controlled A/B verdict board from the paired local-lab eval ledger. */
+function labVerdictBoard(verdicts: readonly LabScenarioVerdict[]): string {
+  if (verdicts.length === 0) {
+    return `
+    <p class="cp-note">No paired eval runs recorded yet. Populate the board:</p>
+    <pre class="tk-cmd">pnpm evals:local-lab                 # deterministic, free
+LOCAL_LAB_PROVIDER=openrouter pnpm evals:local-agent-lab:live   # all failure classes</pre>`;
+  }
+  const blocks = verdicts.filter((v) => v.expectedAdmission === "block");
+  const allows = verdicts.filter((v) => v.expectedAdmission === "allow");
+  const protectedCount = blocks.filter(
+    (v) => v.baselineResult === "fail" && v.substrateResult !== "fail",
+  ).length;
+  const baselineFailures = blocks.filter((v) => v.baselineResult === "fail").length;
+  const leaks = verdicts.filter((v) => v.substrateResult === "fail").length;
+  const cleanControls = allows.filter(
+    (v) => v.baselineResult !== "fail" && v.substrateResult !== "fail",
+  ).length;
+
+  const row = (v: LabScenarioVerdict): string => {
+    const isProtected = v.baselineResult === "fail" && v.substrateResult !== "fail";
+    const verdict =
+      v.substrateResult === "fail"
+        ? `<span class="bm-verdict bm-verdict-leak">substrate leak</span>`
+        : v.expectedAdmission === "allow"
+          ? `<span class="bm-verdict bm-verdict-control">control held</span>`
+          : isProtected
+            ? `<span class="bm-verdict bm-verdict-protected">protected</span>`
+            : `<span class="bm-verdict">–</span>`;
+    return `
+      <tr>
+        <td>${esc(v.scenarioId.replaceAll("-expected-allow", ""))}${
+          v.expectedAdmission === "allow" ? ' <em>(allow-control)</em>' : ""
+        }</td>
+        <td>${esc(v.failureClass.replaceAll("_", " "))}</td>
+        <td>${v.stateBenchCategory ? esc(v.stateBenchCategory.replaceAll("_", " ")) : "–"}</td>
+        ${armCell(v.baselineResult)}
+        ${armCell(v.substrateResult)}
+        <td>${verdict}</td>
+      </tr>`;
+  };
+
+  return `
+    <div class="cp-tiles bm-verdict-tiles">
+      <div class="cp-tile"><span class="cp-tile-label">Scenarios protected</span>
+        <span class="cp-tile-value cp-good">${protectedCount}/${blocks.length}</span>
+        <span class="cp-tile-sub">baseline shipped bad state · substrate caught it</span></div>
+      <div class="cp-tile"><span class="cp-tile-label">Baseline failures</span>
+        <span class="cp-tile-value">${baselineFailures}</span>
+        <span class="cp-tile-sub">validation OFF let the bad action through</span></div>
+      <div class="cp-tile"><span class="cp-tile-label">Substrate leaks</span>
+        <span class="cp-tile-value${leaks === 0 ? " cp-good" : " cp-critical"}">${leaks}</span>
+        <span class="cp-tile-sub">wrong state that passed the gate (want 0)</span></div>
+      <div class="cp-tile"><span class="cp-tile-label">Allow-controls held</span>
+        <span class="cp-tile-value">${cleanControls}/${allows.length}</span>
+        <span class="cp-tile-sub">deny-mutant guard: substrate didn't over-block</span></div>
+    </div>
+    <div class="bm-arms-wrap">
+      <table class="bm-verdict-table">
+        <thead><tr>
+          <th>scenario</th><th>failure class</th><th>STATE-Bench category</th>
+          <th>baseline<br><small>validation OFF</small></th>
+          <th>substrate<br><small>validation ON</small></th>
+          <th>verdict</th>
+        </tr></thead>
+        <tbody>
+          ${[...blocks, ...allows].map(row).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
 export function renderBenchmarksHtml(d: BenchmarksPayload): string {
   const labClasses = [...new Set(d.labScenarios.map((s) => s.failureClass))];
   return `
@@ -222,15 +315,15 @@ export function renderBenchmarksHtml(d: BenchmarksPayload): string {
   </div>
 
   <article class="cp-card bm-lab-link">
-    <h2>Local Agent Lab — the controlled complement</h2>
+    <h2>Local Agent Lab — controlled A/B verdicts</h2>
     <p class="cp-note">Public benchmarks are coarse and expensive. The Local Agent Lab isolates
-    ${d.labScenarios.length} scenarios across ${labClasses.length} agent-state failure classes so
-    each mechanism can be tested deterministically, both arms, on demand:</p>
-    <div class="bm-chips">
-      ${labClasses.map((c) => `<span class="bm-chip">${esc(c.replaceAll("_", " "))}</span>`).join("")}
-    </div>
-    <p class="cp-note">Open <a href="/#lab">Local Agent Lab</a> to run them, or
-    <a href="/#token-kpis">Token KPIs</a> for the same runs measured as cost.</p>
+    ${d.labScenarios.length} scenarios across ${labClasses.length} agent-state failure classes and
+    runs each one twice — validation OFF (baseline) vs ON (substrate) — so every mechanism gets a
+    deterministic verdict. <strong>fail</strong> = the stale/wrong action became operational;
+    <strong>blocked</strong> = the substrate refused it at the admission boundary.</p>
+    ${labVerdictBoard(d.labVerdicts)}
+    <p class="cp-note">Open <a href="/#lab">Local Agent Lab</a> to run new sessions, or
+    <a href="/#token-kpis">Token KPIs</a> for the same runs measured as token cost.</p>
   </article>
 </section>`;
 }
