@@ -69,6 +69,7 @@ interface Fixture {
   };
   readonly files: {
     gitExecutable: string;
+    gitExecHelper: string;
     nodeTarget: string;
     nodeRequested: string;
     frontendDependency: string;
@@ -90,7 +91,7 @@ function commandResult(stdout = ""): SentinelRuntimeCommandResult {
 }
 
 function fixture(): Fixture {
-  const root = mkdtempSync(join(tmpdir(), "pm-sentinel-runtime-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "pm-sentinel-runtime-")));
   roots.push(root);
   const substrate = join(root, "substrate");
   const upstream = join(root, "upstream");
@@ -128,6 +129,9 @@ function fixture(): Fixture {
   write(join(substrate, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
   const gitExecutable = join(runtime, "git");
   write(gitExecutable, "fixture git\n", 0o755);
+  const gitExecPathRoot = join(runtime, "git-core");
+  const gitExecHelper = join(gitExecPathRoot, "git-fixture-helper");
+  write(gitExecHelper, "fixture git helper\n", 0o755);
   const nodeTarget = join(nodeRoot, "bin", "node-real");
   const nodeRequested = join(nodeRoot, "bin", "node");
   write(nodeTarget, "fixture node executable\n", 0o755);
@@ -180,6 +184,8 @@ function fixture(): Fixture {
   write(requirements, "fastapi==0.1\n");
   const paths: SentinelRuntimeClosurePaths = {
     gitExecutablePath: gitExecutable,
+    gitRealExecutablePath: gitExecutable,
+    gitExecPathRootPath: gitExecPathRoot,
     substrateCheckoutPath: substrate,
     rootPackageJsonPath: join(substrate, "package.json"),
     pnpmWorkspaceManifestPath: join(substrate, "pnpm-workspace.yaml"),
@@ -226,13 +232,19 @@ function fixture(): Fixture {
     gitIndexFlags: "H fixture.txt\n",
   };
   const runCommand = (invocation: SentinelRuntimeCommandInvocation): SentinelRuntimeCommandResult => {
-    const [first, second, ...rest] = invocation.arguments;
+    const [first] = invocation.arguments;
     if (invocation.executablePath === gitExecutable && first === "--version") {
       return commandResult("git version 2.42.0.fixture\n");
     }
-    if (first === "-C") {
-      const gitCheckout = second;
-      const command = rest.join(" ");
+    if (invocation.executablePath === gitExecutable && first === "--exec-path") {
+      return commandResult(`${gitExecPathRoot}\n`);
+    }
+    const gitWorkTree = invocation.arguments.find((argument) => argument.startsWith("--work-tree="));
+    const commandIndex = invocation.arguments.findIndex((argument) =>
+      ["rev-parse", "status", "ls-files"].includes(argument));
+    if (gitWorkTree !== undefined && commandIndex >= 0) {
+      const gitCheckout = gitWorkTree.slice("--work-tree=".length);
+      const command = invocation.arguments.slice(commandIndex).join(" ");
       if (command === "rev-parse --verify HEAD") {
         return commandResult(`${gitCheckout === upstream ? SENTINEL_PRODUCTION_REVISION : "a".repeat(40)}\n`);
       }
@@ -260,10 +272,11 @@ function fixture(): Fixture {
   };
   return {
     paths,
-    dependencies: { runCommand },
+    dependencies: { runCommand, platform: "linux" },
     state,
     files: {
       gitExecutable,
+      gitExecHelper,
       nodeTarget,
       nodeRequested,
       frontendDependency,

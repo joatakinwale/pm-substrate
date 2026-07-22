@@ -2,6 +2,7 @@ import "./styles.css";
 
 import { mountControlPlane } from "./control-plane-page.js";
 import { mountIntegrationWorkbench } from "./integration-workbench-page.js";
+import { mountReviewReport } from "./review-report-page.js";
 
 type Mode = "substrate" | "no_substrate" | "ab_pair";
 type SessionStatus = "running" | "completed" | "stopped" | "failed";
@@ -83,12 +84,12 @@ interface SessionDetail {
 const appRoot = document.querySelector<HTMLDivElement>("#app")!;
 if (!appRoot) throw new Error("missing #app root");
 
-type DashboardView = "lab" | "control-plane" | "integrations";
+type DashboardView = "lab" | "control-plane" | "integrations" | "review";
 type LabTab = "run" | "sessions" | "evidence" | "settings";
 
 function currentView(): DashboardView {
   const raw = window.location.hash.replace(/^#\/?/, "");
-  if (raw === "control-plane" || raw === "integrations") return raw;
+  if (raw === "control-plane" || raw === "integrations" || raw === "review") return raw;
   return "lab";
 }
 
@@ -123,6 +124,7 @@ function renderShell(active: DashboardView): void {
           ${link("lab", "Lab", "lab")}
           ${link("control-plane", "Control Plane", "control")}
           ${link("integrations", "Integrations", "integrations")}
+          ${link("review", "Validation Review", "control")}
         </nav>
       </aside>
       <section class="dashboard-view"></section>
@@ -311,6 +313,12 @@ async function route(): Promise<void> {
     await mountIntegrationWorkbench(
       viewRoot().querySelector<HTMLElement>("#integration-workbench-root")!,
     );
+    return;
+  }
+  if (view === "review") {
+    disconnectStream();
+    viewRoot().innerHTML = `<div id="review-report-root"></div>`;
+    mountReviewReport(viewRoot().querySelector<HTMLElement>("#review-report-root")!);
     return;
   }
   const id = currentSessionId();

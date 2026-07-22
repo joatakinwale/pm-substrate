@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync, statSync, writeFileSync, chmodSync } from "node:fs";
 import { createServer } from "node:net";
-import { relative, resolve } from "node:path";
+import { isAbsolute, normalize, relative, resolve } from "node:path";
 
 import pg from "pg";
 
@@ -9,6 +9,7 @@ import {
   SENTINEL_PRODUCTION_REPOSITORY,
   SENTINEL_PRODUCTION_REVISION,
   SENTINEL_PRODUCTION_SOURCE_TREE,
+  isSentinelRuntimeSanitizedEnvironment,
   sentinelProductionJsonSha256,
   sentinelProductionSha256,
   type SentinelProductionTask,
@@ -45,10 +46,54 @@ function hashFile(path: string): string {
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`${path} is not a regular file`);
   return sentinelProductionSha256(readFileSync(path));
 }
-function command(checkoutPath: string, arguments_: readonly string[]): string {
-  return execFileSync("git", ["-C", checkoutPath, ...arguments_], {
+interface SentinelCheckoutGitInvocation {
+  readonly executablePath: string;
+  readonly executableSha256: string;
+  readonly environment: Readonly<Record<string, string>>;
+}
+
+function checkoutGitInvocation(
+  plannedRuntime: SentinelRuntimeClosure,
+): SentinelCheckoutGitInvocation {
+  const executablePath = plannedRuntime.git.executablePath;
+  const environment = plannedRuntime.executionEnvironment.values;
+  if (
+    !isAbsolute(executablePath) ||
+    normalize(executablePath) !== executablePath ||
+    /[\0\r\n\t]/u.test(executablePath)
+  ) throw new Error("signed Git executable path is not canonical absolute");
+  if (
+    plannedRuntime.executionEnvironment.inheritsHostEnvironment !== false ||
+    !isSentinelRuntimeSanitizedEnvironment(environment, plannedRuntime.node.requestedPath)
+  ) throw new Error("checkout Git environment is not the exact signed sanitized environment");
+  const environmentSha256 = sentinelProductionJsonSha256(environment);
+  if (
+    plannedRuntime.executionEnvironment.environmentSha256 !== environmentSha256 ||
+    plannedRuntime.git.invocationEnvironmentSha256 !== environmentSha256
+  ) throw new Error("checkout Git environment is not closure-bound");
+  if (hashFile(executablePath) !== plannedRuntime.git.executableSha256) {
+    throw new Error("checkout Git executable is not the closure-bound executable");
+  }
+  return {
+    executablePath,
+    executableSha256: plannedRuntime.git.executableSha256,
+    environment: Object.freeze({ ...environment }),
+  };
+}
+
+function command(
+  git: SentinelCheckoutGitInvocation,
+  checkoutPath: string,
+  arguments_: readonly string[],
+): string {
+  if (hashFile(git.executablePath) !== git.executableSha256) {
+    throw new Error("checkout Git executable changed during preflight");
+  }
+  return execFileSync(git.executablePath, ["-C", checkoutPath, ...arguments_], {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
     maxBuffer: 64 * 1024 * 1024,
+    cwd: checkoutPath,
+    env: { ...git.environment },
   });
 }
 function normalizedRemote(value: string): string { return value.trim().replace(/\.git$/u, ""); }
@@ -153,14 +198,20 @@ export function inspectSentinelProductionCheckout(
   let ignoredArtifactRootSha256 = "", databaseRootSha256 = "", selectedScenarioRootSha256 = "";
   let frontendInstalledTreeSha256 = "", frontendPackageLockSha256 = "", serverRequirementsSha256 = "";
   try {
+    const git = checkoutGitInvocation(plannedRuntime);
     canonicalPath = realpathSync(canonicalPath);
     const rootStat = lstatSync(canonicalPath);
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error("checkout is unsafe");
-    repositoryUrl = command(canonicalPath, ["remote", "get-url", "origin"]).trim();
-    revision = command(canonicalPath, ["rev-parse", "--verify", "HEAD"]).trim();
-    sourceTreeHash = command(canonicalPath, ["rev-parse", "--verify", "HEAD^{tree}"]).trim();
-    cleanTrackedAndUntracked = command(canonicalPath, ["status", "--porcelain=v1", "--untracked-files=all"]).length === 0;
-    const ignored = command(canonicalPath, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"])
+    repositoryUrl = command(git, canonicalPath, ["remote", "get-url", "origin"]).trim();
+    revision = command(git, canonicalPath, ["rev-parse", "--verify", "HEAD"]).trim();
+    sourceTreeHash = command(git, canonicalPath, ["rev-parse", "--verify", "HEAD^{tree}"]).trim();
+    cleanTrackedAndUntracked = command(git, canonicalPath, ["status", "--porcelain=v1", "--untracked-files=all"]).length === 0;
+    const hiddenIndexFlags = command(git, canonicalPath, ["ls-files", "-v"])
+      .split("\n").filter((line) => line !== "" && !line.startsWith("H "));
+    if (hiddenIndexFlags.length > 0) {
+      throw new Error("checkout has skip-worktree or assume-unchanged index flags");
+    }
+    const ignored = command(git, canonicalPath, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"])
       .split("\0").filter(Boolean).sort(compare);
     const unsafeIgnored = ignored.filter((path) => !path.startsWith("frontend/node_modules/"));
     if (unsafeIgnored.length > 0) throw new Error(`checkout has non-runtime ignored artifacts: ${unsafeIgnored.slice(0, 8).join(", ")}`);

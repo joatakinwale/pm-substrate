@@ -1,20 +1,19 @@
 import { randomBytes } from "node:crypto";
 import {
-  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   realpathSync,
   statSync,
-  writeFileSync,
 } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import {
   SENTINEL_PRODUCTION_REPOSITORY,
   SENTINEL_PRODUCTION_REVISION,
+  buildSentinelProductionSchedule,
+  createSentinelProductionPreregistration,
   sentinelProductionCanonicalJson,
   sentinelProductionJsonSha256,
   sentinelProductionSha256,
@@ -34,7 +33,6 @@ import {
   verifyProductionStateEvidence,
   type ProductionStateFinalReceipt,
   type RunningProductionStateSidecar,
-  type StartProductionStateSidecarInput,
 } from "./production-state-sidecar.js";
 import {
   SENTINEL_GENERAL_ANTHROPIC_ACTION_SCHEMA_SHA256,
@@ -43,7 +41,6 @@ import {
   startSentinelGeneralAnthropicProviderProxy,
   type SentinelGeneralAnthropicProviderFinalReceipt,
   type SentinelGeneralAnthropicProviderProxy,
-  type StartSentinelGeneralAnthropicProviderProxyInput,
 } from "./sentinel-general-provider-proxy.js";
 import {
   superviseSentinelProductionAttempt,
@@ -53,15 +50,11 @@ import {
   type SentinelProductionTaskRegistration,
 } from "./sentinel-production-supervisor.js";
 import {
-  type SentinelRuntimeClosurePaths,
-} from "./sentinel-runtime-closure.js";
-import {
   assertSentinelProductionRuntimeInspectionEvidence,
   prepareSentinelProductionExternalObservation,
   retainSentinelProductionExternalObservation,
   retainSentinelProductionRuntimeInspection,
   verifySentinelProductionExternalCommitmentRecord,
-  type SentinelProductionExternalCommitmentVerification,
   type SentinelProductionRuntimeInspection,
   type SentinelProductionRuntimeInspectionReference,
 } from "./sentinel-production-runner-evidence.js";
@@ -75,6 +68,76 @@ import {
   retainSentinelProductionScenario,
   sentinelProductionScenarioRelativePath,
 } from "./sentinel-production-runner-infrastructure.js";
+import type {
+  SentinelProductionDiagnosticRunInput,
+  SentinelProductionDiagnosticSelection,
+  SentinelProductionExecutionInput,
+} from "./sentinel-production-runner-contracts.js";
+import type {
+  SentinelProductionArtifactIdentity,
+  SentinelProductionBatchResult,
+  SentinelProductionBlockManifest,
+  SentinelProductionCellManifest,
+  SentinelProductionCellManifestReference,
+  SentinelProductionCheckoutPreflight,
+  SentinelProductionContinuityReplayExport,
+  SentinelProductionContinuityTenantReceipt,
+  SentinelProductionDiagnosticExecutionFinal,
+  SentinelProductionDiagnosticExecutionStart,
+  SentinelProductionDiagnosticResult,
+  SentinelProductionExecutionManifest,
+  SentinelProductionJsonValue as JsonValue,
+  SentinelProductionRunnerDependencies,
+  SentinelProductionServiceBinding,
+} from "./sentinel-production-runner-manifests.js";
+import { assertSentinelFreshDisjointRoots } from "./sentinel-production-output-boundary.js";
+import type {
+  SentinelProductionCellExecutionContext as CellExecutionContext,
+  SentinelProductionCellPorts as CellPorts,
+} from "./sentinel-production-runner-context.js";
+import {
+  inventorySentinelTree as inventory,
+  sealSentinelTree as sealTree,
+  writeSentinelContentAddressedJson as writeContentAddressedJson,
+  writeSentinelExclusiveJson as writeExclusiveJson,
+  type SentinelContentAddressedManifest as ContentAddressedManifest,
+} from "./sentinel-production-runner-files.js";
+import {
+  type SentinelProductionCheckoutSet,
+  type SentinelProductionExternalCommitment,
+  type SentinelProductionRunInput,
+  type SentinelProductionRuntimeBindings,
+} from "./sentinel-production-runner-contracts.js";
+
+export type {
+  SentinelProductionCheckoutSet,
+  SentinelProductionDiagnosticRunInput,
+  SentinelProductionDiagnosticSelection,
+  SentinelProductionExternalCommitment,
+  SentinelProductionRunInput,
+  SentinelProductionRuntimeBindings,
+} from "./sentinel-production-runner-contracts.js";
+export type {
+  SentinelProductionExternalCommitmentVerification,
+  SentinelProductionRuntimeInspection,
+  SentinelProductionRuntimeInspectionReference,
+} from "./sentinel-production-runner-evidence.js";
+export type {
+  SentinelProductionArtifactIdentity,
+  SentinelProductionBatchResult,
+  SentinelProductionBlockManifest,
+  SentinelProductionCellManifest,
+  SentinelProductionCellManifestReference,
+  SentinelProductionCheckoutPreflight,
+  SentinelProductionContinuityReplayExport,
+  SentinelProductionContinuityTenantReceipt,
+  SentinelProductionDiagnosticExecutionFinal,
+  SentinelProductionDiagnosticExecutionStart,
+  SentinelProductionDiagnosticResult,
+  SentinelProductionExecutionManifest,
+  SentinelProductionRunnerDependencies,
+  SentinelProductionServiceBinding,
+} from "./sentinel-production-runner-manifests.js";
 
 const ARMS = ["native", "sham", "plain-kv", "substrate"] as const;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -87,11 +150,13 @@ const MAX_DECISIONS = 1_000;
 const MAX_CONSECUTIVE_ACTIVE_ACTIONS = 64;
 const VIEWPORT_WIDTH = 1_280;
 const VIEWPORT_HEIGHT = 720;
-const MAX_ARTIFACTS_PER_CELL = 100_000;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OPAQUE_ATTEMPT_ID = /^spa-[a-f0-9]{48}$/u;
+const OPAQUE_DIAGNOSTIC_EXECUTION_ID = /^sde-[a-f0-9]{48}$/u;
 const OPAQUE_IDENTITY = /^[A-Za-z0-9._:-]{1,128}$/u;
 const OPAQUE_TOKEN = /^[A-Za-z0-9_-]{43,128}$/u;
+const PLAN_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u;
+const GIT_SHA1 = /^[a-f0-9]{40}$/u;
 const CANONICAL_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const FORBIDDEN_OUTCOME_KEYS = new Set([
   "condition_at",
@@ -107,348 +172,11 @@ const FORBIDDEN_OUTCOME_KEYS = new Set([
   "score",
   "success",
 ]);
-type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
 
-export interface SentinelProductionRuntimeBindings {
-  readonly paths: SentinelRuntimeClosurePaths;
-}
 
-export interface SentinelProductionCheckoutSet {
-  readonly native: string;
-  readonly sham: string;
-  readonly "plain-kv": string;
-  readonly substrate: string;
-}
 
-export interface SentinelProductionExternalCommitment {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-external-commitment.v1";
-  readonly medium: "independent-append-only-external-record";
-  readonly commitmentId: string;
-  readonly committedAt: string;
-  readonly custodianId: string;
-  readonly custodianOwnerId: string;
-  readonly independent: true;
-  readonly locator: string;
-  readonly expectedPreregistrationSha256: string;
-  readonly expectedAuthorityId: string;
-  readonly expectedAuthorityPublicKeySha256: string;
-  readonly receiptSha256: string;
-}
 
-export interface SentinelProductionRunInput {
-  readonly preregistration: SentinelProductionPreregistration;
-  readonly signature: SentinelProductionSignature;
-  readonly trustAnchor: SentinelExternalTrustAnchor;
-  readonly externalCommitment: SentinelProductionExternalCommitment;
-  readonly checkouts: SentinelProductionCheckoutSet;
-  readonly batchRoot: string;
-  readonly attemptRegistryRoot: string;
-  readonly runtime: SentinelProductionRuntimeBindings;
-  /** Passed only to continuity-backed state services and never serialized. */
-  readonly databaseUrl: string;
-  /** Passed only to the provider proxy and never serialized. */
-  readonly anthropicApiKey: string;
-}
 
-export type {
-  SentinelProductionExternalCommitmentVerification,
-  SentinelProductionRuntimeInspection,
-  SentinelProductionRuntimeInspectionReference,
-} from "./sentinel-production-runner-evidence.js";
-
-export interface SentinelProductionCheckoutPreflight {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v1";
-  readonly checkoutPath: string;
-  readonly repositoryUrl: string | null;
-  readonly revision: string | null;
-  readonly sourceTreeHash: string | null;
-  readonly cleanTrackedAndUntracked: boolean;
-  readonly ignoredArtifactRootSha256: string;
-  readonly databaseRootSha256: string;
-  readonly selectedScenarioRootSha256: string;
-  readonly frontendInstalledTreeSha256: string;
-  readonly frontendPackageLockSha256: string;
-  readonly serverRequirementsSha256: string;
-  readonly valid: boolean;
-  readonly issues: readonly string[];
-  readonly preflightSha256: string;
-}
-
-export interface SentinelProductionContinuityTenantReceipt {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-continuity-tenant.v1";
-  readonly tenant: string;
-  readonly createdAt: string;
-  readonly initialCheckpointCount: 0;
-  readonly initialCheckpointHeadSha256: null;
-  readonly receiptSha256: string;
-}
-
-export interface SentinelProductionContinuityReplayExport {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-continuity-replay.v1";
-  readonly tenant: string;
-  readonly agentId: string;
-  readonly scope: string;
-  readonly exportedAt: string;
-  readonly tenantRow: JsonValue;
-  readonly checkpoints: readonly JsonValue[];
-  readonly checkpointCount: number;
-  readonly checkpointHeadSha256: string | null;
-  readonly exportSha256: string;
-}
-
-export interface SentinelProductionArtifactIdentity {
-  readonly path: string;
-  readonly byteLength: number;
-  readonly sha256: string;
-}
-
-export interface SentinelProductionServiceBinding {
-  readonly state: {
-    readonly mode: SentinelProductionArm;
-    readonly origin: string;
-    readonly tokenSha256: string;
-    readonly evidenceBindingSha256: string;
-    readonly identitySha256: string;
-    readonly readyReceiptPath: string;
-    readonly readyReceiptSha256: string;
-    readonly initialBackendRecordCount: number;
-    readonly initialBackendHeadSha256: string | null;
-    readonly initialRelevantStateSha256: string;
-    readonly responseDeadlineMs: number;
-    readonly firstStateFresh: boolean;
-  };
-  readonly provider: {
-    readonly origin: string;
-    readonly tokenSha256: string;
-    readonly readyReceiptPath: string;
-    readonly readyReceiptSha256: string;
-  };
-  readonly continuity: {
-    readonly tenant: string;
-    readonly agentId: string;
-    readonly scope: string;
-    readonly tenantReceiptSha256: string | null;
-    readonly replayExportPath: string;
-    readonly replayExportSha256: string;
-  };
-}
-
-export interface SentinelProductionCellManifest {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-cell-manifest.v1";
-  readonly evidenceEligible: false;
-  readonly materialBenefit: false;
-  readonly sequence: number;
-  readonly blockSequence: number;
-  readonly cellId: string;
-  readonly phase: SentinelProductionCell["phase"];
-  readonly taskId: string;
-  readonly taskRole: SentinelProductionCell["taskRole"];
-  readonly arm: SentinelProductionArm;
-  readonly repeatId: string;
-  readonly attemptId: string;
-  readonly cellRoot: string;
-  readonly checkoutPreflightSha256: string;
-  readonly ports: {
-    readonly state: number;
-    readonly provider: number;
-    readonly server: number;
-    readonly frontend: number;
-  };
-  readonly retryCount: 0;
-  readonly rerunCount: 0;
-  readonly replacementCount: 0;
-  readonly attemptInvokedAt: string | null;
-  readonly attemptStartedAt: string | null;
-  readonly serviceBinding: SentinelProductionServiceBinding | null;
-  readonly agentConfigPath: string;
-  readonly agentConfigSha256: string | null;
-  readonly supervisor: {
-    readonly returned: boolean;
-    readonly receiptHash: string | null;
-    readonly completion: "behavioral-complete" | "infrastructure-incomplete" | null;
-    readonly infrastructureStage: string | null;
-    readonly infrastructureIssueSha256: string | null;
-  };
-  readonly stateFinalReceiptSha256: string | null;
-  readonly providerFinalReceiptSha256: string | null;
-  readonly runnerFailureCount: number;
-  readonly infrastructureComplete: boolean;
-  readonly artifactRootSha256: string;
-  readonly artifacts: readonly SentinelProductionArtifactIdentity[];
-}
-
-export interface SentinelProductionCellManifestReference {
-  readonly sequence: number;
-  readonly cellId: string;
-  readonly arm: SentinelProductionArm;
-  readonly attemptId: string;
-  readonly path: string;
-  readonly sha256: string;
-  readonly infrastructureComplete: boolean;
-}
-
-export interface SentinelProductionBlockManifest {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-block-manifest.v1";
-  readonly evidenceEligible: false;
-  readonly materialBenefit: false;
-  readonly blockSequence: number;
-  readonly taskId: string;
-  readonly repeatId: string;
-  readonly previousBlockManifestSha256: string;
-  readonly expectedArms: readonly ["native", "sham", "plain-kv", "substrate"];
-  readonly completeArmSet: boolean;
-  readonly simultaneousLaunch: boolean;
-  readonly maximumObservedStartSkewMs: number | null;
-  readonly maximumAllowedStartSkewMs: number;
-  readonly runtimeBefore: SentinelProductionRuntimeInspectionReference;
-  readonly runtimeAfter: SentinelProductionRuntimeInspectionReference | null;
-  readonly runtimeStable: boolean;
-  readonly checkoutRootsStable: boolean;
-  readonly infrastructureComplete: boolean;
-  readonly modeToCell: Readonly<Record<SentinelProductionArm, SentinelProductionCellManifestReference>>;
-  readonly completedAt: string;
-}
-
-export interface SentinelProductionExecutionManifest {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-execution-manifest.v1";
-  readonly evidenceEligible: false;
-  readonly materialBenefit: false;
-  readonly preregistrationSha256: string;
-  readonly signatureSha256: string;
-  readonly externalCommitmentSha256: string;
-  readonly runStartedAt: string;
-  readonly declaredBlockCount: number;
-  readonly retainedBlockCount: number;
-  readonly declaredCellCount: number;
-  readonly retainedCellCount: number;
-  readonly retryCount: 0;
-  readonly rerunCount: 0;
-  readonly replacementCount: 0;
-  readonly noOutcomeInspectionDuringExecution: true;
-  readonly batchComplete: boolean;
-  readonly blockManifestHeadSha256: string;
-  readonly runtimeInspectionHeadSha256: string;
-  readonly blocks: readonly { readonly path: string; readonly sha256: string }[];
-  readonly finalizedAt: string;
-}
-
-export interface SentinelProductionBatchResult {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-batch-result.v1";
-  readonly evidenceEligible: false;
-  readonly materialBenefit: false;
-  readonly batchComplete: boolean;
-  readonly batchRoot: string;
-  readonly preregistrationSha256: string;
-  readonly executionStartManifestPath: string;
-  readonly executionStartManifestSha256: string;
-  readonly executionFinalManifestPath: string;
-  readonly executionFinalManifestSha256: string;
-  readonly blockManifestHeadSha256: string;
-  readonly blocks: readonly { readonly path: string; readonly sha256: string }[];
-  readonly cells: readonly SentinelProductionCellManifestReference[];
-}
-
-export interface SentinelProductionRunnerDependencies {
-  readonly now: () => string;
-  readonly verifyExternalCommitmentRecord: (
-    commitment: SentinelProductionExternalCommitment,
-  ) => Promise<SentinelProductionExternalCommitmentVerification>;
-  readonly inspectRuntime: (
-    bindings: SentinelProductionRuntimeBindings,
-    declared: SentinelRuntimeClosure,
-  ) => SentinelProductionRuntimeInspection;
-  readonly inspectCheckout: (
-    checkoutPath: string,
-    selectedTasks: readonly SentinelProductionTask[],
-    plannedRuntime: SentinelRuntimeClosure,
-  ) => SentinelProductionCheckoutPreflight;
-  readonly allocatePorts: (
-    count: number,
-    excluded: ReadonlySet<number>,
-  ) => Promise<readonly number[]>;
-  readonly deriveAttemptId: (preregistrationSha256: string, cellId: string) => string;
-  readonly opaqueToken: () => string;
-  readonly opaqueIdentity: (kind: "tenant" | "agent" | "scope") => string;
-  readonly retainScenarioDefinition: (
-    checkoutPath: string,
-    task: SentinelProductionTask,
-    targetPath: string,
-  ) => SentinelProductionArtifactIdentity;
-  readonly createContinuityTenant: (input: {
-    readonly databaseUrl: string;
-    readonly tenant: string;
-    readonly createdAt: string;
-  }) => Promise<SentinelProductionContinuityTenantReceipt>;
-  readonly exportContinuityReplay: (input: {
-    readonly databaseUrl: string;
-    readonly tenant: string;
-    readonly agentId: string;
-    readonly scope: string;
-    readonly exportedAt: string;
-  }) => Promise<SentinelProductionContinuityReplayExport>;
-  readonly startStateSidecar: (
-    input: StartProductionStateSidecarInput,
-  ) => Promise<RunningProductionStateSidecar>;
-  readonly startProviderProxy: (
-    input: StartSentinelGeneralAnthropicProviderProxyInput,
-  ) => Promise<SentinelGeneralAnthropicProviderProxy>;
-  readonly superviseAttempt: (
-    input: SentinelProductionSupervisorInput,
-  ) => Promise<SentinelProductionAttemptTerminalReceipt>;
-}
-
-interface ContentAddressedManifest {
-  readonly path: string;
-  readonly sha256: string;
-}
-
-interface CellPorts {
-  readonly state: number;
-  readonly provider: number;
-  readonly server: number;
-  readonly frontend: number;
-}
-
-interface CellExecutionContext {
-  readonly cell: SentinelProductionCell;
-  readonly task: SentinelProductionTask;
-  readonly blockSequence: number;
-  readonly attemptId: string;
-  readonly checkoutPath: string;
-  readonly checkoutPreflight: SentinelProductionCheckoutPreflight;
-  readonly cellRoot: string;
-  readonly stateEvidenceRoot: string;
-  readonly stateStoreRoot: string;
-  readonly providerRoot: string;
-  readonly upstreamRoot: string;
-  readonly continuityRoot: string;
-  readonly agentConfigPath: string;
-  readonly ports: CellPorts;
-  readonly stateToken: string;
-  readonly providerToken: string;
-  readonly tenant: string;
-  readonly agentId: string;
-  readonly scope: string;
-  readonly failures: { stage: string; message: string }[];
-  state?: RunningProductionStateSidecar;
-  provider?: SentinelGeneralAnthropicProviderProxy;
-  tenantReceipt?: SentinelProductionContinuityTenantReceipt;
-  stateBinding?: SentinelProductionServiceBinding["state"];
-  providerBinding?: SentinelProductionServiceBinding["provider"];
-  agentConfig?: SentinelProductionExecutableIdentity;
-  supervisorReceipt?: SentinelProductionAttemptTerminalReceipt;
-  attemptInvokedAt?: string;
-  attemptStartedAt?: string;
-  stateFinal?: ProductionStateFinalReceipt;
-  providerFinal?: SentinelGeneralAnthropicProviderFinalReceipt;
-  replayExport?: SentinelProductionContinuityReplayExport;
-}
 
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -591,54 +319,6 @@ function emptyContinuityReplay(
   return { ...withoutHash, exportSha256: sentinelProductionJsonSha256(withoutHash) };
 }
 
-function writeExclusiveJson(path: string, value: unknown): void {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o400 });
-  chmodSync(path, 0o400);
-}
-
-function writeContentAddressedJson(
-  directory: string,
-  prefix: string,
-  body: Record<string, unknown>,
-): ContentAddressedManifest {
-  const hash = sentinelProductionJsonSha256(body);
-  const path = resolve(directory, `${prefix}-${hash}.json`);
-  writeExclusiveJson(path, { ...body, manifestSha256: hash });
-  return { path, sha256: hash };
-}
-
-function artifactIdentity(path: string, root: string): SentinelProductionArtifactIdentity {
-  const bytes = readFileSync(path);
-  return { path: relative(root, path), byteLength: bytes.byteLength, sha256: sentinelProductionSha256(bytes) };
-}
-
-function inventory(root: string, current = root): readonly SentinelProductionArtifactIdentity[] {
-  if (!existsSync(current)) return [];
-  const output: SentinelProductionArtifactIdentity[] = [];
-  for (const name of readdirSync(current).sort(compareCodeUnits)) {
-    const path = resolve(current, name);
-    const stat = lstatSync(path);
-    if (stat.isSymbolicLink()) throw new Error("cell evidence contains a symbolic link");
-    if (stat.isDirectory()) output.push(...inventory(root, path));
-    else if (stat.isFile()) output.push(artifactIdentity(path, root));
-    else throw new Error("cell evidence contains a special file");
-    if (output.length > MAX_ARTIFACTS_PER_CELL) throw new Error("cell artifact ceiling exceeded");
-  }
-  return output.sort((left, right) => compareCodeUnits(left.path, right.path));
-}
-
-function sealTree(root: string): void {
-  if (!existsSync(root)) return;
-  for (const name of readdirSync(root)) {
-    const path = resolve(root, name);
-    const stat = lstatSync(path);
-    if (stat.isSymbolicLink()) throw new Error("cannot seal symbolic-link evidence");
-    if (stat.isDirectory()) sealTree(path);
-    else if (stat.isFile()) chmodSync(path, 0o400);
-    else throw new Error("cannot seal special-file evidence");
-  }
-  chmodSync(root, 0o500);
-}
 
 function selectedTasks(plan: SentinelProductionPreregistration): readonly SentinelProductionTask[] {
   switch (plan.registration.selectedPhase) {
@@ -726,34 +406,7 @@ function exactCheckoutKeys(checkouts: SentinelProductionCheckoutSet): void {
   exactKeys(checkouts, ARMS, "checkout map");
 }
 
-function assertFreshDisjointRoots(
-  checkouts: readonly string[],
-  batchRoot: string,
-  registryRoot: string,
-): void {
-  if (!isAbsolute(batchRoot) || resolve(batchRoot) !== batchRoot) {
-    throw new Error("batchRoot must be a canonical absolute path");
-  }
-  if (!isAbsolute(registryRoot) || resolve(registryRoot) !== registryRoot) {
-    throw new Error("attemptRegistryRoot must be a canonical absolute path");
-  }
-  if (batchRoot === registryRoot || batchRoot.startsWith(`${registryRoot}/`) || registryRoot.startsWith(`${batchRoot}/`)) {
-    throw new Error("batch and attempt registry roots overlap");
-  }
-  for (const checkout of checkouts) {
-    if (
-      batchRoot === checkout ||
-      registryRoot === checkout ||
-      batchRoot.startsWith(`${checkout}/`) ||
-      registryRoot.startsWith(`${checkout}/`) ||
-      checkout.startsWith(`${batchRoot}/`) ||
-      checkout.startsWith(`${registryRoot}/`)
-    ) throw new Error("execution roots overlap a benchmark checkout");
-  }
-  if (existsSync(batchRoot) || existsSync(registryRoot)) {
-    throw new Error("batchRoot and attemptRegistryRoot must both be fresh");
-  }
-}
+
 
 function validateBlocks(cells: readonly SentinelProductionCell[]): readonly (readonly SentinelProductionCell[])[] {
   if (cells.length === 0 || cells.length % 4 !== 0) {
@@ -798,7 +451,7 @@ function compareCheckoutRoots(preflights: Readonly<Record<SentinelProductionArm,
 }
 
 function inspectAllCheckouts(
-  input: SentinelProductionRunInput,
+  input: SentinelProductionExecutionInput,
   tasks: readonly SentinelProductionTask[],
   dependencies: SentinelProductionRunnerDependencies,
 ): Readonly<Record<SentinelProductionArm, SentinelProductionCheckoutPreflight>> {
@@ -831,6 +484,59 @@ function assertRuntimeInspection(
     expectedExecutableIdentitySha256 !== undefined &&
     inspection.executableIdentitySha256 !== expectedExecutableIdentitySha256
   ) throw new Error("runtime executable identity changed between block boundaries");
+}
+
+interface SentinelVerifiedExecutionInputs {
+  readonly preregistrationSha256: string;
+  readonly blocks: readonly (readonly SentinelProductionCell[])[];
+  readonly tasks: readonly SentinelProductionTask[];
+  readonly runtime: SentinelProductionRuntimeInspection;
+  readonly checkouts: Readonly<
+    Record<SentinelProductionArm, SentinelProductionCheckoutPreflight>
+  >;
+}
+
+function verifyExecutionBindings(
+  input: SentinelProductionExecutionInput,
+  preregistrationSha256: string,
+  cells: readonly SentinelProductionCell[],
+  dependencies: Pick<
+    SentinelProductionRunnerDependencies,
+    "inspectRuntime" | "inspectCheckout"
+  >,
+): SentinelVerifiedExecutionInputs {
+  maximumArmStartSkewMs(input.preregistration);
+  exactCheckoutKeys(input.checkouts);
+  const canonicalCheckouts = ARMS.map((arm) => realpathSync(resolve(input.checkouts[arm])));
+  if (new Set(canonicalCheckouts).size !== 4) {
+    throw new Error("four execution arms require four disjoint checkouts");
+  }
+  assertSentinelFreshDisjointRoots(
+    canonicalCheckouts,
+    resolve(input.batchRoot),
+    resolve(input.attemptRegistryRoot),
+  );
+  if (typeof input.databaseUrl !== "string" || input.databaseUrl.length < 8) {
+    throw new Error("databaseUrl is missing or invalid");
+  }
+  if (typeof input.anthropicApiKey !== "string" || input.anthropicApiKey.length < 8) {
+    throw new Error("anthropicApiKey is missing or invalid");
+  }
+  const runtime = dependencies.inspectRuntime(input.runtime, input.preregistration.runtime);
+  assertRuntimeInspection(runtime, input.preregistration);
+  const tasks = selectedTasks(input.preregistration);
+  const checkouts = inspectAllCheckouts(
+    input,
+    tasks,
+    dependencies as SentinelProductionRunnerDependencies,
+  );
+  return {
+    preregistrationSha256,
+    blocks: validateBlocks(cells),
+    tasks,
+    runtime,
+    checkouts,
+  };
 }
 
 export function verifySentinelProductionRunInputs(
@@ -867,37 +573,119 @@ export function verifySentinelProductionRunInputs(
     input.signature,
     runStartedAt,
   );
-  maximumArmStartSkewMs(input.preregistration);
-  exactCheckoutKeys(input.checkouts);
-  const canonicalCheckouts = ARMS.map((arm) => realpathSync(resolve(input.checkouts[arm])));
-  if (new Set(canonicalCheckouts).size !== 4) {
-    throw new Error("four execution arms require four disjoint checkouts");
-  }
-  const batchRoot = resolve(input.batchRoot);
-  const registryRoot = resolve(input.attemptRegistryRoot);
-  assertFreshDisjointRoots(canonicalCheckouts, batchRoot, registryRoot);
-  if (typeof input.databaseUrl !== "string" || input.databaseUrl.length < 8) {
-    throw new Error("databaseUrl is missing or invalid");
-  }
-  if (typeof input.anthropicApiKey !== "string" || input.anthropicApiKey.length < 8) {
-    throw new Error("anthropicApiKey is missing or invalid");
-  }
-  const runtime = dependencies.inspectRuntime(input.runtime, input.preregistration.runtime);
-  assertRuntimeInspection(runtime, input.preregistration);
-  const tasks = selectedTasks(input.preregistration);
-  const checkouts = inspectAllCheckouts(
-    input,
-    tasks,
-    dependencies as SentinelProductionRunnerDependencies,
-  );
   return {
-    preregistrationSha256: verification.preregistrationSha256,
+    ...verifyExecutionBindings(
+      input,
+      verification.preregistrationSha256,
+      verification.cells,
+      dependencies,
+    ),
     commitmentSha256,
-    blocks: validateBlocks(verification.cells),
-    tasks,
-    runtime,
-    checkouts,
   };
+}
+
+function reconstructLocalDiagnosticPlan(
+  plan: SentinelProductionPreregistration,
+): SentinelProductionPreregistration {
+  return createSentinelProductionPreregistration({
+    registrationId: plan.registration.registrationId,
+    registeredAt: plan.registration.registeredAt,
+    producerId: plan.registration.producerId,
+    selectedPhase: plan.registration.selectedPhase,
+    repeatIds: plan.execution.repeatIds,
+    randomizationSeed: plan.execution.randomizationSeed,
+    systemPromptSha256: plan.model.systemPromptSha256,
+    actionSchemaSha256: plan.model.actionSchemaSha256,
+    runtime: plan.runtime,
+    poweredConfirmatoryUniverse: plan.benchmark.universes.poweredConfirmatory,
+    bootstrapSeed: plan.analysis.bootstrapSeed,
+    rawBatchVerifierId: plan.analysis.rawBatchVerifier.verifierId,
+    rawBatchVerifierRevision: plan.analysis.rawBatchVerifier.verifierRevision,
+    rawBatchVerifierSha256: plan.analysis.rawBatchVerifier.verifierScriptSha256,
+  });
+}
+
+export function verifySentinelProductionDiagnosticRunInputs(
+  input: SentinelProductionDiagnosticRunInput,
+  selection: SentinelProductionDiagnosticSelection,
+  runStartedAt: string,
+  dependencies: Pick<
+    SentinelProductionRunnerDependencies,
+    "inspectRuntime" | "inspectCheckout"
+  >,
+): SentinelVerifiedExecutionInputs & {
+  readonly scheduleSha256: string;
+  readonly selection: SentinelProductionDiagnosticSelection;
+} {
+  canonicalTimestamp(runStartedAt, "diagnostic runStartedAt");
+  assertHash(input.expectedPreregistrationSha256, "diagnostic expected preregistration");
+  assertHash(input.expectedScheduleSha256, "diagnostic expected schedule");
+  const preregistrationSha256 = sentinelProductionJsonSha256(input.preregistration);
+  if (preregistrationSha256 !== input.expectedPreregistrationSha256) {
+    throw new Error("local diagnostic preregistration differs from its disclosed frozen hash");
+  }
+  const reconstructed = reconstructLocalDiagnosticPlan(input.preregistration);
+  if (
+    sentinelProductionCanonicalJson(reconstructed) !==
+    sentinelProductionCanonicalJson(input.preregistration)
+  ) {
+    throw new Error("local diagnostic preregistration is not the exact production plan structure");
+  }
+  canonicalTimestamp(
+    input.preregistration.registration.registeredAt,
+    "local diagnostic registeredAt",
+  );
+  if (
+    !PLAN_ID.test(input.preregistration.registration.registrationId) ||
+    !PLAN_ID.test(input.preregistration.registration.producerId) ||
+    input.preregistration.execution.repeatIds.length !== 3 ||
+    new Set(input.preregistration.execution.repeatIds).size !== 3 ||
+    input.preregistration.execution.repeatIds.some((repeatId) => !PLAN_ID.test(repeatId)) ||
+    !PLAN_ID.test(input.preregistration.execution.randomizationSeed) ||
+    !PLAN_ID.test(input.preregistration.analysis.bootstrapSeed) ||
+    !PLAN_ID.test(input.preregistration.analysis.rawBatchVerifier.verifierId) ||
+    !GIT_SHA1.test(input.preregistration.analysis.rawBatchVerifier.verifierRevision) ||
+    !SHA256.test(input.preregistration.analysis.rawBatchVerifier.verifierScriptSha256) ||
+    !SHA256.test(input.preregistration.model.systemPromptSha256) ||
+    !SHA256.test(input.preregistration.model.actionSchemaSha256)
+  ) throw new Error("local diagnostic dynamic plan identities or hashes are invalid");
+  if (
+    input.preregistration.registration.selectedPhase !== "qualification" ||
+    input.preregistration.benchmark.universes.qualification.efficacyEligible !== false ||
+    input.preregistration.analysis.qualificationMaterialBenefit !== false
+  ) {
+    throw new Error("local diagnostic accepts only the non-efficacy qualification plan");
+  }
+  if (Date.parse(input.preregistration.registration.registeredAt) >= Date.parse(runStartedAt)) {
+    throw new Error("local diagnostic registration must strictly precede run start");
+  }
+  const cells = buildSentinelProductionSchedule(input.preregistration);
+  const scheduleSha256 = sentinelProductionJsonSha256(cells);
+  if (scheduleSha256 !== input.expectedScheduleSha256) {
+    throw new Error("local diagnostic schedule differs from its disclosed frozen hash");
+  }
+  const blocks = validateBlocks(cells);
+  if (!Number.isSafeInteger(selection.blockSequence) || selection.blockSequence < 1) {
+    throw new Error("local diagnostic blockSequence is invalid");
+  }
+  const block = blocks[selection.blockSequence - 1];
+  if (
+    block === undefined ||
+    block[0]?.taskId !== selection.taskId ||
+    block[0]?.repeatId !== selection.repeatId ||
+    block[0]?.taskRole !== "state-retention-relative" ||
+    sentinelProductionCanonicalJson(block.map(({ cellId }) => cellId)) !==
+      sentinelProductionCanonicalJson(selection.cellIds)
+  ) {
+    throw new Error("local diagnostic selection is not one exact qualification state-retention block");
+  }
+  const verified = verifyExecutionBindings(
+    input,
+    preregistrationSha256,
+    cells,
+    dependencies,
+  );
+  return { ...verified, scheduleSha256, selection };
 }
 
 function portFromOrigin(origin: string, label: string): number {
@@ -1093,9 +881,15 @@ function contextForCell(input: {
   readonly ports: CellPorts;
   readonly dependencies: SentinelProductionRunnerDependencies;
   readonly usedOpaqueValues: Set<string>;
+  readonly diagnosticExecutionId?: string;
 }): CellExecutionContext {
+  const derivedAttemptId = input.diagnosticExecutionId === undefined
+    ? input.dependencies.deriveAttemptId(input.preregistrationSha256, input.cell.cellId)
+    : `spa-${sentinelProductionSha256(
+        `pm.sentinel.local-diagnostic.attempt.v1\0${input.preregistrationSha256}\0${input.diagnosticExecutionId}\0${input.cell.cellId}`,
+      ).slice(0, 48)}`;
   const attemptId = assertOpaqueValue(
-    input.dependencies.deriveAttemptId(input.preregistrationSha256, input.cell.cellId),
+    derivedAttemptId,
     OPAQUE_ATTEMPT_ID,
     "attemptId",
     input.usedOpaqueValues,
@@ -1173,7 +967,7 @@ function validateTenantReceipt(
 
 async function prepareCell(
   context: CellExecutionContext,
-  input: SentinelProductionRunInput,
+  input: SentinelProductionExecutionInput,
   preregistrationSha256: string,
   dependencies: SentinelProductionRunnerDependencies,
 ): Promise<void> {
@@ -1255,7 +1049,7 @@ function readyForSimultaneousLaunch(context: CellExecutionContext): boolean {
 
 function supervisorInput(
   context: CellExecutionContext,
-  input: SentinelProductionRunInput,
+  input: SentinelProductionExecutionInput,
 ): SentinelProductionSupervisorInput {
   if (!context.state || !context.provider || !context.agentConfig) {
     throw new Error("cell services were not ready for supervisor launch");
@@ -1307,8 +1101,9 @@ function validateSupervisorReceipt(
 
 async function launchPreparedBlock(
   contexts: readonly CellExecutionContext[],
-  input: SentinelProductionRunInput,
+  input: SentinelProductionExecutionInput,
   dependencies: SentinelProductionRunnerDependencies,
+  authorization: { readonly timestamp: string; readonly label: string },
 ): Promise<{ readonly simultaneous: boolean; readonly startSkewMs: number | null }> {
   if (!contexts.every(readyForSimultaneousLaunch)) {
     for (const context of contexts) {
@@ -1322,8 +1117,8 @@ async function launchPreparedBlock(
   await Promise.all(contexts.map(async (context) => {
     try {
       context.attemptInvokedAt = canonicalTimestamp(dependencies.now(), "attempt invokedAt");
-      if (Date.parse(input.signature.authority.signedAt) >= Date.parse(context.attemptInvokedAt)) {
-        throw new Error("external signature did not precede attempt invocation");
+      if (Date.parse(authorization.timestamp) >= Date.parse(context.attemptInvokedAt)) {
+        throw new Error(`${authorization.label} did not precede attempt invocation`);
       }
       const receipt = await dependencies.superviseAttempt(supervisorInput(context, input));
       validateSupervisorReceipt(receipt, context);
@@ -1333,8 +1128,8 @@ async function launchPreparedBlock(
         receipt.startReceiptHash,
         context.attemptId,
       );
-      if (Date.parse(input.signature.authority.signedAt) >= Date.parse(context.attemptStartedAt)) {
-        throw new Error("external signature did not precede retained attempt start");
+      if (Date.parse(authorization.timestamp) >= Date.parse(context.attemptStartedAt)) {
+        throw new Error(`${authorization.label} did not precede retained attempt start`);
       }
       if (Date.parse(context.attemptStartedAt) < Date.parse(context.attemptInvokedAt)) {
         throw new Error("retained attempt start predates its runner invocation");
@@ -1432,7 +1227,7 @@ function validateReplayExport(
 
 async function drainCellServices(
   context: CellExecutionContext,
-  input: SentinelProductionRunInput,
+  input: SentinelProductionExecutionInput,
 ): Promise<void> {
   const stops: Promise<void>[] = [];
   if (context.state !== undefined) {
@@ -1481,7 +1276,7 @@ async function drainCellServices(
 
 async function retainReplayExport(
   context: CellExecutionContext,
-  input: SentinelProductionRunInput,
+  input: SentinelProductionExecutionInput,
   dependencies: SentinelProductionRunnerDependencies,
 ): Promise<void> {
   try {
@@ -1512,7 +1307,7 @@ async function retainReplayExport(
 
 async function finalizeCell(
   context: CellExecutionContext,
-  input: SentinelProductionRunInput,
+  input: SentinelProductionExecutionInput,
   dependencies: SentinelProductionRunnerDependencies,
   manifestsRoot: string,
 ): Promise<SentinelProductionCellManifestReference> {
@@ -1610,7 +1405,7 @@ async function finalizeCell(
   const manifest = writeContentAddressedJson(
     manifestsRoot,
     `cell-${String(context.cell.sequence).padStart(6, "0")}`,
-    body as unknown as Record<string, unknown>,
+    body,
   );
   return {
     sequence: context.cell.sequence,
@@ -1657,6 +1452,7 @@ export function createSentinelProductionRunnerDependencies(): SentinelProduction
       `spa-${sentinelProductionSha256(
         `pm.sentinel.production.attempt.v1\0${preregistrationSha256}\0${cellId}`,
       ).slice(0, 48)}`,
+    diagnosticExecutionId: () => `sde-${randomBytes(24).toString("hex")}`,
     opaqueToken: () => randomBytes(32).toString("base64url"),
     opaqueIdentity: (kind) => {
       const prefix = kind === "tenant" ? "tnt" : kind === "agent" ? "agt" : "scp";
@@ -1671,46 +1467,43 @@ export function createSentinelProductionRunnerDependencies(): SentinelProduction
   };
 }
 
-interface SentinelProductionDiagnosticSelection {
-  readonly taskId: string;
-  readonly repeatId: string;
+interface SentinelProductionExecutionMode {
+  readonly kind: "production";
+  readonly input: SentinelProductionRunInput;
+  readonly runStartedAt: string;
+  readonly verified: ReturnType<typeof verifySentinelProductionRunInputs>;
 }
 
-async function runSentinelProductionBatchInternal(
-  input: SentinelProductionRunInput,
+interface SentinelProductionDiagnosticMode {
+  readonly kind: "local-diagnostic";
+  readonly input: SentinelProductionDiagnosticRunInput;
+  readonly runStartedAt: string;
+  readonly diagnosticExecutionId: string;
+  readonly verified: ReturnType<typeof verifySentinelProductionDiagnosticRunInputs>;
+}
+
+async function runSentinelProductionExecution(
+  mode: SentinelProductionExecutionMode | SentinelProductionDiagnosticMode,
   dependencies: SentinelProductionRunnerDependencies,
-  diagnosticSelection?: SentinelProductionDiagnosticSelection,
-): Promise<SentinelProductionBatchResult> {
-  const runStartedAt = canonicalTimestamp(dependencies.now(), "runStartedAt");
-  const verified = verifySentinelProductionRunInputs(input, runStartedAt, dependencies);
+): Promise<SentinelProductionBatchResult | SentinelProductionDiagnosticResult> {
+  const { input, runStartedAt, verified } = mode;
   const indexedBlocks = verified.blocks.map((block, index) => ({ block, blockSequence: index + 1 }));
-  const executionBlocks = diagnosticSelection === undefined
+  const executionBlocks = mode.kind === "production"
     ? indexedBlocks
-    : indexedBlocks.filter(({ block }) =>
-        block[0]?.taskId === diagnosticSelection.taskId &&
-        block[0]?.repeatId === diagnosticSelection.repeatId);
-  if (diagnosticSelection !== undefined) {
-    if (
-      input.preregistration.registration.selectedPhase !== "qualification" ||
-      executionBlocks.length !== 1 ||
-      executionBlocks[0]?.block[0]?.taskRole !== "state-retention-relative"
-    ) {
-      throw new Error("excluded smoke must select exactly one qualification state-retention block");
-    }
-  }
+    : indexedBlocks.filter(({ blockSequence }) =>
+        blockSequence === mode.verified.selection.blockSequence);
   const initialRuntimeInspectedAt = canonicalTimestamp(
     dependencies.now(),
     "initial runtime inspectedAt",
   );
-  const externalObservation = await dependencies.verifyExternalCommitmentRecord(
-    input.externalCommitment,
-  );
-  const preparedExternalObservation = prepareSentinelProductionExternalObservation(
-    input.externalCommitment,
-    externalObservation,
-    runStartedAt,
-    canonicalTimestamp(dependencies.now(), "external commitment locallyValidatedAt"),
-  );
+  const preparedExternalObservation = mode.kind === "production"
+    ? prepareSentinelProductionExternalObservation(
+        mode.input.externalCommitment,
+        await dependencies.verifyExternalCommitmentRecord(mode.input.externalCommitment),
+        runStartedAt,
+        canonicalTimestamp(dependencies.now(), "external commitment locallyValidatedAt"),
+      )
+    : null;
   const batchRoot = resolve(input.batchRoot);
   const registryRoot = resolve(input.attemptRegistryRoot);
   mkdirSync(batchRoot, { mode: 0o700 });
@@ -1723,16 +1516,33 @@ async function runSentinelProductionBatchInternal(
   mkdirSync(resolve(batchRoot, "manifests", "runtime"), { mode: 0o700 });
 
   writeExclusiveJson(resolve(batchRoot, "inputs", "preregistration.json"), input.preregistration);
-  writeExclusiveJson(resolve(batchRoot, "inputs", "signature.json"), input.signature);
-  writeExclusiveJson(resolve(batchRoot, "inputs", "trust-anchor.json"), input.trustAnchor);
-  writeExclusiveJson(
-    resolve(batchRoot, "inputs", "external-commitment.json"),
-    input.externalCommitment,
-  );
-  const externalObservationReceipt = retainSentinelProductionExternalObservation(
-    batchRoot,
-    preparedExternalObservation,
-  );
+  if (mode.kind === "production") {
+    writeExclusiveJson(resolve(batchRoot, "inputs", "signature.json"), mode.input.signature);
+    writeExclusiveJson(resolve(batchRoot, "inputs", "trust-anchor.json"), mode.input.trustAnchor);
+    writeExclusiveJson(
+      resolve(batchRoot, "inputs", "external-commitment.json"),
+      mode.input.externalCommitment,
+    );
+  } else {
+    writeExclusiveJson(resolve(batchRoot, "inputs", "local-diagnostic-disclosure.json"), {
+      schemaVersion:
+        "pm.public-eval-corners.sentinel-production-local-diagnostic-disclosure.v1",
+      trustMode: "local-untrusted-diagnostic",
+      independent: false,
+      batchComplete: false,
+      evidenceEligible: false,
+      analysisEligible: false,
+      materialBenefit: false,
+      diagnosticExecutionId: mode.diagnosticExecutionId,
+      expectedPreregistrationSha256: mode.input.expectedPreregistrationSha256,
+      expectedScheduleSha256: mode.input.expectedScheduleSha256,
+      selectedBlock: mode.verified.selection,
+    });
+  }
+  const externalObservationReceipt =
+    mode.kind === "production" && preparedExternalObservation !== null
+      ? retainSentinelProductionExternalObservation(batchRoot, preparedExternalObservation)
+      : null;
   let runtimeInspectionHeadSha256 = HASH_GENESIS;
   const initialRuntimeInspection = retainSentinelProductionRuntimeInspection({
     batchRoot,
@@ -1744,34 +1554,58 @@ async function runSentinelProductionBatchInternal(
     previousInspectionReceiptSha256: runtimeInspectionHeadSha256,
   });
   runtimeInspectionHeadSha256 = initialRuntimeInspection.inspectionReceiptSha256;
-  const signatureSha256 = sentinelProductionJsonSha256(input.signature);
-  const startBody = {
-    schemaVersion: "pm.public-eval-corners.sentinel-production-execution-start.v1",
-    evidenceEligible: false,
-    materialBenefit: false,
+  const commonStart = {
     preregistrationSha256: verified.preregistrationSha256,
-    signatureSha256,
-    externalCommitmentSha256: verified.commitmentSha256,
-    externalCommitmentObservation: {
-      path: relative(batchRoot, externalObservationReceipt.path),
-      receiptSha256: externalObservationReceipt.sha256,
-      bodyPath: preparedExternalObservation.receiptBody.bodyPath,
-      bodySha256: preparedExternalObservation.receiptBody.bodySha256,
-      observedAt: preparedExternalObservation.receiptBody.observedAt,
-    },
     runStartedAt,
     phase: input.preregistration.registration.selectedPhase,
     declaredBlockCount: verified.blocks.length,
     declaredCellCount: verified.blocks.length * 4,
     maximumArmStartSkewMs: maximumArmStartSkewMs(input.preregistration),
     initialRuntimeInspection,
-    checkoutPreflights: Object.fromEntries(ARMS.map((arm) => [arm, verified.checkouts[arm]])),
+    checkoutPreflights: Object.fromEntries(
+      ARMS.map((arm) => [arm, verified.checkouts[arm]]),
+    ) as unknown as Readonly<
+      Record<SentinelProductionArm, SentinelProductionCheckoutPreflight>
+    >,
     schedule: verified.blocks.flat(),
-    noAutomaticRetries: true,
-    noCellReruns: true,
-    noTaskReplacements: true,
-    noOutcomeInspectionDuringExecution: true,
+    noAutomaticRetries: true as const,
+    noCellReruns: true as const,
+    noTaskReplacements: true as const,
+    noOutcomeInspectionDuringExecution: true as const,
   };
+  const startBody = mode.kind === "production"
+    ? {
+        schemaVersion: "pm.public-eval-corners.sentinel-production-execution-start.v1",
+        evidenceEligible: false,
+        materialBenefit: false,
+        ...commonStart,
+        signatureSha256: sentinelProductionJsonSha256(mode.input.signature),
+        externalCommitmentSha256: mode.verified.commitmentSha256,
+        externalCommitmentObservation: {
+          path: relative(batchRoot, externalObservationReceipt!.path),
+          receiptSha256: externalObservationReceipt!.sha256,
+          bodyPath: preparedExternalObservation!.receiptBody.bodyPath,
+          bodySha256: preparedExternalObservation!.receiptBody.bodySha256,
+          observedAt: preparedExternalObservation!.receiptBody.observedAt,
+        },
+      }
+    : {
+        schemaVersion:
+          "pm.public-eval-corners.sentinel-production-local-diagnostic-execution-start.v1" as const,
+        trustMode: "local-untrusted-diagnostic" as const,
+        independent: false as const,
+        batchComplete: false as const,
+        evidenceEligible: false as const,
+        analysisEligible: false as const,
+        materialBenefit: false as const,
+        diagnosticExecutionId: mode.diagnosticExecutionId,
+        expectedPreregistrationSha256: mode.input.expectedPreregistrationSha256,
+        scheduleSha256: mode.verified.scheduleSha256,
+        expectedScheduleSha256: mode.input.expectedScheduleSha256,
+        ...commonStart,
+        phase: "qualification" as const,
+        selectedBlock: mode.verified.selection,
+      } satisfies SentinelProductionDiagnosticExecutionStart;
   const executionStart = writeContentAddressedJson(
     resolve(batchRoot, "manifests"),
     "execution-start",
@@ -1832,11 +1666,19 @@ async function runSentinelProductionBatchInternal(
         ports,
         dependencies,
         usedOpaqueValues,
+        ...(mode.kind === "local-diagnostic"
+          ? { diagnosticExecutionId: mode.diagnosticExecutionId }
+          : {}),
       });
     });
     await Promise.all(contexts.map((context) =>
       prepareCell(context, input, verified.preregistrationSha256, dependencies)));
-    const launch = await launchPreparedBlock(contexts, input, dependencies);
+    const launch = await launchPreparedBlock(contexts, input, dependencies, {
+      timestamp: mode.kind === "production"
+        ? mode.input.signature.authority.signedAt
+        : mode.input.preregistration.registration.registeredAt,
+      label: mode.kind === "production" ? "external signature" : "local registration",
+    });
     const references = await Promise.all(contexts.map((context) =>
       finalizeCell(
         context,
@@ -1913,24 +1755,100 @@ async function runSentinelProductionBatchInternal(
     const blockManifest = writeContentAddressedJson(
       resolve(batchRoot, "manifests", "blocks"),
       `block-${String(blockSequence).padStart(6, "0")}`,
-      blockBody as unknown as Record<string, unknown>,
+      blockBody,
     );
     previousBlockManifestSha256 = blockManifest.sha256;
     blockReferences.push(blockManifest);
   }
 
-  const batchComplete =
-    diagnosticSelection === undefined &&
+  const batchComplete = mode.kind === "production" &&
     allBlocksComplete &&
     blockReferences.length === verified.blocks.length &&
     cellReferences.length === verified.blocks.length * 4;
+  const diagnosticInfrastructureComplete = mode.kind === "local-diagnostic" &&
+    allBlocksComplete && blockReferences.length === 1 && cellReferences.length === 4;
+  const retainedBlocks = blockReferences.map((reference) => ({
+    path: relative(batchRoot, reference.path),
+    sha256: reference.sha256,
+  }));
+  const finalizedAt = canonicalTimestamp(dependencies.now(), "batch finalizedAt");
+  if (mode.kind === "local-diagnostic") {
+    if (retainedBlocks.length !== 1 || cellReferences.length !== 4) {
+      throw new Error("local diagnostic did not retain exactly one four-arm block");
+    }
+    const diagnosticBlocks = [retainedBlocks[0]!] as const;
+    const orderedCells = [...cellReferences].sort((left, right) => left.sequence - right.sequence);
+    const diagnosticCells: SentinelProductionDiagnosticResult["cells"] = [
+      orderedCells[0]!,
+      orderedCells[1]!,
+      orderedCells[2]!,
+      orderedCells[3]!,
+    ];
+    const finalBody: SentinelProductionDiagnosticExecutionFinal = {
+      schemaVersion:
+        "pm.public-eval-corners.sentinel-production-local-diagnostic-execution-final.v1",
+      trustMode: "local-untrusted-diagnostic",
+      independent: false,
+      batchComplete: false,
+      evidenceEligible: false,
+      analysisEligible: false,
+      materialBenefit: false,
+      diagnosticInfrastructureComplete,
+      diagnosticExecutionId: mode.diagnosticExecutionId,
+      preregistrationSha256: verified.preregistrationSha256,
+      scheduleSha256: mode.verified.scheduleSha256,
+      runStartedAt,
+      declaredBlockCount: verified.blocks.length,
+      retainedBlockCount: 1,
+      declaredCellCount: verified.blocks.length * 4,
+      retainedCellCount: 4,
+      retryCount: 0,
+      rerunCount: 0,
+      replacementCount: 0,
+      noOutcomeInspectionDuringExecution: true,
+      blockManifestHeadSha256: previousBlockManifestSha256,
+      runtimeInspectionHeadSha256,
+      selectedBlock: mode.verified.selection,
+      blocks: diagnosticBlocks,
+      finalizedAt,
+    };
+    const executionFinal = writeContentAddressedJson(
+      resolve(batchRoot, "manifests"),
+      "execution-final",
+      finalBody,
+    );
+    sealTree(resolve(batchRoot, "inputs"));
+    sealTree(resolve(batchRoot, "manifests"));
+    return {
+      schemaVersion: "pm.public-eval-corners.sentinel-production-local-diagnostic-result.v1",
+      trustMode: "local-untrusted-diagnostic",
+      independent: false,
+      batchComplete: false,
+      evidenceEligible: false,
+      analysisEligible: false,
+      materialBenefit: false,
+      diagnosticInfrastructureComplete,
+      diagnosticExecutionId: mode.diagnosticExecutionId,
+      batchRoot,
+      preregistrationSha256: verified.preregistrationSha256,
+      scheduleSha256: mode.verified.scheduleSha256,
+      executionStartManifestPath: executionStart.path,
+      executionStartManifestSha256: executionStart.sha256,
+      executionFinalManifestPath: executionFinal.path,
+      executionFinalManifestSha256: executionFinal.sha256,
+      blockManifestHeadSha256: previousBlockManifestSha256,
+      selectedBlock: mode.verified.selection,
+      blocks: diagnosticBlocks,
+      cells: diagnosticCells,
+    };
+  }
   const finalBody: SentinelProductionExecutionManifest = {
     schemaVersion: "pm.public-eval-corners.sentinel-production-execution-manifest.v1",
     evidenceEligible: false,
     materialBenefit: false,
     preregistrationSha256: verified.preregistrationSha256,
-    signatureSha256,
-    externalCommitmentSha256: verified.commitmentSha256,
+    signatureSha256: sentinelProductionJsonSha256(mode.input.signature),
+    externalCommitmentSha256: mode.verified.commitmentSha256,
     runStartedAt,
     declaredBlockCount: verified.blocks.length,
     retainedBlockCount: blockReferences.length,
@@ -1943,16 +1861,13 @@ async function runSentinelProductionBatchInternal(
     batchComplete,
     blockManifestHeadSha256: previousBlockManifestSha256,
     runtimeInspectionHeadSha256,
-    blocks: blockReferences.map((reference) => ({
-      path: relative(batchRoot, reference.path),
-      sha256: reference.sha256,
-    })),
-    finalizedAt: canonicalTimestamp(dependencies.now(), "batch finalizedAt"),
+    blocks: retainedBlocks,
+    finalizedAt,
   };
   const executionFinal = writeContentAddressedJson(
     resolve(batchRoot, "manifests"),
     "execution-final",
-    finalBody as unknown as Record<string, unknown>,
+    finalBody,
   );
   sealTree(resolve(batchRoot, "inputs"));
   sealTree(resolve(batchRoot, "manifests"));
@@ -1968,10 +1883,7 @@ async function runSentinelProductionBatchInternal(
     executionFinalManifestPath: executionFinal.path,
     executionFinalManifestSha256: executionFinal.sha256,
     blockManifestHeadSha256: previousBlockManifestSha256,
-    blocks: blockReferences.map((reference) => ({
-      path: relative(batchRoot, reference.path),
-      sha256: reference.sha256,
-    })),
+    blocks: retainedBlocks,
     cells: cellReferences.sort((left, right) => left.sequence - right.sequence),
   };
 }
@@ -1981,15 +1893,39 @@ export async function runSentinelProductionBatch(
   dependencies: SentinelProductionRunnerDependencies =
     createSentinelProductionRunnerDependencies(),
 ): Promise<SentinelProductionBatchResult> {
-  return runSentinelProductionBatchInternal(input, dependencies);
+  const runStartedAt = canonicalTimestamp(dependencies.now(), "runStartedAt");
+  const verified = verifySentinelProductionRunInputs(input, runStartedAt, dependencies);
+  return await runSentinelProductionExecution({
+    kind: "production",
+    input,
+    runStartedAt,
+    verified,
+  }, dependencies) as SentinelProductionBatchResult;
 }
 
-/** Run one four-arm qualification block; the declared full schedule stays incomplete. */
+/** Run one local-only four-arm qualification diagnostic with no independent trust claim. */
 export async function runSentinelProductionExcludedSmoke(
-  input: SentinelProductionRunInput,
+  input: SentinelProductionDiagnosticRunInput,
   selection: SentinelProductionDiagnosticSelection,
   dependencies: SentinelProductionRunnerDependencies =
     createSentinelProductionRunnerDependencies(),
-): Promise<SentinelProductionBatchResult> {
-  return runSentinelProductionBatchInternal(input, dependencies, selection);
+): Promise<SentinelProductionDiagnosticResult> {
+  const runStartedAt = canonicalTimestamp(dependencies.now(), "diagnostic runStartedAt");
+  const verified = verifySentinelProductionDiagnosticRunInputs(
+    input,
+    selection,
+    runStartedAt,
+    dependencies,
+  );
+  const diagnosticExecutionId = dependencies.diagnosticExecutionId();
+  if (!OPAQUE_DIAGNOSTIC_EXECUTION_ID.test(diagnosticExecutionId)) {
+    throw new Error("diagnosticExecutionId is not a unique opaque execution identity");
+  }
+  return await runSentinelProductionExecution({
+    kind: "local-diagnostic",
+    input,
+    runStartedAt,
+    verified,
+    diagnosticExecutionId,
+  }, dependencies) as SentinelProductionDiagnosticResult;
 }

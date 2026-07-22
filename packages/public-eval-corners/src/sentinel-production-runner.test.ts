@@ -5,8 +5,10 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,6 +23,7 @@ import {
 } from "./sentinel-general-provider-proxy.js";
 import {
   buildSentinelRuntimeSanitizedEnvironment,
+  buildSentinelProductionSchedule,
   createSentinelProductionPreregistration,
   sentinelProductionCanonicalJson,
   sentinelProductionJsonSha256,
@@ -35,11 +38,13 @@ import {
   runSentinelProductionBatch,
   runSentinelProductionExcludedSmoke,
   type SentinelProductionCheckoutPreflight,
+  type SentinelProductionDiagnosticRunInput,
   type SentinelProductionExternalCommitment,
   type SentinelProductionRunInput,
   type SentinelProductionRuntimeInspection,
   type SentinelProductionRunnerDependencies,
 } from "./sentinel-production-runner.js";
+import { verifySentinelProductionRawBatch } from "./sentinel-production-verifier.js";
 import { createSentinelProductionRuntimeLeaseIdentity } from "./sentinel-production-runner-evidence.js";
 import type { SentinelProductionAttemptTerminalReceipt } from "./sentinel-production-supervisor.js";
 
@@ -60,7 +65,7 @@ afterEach(() => {
 
 function hash(character: string): string { return character.repeat(64); }
 function freshRoot(): string {
-  const root = mkdtempSync(resolve(tmpdir(), "pm-sentinel-production-runner-"));
+  const root = mkdtempSync(resolve(realpathSync(tmpdir()), "pm-sentinel-production-runner-"));
   roots.push(root);
   return root;
 }
@@ -331,6 +336,7 @@ interface HarnessOptions {
   readonly invalidRuntimeInspectionCall?: number;
   readonly tamperedRuntimeArtifact?: boolean;
   readonly startSkewMs?: number;
+  readonly diagnosticExecutionId?: string;
 }
 
 function fixture(options: HarnessOptions = {}): {
@@ -467,6 +473,8 @@ function fixture(options: HarnessOptions = {}): {
       options.duplicateAttemptIds
         ? `spa-${"a".repeat(48)}`
         : `spa-${sentinelProductionSha256(`${preregistrationSha256}\0${cellId}`).slice(0, 48)}`,
+    diagnosticExecutionId: () =>
+      options.diagnosticExecutionId ?? `sde-${"d".repeat(48)}`,
     opaqueToken: () => Buffer.alloc(32, (opaqueIndex += 1) % 255).toString("base64url"),
     opaqueIdentity: (kind) => `${kind.slice(0, 3)}_spe_${String(opaqueIndex += 1).padStart(8, "0")}`,
     retainScenarioDefinition: (_checkout, task, targetPath) => {
@@ -670,6 +678,46 @@ function fixture(options: HarnessOptions = {}): {
     },
   };
   return { input, dependencies, supervisorInputs, root };
+}
+
+function diagnosticInput(test: ReturnType<typeof fixture>): {
+  readonly input: SentinelProductionDiagnosticRunInput;
+  readonly selection: {
+    readonly blockSequence: number;
+    readonly taskId: string;
+    readonly repeatId: string;
+    readonly cellIds: readonly [string, string, string, string];
+  };
+} {
+  const schedule = buildSentinelProductionSchedule(test.input.preregistration);
+  const blockIndex = Array.from({ length: schedule.length / 4 }, (_, index) => index)
+    .find((index) => {
+      const first = schedule[index * 4];
+      return first?.taskId === "microhub-stars-relative-passive" &&
+        first.repeatId === "repeat-01";
+    });
+  if (blockIndex === undefined) throw new Error("test plan lacks selected diagnostic block");
+  const cells = schedule.slice(blockIndex * 4, blockIndex * 4 + 4);
+  if (cells.length !== 4) throw new Error("test diagnostic block is partial");
+  return {
+    input: {
+      preregistration: test.input.preregistration,
+      expectedPreregistrationSha256: sentinelProductionJsonSha256(test.input.preregistration),
+      expectedScheduleSha256: sentinelProductionJsonSha256(schedule),
+      checkouts: test.input.checkouts,
+      batchRoot: test.input.batchRoot,
+      attemptRegistryRoot: test.input.attemptRegistryRoot,
+      runtime: test.input.runtime,
+      databaseUrl: test.input.databaseUrl,
+      anthropicApiKey: test.input.anthropicApiKey,
+    },
+    selection: {
+      blockSequence: blockIndex + 1,
+      taskId: cells[0]!.taskId,
+      repeatId: cells[0]!.repeatId,
+      cellIds: cells.map(({ cellId }) => cellId) as [string, string, string, string],
+    },
+  };
 }
 
 describe("Sentinel production outcome-blind runner", () => {
@@ -878,18 +926,22 @@ describe("Sentinel production outcome-blind runner", () => {
 
   it("runs one exact four-arm qualification block only as an excluded smoke", async () => {
     const test = fixture();
+    const diagnostic = diagnosticInput(test);
     const result = await runSentinelProductionExcludedSmoke(
-      test.input,
-      {
-        taskId: "microhub-stars-relative-passive",
-        repeatId: "repeat-01",
-      },
+      diagnostic.input,
+      diagnostic.selection,
       test.dependencies,
     );
     expect(result).toMatchObject({
+      schemaVersion: "pm.public-eval-corners.sentinel-production-local-diagnostic-result.v1",
+      trustMode: "local-untrusted-diagnostic",
+      independent: false,
       batchComplete: false,
       evidenceEligible: false,
+      analysisEligible: false,
       materialBenefit: false,
+      diagnosticExecutionId: `sde-${"d".repeat(48)}`,
+      selectedBlock: diagnostic.selection,
     });
     expect(result.blocks).toHaveLength(1);
     expect(result.cells).toHaveLength(4);
@@ -898,14 +950,152 @@ describe("Sentinel production outcome-blind runner", () => {
       readFileSync(result.executionFinalManifestPath, "utf8"),
     ) as Record<string, unknown>;
     expect(final).toMatchObject({
+      schemaVersion:
+        "pm.public-eval-corners.sentinel-production-local-diagnostic-execution-final.v1",
+      trustMode: "local-untrusted-diagnostic",
+      independent: false,
       declaredBlockCount: 9,
       retainedBlockCount: 1,
       declaredCellCount: 36,
       retainedCellCount: 4,
       batchComplete: false,
       evidenceEligible: false,
+      analysisEligible: false,
       materialBenefit: false,
     });
+    const start = JSON.parse(
+      readFileSync(result.executionStartManifestPath, "utf8"),
+    ) as Record<string, unknown>;
+    expect(start).toMatchObject({
+      schemaVersion:
+        "pm.public-eval-corners.sentinel-production-local-diagnostic-execution-start.v1",
+      trustMode: "local-untrusted-diagnostic",
+      independent: false,
+      batchComplete: false,
+      evidenceEligible: false,
+      analysisEligible: false,
+      materialBenefit: false,
+      selectedBlock: diagnostic.selection,
+    });
+    expect(result.cells.map(({ cellId }) => cellId)).toEqual(diagnostic.selection.cellIds);
+    expect(result.cells.every(({ sequence }) => sequence >= 1 && sequence <= 36)).toBe(true);
+    expect(result.cells.map(({ attemptId, cellId }) => attemptId)).toEqual(
+      result.cells.map(({ cellId }) =>
+        `spa-${sentinelProductionSha256(
+          `pm.sentinel.local-diagnostic.attempt.v1\0${result.preregistrationSha256}\0${result.diagnosticExecutionId}\0${cellId}`,
+        ).slice(0, 48)}`),
+    );
+    const retainedInputs = readdirSync(resolve(result.batchRoot, "inputs"));
+    expect(retainedInputs.sort()).toEqual([
+      "local-diagnostic-disclosure.json",
+      "preregistration.json",
+    ]);
+    const retainedText = [
+      ...retainedInputs.map((name) => readFileSync(resolve(result.batchRoot, "inputs", name), "utf8")),
+      readFileSync(result.executionStartManifestPath, "utf8"),
+      readFileSync(result.executionFinalManifestPath, "utf8"),
+    ].join("\n");
+    expect(retainedText).not.toContain('"independent": true');
+
+    const raw = verifySentinelProductionRawBatch({
+      batchRoot: result.batchRoot,
+      trustAnchor: test.input.trustAnchor,
+    });
+    expect(raw).toMatchObject({
+      valid: false,
+      rawComplete: false,
+      evidenceEligible: false,
+      analysisEligible: false,
+      materialBenefit: false,
+      verifiedCellCount: 0,
+      analysis: null,
+      measurements: [],
+    });
+  });
+
+  it("domain-separates physical attempt IDs across local diagnostic reruns", async () => {
+    const first = fixture({ diagnosticExecutionId: `sde-${"1".repeat(48)}` });
+    const second = fixture({ diagnosticExecutionId: `sde-${"2".repeat(48)}` });
+    const firstDiagnostic = diagnosticInput(first);
+    const secondDiagnostic = diagnosticInput(second);
+    const [firstResult, secondResult] = await Promise.all([
+      runSentinelProductionExcludedSmoke(
+        firstDiagnostic.input,
+        firstDiagnostic.selection,
+        first.dependencies,
+      ),
+      runSentinelProductionExcludedSmoke(
+        secondDiagnostic.input,
+        secondDiagnostic.selection,
+        second.dependencies,
+      ),
+    ]);
+    expect(firstResult.cells.map(({ cellId }) => cellId)).toEqual(
+      secondResult.cells.map(({ cellId }) => cellId),
+    );
+    expect(new Set([
+      ...firstResult.cells.map(({ attemptId }) => attemptId),
+      ...secondResult.cells.map(({ attemptId }) => attemptId),
+    ])).toHaveLength(8);
+  });
+
+  it("rejects local diagnostic plan, schedule, block, and cell substitutions before launch", async () => {
+    const mutations = [
+      (value: ReturnType<typeof diagnosticInput>) => ({
+        ...value,
+        input: { ...value.input, expectedPreregistrationSha256: hash("f") },
+      }),
+      (value: ReturnType<typeof diagnosticInput>) => ({
+        ...value,
+        input: { ...value.input, expectedScheduleSha256: hash("e") },
+      }),
+      (value: ReturnType<typeof diagnosticInput>) => ({
+        ...value,
+        selection: { ...value.selection, blockSequence: value.selection.blockSequence + 1 },
+      }),
+      (value: ReturnType<typeof diagnosticInput>) => ({
+        ...value,
+        selection: {
+          ...value.selection,
+          cellIds: [hash("a"), ...value.selection.cellIds.slice(1)] as [string, string, string, string],
+        },
+      }),
+      (value: ReturnType<typeof diagnosticInput>) => {
+        const preregistration = {
+          ...value.input.preregistration,
+          objective: "substituted local objective",
+        } as unknown as SentinelProductionPreregistration;
+        return {
+          ...value,
+          input: {
+            ...value.input,
+            preregistration,
+            expectedPreregistrationSha256: sentinelProductionJsonSha256(preregistration),
+          },
+        };
+      },
+    ];
+    for (const mutate of mutations) {
+      const test = fixture();
+      const diagnostic = mutate(diagnosticInput(test));
+      await expect(runSentinelProductionExcludedSmoke(
+        diagnostic.input,
+        diagnostic.selection,
+        test.dependencies,
+      )).rejects.toThrow();
+      expect(test.supervisorInputs).toHaveLength(0);
+    }
+  });
+
+  it("rejects an output root whose lexical parent is a symlink into a checkout", async () => {
+    const test = fixture();
+    const alias = resolve(test.root, "output-parent-alias");
+    symlinkSync(test.input.checkouts.native, alias);
+    await expect(runSentinelProductionBatch({
+      ...test.input,
+      batchRoot: resolve(alias, "batch"),
+    }, test.dependencies)).rejects.toThrow(/parent.*canonical.*symlink/iu);
+    expect(test.supervisorInputs).toHaveLength(0);
   });
 
   it("uses retained supervisor start receipts to fail excessive four-arm skew", async () => {
