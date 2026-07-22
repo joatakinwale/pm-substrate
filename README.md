@@ -35,13 +35,17 @@ speed-1 horizon, one task-agnostic browser agent, and identical native, sham,
 plain-KV, and production-continuity interfaces. MicroHub is qualification-only;
 a frozen 12-task cross-application set is procedural holdout validation, not a
 powered confirmatory result. The untouched 50-task catalog is content-frozen,
-but its proposed 19-relative-task × 3-repeat power declaration was also
-falsified before execution: under its declared independent-binomial planning
-model, the necessary two-control 10-point-lift gate reaches at most 0.5112,
-before the stricter Holm, bootstrap, or clean-control gates. No replacement
-benchmark cell has yet established benefit. D7 remains `not_eligible` pending
-an honestly powered task-clustered confirmation, external trust, replication,
-and a separate owner decision. See the
+but its proposed 19-relative-task × 3-repeat, true-lift=0.10 declaration was
+also falsified before execution: its necessary two-control lift gate reaches at
+most 0.5112. A deterministic redesign separated the 0.10 claim threshold from
+a 0.35 planning alternative and an independent Python implementation replayed
+all 56 sensitivity cells. It clears 0.80 only conditionally at the listed ICC
+values 0 and 0.10; listed ICC 0.25 and 1 fail, and no evidence yet justifies an
+accepted dependence range. Powered execution therefore remains blocked. No
+replacement benchmark cell has established benefit. D7 remains `not_eligible`
+because completed raw heads still lack an independent post-run witness, and
+because powered confirmation, replication, and a separate owner decision are
+absent. See the
 exact run results and blockers in
 [`docs/public-benchmark-status-2026-07-13.md`](./docs/public-benchmark-status-2026-07-13.md).
 

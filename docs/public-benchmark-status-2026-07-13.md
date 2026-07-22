@@ -39,9 +39,15 @@ equal-control-rate planning model with true lift equal to the 0.10 claim
 threshold, the necessary probability of observing at least 0.10 over both
 controls is at most `0.511210781855188` over the declared 9,001-point baseline
 grid. Both Holm rejections, the positive task bootstrap bound, raw completeness,
-and clean-control/economics gates can only reduce that probability. The powered
-phase therefore remains unsigned and blocked; this is an evaluation-design
-failure, not an Arrowsmith trigger.
+and clean-control/economics gates can only reduce that probability. A subsequent
+pre-outcome redesign separated the 0.10 claim threshold from a 0.35 planning
+alternative and replayed the complete Holm/bootstrap/guardrail rule. An
+independent Python implementation reproduced all 56 cells (audit
+`9c5a9bc6…`, replay receipt `bea82b26…`). Worst simultaneous lower bounds are
+0.9190 at listed ICC 0 and 0.8705 at listed ICC 0.10, but 0.7724 at ICC 0.25 and
+0.3267 at ICC 1. The passing endpoints do not cover an interval and the model
+assumptions remain unverified, so powered execution remains unsigned and
+blocked. This is an evaluation-design failure, not an Arrowsmith trigger.
 
 Full content hashes for the executed qualifications, failed provider batch,
 and continuity repair are preserved in
@@ -110,9 +116,9 @@ a 30-test final regression subset passed.
 | 1. Evidence integrity reset | Local labs are `mechanism_conformance_only`; exact pair identity, expected-allow checks, allow-all/block-all mutants, deterministic top-ranked task selection, immutable arm interventions, initial environment, randomized order, signed preregistration/attempt-time bindings, versioned structured assertions, and fixed guardrails ship | Live Ollama suite `suite_6cf46d7e-a3fe-46ce-a5dc-4fc57f2a8ed8`: 22 scenarios/22 exact pairs; expected-block 12/12; expected-allow 10/10; both mutants rejected. Analysis/decision adversarial suite: 30/30 | Conformance and gate integrity only. Internally consistent signed facts remain diagnostic-only and `not_eligible`; no local result can establish public efficacy or authorize KEEP |
 | 2. ToolSandbox slice | Pinned `apple/ToolSandbox@165848b9…`; matched-batch/raw-verification v3; verifier-selected Apple oracle replay; raw provider/trajectory/sidecar/state cross-binding; authenticated HTTP sidecar; runtime closure; pinned starting context; real OS-process restart; outcome-neutral replay | Preserved history: quota-failed v1 batch, then a deterministic derivative that exposed a 136-character idempotency-key `400`, then pre-final repair retest `90a8e03a…`. Final headline `7ad2c0e8…` and derivative `0043af27…` both scored `1.0` in every arm. In the derivative, native/sham duplicated the target side effect and substrate did not | Strong qualification/mechanism evidence for one known scenario, not efficacy. Eligibility remains false for missing provider usage/cost/latency, trusted oracle runtime/environment, non-scripted public-agent execution, and independent trust anchor. The upstream score's duplicate-send blind spot requires a separate state-effect metric |
 | 3. STATE-Bench held-out proof | Pinned `microsoft/STATE-Bench@fd980728…`; deterministic 20/80 train qualification/extraction partition; exact 150-task test confirmation and replication inventories; five stochastic repeat identities; randomized arm schedule; v3 bound configs; exact 2,250-command phase plans; oracle-field redaction; one-attempt policy; external preregistration preflight; command-bound raw transport/retry/treatment/state schema; score conversion refuses by design | STATE adversarial suite: 62/62; pinned upstream plus adapter Python suite: 150 passed, 1 credential-dependent skip. Official scored trajectories: 0 | Planning and schemas are controls, not execution. No instrumented executor captures runner/agent/simulator/judge transports, independently replays state, or derives official scores from raw judge bytes. Official credentials and external command/trust pins are absent; local “perfect” JSON cannot substitute |
-| 4. Independent corner battery | Four source-pinned adapters plus the generic matched-arm protocol. The first Sentinel implementation added Chromium/provider/state/process capture, but its causal design is now excluded. The replacement uses one task-agnostic agent, speed 1, strict liveness, and no-state/sham/plain-KV/production-continuity arms | The legacy focused/adversarial tests remain harness diagnostics. Production hardening now covers fixed-shape responses, real post-ack `SIGKILL` durability, isolation, concurrent append, independent backend replay, chained browser request/response bytes, DB/file tamper fail-closed, and transitive runtime closure. The exact power-audit CLI falsifies the current 19×3/10-point declaration. Completed accepted Sentinel cells: 0 | MicroHub can qualify only. The 12-task procedural holdout cannot emit material benefit. The 50-task content catalog is frozen, but powered execution remains blocked until a redesigned calculation is retained and independently verified; external anchor, complete raw execution, clean replay, and replication still gate efficacy |
+| 4. Independent corner battery | Four source-pinned adapters plus the generic matched-arm protocol. The first Sentinel implementation added Chromium/provider/state/process capture, but its causal design is now excluded. The replacement uses one task-agnostic agent, speed 1, strict liveness, and no-state/sham/plain-KV/production-continuity arms | Production hardening covers fixed-shape responses, real post-ack `SIGKILL` durability, isolation, concurrent append, independent backend replay, chained browser bytes, provider usage, exact process/environment/collateral evidence, economics, and transitive runtime closure. The raw verifier independently reconstructs those records and fails closed without a post-run raw-head witness. The original power declaration is falsified; the 56-cell redesign replay is conditional only. Completed accepted Sentinel cells: 0 | MicroHub can qualify only. The 12-task procedural holdout cannot emit material benefit. Powered execution remains blocked until dependence is justified across an accepted range or more independent tasks are added, and until pre/post external anchors exist. Complete raw execution, clean replay, and replication still gate efficacy |
 | 5. Failure-driven Arrowsmith loop | v230 repaired an observed continuity fork; v231 repaired the false-KEEP authority boundary; v232 repaired the observed ToolSandbox bounded-idempotency composition failure without weakening the sidecar's limit or request-byte conflict check | Continuity concurrency ablation passed; fabricated signed D7 facts remain ineligible; v232 preserves the failing `d9cf73c3…` batch and final derivative shows the bounded digest survives restart and suppresses the exact duplicate | Integrity and mechanism evidence, not public benefit. A general substrate repair still requires a non-scripted behavioral failure trace, minimal consumed primitive, ablation, exact rerun, and clean controls |
-| 6. Replicate and decide | Task-clustered analysis uses ≥20 deterministic top-ranked tasks/decision phase, ≥3 predeclared repeats/task (provider-seeded only when the runtime supports it), 10,000 bootstrap draws, simultaneous ≥0.10 lift over both controls, positive lower bound, ≥0.5 reliability, zero deterministic false blocks/collateral, ≤$10/≤300s absolute and ≤1.25× per-control economics. Future eligibility additionally requires adapter-specific derivation of all 31 facts from bound raw records plus six signed receipts | Analysis/decision suite: 30/30. The generated memo reports `unproven` | Current v4 automation always emits `not_eligible`, with structured assertions diagnostic-only and `ownerAuthorizationRequired=true`. No raw-derived semantic evidence, external preregistration/trust anchor, confirmation, replication, or owner authorization exists |
+| 6. Replicate and decide | Task-clustered analysis uses predeclared independent tasks/repeats, 10,000 bootstrap draws, simultaneous ≥0.10 lift over both controls, positive lower bound, ≥0.5 reliability, zero deterministic false blocks/collateral, ≤$10 and ≤720s per cell, and substrate cost ≤1.25× each control. Repeats remain clustered and cannot self-supply independent task count. Future eligibility additionally requires raw-derived facts and independent pre/post receipts | The exact 19×3 redesign and independent replay are retained but conditional; no live outcome was read. The generated memo remains `unproven` | Current automation remains `not_eligible`. No independent post-run raw-head witness, eligible confirmation, replication, or owner authorization exists |
 
 ## Exact external blockers
 
@@ -136,11 +142,12 @@ a 30-test final regression subset passed.
    command plan and raw schema into independently replayable attempts.
 3. **Corner execution:** the legacy Sentinel real-browser/model path is excluded
    from causal use. The production four-arm replacement still needs a clean
-   excluded smoke. Its 50-task catalog is frozen, but the 19×3/10-point power
-   declaration is mathematically ineligible under its own planning model.
-   A redesigned, externally verified calculation, externally anchored attempt
-   roots, and clean independent replay must exist before any efficacy result can
-   count.
+   excluded smoke. Its 50-task catalog is frozen. The 19×3/10-point declaration
+   is mathematically ineligible, and the replayed 0.35-alternative redesign is
+   only conditional on unverified repeat/task assumptions. Full accepted-range
+   justification or additional untouched independent tasks, plus externally
+   anchored completed raw roots and clean independent replay, must exist before
+   any efficacy result can count.
 4. **Trust and decision authority:** the repository has no externally witnessed
    preregistration, owner-configured trust root, adapter-specific producer and
    reviewer that derive the v2 semantic facts from real benchmark records,
@@ -172,10 +179,11 @@ a 30-test final regression subset passed.
    procedural holdout across all four arms without replacement or outcome
    inspection. Use its predeclared economics/infrastructure facts—not its score—
    to validate procedure and economics only. Keep the already content-frozen
-   50-task catalog separate from power: redesign the planning alternative and/or
-   information count, independently replay the exact power artifact, and only
-   then sign a powered phase. Externally anchor that phase and every attempt root
-   before executing and raw-replaying the complete universe.
+   50-task catalog separate from power: use the retained conditional redesign
+   only after independently justifying its accepted dependence range, otherwise
+   add untouched independent tasks and re-power. Externally anchor the phase
+   before execution and bind every completed attempt/raw root afterward before
+   raw-replaying the complete universe.
 4. Feed only an observed public failure into the Arrowsmith loop. Implement the
    smallest general, runtime-consumed repair; ablate it; rerun the exact case
    and clean controls.
