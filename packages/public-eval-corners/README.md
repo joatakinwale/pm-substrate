@@ -89,8 +89,9 @@ qualification, not a browser-agent efficacy result.
 
 ## Sentinel causal stress test
 
-The original `pm-sentinel-live` 27-cell MicroHub design is retained only as
-excluded harness history. It cannot establish attribution: the useful baseline
+The original `pm-sentinel-live` 27-cell MicroHub design is documented here and
+preserved in Git history, but its executable implementation and obsolete bins
+have been removed. It cannot establish attribution: the useful baseline
 lived in an adapter-owned in-memory `Map`, all arms used the substrate core only
 for evidence admission, the discard arm was not Microsoft's unpublished paper
 agent, and a plain KV store was never tested. Its speed-factor-4 schedule also
@@ -131,6 +132,32 @@ incompleteness blocks a conclusion and never authorizes a replacement. A
 substrate win over native and sham shows that useful durable state mattered;
 substrate-specific attribution additionally requires a declared contrast over
 plain KV on integrity, isolation, conflict, or recovery behavior.
+
+Run the signed four-arm batch with one secret-free invocation file:
+
+```json
+{
+  "schemaVersion": "pm.public-eval-corners.sentinel-production-run-invocation.v1",
+  "preregistrationPath": "/proof/preregistration.json",
+  "signaturePath": "/proof/signature.json",
+  "trustAnchorPath": "/proof/trust-anchor.json",
+  "externalCommitmentPath": "/proof/external-commitment.json",
+  "runtimePathsPath": "/proof/runtime-paths.json",
+  "checkouts": {
+    "native": "/checkouts/native",
+    "sham": "/checkouts/sham",
+    "plain-kv": "/checkouts/plain-kv",
+    "substrate": "/checkouts/substrate"
+  },
+  "batchRoot": "/runs/batch",
+  "attemptRegistryRoot": "/runs/attempts"
+}
+```
+
+Set `PM_DATABASE_URL` and `ANTHROPIC_API_KEY` in the environment, then run
+`pnpm public-eval:sentinel-production-run /absolute/path/to/invocation.json`.
+The invocation rejects extra keys, so neither credential can be serialized
+into it.
 
 ## Behavioral matched-arm protocol
 

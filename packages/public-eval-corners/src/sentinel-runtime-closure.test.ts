@@ -47,7 +47,6 @@ const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-
 function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -69,7 +68,6 @@ interface Fixture {
   };
   readonly files: {
     gitExecutable: string;
-    gitExecHelper: string;
     nodeTarget: string;
     nodeRequested: string;
     frontendDependency: string;
@@ -129,9 +127,6 @@ function fixture(): Fixture {
   write(join(substrate, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
   const gitExecutable = join(runtime, "git");
   write(gitExecutable, "fixture git\n", 0o755);
-  const gitExecPathRoot = join(runtime, "git-core");
-  const gitExecHelper = join(gitExecPathRoot, "git-fixture-helper");
-  write(gitExecHelper, "fixture git helper\n", 0o755);
   const nodeTarget = join(nodeRoot, "bin", "node-real");
   const nodeRequested = join(nodeRoot, "bin", "node");
   write(nodeTarget, "fixture node executable\n", 0o755);
@@ -184,8 +179,6 @@ function fixture(): Fixture {
   write(requirements, "fastapi==0.1\n");
   const paths: SentinelRuntimeClosurePaths = {
     gitExecutablePath: gitExecutable,
-    gitRealExecutablePath: gitExecutable,
-    gitExecPathRootPath: gitExecPathRoot,
     substrateCheckoutPath: substrate,
     rootPackageJsonPath: join(substrate, "package.json"),
     pnpmWorkspaceManifestPath: join(substrate, "pnpm-workspace.yaml"),
@@ -236,9 +229,6 @@ function fixture(): Fixture {
     if (invocation.executablePath === gitExecutable && first === "--version") {
       return commandResult("git version 2.42.0.fixture\n");
     }
-    if (invocation.executablePath === gitExecutable && first === "--exec-path") {
-      return commandResult(`${gitExecPathRoot}\n`);
-    }
     const gitWorkTree = invocation.arguments.find((argument) => argument.startsWith("--work-tree="));
     const commandIndex = invocation.arguments.findIndex((argument) =>
       ["rev-parse", "status", "ls-files"].includes(argument));
@@ -272,11 +262,10 @@ function fixture(): Fixture {
   };
   return {
     paths,
-    dependencies: { runCommand, platform: "linux" },
+    dependencies: { runCommand },
     state,
     files: {
       gitExecutable,
-      gitExecHelper,
       nodeTarget,
       nodeRequested,
       frontendDependency,
@@ -471,6 +460,38 @@ describe("Sentinel production runtime closure", () => {
     expect(derived.artifacts.upstreamGit.revision).toBe(SENTINEL_PRODUCTION_REVISION);
     expect(verifySentinelRuntimeClosure(value.paths, derived.closure, value.dependencies).closure)
       .toEqual(derived.closure);
+  });
+
+  it("uses only Git builtins with external helpers disabled", () => {
+    const value = fixture();
+    const { artifacts } = deriveSentinelRuntimeClosure(value.paths, value.dependencies);
+    for (const git of [artifacts.substrateGit, artifacts.upstreamGit]) {
+      const prefix = [
+        "--exec-path=/dev/null",
+        "--no-pager",
+        "--no-replace-objects",
+        "--literal-pathspecs",
+        `--git-dir=${join(git.checkoutPath, ".git")}`,
+        `--work-tree=${git.checkoutPath}`,
+        "-c", `core.worktree=${git.checkoutPath}`,
+        "-c", "core.fsmonitor=false",
+        "-c", "core.attributesFile=/dev/null",
+        "-c", "core.excludesFile=/dev/null",
+        "-c", "core.hooksPath=/dev/null",
+      ];
+      for (const command of git.commands) {
+        expect(command.arguments.slice(0, prefix.length)).toEqual(prefix);
+        expect(command.arguments).not.toContain("-C");
+      }
+    }
+  });
+
+  it("rejects the macOS Git launcher instead of hashing the unexecuted shim", () => {
+    const value = fixture();
+    expect(() => deriveSentinelRuntimeClosure(
+      { ...value.paths, gitExecutablePath: "/usr/bin/git" },
+      { ...value.dependencies, platform: "darwin" },
+    )).toThrow(/macOS \/usr\/bin\/git is a launcher/u);
   });
 
   it("rejects a stale but internally rehashed aggregate", () => {

@@ -14,13 +14,11 @@
   },
   "bin": {
     "pm-public-eval-corners": "./dist/cli.js",
-    "pm-sentinel-anthropic-provider": "./dist/sentinel-anthropic-provider-proxy-cli.js",
-    "pm-sentinel-live": "./dist/sentinel-live-runner-cli.js",
     "pm-sentinel-production-smoke": "./dist/sentinel-production-excluded-smoke-cli.js",
     "pm-sentinel-production-batch": "./dist/sentinel-production-batch-cli.js",
     "pm-sentinel-power-audit": "./dist/sentinel-production-power-audit-cli.js",
-    "pm-sentinel-production-verify": "./dist/sentinel-production-raw-verifier-cli.js",
-    "pm-sentinel-state-sidecar": "./dist/sentinel-state-sidecar-cli.js"
+    "pm-sentinel-production-run": "./dist/sentinel-production-runner-cli.js",
+    "pm-sentinel-production-verify": "./dist/sentinel-production-raw-verifier-cli.js"
   },
   "dependencies": {
     "@pm/agent-state-core": "workspace:*",
@@ -35,7 +33,7 @@
     "clean": "rm -rf dist .tsbuildinfo",
     "test": "echo \"(tests run from root)\" && true",
     "public-eval-corners": "node dist/cli.js",
-    "sentinel-live": "node dist/sentinel-live-runner-cli.js",
+    "sentinel-production-run": "node dist/sentinel-production-runner-cli.js",
     "sentinel-production-smoke": "node dist/sentinel-production-excluded-smoke-cli.js",
     "sentinel-production-verify": "node dist/sentinel-production-raw-verifier-cli.js"
   },

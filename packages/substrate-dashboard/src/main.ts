@@ -4,7 +4,6 @@ import { mountBenchmarks } from "./benchmarks-page.js";
 import { mountControlPlane } from "./control-plane-page.js";
 import { mountTokenKpis } from "./token-kpis-page.js";
 import { mountIntegrationWorkbench } from "./integration-workbench-page.js";
-import { mountReviewReport } from "./review-report-page.js";
 
 type Mode = "substrate" | "no_substrate" | "ab_pair";
 type SessionStatus = "running" | "completed" | "stopped" | "failed";
@@ -339,12 +338,6 @@ async function route(): Promise<void> {
     await mountIntegrationWorkbench(
       viewRoot().querySelector<HTMLElement>("#integration-workbench-root")!,
     );
-    return;
-  }
-  if (view === "review") {
-    disconnectStream();
-    viewRoot().innerHTML = `<div id="review-report-root"></div>`;
-    mountReviewReport(viewRoot().querySelector<HTMLElement>("#review-report-root")!);
     return;
   }
   const id = currentSessionId();

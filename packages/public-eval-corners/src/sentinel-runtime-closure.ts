@@ -41,12 +41,7 @@ const PYTHON_VERSION = /^Python [0-9]+\.[0-9]+\.[0-9]+$/u;
 const DISTRIBUTION_FIELD = /^[^\0\r\n]+$/u;
 
 export interface SentinelRuntimeClosurePaths {
-  /** Requested platform launcher; on macOS this is the libxcselect /usr/bin/git shim. */
   readonly gitExecutablePath: string;
-  /** Canonical developer-tool Git binary executed directly by every runtime probe. */
-  readonly gitRealExecutablePath: string;
-  /** Exact helper tree returned by the real binary's --exec-path probe. */
-  readonly gitExecPathRootPath: string;
   readonly substrateCheckoutPath: string;
   readonly rootPackageJsonPath: string;
   readonly pnpmWorkspaceManifestPath: string;
@@ -87,7 +82,6 @@ export interface SentinelRuntimeClosurePaths {
   readonly upstreamFrontendInstalledRootPath: string;
   readonly upstreamServerRequirementsPath: string;
 }
-
 export interface SentinelRuntimeCommandInvocation {
   readonly executablePath: string;
   readonly arguments: readonly string[];
@@ -108,7 +102,7 @@ export interface SentinelRuntimeClosureDependencies {
   ) => SentinelRuntimeCommandResult;
   /** Test seam only; production must use the exact exported sanitized map. */
   readonly executionEnvironment?: Readonly<Record<string, string>>;
-  /** Test seam for deterministic cross-platform launcher-resolution coverage. */
+  /** Test seam for the macOS launcher rejection; production uses process.platform. */
   readonly platform?: NodeJS.Platform;
 }
 
@@ -155,12 +149,10 @@ export interface SentinelRuntimeGitArtifact {
 }
 
 export interface SentinelRuntimeClosureArtifacts {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4";
+  readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3";
   readonly substrateGit: SentinelRuntimeGitArtifact;
   readonly upstreamGit: SentinelRuntimeGitArtifact;
   readonly commands: {
-    readonly gitResolution: SentinelRuntimeCommandArtifact | null;
-    readonly gitExecPath: SentinelRuntimeCommandArtifact;
     readonly gitVersion: SentinelRuntimeCommandArtifact;
     readonly nodeVersion: SentinelRuntimeCommandArtifact;
     readonly npmVersion: SentinelRuntimeCommandArtifact;
@@ -174,8 +166,6 @@ export interface SentinelRuntimeClosureArtifacts {
     readonly python: SentinelRuntimeEntryArtifact;
   };
   readonly files: {
-    readonly gitLauncher: SentinelRuntimeFileArtifact;
-    readonly gitResolver: SentinelRuntimeFileArtifact | null;
     readonly gitExecutable: SentinelRuntimeFileArtifact;
     readonly pnpmWorkspaceLock: SentinelRuntimeFileArtifact;
     readonly rootPackageJson: SentinelRuntimeFileArtifact;
@@ -201,9 +191,6 @@ export interface SentinelRuntimeClosureArtifacts {
   readonly installedDistributionsManifestSha256: string;
   readonly executionEnvironmentManifest: string;
   readonly boundPathsManifest: string;
-  readonly gitExternalHelperTargetsManifest: string;
-  readonly gitExternalHelperTargetsManifestSha256: string;
-  readonly gitExecPathTree: SentinelRuntimeTreeArtifact;
   readonly workspacePackagesTree: SentinelRuntimeTreeArtifact;
   readonly workspaceInstalledDependenciesTree: SentinelRuntimeTreeArtifact;
   readonly publicEvalCompiledOutputTree: SentinelRuntimeTreeArtifact;
@@ -244,7 +231,7 @@ export interface SentinelRuntimeExecutionLease {
 
 function runtimeBoundPathsManifest(paths: SentinelRuntimeClosurePaths): string {
   return sentinelProductionCanonicalJson({
-    schemaVersion: "pm.public-eval-corners.sentinel-runtime-bound-paths.v2",
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-bound-paths.v1",
     paths,
   });
 }
@@ -517,73 +504,6 @@ function deriveTree(
   return first;
 }
 
-interface GitExternalHelperTargets {
-  readonly manifest: string;
-  readonly manifestSha256: string;
-  readonly targetCount: number;
-  readonly allowedTreeRoots: readonly string[];
-}
-
-/**
- * Git's exec-path commonly contains multicall symlinks that leave the helper
- * directory (Apple Git points at ../../bin/git, git-shell, and scalar). The
- * tree manifest binds each link string; this second manifest binds the bytes
- * of every resolved external target so the helper closure is transitive.
- */
-function deriveGitExternalHelperTargets(rootPath: string): GitExternalHelperTargets {
-  const canonicalRoot = realpathSync(rootPath);
-  const entries: Array<{
-    readonly linkPath: string;
-    readonly linkTarget: string;
-    readonly resolvedPath: string;
-    readonly mode: string;
-    readonly size: number;
-    readonly sha256: string;
-  }> = [];
-  const visit = (directory: string, prefix: string): void => {
-    for (const name of readdirSync(directory).sort(codeUnitCompare)) {
-      validateRelativeName(name, "Git exec-path helper tree");
-      const path = resolve(directory, name);
-      const relativePath = prefix ? `${prefix}/${name}` : name;
-      const stat = lstatSync(path, { bigint: true });
-      if (stat.isDirectory()) {
-        visit(path, relativePath);
-      } else if (stat.isSymbolicLink()) {
-        const target = readlinkSync(path, "utf8");
-        if (/\0|\r|\n/u.test(target)) throw new Error("Git helper tree contains an unsafe symlink");
-        const resolvedPath = realpathSync(path);
-        if (!pathWithin(resolvedPath, canonicalRoot)) {
-          const stable = readStableRegular(resolvedPath, `Git helper target ${relativePath}`);
-          entries.push({
-            linkPath: relativePath,
-            linkTarget: target,
-            resolvedPath,
-            mode: stable.mode.toString(8).padStart(4, "0"),
-            size: stable.bytes.byteLength,
-            sha256: sha256(stable.bytes),
-          });
-        }
-      } else if (!stat.isFile()) {
-        throw new Error("Git helper tree contains a special file");
-      }
-    }
-  };
-  visit(rootPath, "");
-  entries.sort((left, right) => codeUnitCompare(left.linkPath, right.linkPath));
-  const manifest = sentinelProductionCanonicalJson({
-    schemaVersion: "pm.public-eval-corners.git-external-helper-targets.v1",
-    execPathRootPath: rootPath,
-    entries,
-  });
-  return {
-    manifest,
-    manifestSha256: sha256(manifest),
-    targetCount: entries.length,
-    allowedTreeRoots: [...new Set([canonicalRoot, ...entries.map(({ resolvedPath }) => dirname(resolvedPath))])]
-      .sort(codeUnitCompare),
-  };
-}
-
 function defaultRunCommand(
   invocation: SentinelRuntimeCommandInvocation,
 ): SentinelRuntimeCommandResult {
@@ -661,7 +581,6 @@ function validatePipFreeze(bytes: Buffer): {
 function gitArtifact(
   checkoutPath: string,
   gitExecutablePath: string,
-  gitExecPathRootPath: string,
   environment: Readonly<Record<string, string>>,
   dependencies: SentinelRuntimeClosureDependencies,
   expectedRevision?: string,
@@ -669,7 +588,7 @@ function gitArtifact(
 ): SentinelRuntimeGitArtifact {
   const gitDirectory = resolve(checkoutPath, ".git");
   const invocationPrefix = [
-    `--exec-path=${gitExecPathRootPath}`,
+    "--exec-path=/dev/null",
     "--no-pager",
     "--no-replace-objects",
     "--literal-pathspecs",
@@ -900,11 +819,8 @@ function distributionManifest(
 }
 
 function validatePaths(paths: SentinelRuntimeClosurePaths): void {
-  assertCanonicalAbsolute(paths.gitExecutablePath, "Git launcher");
-  assertCanonicalAbsolute(paths.gitRealExecutablePath, "real Git executable");
-  assertCanonicalAbsolute(paths.gitExecPathRootPath, "Git exec-path helper root");
   const independentPaths: readonly [string, string][] = [
-    ["real Git executable", paths.gitRealExecutablePath],
+    ["git executable", paths.gitExecutablePath],
     ["root package.json", paths.rootPackageJsonPath],
     ["pnpm workspace manifest", paths.pnpmWorkspaceManifestPath],
     ["root tsconfig", paths.rootTsconfigPath],
@@ -930,7 +846,6 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
   ];
   assertDistinct(independentPaths);
   const rootPaths: Array<readonly [string, string]> = [
-    ["Git exec-path helper root", paths.gitExecPathRootPath],
     ["substrate checkout", paths.substrateCheckoutPath],
     ["substrate packages", paths.substratePackagesRootPath],
     ["substrate installed dependencies", paths.substrateInstalledDependenciesRootPath],
@@ -1074,110 +989,24 @@ function validatePaths(paths: SentinelRuntimeClosurePaths): void {
   }
 }
 
-interface ResolvedGitRuntime {
-  readonly platform: NodeJS.Platform;
-  readonly resolutionStrategy: "macos-xcrun-find" | "direct-realpath";
-  readonly launcher: StableRegular;
-  readonly resolverPath: string | null;
-  readonly resolver: StableRegular | null;
-  readonly resolutionCommand: CommandCapture | null;
-  readonly executable: StableRegular;
-  readonly execPathCommand: CommandCapture;
-  readonly execPathTree: SentinelRuntimeTreeArtifact;
-  readonly externalHelperTargets: GitExternalHelperTargets;
-}
-
-function resolveGitRuntime(
-  paths: SentinelRuntimeClosurePaths,
-  environment: Readonly<Record<string, string>>,
-  dependencies: SentinelRuntimeClosureDependencies,
-): ResolvedGitRuntime {
-  const platform = dependencies.platform ?? process.platform;
-  const launcher = readStableRegular(paths.gitExecutablePath, "Git launcher");
-  const executable = readStableRegular(paths.gitRealExecutablePath, "real Git executable");
-  if (realpathSync(paths.gitRealExecutablePath) !== paths.gitRealExecutablePath) {
-    throw new Error("real Git executable path must already be canonical and resolved");
-  }
-  let resolutionStrategy: ResolvedGitRuntime["resolutionStrategy"];
-  let resolverPath: string | null = null;
-  let resolver: StableRegular | null = null;
-  let resolutionCommand: CommandCapture | null = null;
-  if (platform === "darwin") {
-    if (paths.gitExecutablePath !== "/usr/bin/git") {
-      throw new Error("macOS production Git launcher must be /usr/bin/git");
-    }
-    resolutionStrategy = "macos-xcrun-find";
-    resolverPath = "/usr/bin/xcrun";
-    resolver = readStableRegular(resolverPath, "macOS Git resolver");
-    resolutionCommand = runCaptured(dependencies, {
-      executablePath: resolverPath,
-      arguments: ["--find", "git"],
-      cwd: paths.substrateCheckoutPath,
-      environment,
-    }, "macOS real Git resolution");
-    const selected = strictLine(
-      resolutionCommand.stdout,
-      /^\/[^\0\r\n]+$/u,
-      "macOS real Git resolution",
-    );
-    if (selected !== paths.gitRealExecutablePath) {
-      throw new Error("explicit real Git path differs from xcrun-selected developer-tool Git");
-    }
-  } else {
-    resolutionStrategy = "direct-realpath";
-    if (realpathSync(paths.gitExecutablePath) !== paths.gitRealExecutablePath) {
-      throw new Error("direct Git launcher does not resolve to the explicit real Git executable");
-    }
-  }
-  const execPathCommand = runCaptured(dependencies, {
-    executablePath: paths.gitRealExecutablePath,
-    arguments: ["--exec-path"],
-    cwd: paths.substrateCheckoutPath,
-    environment,
-  }, "real Git exec-path");
-  const selectedExecPath = strictLine(
-    execPathCommand.stdout,
-    /^\/[^\0\r\n]+$/u,
-    "real Git exec-path",
-  );
-  if (selectedExecPath !== paths.gitExecPathRootPath || realpathSync(selectedExecPath) !== selectedExecPath) {
-    throw new Error("explicit Git exec-path differs from the real Git helper root");
-  }
-  const externalHelperTargets = deriveGitExternalHelperTargets(paths.gitExecPathRootPath);
-  const execPathTree = deriveTree(
-    paths.gitExecPathRootPath,
-    "Git exec-path helper tree",
-    externalHelperTargets.allowedTreeRoots,
-  );
-  return {
-    platform,
-    resolutionStrategy,
-    launcher,
-    resolverPath,
-    resolver,
-    resolutionCommand,
-    executable,
-    execPathCommand,
-    execPathTree,
-    externalHelperTargets,
-  };
-}
-
 /** Reconstruct the signed closure from bytes, process output, clean git objects, and full trees. */
 export function deriveSentinelRuntimeClosure(
   paths: SentinelRuntimeClosurePaths,
   dependencies: SentinelRuntimeClosureDependencies = { runCommand: defaultRunCommand },
 ): SentinelRuntimeClosureDerivation {
+  if ((dependencies.platform ?? process.platform) === "darwin" && paths.gitExecutablePath === "/usr/bin/git") {
+    throw new Error("macOS /usr/bin/git is a launcher; bind the direct developer-tool Git executable");
+  }
   validatePaths(paths);
-  if (dependencies.runCommand === defaultRunCommand && paths.gitExecutablePath !== "/usr/bin/git") {
-    throw new Error("production runtime closure requires the system /usr/bin/git executable");
+  if (realpathSync(paths.gitExecutablePath) !== paths.gitExecutablePath) {
+    throw new Error("Git executable must be a canonical direct real path");
   }
   const environment = executionEnvironment(dependencies, paths.nodeRequestedPath);
   const executionEnvironmentManifest = sentinelProductionCanonicalJson(environment);
   const boundPathsManifest = runtimeBoundPathsManifest(paths);
-  const gitRuntime = resolveGitRuntime(paths, environment, dependencies);
+  const gitExecutable = readStableRegular(paths.gitExecutablePath, "git executable");
   const gitVersion = runCaptured(dependencies, {
-    executablePath: paths.gitRealExecutablePath,
+    executablePath: paths.gitExecutablePath,
     arguments: ["--version"],
     cwd: paths.substrateCheckoutPath,
     environment,
@@ -1185,15 +1014,13 @@ export function deriveSentinelRuntimeClosure(
   const gitVersionValue = strictLine(gitVersion.stdout, GIT_VERSION, "git version");
   const substrateGit = gitArtifact(
     paths.substrateCheckoutPath,
-    paths.gitRealExecutablePath,
-    paths.gitExecPathRootPath,
+    paths.gitExecutablePath,
     environment,
     dependencies,
   );
   const upstreamGit = gitArtifact(
     paths.upstreamCheckoutPath,
-    paths.gitRealExecutablePath,
-    paths.gitExecPathRootPath,
+    paths.gitExecutablePath,
     environment,
     dependencies,
     SENTINEL_PRODUCTION_REVISION,
@@ -1367,8 +1194,8 @@ export function deriveSentinelRuntimeClosure(
   );
   const withoutHash: SentinelRuntimeClosure = {
     closureSha256: "0".repeat(64),
-    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v3",
-    closureDerivation: "canonical-runtime-git-helper-and-transitive-tree-fields-v3",
+    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2",
+    closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2",
     requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1",
     treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1",
     runnerReconstructsAndVerifiesClosure: true,
@@ -1389,22 +1216,9 @@ export function deriveSentinelRuntimeClosure(
       inheritsHostEnvironment: false,
     },
     git: {
-      platform: gitRuntime.platform,
-      resolutionStrategy: gitRuntime.resolutionStrategy,
-      launcherPath: paths.gitExecutablePath,
-      launcherSha256: sha256(gitRuntime.launcher.bytes),
-      resolverExecutablePath: gitRuntime.resolverPath,
-      resolverExecutableSha256: gitRuntime.resolver === null
-        ? null
-        : sha256(gitRuntime.resolver.bytes),
       version: gitVersionValue,
-      executablePath: paths.gitRealExecutablePath,
-      executableSha256: sha256(gitRuntime.executable.bytes),
-      execPathRootPath: paths.gitExecPathRootPath,
-      execPathTreeSha256: gitRuntime.execPathTree.manifestSha256,
-      execPathTreeEntryCount: gitRuntime.execPathTree.entryCount,
-      externalHelperTargetsManifestSha256: gitRuntime.externalHelperTargets.manifestSha256,
-      externalHelperTargetCount: gitRuntime.externalHelperTargets.targetCount,
+      executablePath: paths.gitExecutablePath,
+      executableSha256: sha256(gitExecutable.bytes),
       invocationEnvironmentSha256: sha256(executionEnvironmentManifest),
     },
     workspace: {
@@ -1495,12 +1309,10 @@ export function deriveSentinelRuntimeClosure(
     closureSha256: sentinelProductionRuntimeClosureSha256(withoutHash),
   };
   const artifactWithoutHash = {
-    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4" as const,
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3" as const,
     substrateGit,
     upstreamGit,
     commands: {
-      gitResolution: gitRuntime.resolutionCommand?.artifact ?? null,
-      gitExecPath: gitRuntime.execPathCommand.artifact,
       gitVersion: gitVersion.artifact,
       nodeVersion: nodeVersion.artifact,
       npmVersion: npmVersion.artifact,
@@ -1529,11 +1341,7 @@ export function deriveSentinelRuntimeClosure(
       },
     },
     files: {
-      gitLauncher: fileArtifact(paths.gitExecutablePath, gitRuntime.launcher),
-      gitResolver: gitRuntime.resolver === null || gitRuntime.resolverPath === null
-        ? null
-        : fileArtifact(gitRuntime.resolverPath, gitRuntime.resolver),
-      gitExecutable: fileArtifact(paths.gitRealExecutablePath, gitRuntime.executable),
+      gitExecutable: fileArtifact(paths.gitExecutablePath, gitExecutable),
       pnpmWorkspaceLock: fileArtifact(paths.pnpmWorkspaceLockPath, lock),
       rootPackageJson: fileArtifact(paths.rootPackageJsonPath, rootPackageJson),
       pnpmWorkspaceManifest: fileArtifact(paths.pnpmWorkspaceManifestPath, pnpmWorkspaceManifest),
@@ -1561,9 +1369,6 @@ export function deriveSentinelRuntimeClosure(
     installedDistributionsManifestSha256: distributions.sha256,
     executionEnvironmentManifest,
     boundPathsManifest,
-    gitExternalHelperTargetsManifest: gitRuntime.externalHelperTargets.manifest,
-    gitExternalHelperTargetsManifestSha256: gitRuntime.externalHelperTargets.manifestSha256,
-    gitExecPathTree: gitRuntime.execPathTree,
     workspacePackagesTree,
     workspaceInstalledDependenciesTree,
     publicEvalCompiledOutputTree,
@@ -1581,15 +1386,13 @@ export function deriveSentinelRuntimeClosure(
   };
   const substrateAfter = gitArtifact(
     paths.substrateCheckoutPath,
-    paths.gitRealExecutablePath,
-    paths.gitExecPathRootPath,
+    paths.gitExecutablePath,
     environment,
     dependencies,
   );
   const upstreamAfter = gitArtifact(
     paths.upstreamCheckoutPath,
-    paths.gitRealExecutablePath,
-    paths.gitExecPathRootPath,
+    paths.gitExecutablePath,
     environment,
     dependencies,
     SENTINEL_PRODUCTION_REVISION,

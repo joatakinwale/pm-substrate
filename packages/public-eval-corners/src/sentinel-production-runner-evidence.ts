@@ -35,7 +35,6 @@ export interface SentinelProductionExternalCommitmentRecord {
   readonly expectedAuthorityPublicKeySha256: string;
   readonly receiptSha256: string;
 }
-
 export interface SentinelProductionExternalCommitmentVerification {
   readonly valid: boolean;
   readonly locator: string;
@@ -348,7 +347,7 @@ export function assertSentinelProductionRuntimeInspectionEvidence(
   }
   const { derivationSha256, ...artifactBody } = inspection.artifacts;
   if (
-    inspection.artifacts.schemaVersion !== "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4" ||
+    inspection.artifacts.schemaVersion !== "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3" ||
     !SHA256.test(derivationSha256) ||
     sentinelProductionJsonSha256(artifactBody) !== derivationSha256
   ) throw new Error("runtime derivation artifact identity is invalid");

@@ -242,11 +242,24 @@ function validateGitArtifact(
     record.checkoutPath !== expected.checkoutPath || record.revision !== expected.revision ||
     record.sourceTreeHash !== expected.sourceTreeHash || !Array.isArray(record.commands) || record.commands.length !== 4
   ) throw new Error(`${label} identity differs from the signed checkout`);
+  const prefix = [
+    "--exec-path=/dev/null",
+    "--no-pager",
+    "--no-replace-objects",
+    "--literal-pathspecs",
+    `--git-dir=${resolve(expected.checkoutPath, ".git")}`,
+    `--work-tree=${expected.checkoutPath}`,
+    "-c", `core.worktree=${expected.checkoutPath}`,
+    "-c", "core.fsmonitor=false",
+    "-c", "core.attributesFile=/dev/null",
+    "-c", "core.excludesFile=/dev/null",
+    "-c", "core.hooksPath=/dev/null",
+  ] as const;
   const specifications = [
-    { arguments: ["-C", expected.checkoutPath, "rev-parse", "--verify", "HEAD"], stdoutBytes: `${expected.revision}\n` },
-    { arguments: ["-C", expected.checkoutPath, "rev-parse", "--verify", "HEAD^{tree}"], stdoutBytes: `${expected.sourceTreeHash}\n` },
-    { arguments: ["-C", expected.checkoutPath, "status", "--porcelain=v1", "--untracked-files=all"], stdoutBytes: "" },
-    { arguments: ["-C", expected.checkoutPath, "ls-files", "-v"] },
+    { arguments: [...prefix, "rev-parse", "--verify", "HEAD"], stdoutBytes: `${expected.revision}\n` },
+    { arguments: [...prefix, "rev-parse", "--verify", "HEAD^{tree}"], stdoutBytes: `${expected.sourceTreeHash}\n` },
+    { arguments: [...prefix, "status", "--porcelain=v1", "--untracked-files=all"], stdoutBytes: "" },
+    { arguments: [...prefix, "ls-files", "-v"] },
   ] as const;
   specifications.forEach((specification, index) => {
     const command = commandArtifact(record.commands[index], `${label} command ${index + 1}`);

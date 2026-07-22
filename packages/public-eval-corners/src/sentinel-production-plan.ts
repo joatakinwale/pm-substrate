@@ -60,7 +60,6 @@ function canonicalNodeExecutablePath(nodeExecutablePath: string): string {
   ) throw new Error("pinned Node executable path must be canonical absolute and PATH-safe");
   return nodeExecutablePath;
 }
-
 /** Build the only accepted no-inheritance environment from the pinned Node entry. */
 export function buildSentinelRuntimeSanitizedEnvironment(
   nodeExecutablePath: string,
@@ -559,8 +558,8 @@ SentinelPoweredConfirmatoryUniverse = Object.freeze({
 
 export interface SentinelRuntimeClosure {
   readonly closureSha256: string;
-  readonly closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v3";
-  readonly closureDerivation: "canonical-runtime-git-helper-and-transitive-tree-fields-v3";
+  readonly closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2";
+  readonly closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2";
   readonly requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1";
   readonly treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1";
   readonly runnerReconstructsAndVerifiesClosure: true;
@@ -581,20 +580,9 @@ export interface SentinelRuntimeClosure {
     readonly inheritsHostEnvironment: false;
   };
   readonly git: {
-    readonly platform: NodeJS.Platform;
-    readonly resolutionStrategy: "macos-xcrun-find" | "direct-realpath";
-    readonly launcherPath: string;
-    readonly launcherSha256: string;
-    readonly resolverExecutablePath: string | null;
-    readonly resolverExecutableSha256: string | null;
     readonly version: string;
     readonly executablePath: string;
     readonly executableSha256: string;
-    readonly execPathRootPath: string;
-    readonly execPathTreeSha256: string;
-    readonly execPathTreeEntryCount: number;
-    readonly externalHelperTargetsManifestSha256: string;
-    readonly externalHelperTargetCount: number;
     readonly invocationEnvironmentSha256: string;
   };
   readonly workspace: {
@@ -1246,10 +1234,7 @@ function validateExactShape(plan: unknown, signature: unknown): readonly string[
         "runtime.executionEnvironment.values");
     }
     check(runtime.git, [
-      "execPathRootPath", "execPathTreeEntryCount", "execPathTreeSha256", "executablePath",
-      "executableSha256", "externalHelperTargetCount", "externalHelperTargetsManifestSha256",
-      "invocationEnvironmentSha256", "launcherPath", "launcherSha256", "platform",
-      "resolutionStrategy", "resolverExecutablePath", "resolverExecutableSha256", "version",
+      "executablePath", "executableSha256", "invocationEnvironmentSha256", "version",
     ], "runtime.git");
     check(runtime.workspace, [
       "checkoutPath", "compiledOutputRootPath", "compiledOutputTreeEntryCount", "compiledOutputTreeSha256",
@@ -1366,10 +1351,7 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.providerProxyScriptSha256,
     runtime.stateSidecarScriptSha256,
     runtime.executionEnvironment.environmentSha256,
-    runtime.git.launcherSha256,
     runtime.git.executableSha256,
-    runtime.git.execPathTreeSha256,
-    runtime.git.externalHelperTargetsManifestSha256,
     runtime.git.invocationEnvironmentSha256,
     runtime.workspace.rootPackageJsonSha256,
     runtime.workspace.pnpmWorkspaceManifestSha256,
@@ -1408,9 +1390,9 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     GIT_SHA1.test(runtime.substrateRevision) &&
     GIT_SHA1.test(runtime.sourceTreeHash) &&
     runtime.workingTreeClean === true &&
-    runtime.closureSchemaVersion === "pm.public-eval-corners.sentinel-runtime-closure.v3" &&
+    runtime.closureSchemaVersion === "pm.public-eval-corners.sentinel-runtime-closure.v2" &&
     runtime.closureDerivation ===
-      "canonical-runtime-git-helper-and-transitive-tree-fields-v3" &&
+      "canonical-runtime-and-transitive-tree-fields-v2" &&
     runtime.requestedEntryHashSemantics ===
       "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1" &&
     runtime.treeHashSemantics ===
@@ -1426,15 +1408,6 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.executionEnvironment.environmentSha256 ===
       sentinelProductionJsonSha256(runtime.executionEnvironment.values) &&
     GIT_VERSION.test(runtime.git.version) &&
-    (runtime.git.platform === "darwin"
-      ? runtime.git.resolutionStrategy === "macos-xcrun-find" &&
-        runtime.git.launcherPath === "/usr/bin/git" &&
-        runtime.git.resolverExecutablePath === "/usr/bin/xcrun" &&
-        typeof runtime.git.resolverExecutableSha256 === "string" &&
-        SHA256.test(runtime.git.resolverExecutableSha256)
-      : runtime.git.resolutionStrategy === "direct-realpath" &&
-        runtime.git.resolverExecutablePath === null &&
-        runtime.git.resolverExecutableSha256 === null) &&
     runtime.git.invocationEnvironmentSha256 ===
       runtime.executionEnvironment.environmentSha256 &&
     NODE_VERSION.test(runtime.node.version) &&
@@ -1452,10 +1425,7 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
       runtime.python.stdlibTreeEntryCount,
       runtime.browser.libraryTreeEntryCount,
       runtime.browser.coreLibraryTreeEntryCount,
-      runtime.git.execPathTreeEntryCount,
     ].every((count) => Number.isSafeInteger(count) && count > 0) &&
-    Number.isSafeInteger(runtime.git.externalHelperTargetCount) &&
-    runtime.git.externalHelperTargetCount >= 0 &&
     runtime.executionLease.schemaVersion ===
       "pm.public-eval-corners.sentinel-runtime-execution-lease.v1" &&
     runtime.executionLease.exactBoundPathsRequired === true &&
@@ -1466,8 +1436,6 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
       "kernel-dynamic-loader-system-libraries-and-in-process-races-outside-user-space-hash-closure" &&
     [
       runtime.git.executablePath,
-      runtime.git.launcherPath,
-      runtime.git.execPathRootPath,
       runtime.workspace.checkoutPath,
       runtime.workspace.packagesRootPath,
       runtime.workspace.installedDependenciesRootPath,

@@ -89,7 +89,20 @@ function command(
   if (hashFile(git.executablePath) !== git.executableSha256) {
     throw new Error("checkout Git executable changed during preflight");
   }
-  return execFileSync(git.executablePath, ["-C", checkoutPath, ...arguments_], {
+  const invocationPrefix = [
+    "--exec-path=/dev/null",
+    "--no-pager",
+    "--no-replace-objects",
+    "--literal-pathspecs",
+    `--git-dir=${resolve(checkoutPath, ".git")}`,
+    `--work-tree=${checkoutPath}`,
+    "-c", `core.worktree=${checkoutPath}`,
+    "-c", "core.fsmonitor=false",
+    "-c", "core.attributesFile=/dev/null",
+    "-c", "core.excludesFile=/dev/null",
+    "-c", "core.hooksPath=/dev/null",
+  ] as const;
+  return execFileSync(git.executablePath, [...invocationPrefix, ...arguments_], {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
     maxBuffer: 64 * 1024 * 1024,
     cwd: checkoutPath,
