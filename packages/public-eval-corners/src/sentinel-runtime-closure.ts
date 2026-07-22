@@ -24,13 +24,12 @@ import {
 import {
   buildSentinelRuntimeSanitizedEnvironment,
   isSentinelRuntimeSanitizedEnvironment,
-  SENTINEL_PRODUCTION_REVISION,
-  SENTINEL_PRODUCTION_SOURCE_TREE,
   sentinelProductionCanonicalJson,
   sentinelProductionRuntimeClosureSha256,
   type SentinelRuntimeSanitizedEnvironment,
   type SentinelRuntimeClosure,
 } from "./sentinel-production-plan.js";
+import { assertSentinelTrackedWorkingTreeMatchesHead } from "./sentinel-git-working-tree.js";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const GIT_SHA1 = /^[a-f0-9]{40}$/u;
@@ -144,12 +143,13 @@ export interface SentinelRuntimeGitArtifact {
   readonly checkoutPath: string;
   readonly revision: string;
   readonly sourceTreeHash: string;
+  readonly ignoredPathListingSha256: string;
   readonly clean: true;
   readonly commands: readonly SentinelRuntimeCommandArtifact[];
 }
 
 export interface SentinelRuntimeClosureArtifacts {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3";
+  readonly schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4";
   readonly substrateGit: SentinelRuntimeGitArtifact;
   readonly upstreamGit: SentinelRuntimeGitArtifact;
   readonly commands: {
@@ -423,7 +423,7 @@ function validateRelativeName(name: string, label: string): void {
     name === ".." ||
     name.includes("/") ||
     name.includes("\\") ||
-    /[\0\r\n\t]/u.test(name)
+    /[\u0000-\u001f\u007f]/u.test(name)
   ) {
     throw new Error(`${label} contains an unsafe path component`);
   }
@@ -578,13 +578,36 @@ function validatePipFreeze(bytes: Buffer): {
   return { value, identities };
 }
 
+function validateRuntimeIgnoredPaths(bytes: Buffer, upstream: boolean): void {
+  const text = bytes.toString("utf8");
+  if (
+    !Buffer.from(text, "utf8").equals(bytes) ||
+    (text !== "" && !text.endsWith("\0"))
+  ) throw new Error("git ignored-path listing is not canonical NUL-delimited UTF-8");
+  const paths = text === "" ? [] : text.slice(0, -1).split("\0");
+  if (new Set(paths).size !== paths.length) {
+    throw new Error("git ignored-path listing contains duplicates");
+  }
+  for (const path of paths) {
+    if (
+      path.length === 0 || path.startsWith("/") || path.startsWith("../") ||
+      path.includes("/../") || path.includes("//") || /[\\\r\n\t]/u.test(path)
+    ) throw new Error("git ignored-path listing contains an unsafe path");
+    const allowed = upstream
+      ? path === "frontend/node_modules/"
+      : path === "node_modules/" ||
+        /^packages\/[A-Za-z0-9._-]+\/(?:dist|node_modules)\/$/u.test(path) ||
+        /^packages\/[A-Za-z0-9._-]+\/(?:\.tsbuildinfo|tsconfig\.tsbuildinfo)$/u.test(path);
+    if (!allowed) throw new Error(`unexpected ignored runtime path: ${path}`);
+  }
+}
+
 function gitArtifact(
   checkoutPath: string,
   gitExecutablePath: string,
   environment: Readonly<Record<string, string>>,
   dependencies: SentinelRuntimeClosureDependencies,
-  expectedRevision?: string,
-  expectedTree?: string,
+  ignoredPolicy: "substrate-runtime" | "sentinel-upstream",
 ): SentinelRuntimeGitArtifact {
   const gitDirectory = resolve(checkoutPath, ".git");
   const invocationPrefix = [
@@ -595,6 +618,7 @@ function gitArtifact(
     `--git-dir=${gitDirectory}`,
     `--work-tree=${checkoutPath}`,
     "-c", `core.worktree=${checkoutPath}`,
+    "-c", "core.fileMode=true",
     "-c", "core.fsmonitor=false",
     "-c", "core.attributesFile=/dev/null",
     "-c", "core.excludesFile=/dev/null",
@@ -614,6 +638,14 @@ function gitArtifact(
     "git status",
   );
   const indexFlags = invoke(["ls-files", "-v"], "git index flags");
+  const trackedTree = invoke(
+    ["ls-tree", "-r", "-z", "--full-tree", "HEAD"],
+    "git tracked working tree",
+  );
+  const ignored = invoke(
+    ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
+    "git ignored paths",
+  );
   const revision = strictLine(head.stdout, GIT_SHA1, "git HEAD");
   const sourceTreeHash = strictLine(tree.stdout, GIT_SHA1, "git tree");
   if (status.stdout.byteLength !== 0) throw new Error(`${checkoutPath} git checkout is dirty`);
@@ -627,14 +659,26 @@ function gitArtifact(
   ) {
     throw new Error(`${checkoutPath} has hidden or nonstandard git index flags`);
   }
-  if (expectedRevision && revision !== expectedRevision) throw new Error("upstream revision is not pinned");
-  if (expectedTree && sourceTreeHash !== expectedTree) throw new Error("upstream source tree is not pinned");
+  assertSentinelTrackedWorkingTreeMatchesHead(
+    checkoutPath,
+    trackedTree.stdout,
+    sourceTreeHash,
+  );
+  validateRuntimeIgnoredPaths(ignored.stdout, ignoredPolicy === "sentinel-upstream");
   return {
     checkoutPath,
     revision,
     sourceTreeHash,
+    ignoredPathListingSha256: sha256(ignored.stdout),
     clean: true,
-    commands: [head.artifact, tree.artifact, status.artifact, indexFlags.artifact],
+    commands: [
+      head.artifact,
+      tree.artifact,
+      status.artifact,
+      indexFlags.artifact,
+      trackedTree.artifact,
+      ignored.artifact,
+    ],
   };
 }
 
@@ -1017,14 +1061,14 @@ export function deriveSentinelRuntimeClosure(
     paths.gitExecutablePath,
     environment,
     dependencies,
+    "substrate-runtime",
   );
   const upstreamGit = gitArtifact(
     paths.upstreamCheckoutPath,
     paths.gitExecutablePath,
     environment,
     dependencies,
-    SENTINEL_PRODUCTION_REVISION,
-    SENTINEL_PRODUCTION_SOURCE_TREE,
+    "sentinel-upstream",
   );
   const node = readStableEntry(paths.nodeRequestedPath, paths.nodeAllowedRootPath, "Node entry");
   const npm = readStableEntry(paths.npmRequestedCliPath, paths.npmAllowedRootPath, "npm CLI entry");
@@ -1194,8 +1238,8 @@ export function deriveSentinelRuntimeClosure(
   );
   const withoutHash: SentinelRuntimeClosure = {
     closureSha256: "0".repeat(64),
-    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2",
-    closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2",
+    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v3",
+    closureDerivation: "canonical-runtime-transitive-trees-and-git-listings-v3",
     requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1",
     treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1",
     runnerReconstructsAndVerifiesClosure: true,
@@ -1223,6 +1267,7 @@ export function deriveSentinelRuntimeClosure(
     },
     workspace: {
       checkoutPath: paths.substrateCheckoutPath,
+      ignoredPathListingSha256: substrateGit.ignoredPathListingSha256,
       rootPackageJsonSha256: sha256(rootPackageJson.bytes),
       pnpmWorkspaceManifestSha256: sha256(pnpmWorkspaceManifest.bytes),
       rootTsconfigSha256: sha256(rootTsconfig.bytes),
@@ -1289,6 +1334,9 @@ export function deriveSentinelRuntimeClosure(
       corePackageMetadataSha256: sha256(corePackageMetadata.bytes),
     },
     upstream: {
+      revision: upstreamGit.revision,
+      sourceTreeHash: upstreamGit.sourceTreeHash,
+      ignoredPathListingSha256: upstreamGit.ignoredPathListingSha256,
       frontendPackageLockSha256: sha256(frontendLock.bytes),
       frontendInstalledTreeSha256: frontendTree.manifestSha256,
       serverRequirementsSha256: sha256(requirements.bytes),
@@ -1309,7 +1357,7 @@ export function deriveSentinelRuntimeClosure(
     closureSha256: sentinelProductionRuntimeClosureSha256(withoutHash),
   };
   const artifactWithoutHash = {
-    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3" as const,
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4" as const,
     substrateGit,
     upstreamGit,
     commands: {
@@ -1389,20 +1437,22 @@ export function deriveSentinelRuntimeClosure(
     paths.gitExecutablePath,
     environment,
     dependencies,
+    "substrate-runtime",
   );
   const upstreamAfter = gitArtifact(
     paths.upstreamCheckoutPath,
     paths.gitExecutablePath,
     environment,
     dependencies,
-    SENTINEL_PRODUCTION_REVISION,
-    SENTINEL_PRODUCTION_SOURCE_TREE,
+    "sentinel-upstream",
   );
   if (
     substrateAfter.revision !== substrateGit.revision ||
     substrateAfter.sourceTreeHash !== substrateGit.sourceTreeHash ||
+    substrateAfter.ignoredPathListingSha256 !== substrateGit.ignoredPathListingSha256 ||
     upstreamAfter.revision !== upstreamGit.revision ||
-    upstreamAfter.sourceTreeHash !== upstreamGit.sourceTreeHash
+    upstreamAfter.sourceTreeHash !== upstreamGit.sourceTreeHash ||
+    upstreamAfter.ignoredPathListingSha256 !== upstreamGit.ignoredPathListingSha256
   ) {
     throw new Error("git identity changed during runtime closure derivation");
   }

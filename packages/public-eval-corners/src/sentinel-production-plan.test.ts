@@ -45,8 +45,8 @@ function runtime(): SentinelRuntimeClosure {
   );
   const closure: SentinelRuntimeClosure = {
     closureSha256: hash("0"),
-    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2",
-    closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2",
+    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v3",
+    closureDerivation: "canonical-runtime-transitive-trees-and-git-listings-v3",
     requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1",
     treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1",
     runnerReconstructsAndVerifiesClosure: true,
@@ -74,6 +74,7 @@ function runtime(): SentinelRuntimeClosure {
     },
     workspace: {
       checkoutPath: "/workspace/pm-substrate",
+      ignoredPathListingSha256: hash("a"),
       rootPackageJsonSha256: hash("b"),
       pnpmWorkspaceManifestSha256: hash("c"),
       rootTsconfigSha256: hash("d"),
@@ -140,6 +141,9 @@ function runtime(): SentinelRuntimeClosure {
       corePackageMetadataSha256: hash("8"),
     },
     upstream: {
+      revision: SENTINEL_PRODUCTION_REVISION,
+      sourceTreeHash: SENTINEL_PRODUCTION_SOURCE_TREE,
+      ignoredPathListingSha256: hash("5"),
       frontendPackageLockSha256: hash("6"),
       frontendInstalledTreeSha256: hash("7"),
       serverRequirementsSha256: hash("8"),
@@ -481,6 +485,18 @@ describe("Sentinel production preregistration", () => {
       signedPlan.signature,
       { ...signedPlan.trustAnchor, expectedPreregistrationSha256: hash("f") },
     ).valid).toBe(false);
+    const anchorWithPrivateMaterial = {
+      ...signedPlan.trustAnchor,
+      privateKey: "must-not-cross",
+      outcomes: { success: true },
+    };
+    const anchorVerification = verifySentinelProductionPreregistration(
+      preregistration,
+      signedPlan.signature,
+      anchorWithPrivateMaterial,
+    );
+    expect(anchorVerification.valid).toBe(false);
+    expect(anchorVerification.issues).toContain("out-of-band trust anchor keys are not exact");
   });
 
   it("requires an out-of-band expected key and a different authority owner", () => {

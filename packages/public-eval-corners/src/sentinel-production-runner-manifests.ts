@@ -33,13 +33,15 @@ export type SentinelProductionJsonValue =
   | { readonly [key: string]: SentinelProductionJsonValue };
 
 export interface SentinelProductionCheckoutPreflight {
-  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v1";
+  readonly schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v2";
   readonly checkoutPath: string;
   readonly repositoryUrl: string | null;
   readonly revision: string | null;
   readonly sourceTreeHash: string | null;
   readonly cleanTrackedAndUntracked: boolean;
   readonly ignoredArtifactRootSha256: string;
+  readonly ignoredPathListingBase64: string;
+  readonly ignoredPathListingSha256: string;
   readonly databaseRootSha256: string;
   readonly selectedScenarioRootSha256: string;
   readonly frontendInstalledTreeSha256: string;

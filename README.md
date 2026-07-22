@@ -23,7 +23,7 @@ pm-substrate is that enforcement medium: what the workspace accepts as actionabl
 
 **The immediate objective (see ROADMAP):** prove—or falsify—the substrate's causal benefit on pinned public tasks that are already known to expose agent-state failure. Official benchmark task completion is the outcome; native and equal-overhead sham arms are the controls; internal events, blocks, and receipts are mechanism diagnostics only. PluggedInSocial and ArrowHedge are frozen until the public claim passes held-out evaluation, anti-degenerate controls, clean artifact verification, and replication. The executable protocol is [`docs/objective-falsification.md`](./docs/objective-falsification.md).
 
-**Current public-proof status (2026-07-14):** causal benefit remains unproven.
+**Current public-proof status (2026-07-21):** causal benefit remains unproven.
 An adversarial audit rejected the first Sentinel 27-cell design before any
 headline execution: useful state lived in a task-specific adapter `Map`, all
 arms used the same core only for evidence admission, the native arm was an
@@ -48,6 +48,19 @@ because powered confirmation, replication, and a separate owner decision are
 absent. See the
 exact run results and blockers in
 [`docs/public-benchmark-status-2026-07-13.md`](./docs/public-benchmark-status-2026-07-13.md).
+
+The obsolete Sentinel implementations and a stale dashboard review snapshot
+have now been removed by behavioral ablation: roughly 15,000 lines disappeared
+while the smaller production evaluation package remained green. The retained
+path reconstructs Git root trees from direct tracked bytes and modes, binds and
+replays ignored-file listings, nested Python distributions and pip identities,
+overlapping runtime subtrees, and bound executable/file identities; it rejects
+mode-unfaithful filesystems and exposes separate outcome-free `prepare` and
+signed `run` commands. This is stronger
+instrumentation, not efficacy evidence: completed replacement cells remain
+zero. Preparation still requires clean mode-faithful checkouts, a complete
+Python/browser runtime closure, and genuinely independent signature, trust
+anchor, external commitment, and post-run raw-head witness.
 
 ## The product shape (decided 2026-07-02)
 

@@ -433,6 +433,7 @@ function compareCheckoutRoots(preflights: Readonly<Record<SentinelProductionArm,
     "revision",
     "sourceTreeHash",
     "ignoredArtifactRootSha256",
+    "ignoredPathListingSha256",
     "databaseRootSha256",
     "selectedScenarioRootSha256",
     "frontendInstalledTreeSha256",
@@ -510,6 +511,16 @@ function verifyExecutionBindings(
   const canonicalCheckouts = ARMS.map((arm) => realpathSync(resolve(input.checkouts[arm])));
   if (new Set(canonicalCheckouts).size !== 4) {
     throw new Error("four execution arms require four disjoint checkouts");
+  }
+  const physicalCheckouts = canonicalCheckouts.map((path) => {
+    const stat = lstatSync(path, { bigint: true });
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      throw new Error("four execution arms require regular checkout directories");
+    }
+    return `${stat.dev}:${stat.ino}`;
+  });
+  if (new Set(physicalCheckouts).size !== 4) {
+    throw new Error("four execution arms require four physically disjoint checkouts");
   }
   assertSentinelFreshDisjointRoots(
     canonicalCheckouts,

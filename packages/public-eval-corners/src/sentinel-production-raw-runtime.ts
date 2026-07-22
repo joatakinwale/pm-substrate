@@ -1,8 +1,13 @@
-import { resolve } from "node:path";
+import { createHash } from "node:crypto";
+import {
+  isAbsolute,
+  normalize,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 
 import {
-  SENTINEL_PRODUCTION_REVISION,
-  SENTINEL_PRODUCTION_SOURCE_TREE,
   type SentinelRuntimeClosure,
 } from "./sentinel-production-plan.js";
 import type {
@@ -16,6 +21,7 @@ import {
   SENTINEL_RAW_SHA256,
   sentinelRawCanonical,
   sentinelRawCanonicalTimestamp,
+  sentinelRawCompare,
   sentinelRawContainedPath,
   sentinelRawExactKeys,
   sentinelRawIsRecord,
@@ -119,27 +125,103 @@ function runtimeEntryArtifact(
   ) throw new Error(`${label} differs from the signed requested/resolved entry identity`);
 }
 
-function treeArtifact(value: unknown, label: string): void {
-  sentinelRawExactKeys(value, ["entryCount", "manifest", "manifestSha256", "rootPath"], label);
+interface ParsedTreeEntry {
+  readonly path: string;
+  readonly mode: string;
+  readonly type: "directory" | "file" | "symlink";
+  readonly sha256: string;
+}
+
+interface ParsedTreeArtifact {
+  readonly rootPath: string;
+  readonly manifest: string;
+  readonly manifestSha256: string;
+  readonly entryCount: number;
+  readonly entries: readonly ParsedTreeEntry[];
+  readonly entriesByPath: ReadonlyMap<string, ParsedTreeEntry>;
+}
+
+function canonicalAbsolutePath(value: unknown, label: string): string {
   if (
-    typeof value.rootPath !== "string" || !value.rootPath.startsWith("/") || typeof value.manifest !== "string" ||
-    typeof value.manifestSha256 !== "string" || sentinelRawSha256(value.manifest) !== value.manifestSha256 ||
+    typeof value !== "string" || !isAbsolute(value) || normalize(value) !== value ||
+    /[\0\r\n\t]/u.test(value)
+  ) throw new Error(`${label} must be a canonical absolute path without control characters`);
+  return value;
+}
+
+function safeRelativePathSegments(value: string, label: string): readonly string[] {
+  const segments = value.split("/");
+  if (
+    value.length === 0 || isAbsolute(value) || value.includes("\\") ||
+    /[\u0000-\u001f\u007f]/u.test(value) ||
+    segments.some((segment) => segment.length === 0 || segment === "." || segment === "..")
+  ) throw new Error(`${label} is not a safe canonical relative path`);
+  return segments;
+}
+
+function treeArtifact(value: unknown, label: string): ParsedTreeArtifact {
+  sentinelRawExactKeys(value, ["entryCount", "manifest", "manifestSha256", "rootPath"], label);
+  const rootPath = canonicalAbsolutePath(value.rootPath, `${label} root`);
+  if (
+    typeof value.manifest !== "string" ||
+    typeof value.manifestSha256 !== "string" || !SENTINEL_RAW_SHA256.test(value.manifestSha256) ||
+    sentinelRawSha256(value.manifest) !== value.manifestSha256 ||
     !Number.isSafeInteger(value.entryCount) || Number(value.entryCount) < 0
   ) throw new Error(`${label} manifest identity is invalid`);
-  const lines = value.manifest === "" ? [] : value.manifest.split("\n").filter(Boolean);
-  if (lines.length !== value.entryCount || (value.manifest !== "" && !value.manifest.endsWith("\n"))) {
+  if (value.manifest !== "" && !value.manifest.endsWith("\n")) {
     throw new Error(`${label} entry count or newline termination is invalid`);
   }
-  const paths = new Set<string>();
+  const lines = value.manifest === "" ? [] : value.manifest.slice(0, -1).split("\n");
+  if (lines.length !== value.entryCount || lines.some((line) => line.length === 0)) {
+    throw new Error(`${label} entry count or newline termination is invalid`);
+  }
+  const entries: ParsedTreeEntry[] = [];
+  const entriesByPath = new Map<string, ParsedTreeEntry>();
+  let previousPath: string | null = null;
   for (const [index, line] of lines.entries()) {
     const fields = line.split("\t");
+    const path = fields[0] ?? "";
+    const mode = fields[1] ?? "";
+    const type = fields[2] ?? "";
+    const sha256 = fields[3] ?? "";
     if (
-      fields.length !== 4 || fields[0] === "" || fields[0]?.startsWith("/") || fields[0]?.split("/").includes("..") ||
-      !/^[0-7]{4}$/u.test(fields[1] ?? "") || !["directory", "file", "symlink"].includes(fields[2] ?? "") ||
-      !SENTINEL_RAW_SHA256.test(fields[3] ?? "") || paths.has(fields[0] ?? "")
-    ) throw new Error(`${label} line ${index + 1} is malformed or duplicated`);
-    paths.add(fields[0] as string);
+      fields.length !== 4 || !/^[0-7]{4}$/u.test(mode) ||
+      !["directory", "file", "symlink"].includes(type) || !SENTINEL_RAW_SHA256.test(sha256)
+    ) throw new Error(`${label} line ${index + 1} is malformed`);
+    safeRelativePathSegments(path, `${label} line ${index + 1} path`);
+    if (previousPath !== null && sentinelRawCompare(previousPath, path) >= 0) {
+      throw new Error(`${label} entries are not strictly sorted and unique`);
+    }
+    if (type === "directory" && sha256 !== sentinelRawSha256("")) {
+      throw new Error(`${label} directory entry ${path} has a non-empty digest`);
+    }
+    const entry: ParsedTreeEntry = {
+      path,
+      mode,
+      type: type as ParsedTreeEntry["type"],
+      sha256,
+    };
+    entries.push(entry);
+    entriesByPath.set(path, entry);
+    previousPath = path;
   }
+  for (const entry of entries) {
+    const segments = entry.path.split("/");
+    for (let index = 1; index < segments.length; index += 1) {
+      const parentPath = segments.slice(0, index).join("/");
+      if (entriesByPath.get(parentPath)?.type !== "directory") {
+        throw new Error(`${label} entry ${entry.path} lacks directory parent ${parentPath}`);
+      }
+    }
+  }
+  return {
+    rootPath,
+    manifest: value.manifest,
+    manifestSha256: value.manifestSha256,
+    entryCount: value.entryCount as number,
+    entries,
+    entriesByPath,
+  };
 }
 
 interface ParsedGitArtifact {
@@ -148,14 +230,18 @@ interface ParsedGitArtifact {
   readonly commands: readonly unknown[];
   readonly revision: string;
   readonly sourceTreeHash: string;
+  readonly ignoredPathListingSha256: string;
 }
 
 function gitArtifact(value: unknown, label: string): ParsedGitArtifact {
-  sentinelRawExactKeys(value, ["checkoutPath", "clean", "commands", "revision", "sourceTreeHash"], label);
+  sentinelRawExactKeys(value, [
+    "checkoutPath", "clean", "commands", "ignoredPathListingSha256", "revision", "sourceTreeHash",
+  ], label);
   if (
     typeof value.checkoutPath !== "string" || !value.checkoutPath.startsWith("/") ||
     typeof value.revision !== "string" || !/^[a-f0-9]{40}$/u.test(value.revision) ||
     typeof value.sourceTreeHash !== "string" || !/^[a-f0-9]{40}$/u.test(value.sourceTreeHash) ||
+    typeof value.ignoredPathListingSha256 !== "string" || !SENTINEL_RAW_SHA256.test(value.ignoredPathListingSha256) ||
     value.clean !== true || !Array.isArray(value.commands) || value.commands.length === 0
   ) throw new Error(`${label} is invalid`);
   value.commands.forEach((entry, index) => commandArtifact(entry, `${label} command ${index + 1}`));
@@ -189,14 +275,284 @@ function parseBoundPaths(value: string): SentinelRuntimeClosurePaths {
   sentinelRawExactKeys(parsed.paths, BOUND_PATH_KEYS, "runtime bound paths");
   for (const [name, path] of Object.entries(parsed.paths)) {
     if (name === "pythonSitePackagesRootPaths") {
-      if (!Array.isArray(path) || path.length === 0 || path.some((entry) => typeof entry !== "string" || !entry.startsWith("/"))) {
+      if (!Array.isArray(path) || path.length === 0) {
         throw new Error("runtime Python site-package paths are invalid");
       }
-    } else if (typeof path !== "string" || !path.startsWith("/")) {
-      throw new Error(`runtime bound path ${name} is invalid`);
+      const siteRoots = path.map((entry, index) =>
+        canonicalAbsolutePath(entry, `runtime Python site-package path ${index + 1}`));
+      if (new Set(siteRoots).size !== siteRoots.length) {
+        throw new Error("runtime Python site-package paths contain duplicates");
+      }
+    } else {
+      canonicalAbsolutePath(path, `runtime bound path ${name}`);
     }
   }
   return parsed.paths as unknown as SentinelRuntimeClosurePaths;
+}
+
+function relativeTreeRootPath(rootPath: string, childPath: string, label: string): string {
+  const platformRelative = relative(rootPath, childPath);
+  if (
+    isAbsolute(platformRelative) || platformRelative === ".." ||
+    platformRelative.startsWith(`..${sep}`)
+  ) throw new Error(`${label} escapes its bound tree root`);
+  if (platformRelative === "") return "";
+  const relativePath = platformRelative.split(sep).join("/");
+  safeRelativePathSegments(relativePath, label);
+  return relativePath;
+}
+
+function treeEntryLine(entry: ParsedTreeEntry, path = entry.path): string {
+  return `${path}\t${entry.mode}\t${entry.type}\t${entry.sha256}\n`;
+}
+
+interface ReconstructedSubtree {
+  readonly manifest: string;
+  readonly entries: readonly ParsedTreeEntry[];
+  readonly entriesByPath: ReadonlyMap<string, ParsedTreeEntry>;
+}
+
+function reconstructSubtree(
+  environmentTree: ParsedTreeArtifact,
+  subtreeRootPath: string,
+  label: string,
+): ReconstructedSubtree {
+  const relativeRoot = relativeTreeRootPath(environmentTree.rootPath, subtreeRootPath, label);
+  if (relativeRoot !== "" && environmentTree.entriesByPath.get(relativeRoot)?.type !== "directory") {
+    throw new Error(`${label} is not a directory in its parent tree`);
+  }
+  const prefix = relativeRoot === "" ? "" : `${relativeRoot}/`;
+  const entries: ParsedTreeEntry[] = [];
+  const entriesByPath = new Map<string, ParsedTreeEntry>();
+  for (const environmentEntry of environmentTree.entries) {
+    if (prefix !== "" && !environmentEntry.path.startsWith(prefix)) continue;
+    const path = prefix === "" ? environmentEntry.path : environmentEntry.path.slice(prefix.length);
+    if (path.length === 0) continue;
+    const entry = { ...environmentEntry, path };
+    entries.push(entry);
+    entriesByPath.set(path, entry);
+  }
+  return {
+    manifest: entries.map((entry) => treeEntryLine(entry)).join(""),
+    entries,
+    entriesByPath,
+  };
+}
+
+function validateContainedTree(
+  parentTree: ParsedTreeArtifact,
+  childTree: ParsedTreeArtifact,
+  label: string,
+): void {
+  const reconstructed = reconstructSubtree(parentTree, childTree.rootPath, label);
+  if (
+    reconstructed.manifest !== childTree.manifest ||
+    reconstructed.entries.length !== childTree.entryCount ||
+    sentinelRawSha256(reconstructed.manifest) !== childTree.manifestSha256
+  ) throw new Error(`${label} does not exactly match its retained parent-tree subtree`);
+}
+
+function relativeTreeEntryPath(treeRootPath: string, entryPath: string): string | null {
+  const platformRelative = relative(treeRootPath, entryPath);
+  if (
+    isAbsolute(platformRelative) || platformRelative === ".." ||
+    platformRelative.startsWith(`..${sep}`)
+  ) return null;
+  if (platformRelative === "") return "";
+  const relativePath = platformRelative.split(sep).join("/");
+  safeRelativePathSegments(relativePath, "runtime retained file path");
+  return relativePath;
+}
+
+function validateFileAgainstContainingTrees(
+  value: unknown,
+  label: string,
+  trees: readonly ParsedTreeArtifact[],
+): void {
+  sentinelRawExactKeys(value, ["mode", "path", "sha256", "size"], label);
+  const path = canonicalAbsolutePath(value.path, `${label} path`);
+  for (const tree of trees) {
+    const relativePath = relativeTreeEntryPath(tree.rootPath, path);
+    if (relativePath === null) continue;
+    if (relativePath === "") throw new Error(`${label} aliases retained tree root ${tree.rootPath}`);
+    const treeEntry = tree.entriesByPath.get(relativePath);
+    if (
+      treeEntry?.type !== "file" || treeEntry.mode !== value.mode ||
+      treeEntry.sha256 !== value.sha256
+    ) throw new Error(`${label} contradicts retained tree ${tree.rootPath}`);
+  }
+}
+
+function canonicalDistributionName(name: string): string {
+  const canonical = name.toLowerCase().replace(/[._-]+/gu, "-");
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/u.test(canonical)) {
+    throw new Error(`runtime distribution name ${name} is not canonicalizable`);
+  }
+  return canonical;
+}
+
+function pipFreezeIdentities(value: string): readonly string[] {
+  if (
+    Buffer.from(value, "utf8").toString("utf8") !== value ||
+    value.includes("\0") || value.includes("\r") ||
+    (value !== "" && !value.endsWith("\n"))
+  ) throw new Error("runtime pip freeze is not canonical UTF-8 with LF newlines");
+  const lines = value === "" ? [] : value.slice(0, -1).split("\n");
+  if (lines.some((line) => line.length === 0) || new Set(lines).size !== lines.length) {
+    throw new Error("runtime pip freeze contains blank or duplicate lines");
+  }
+  const identities = lines.map((line) => {
+    const match = /^([^=]+)==([^=]+)$/u.exec(line);
+    if (match === null) throw new Error("runtime pip freeze must use exact name==version identities");
+    return `${canonicalDistributionName(match[1] as string)}==${match[2] as string}`;
+  }).sort(sentinelRawCompare);
+  if (new Set(identities).size !== identities.length) {
+    throw new Error("runtime pip freeze contains duplicate canonical identities");
+  }
+  return identities;
+}
+
+interface DistInfoHashPair {
+  readonly metadataSha256: string;
+  readonly recordSha256: string;
+}
+
+function validateInstalledDistributionsManifest(
+  value: unknown,
+  closure: SentinelRuntimeClosure,
+  paths: SentinelRuntimeClosurePaths,
+  pipFreeze: string,
+  environmentTree: ParsedTreeArtifact,
+): void {
+  sentinelRawExactKeys(value, [
+    "distributions", "environmentRootPath", "schemaVersion", "siteTrees",
+  ], "runtime installed-distributions manifest");
+  if (
+    value.schemaVersion !== closure.python.installedDistributionsManifestSchema ||
+    value.environmentRootPath !== closure.python.environmentRootPath ||
+    value.environmentRootPath !== paths.pythonEnvironmentRootPath ||
+    environmentTree.rootPath !== paths.pythonEnvironmentRootPath ||
+    !Array.isArray(value.distributions) || !Array.isArray(value.siteTrees)
+  ) throw new Error("runtime installed-distributions manifest identity differs from the signed closure");
+
+  const expectedSiteRoots = [...paths.pythonSitePackagesRootPaths];
+  for (const [index, rootPath] of expectedSiteRoots.entries()) {
+    canonicalAbsolutePath(rootPath, `runtime Python site-package path ${index + 1}`);
+    relativeTreeRootPath(environmentTree.rootPath, rootPath, `runtime Python site-package path ${index + 1}`);
+  }
+  if (new Set(expectedSiteRoots).size !== expectedSiteRoots.length) {
+    throw new Error("runtime Python site-package paths contain duplicates");
+  }
+  expectedSiteRoots.sort(sentinelRawCompare);
+  if (value.siteTrees.length !== expectedSiteRoots.length) {
+    throw new Error("runtime installed-distributions site trees do not exactly match bound roots");
+  }
+
+  const distInfoHashPairs: DistInfoHashPair[] = [];
+  for (const [index, expectedRootPath] of expectedSiteRoots.entries()) {
+    const siteTree = value.siteTrees[index];
+    sentinelRawExactKeys(siteTree, ["entryCount", "manifestSha256", "rootPath"], `runtime site tree ${index + 1}`);
+    const rootPath = canonicalAbsolutePath(siteTree.rootPath, `runtime site tree ${index + 1} root`);
+    if (
+      rootPath !== expectedRootPath ||
+      typeof siteTree.manifestSha256 !== "string" || !SENTINEL_RAW_SHA256.test(siteTree.manifestSha256) ||
+      !Number.isSafeInteger(siteTree.entryCount) || Number(siteTree.entryCount) < 0
+    ) throw new Error(`runtime site tree ${index + 1} identity is invalid`);
+    const reconstructed = reconstructSubtree(environmentTree, rootPath, `runtime site tree ${index + 1}`);
+    if (
+      siteTree.manifestSha256 !== sentinelRawSha256(reconstructed.manifest) ||
+      siteTree.entryCount !== reconstructed.entries.length
+    ) throw new Error(`runtime site tree ${index + 1} does not match the Python environment subtree`);
+
+    for (const entry of reconstructed.entries) {
+      if (entry.path.includes("/") || !entry.path.endsWith(".dist-info")) continue;
+      if (entry.type !== "directory") {
+        throw new Error(`runtime site tree ${index + 1} has a non-directory dist-info entry`);
+      }
+      const metadata = reconstructed.entriesByPath.get(`${entry.path}/METADATA`);
+      const record = reconstructed.entriesByPath.get(`${entry.path}/RECORD`);
+      if (metadata?.type !== "file" || record?.type !== "file") {
+        throw new Error(`runtime site tree ${index + 1} dist-info entry lacks regular METADATA or RECORD files`);
+      }
+      distInfoHashPairs.push({ metadataSha256: metadata.sha256, recordSha256: record.sha256 });
+    }
+  }
+
+  if (distInfoHashPairs.length !== value.distributions.length) {
+    throw new Error("runtime installed distributions do not exactly cover site-tree dist-info entries");
+  }
+  const usedDistInfoPairs = new Set<number>();
+  const ownedFilePaths = new Set<string>();
+  const distributionIdentities: string[] = [];
+  let previousCanonicalName: string | null = null;
+  for (const [distributionIndex, distribution] of value.distributions.entries()) {
+    const label = `runtime installed distribution ${distributionIndex + 1}`;
+    sentinelRawExactKeys(distribution, [
+      "canonicalName", "files", "metadataSha256", "name", "recordSha256", "version",
+    ], label);
+    if (
+      typeof distribution.name !== "string" || !/^[^\0\r\n]+$/u.test(distribution.name) ||
+      typeof distribution.version !== "string" || !/^[^\0\r\n]+$/u.test(distribution.version) ||
+      typeof distribution.canonicalName !== "string" ||
+      distribution.canonicalName !== canonicalDistributionName(distribution.name) ||
+      typeof distribution.metadataSha256 !== "string" || !SENTINEL_RAW_SHA256.test(distribution.metadataSha256) ||
+      typeof distribution.recordSha256 !== "string" || !SENTINEL_RAW_SHA256.test(distribution.recordSha256) ||
+      !Array.isArray(distribution.files)
+    ) throw new Error(`${label} identity is invalid`);
+    if (
+      previousCanonicalName !== null &&
+      sentinelRawCompare(previousCanonicalName, distribution.canonicalName) >= 0
+    ) throw new Error("runtime installed distributions are not strictly canonical-name sorted and unique");
+    previousCanonicalName = distribution.canonicalName;
+
+    const distInfoPairIndex = distInfoHashPairs.findIndex((pair, index) =>
+      !usedDistInfoPairs.has(index) &&
+      pair.metadataSha256 === distribution.metadataSha256 &&
+      pair.recordSha256 === distribution.recordSha256);
+    if (distInfoPairIndex < 0) {
+      throw new Error(`${label} metadata or RECORD hash is absent from the bound site trees`);
+    }
+    usedDistInfoPairs.add(distInfoPairIndex);
+
+    let previousFilePath: string | null = null;
+    for (const [fileIndex, file] of distribution.files.entries()) {
+      const fileLabel = `${label} file ${fileIndex + 1}`;
+      sentinelRawExactKeys(file, [
+        "mode", "path", "recordSha256", "recordSize", "sha256", "type",
+      ], fileLabel);
+      if (typeof file.path !== "string") throw new Error(`${fileLabel} path is invalid`);
+      safeRelativePathSegments(file.path, `${fileLabel} path`);
+      if (
+        file.type !== "file" || typeof file.mode !== "string" || !/^[0-7]{4}$/u.test(file.mode) ||
+        typeof file.sha256 !== "string" || !SENTINEL_RAW_SHA256.test(file.sha256) ||
+        !(file.recordSha256 === null ||
+          (typeof file.recordSha256 === "string" && SENTINEL_RAW_SHA256.test(file.recordSha256))) ||
+        !(file.recordSize === null ||
+          (Number.isSafeInteger(file.recordSize) && Number(file.recordSize) >= 0)) ||
+        (file.recordSha256 !== null && file.recordSha256 !== file.sha256)
+      ) throw new Error(`${fileLabel} identity is invalid`);
+      if (
+        previousFilePath !== null && sentinelRawCompare(previousFilePath, file.path) >= 0
+      ) throw new Error(`${label} files are not strictly path-sorted and unique`);
+      if (ownedFilePaths.has(file.path)) {
+        throw new Error(`runtime installed distributions duplicate owned file ${file.path}`);
+      }
+      const environmentEntry = environmentTree.entriesByPath.get(file.path);
+      if (
+        environmentEntry?.type !== "file" || environmentEntry.mode !== file.mode ||
+        environmentEntry.sha256 !== file.sha256
+      ) throw new Error(`${fileLabel} does not match the Python environment tree`);
+      previousFilePath = file.path;
+      ownedFilePaths.add(file.path);
+    }
+    distributionIdentities.push(`${distribution.canonicalName}==${distribution.version}`);
+  }
+
+  const freezeIdentities = pipFreezeIdentities(pipFreeze);
+  if (
+    freezeIdentities.length !== distributionIdentities.length ||
+    freezeIdentities.some((identity, index) => identity !== distributionIdentities[index])
+  ) throw new Error("runtime pip freeze does not exactly match installed distribution identities");
 }
 
 function exactCommand(
@@ -226,21 +582,129 @@ function exactCommand(
   }
 }
 
+function nulDelimitedUtf8(bytes: Buffer, label: string): readonly string[] {
+  const text = bytes.toString("utf8");
+  if (
+    !Buffer.from(text, "utf8").equals(bytes) ||
+    (text !== "" && !text.endsWith("\0"))
+  ) throw new Error(`${label} is not canonical NUL-delimited UTF-8`);
+  const entries = text === "" ? [] : text.slice(0, -1).split("\0");
+  if (new Set(entries).size !== entries.length) throw new Error(`${label} contains duplicates`);
+  return entries;
+}
+
+function safeGitRelativePath(path: string, label: string, allowDirectorySuffix = false): void {
+  const segments = path.split("/");
+  const checkedSegments = allowDirectorySuffix && path.endsWith("/") ? segments.slice(0, -1) : segments;
+  if (
+    path.length === 0 || path.startsWith("/") || /[\\\r\n\t]/u.test(path) ||
+    checkedSegments.length === 0 ||
+    checkedSegments.some((segment) => segment === "" || segment === "." || segment === ".." || segment === ".git")
+  ) throw new Error(`${label} contains an unsafe path`);
+}
+
+interface RawGitTreeNode {
+  readonly blobs: Map<string, { readonly mode: string; readonly sha1: string }>;
+  readonly trees: Map<string, RawGitTreeNode>;
+}
+
+function rawGitTreeNode(): RawGitTreeNode {
+  return { blobs: new Map(), trees: new Map() };
+}
+
+function rawGitTreeSha1(node: RawGitTreeNode): string {
+  const entries: Array<{
+    readonly name: string;
+    readonly tree: boolean;
+    readonly mode: string;
+    readonly sha1: string;
+  }> = [];
+  for (const [name, blob] of node.blobs) entries.push({ name, tree: false, ...blob });
+  for (const [name, tree] of node.trees) {
+    entries.push({ name, tree: true, mode: "40000", sha1: rawGitTreeSha1(tree) });
+  }
+  entries.sort((left, right) => Buffer.compare(
+    Buffer.concat([Buffer.from(left.name, "utf8"), Buffer.from([left.tree ? 0x2f : 0])]),
+    Buffer.concat([Buffer.from(right.name, "utf8"), Buffer.from([right.tree ? 0x2f : 0])]),
+  ));
+  const content = Buffer.concat(entries.flatMap(({ mode, name, sha1 }) => [
+    Buffer.from(`${mode} ${name}\0`, "utf8"),
+    Buffer.from(sha1, "hex"),
+  ]));
+  return createHash("sha1")
+    .update(`tree ${content.byteLength}\0`, "utf8")
+    .update(content)
+    .digest("hex");
+}
+
+function validateRetainedGitTreeListing(bytes: Buffer, label: string): string {
+  const entries = nulDelimitedUtf8(bytes, `${label} tracked-tree listing`);
+  if (entries.length === 0) throw new Error(`${label} tracked-tree listing is empty`);
+  const paths = new Set<string>();
+  const root = rawGitTreeNode();
+  for (const entry of entries) {
+    const match = /^(100644|100755|120000) blob ([a-f0-9]{40})\t(.+)$/u.exec(entry);
+    if (match === null) throw new Error(`${label} tracked-tree entry is invalid`);
+    const path = match[3] as string;
+    safeGitRelativePath(path, `${label} tracked-tree listing`);
+    if (paths.has(path)) throw new Error(`${label} tracked-tree path is duplicated`);
+    paths.add(path);
+    const segments = path.split("/");
+    if (segments.some((segment) => segment === "" || segment === "." || segment === ".." || segment === ".git")) {
+      throw new Error(`${label} tracked-tree listing contains an unsafe segment`);
+    }
+    const leaf = segments.pop() as string;
+    let node = root;
+    for (const segment of segments) {
+      if (node.blobs.has(segment)) throw new Error(`${label} tracked-tree path collides`);
+      let child = node.trees.get(segment);
+      if (child === undefined) {
+        child = rawGitTreeNode();
+        node.trees.set(segment, child);
+      }
+      node = child;
+    }
+    if (node.trees.has(leaf) || node.blobs.has(leaf)) {
+      throw new Error(`${label} tracked-tree path collides`);
+    }
+    node.blobs.set(leaf, { mode: match[1] as string, sha1: match[2] as string });
+  }
+  return rawGitTreeSha1(root);
+}
+
+function validateRetainedIgnoredPaths(
+  bytes: Buffer,
+  policy: "substrate-runtime" | "sentinel-upstream",
+  label: string,
+): void {
+  for (const path of nulDelimitedUtf8(bytes, `${label} ignored-path listing`)) {
+    safeGitRelativePath(path, `${label} ignored-path listing`, true);
+    const allowed = policy === "sentinel-upstream"
+      ? path === "frontend/node_modules/"
+      : path === "node_modules/" ||
+        /^packages\/[A-Za-z0-9._-]+\/(?:dist|node_modules)\/$/u.test(path) ||
+        /^packages\/[A-Za-z0-9._-]+\/(?:\.tsbuildinfo|tsconfig\.tsbuildinfo)$/u.test(path);
+    if (!allowed) throw new Error(`${label} contains an unexpected ignored runtime path`);
+  }
+}
+
 function validateGitArtifact(
   value: unknown,
   expected: {
     readonly checkoutPath: string;
     readonly revision: string;
     readonly sourceTreeHash: string;
+    readonly ignoredPathListingSha256: string;
     readonly gitExecutablePath: string;
     readonly environment: Readonly<Record<string, string>>;
+    readonly ignoredPolicy: "substrate-runtime" | "sentinel-upstream";
   },
   label: string,
 ): void {
   const record = gitArtifact(value, label);
   if (
     record.checkoutPath !== expected.checkoutPath || record.revision !== expected.revision ||
-    record.sourceTreeHash !== expected.sourceTreeHash || !Array.isArray(record.commands) || record.commands.length !== 4
+    record.sourceTreeHash !== expected.sourceTreeHash || !Array.isArray(record.commands) || record.commands.length !== 6
   ) throw new Error(`${label} identity differs from the signed checkout`);
   const prefix = [
     "--exec-path=/dev/null",
@@ -250,6 +714,7 @@ function validateGitArtifact(
     `--git-dir=${resolve(expected.checkoutPath, ".git")}`,
     `--work-tree=${expected.checkoutPath}`,
     "-c", `core.worktree=${expected.checkoutPath}`,
+    "-c", "core.fileMode=true",
     "-c", "core.fsmonitor=false",
     "-c", "core.attributesFile=/dev/null",
     "-c", "core.excludesFile=/dev/null",
@@ -260,6 +725,8 @@ function validateGitArtifact(
     { arguments: [...prefix, "rev-parse", "--verify", "HEAD^{tree}"], stdoutBytes: `${expected.sourceTreeHash}\n` },
     { arguments: [...prefix, "status", "--porcelain=v1", "--untracked-files=all"], stdoutBytes: "" },
     { arguments: [...prefix, "ls-files", "-v"] },
+    { arguments: [...prefix, "ls-tree", "-r", "-z", "--full-tree", "HEAD"] },
+    { arguments: [...prefix, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"] },
   ] as const;
   specifications.forEach((specification, index) => {
     const command = commandArtifact(record.commands[index], `${label} command ${index + 1}`);
@@ -276,15 +743,34 @@ function validateGitArtifact(
         throw new Error(`${label} index flags conceal nonstandard git state`);
       }
     }
+    if (index === 4 && validateRetainedGitTreeListing(command.stdout, label) !== expected.sourceTreeHash) {
+      throw new Error(`${label} tracked-tree listing does not reconstruct the signed source tree`);
+    }
+    if (index === 5) {
+      if (
+        sentinelRawSha256(command.stdout) !== record.ignoredPathListingSha256 ||
+        record.ignoredPathListingSha256 !== expected.ignoredPathListingSha256
+      ) throw new Error(`${label} ignored-path listing differs from the signed closure`);
+      validateRetainedIgnoredPaths(command.stdout, expected.ignoredPolicy, label);
+    }
   });
 }
 
-interface ValidatedRuntimeArtifacts {
+export interface SentinelValidatedRawRuntimeArtifacts {
   readonly artifacts: SentinelRuntimeClosureArtifacts;
   readonly paths: SentinelRuntimeClosurePaths;
 }
 
-function validateArtifacts(value: unknown, closure: SentinelRuntimeClosure): ValidatedRuntimeArtifacts {
+/**
+ * Independently replays every retained runtime-derivation artifact against the
+ * declared closure. Preparation and post-run verification deliberately share
+ * this one fail-closed boundary so a shallow producer-side check cannot admit
+ * evidence that the raw verifier would later reject.
+ */
+export function verifySentinelRawRuntimeArtifacts(
+  value: unknown,
+  closure: SentinelRuntimeClosure,
+): SentinelValidatedRawRuntimeArtifacts {
   sentinelRawExactKeys(value, [
     "artifactSha256", "boundPathsManifest", "browserBundleTree", "commands", "derivationSha256", "entries", "executionEnvironmentManifest",
     "files", "installedDistributionsManifest", "installedDistributionsManifestSha256", "pipFreeze", "playwrightCoreLibraryTree",
@@ -295,7 +781,7 @@ function validateArtifacts(value: unknown, closure: SentinelRuntimeClosure): Val
   const { artifactSha256, ...artifactWithDerivation } = value;
   const { derivationSha256, ...artifactBody } = artifactWithDerivation;
   if (
-    value.schemaVersion !== "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3" ||
+    value.schemaVersion !== "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4" ||
     typeof artifactSha256 !== "string" || artifactSha256 !== sentinelRawJsonSha256(artifactWithDerivation) ||
     typeof derivationSha256 !== "string" || derivationSha256 !== sentinelRawJsonSha256(artifactBody)
   ) throw new Error("runtime artifact is not doubly content-addressed");
@@ -326,11 +812,12 @@ function validateArtifacts(value: unknown, closure: SentinelRuntimeClosure): Val
     "upstreamServerRequirements", "verifierScript", "pnpmWorkspaceManifest",
   ], "runtime files");
   Object.entries(value.files).forEach(([name, entry]) => fileArtifact(entry, `runtime ${name} file`));
+  const parsedTrees = new Map<string, ParsedTreeArtifact>();
   for (const name of [
     "workspacePackagesTree", "workspaceInstalledDependenciesTree", "publicEvalCompiledOutputTree", "pythonEnvironmentTree",
     "pythonRuntimeTree", "pythonStdlibTree", "playwrightLibraryTree", "playwrightCoreLibraryTree", "browserBundleTree",
     "upstreamFrontendInstalledTree",
-  ] as const) treeArtifact(value[name], `runtime ${name}`);
+  ] as const) parsedTrees.set(name, treeArtifact(value[name], `runtime ${name}`));
   const expectedEnvironmentManifest = sentinelRawCanonical(closure.executionEnvironment.values);
   if (
     typeof value.installedDistributionsManifest !== "string" ||
@@ -349,14 +836,16 @@ function validateArtifacts(value: unknown, closure: SentinelRuntimeClosure): Val
   if (sentinelRawCanonical(installedDistributions) !== value.installedDistributionsManifest) {
     throw new Error("runtime installed-distributions manifest is not canonical JSON");
   }
-  sentinelRawExactKeys(installedDistributions, ["distributions", "environmentRootPath", "schemaVersion", "siteTrees"], "runtime installed-distributions manifest");
-  if (
-    installedDistributions.schemaVersion !== closure.python.installedDistributionsManifestSchema ||
-    installedDistributions.environmentRootPath !== closure.python.environmentRootPath ||
-    !Array.isArray(installedDistributions.distributions) || !Array.isArray(installedDistributions.siteTrees)
-  ) throw new Error("runtime installed-distributions manifest identity differs from the signed closure");
-
   const paths = parseBoundPaths(value.boundPathsManifest);
+  const pythonEnvironmentTree = parsedTrees.get("pythonEnvironmentTree");
+  if (pythonEnvironmentTree === undefined) throw new Error("runtime Python environment tree is absent");
+  validateInstalledDistributionsManifest(
+    installedDistributions,
+    closure,
+    paths,
+    value.pipFreeze,
+    pythonEnvironmentTree,
+  );
   const exactPathBindings: readonly [unknown, unknown, string][] = [
     [paths.gitExecutablePath, closure.git.executablePath, "git executable"],
     [paths.substrateCheckoutPath, closure.workspace.checkoutPath, "substrate checkout"],
@@ -378,19 +867,51 @@ function validateArtifacts(value: unknown, closure: SentinelRuntimeClosure): Val
     if (actual !== expected) throw new Error(`runtime bound ${label} path differs from the signed closure`);
   }
 
+  const requiredTree = (name: string): ParsedTreeArtifact => {
+    const tree = parsedTrees.get(name);
+    if (tree === undefined) throw new Error(`runtime retained tree ${name} is absent`);
+    return tree;
+  };
+  for (const [parentTree, childTree, label] of [
+    [
+      requiredTree("workspacePackagesTree"),
+      requiredTree("publicEvalCompiledOutputTree"),
+      "runtime compiled-output tree",
+    ],
+    [
+      requiredTree("workspaceInstalledDependenciesTree"),
+      requiredTree("playwrightLibraryTree"),
+      "runtime Playwright library tree",
+    ],
+    [
+      requiredTree("workspaceInstalledDependenciesTree"),
+      requiredTree("playwrightCoreLibraryTree"),
+      "runtime Playwright core library tree",
+    ],
+    [
+      requiredTree("pythonRuntimeTree"),
+      requiredTree("pythonStdlibTree"),
+      "runtime Python stdlib tree",
+    ],
+  ] as const) validateContainedTree(parentTree, childTree, label);
+
   validateGitArtifact(value.substrateGit, {
     checkoutPath: paths.substrateCheckoutPath,
     revision: closure.substrateRevision,
     sourceTreeHash: closure.sourceTreeHash,
+    ignoredPathListingSha256: closure.workspace.ignoredPathListingSha256,
     gitExecutablePath: paths.gitExecutablePath,
     environment: closure.executionEnvironment.values,
+    ignoredPolicy: "substrate-runtime",
   }, "substrate git artifact");
   validateGitArtifact(value.upstreamGit, {
     checkoutPath: paths.upstreamCheckoutPath,
-    revision: SENTINEL_PRODUCTION_REVISION,
-    sourceTreeHash: SENTINEL_PRODUCTION_SOURCE_TREE,
+    revision: closure.upstream.revision,
+    sourceTreeHash: closure.upstream.sourceTreeHash,
+    ignoredPathListingSha256: closure.upstream.ignoredPathListingSha256,
     gitExecutablePath: paths.gitExecutablePath,
     environment: closure.executionEnvironment.values,
+    ignoredPolicy: "sentinel-upstream",
   }, "upstream git artifact");
   exactCommand(value.commands.gitVersion, {
     executablePath: paths.gitExecutablePath,
@@ -456,6 +977,49 @@ function validateArtifacts(value: unknown, closure: SentinelRuntimeClosure): Val
       (expectedPath !== null && entry.path !== expectedPath)
     ) throw new Error(`runtime ${label} differs from signed closure`);
   }
+  const retainedTrees = [...parsedTrees.values()];
+  for (const [name, file] of Object.entries(files)) {
+    validateFileAgainstContainingTrees(file, `runtime ${name} file`, retainedTrees);
+  }
+  const browserTree = parsedTrees.get("browserBundleTree");
+  if (browserTree === undefined || browserTree.rootPath !== paths.browserBundleRootPath) {
+    throw new Error("runtime browser bundle tree root differs from bound path");
+  }
+  const browserExecutable = files.browserExecutable;
+  if (!sentinelRawIsRecord(browserExecutable)) {
+    throw new Error("runtime browser executable identity is invalid");
+  }
+  const browserExecutablePath = canonicalAbsolutePath(
+    browserExecutable.path,
+    "runtime browser executable path",
+  );
+  const browserExecutableRelativePath = relativeTreeRootPath(
+    browserTree.rootPath,
+    browserExecutablePath,
+    "runtime browser executable path",
+  );
+  if (browserExecutableRelativePath === "") {
+    throw new Error("runtime browser executable must be a descendant of the browser bundle root");
+  }
+  const browserTreeEntry = browserTree.entriesByPath.get(browserExecutableRelativePath);
+  if (
+    browserTreeEntry?.type !== "file" || browserTreeEntry.sha256 !== browserExecutable.sha256 ||
+    browserTreeEntry.mode !== browserExecutable.mode ||
+    (Number.parseInt(browserTreeEntry.mode, 8) & 0o111) === 0
+  ) throw new Error("runtime browser executable does not match an executable browser-tree file");
+  const requestedBrowserRelativePath = relativeTreeRootPath(
+    browserTree.rootPath,
+    paths.browserExecutablePath,
+    "runtime requested browser executable path",
+  );
+  if (requestedBrowserRelativePath === "") {
+    throw new Error("runtime requested browser executable must be a descendant of the browser bundle root");
+  }
+  const requestedBrowserEntry = browserTree.entriesByPath.get(requestedBrowserRelativePath);
+  if (
+    requestedBrowserEntry === undefined || requestedBrowserEntry.type === "directory" ||
+    (requestedBrowserEntry.type === "file" && browserExecutablePath !== paths.browserExecutablePath)
+  ) throw new Error("runtime browser executable path is not the bound requested file or its retained symlink target");
   const trees: readonly [unknown, string, number | null, string, string][] = [
     [value.workspacePackagesTree, closure.workspace.packagesTreeSha256, closure.workspace.packagesTreeEntryCount, paths.substratePackagesRootPath, "workspace packages"],
     [value.workspaceInstalledDependenciesTree, closure.workspace.installedDependenciesTreeSha256, closure.workspace.installedDependenciesTreeEntryCount, paths.substrateInstalledDependenciesRootPath, "workspace dependencies"],
@@ -547,7 +1111,10 @@ export function verifySentinelRawRuntimeBoundary(input: {
       receipt.artifact.path !== `manifests/runtime/runtime-artifacts-${receipt.artifact.sha256}.json` ||
       !artifactPath.endsWith(`-${receipt.artifact.sha256}.json`)
     ) throw new Error("runtime artifact filename/reference differs from its content address");
-    const validatedArtifacts = validateArtifacts(artifactValue, input.preregistrationClosure);
+    const validatedArtifacts = verifySentinelRawRuntimeArtifacts(
+      artifactValue,
+      input.preregistrationClosure,
+    );
     derivationSha256 = validatedArtifacts.artifacts.derivationSha256;
     if (receipt.artifact.derivationSha256 !== derivationSha256) throw new Error("runtime derivation hash differs from receipt");
     sentinelRawExactKeys(receipt.executionLeaseIdentity, [

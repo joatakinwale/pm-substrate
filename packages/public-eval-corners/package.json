@@ -17,6 +17,7 @@
     "pm-sentinel-production-smoke": "./dist/sentinel-production-excluded-smoke-cli.js",
     "pm-sentinel-production-batch": "./dist/sentinel-production-batch-cli.js",
     "pm-sentinel-power-audit": "./dist/sentinel-production-power-audit-cli.js",
+    "pm-sentinel-production-prepare": "./dist/sentinel-production-prepare-cli.js",
     "pm-sentinel-production-run": "./dist/sentinel-production-runner-cli.js",
     "pm-sentinel-production-verify": "./dist/sentinel-production-raw-verifier-cli.js"
   },
@@ -33,6 +34,7 @@
     "clean": "rm -rf dist .tsbuildinfo",
     "test": "echo \"(tests run from root)\" && true",
     "public-eval-corners": "node dist/cli.js",
+    "sentinel-production-prepare": "node dist/sentinel-production-prepare-cli.js",
     "sentinel-production-run": "node dist/sentinel-production-runner-cli.js",
     "sentinel-production-smoke": "node dist/sentinel-production-excluded-smoke-cli.js",
     "sentinel-production-verify": "node dist/sentinel-production-raw-verifier-cli.js"

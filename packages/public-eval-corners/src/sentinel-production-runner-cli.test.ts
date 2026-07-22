@@ -18,6 +18,7 @@ import {
   redactSentinelProductionRunError,
   type SentinelProductionRunInvocation,
 } from "./sentinel-production-runner-cli.js";
+import { SENTINEL_RUNTIME_PATH_KEYS } from "./sentinel-production-prepare-contracts.js";
 import type { SentinelProductionRunInput } from "./sentinel-production-runner.js";
 
 const invocation = (): SentinelProductionRunInvocation => ({
@@ -36,6 +37,23 @@ const invocation = (): SentinelProductionRunInvocation => ({
   batchRoot: "/runs/batch",
   attemptRegistryRoot: "/runs/attempts",
 });
+
+function runtimePaths(): Record<string, unknown> {
+  return Object.fromEntries(SENTINEL_RUNTIME_PATH_KEYS.map((key) => [
+    key,
+    key === "pythonSitePackagesRootPaths"
+      ? ["/runtime/python/site-packages"]
+      : `/runtime/${key}`,
+  ]));
+}
+
+function anchor(): Record<string, string> {
+  return {
+    expectedPreregistrationSha256: "1".repeat(64),
+    expectedAuthorityId: "independent-authority",
+    expectedAuthorityPublicKeySha256: "2".repeat(64),
+  };
+}
 
 describe("sentinel production runner CLI boundary", () => {
   it("accepts only the nine secret-free outer keys and exact four-arm checkout keys", () => {
@@ -73,6 +91,12 @@ describe("sentinel production runner CLI boundary", () => {
       ...invocation(),
       batchRoot: "/runs/../runs/batch",
     })).toThrow(/canonical absolute path/iu);
+    for (const control of ["\0", "\n", "\r", "\t"]) {
+      expect(() => parseSentinelProductionRunInvocation({
+        ...invocation(),
+        batchRoot: `/runs/${control}batch`,
+      })).toThrow(/canonical absolute path/iu);
+    }
     expect(() => parseSentinelProductionRunInvocation({
       ...invocation(),
       schemaVersion: "pm.public-eval-corners.sentinel-production-run-invocation.v2",
@@ -84,9 +108,9 @@ describe("sentinel production runner CLI boundary", () => {
     const values = new Map<string, unknown>([
       ["/proof/preregistration.json", { kind: "preregistration" }],
       ["/proof/signature.json", { kind: "signature" }],
-      ["/proof/trust-anchor.json", { kind: "trust-anchor" }],
+      ["/proof/trust-anchor.json", anchor()],
       ["/proof/external-commitment.json", { kind: "external-commitment" }],
-      ["/proof/runtime-paths.json", { kind: "runtime-paths" }],
+      ["/proof/runtime-paths.json", runtimePaths()],
     ]);
     const readJsonFile = vi.fn((path: string) => ({
       value: values.get(path),
@@ -115,15 +139,59 @@ describe("sentinel production runner CLI boundary", () => {
     expect(calls[0]).toMatchObject({
       preregistration: { kind: "preregistration" },
       signature: { kind: "signature" },
-      trustAnchor: { kind: "trust-anchor" },
+      trustAnchor: anchor(),
       externalCommitment: { kind: "external-commitment" },
-      runtime: { paths: { kind: "runtime-paths" } },
+      runtime: { paths: { gitExecutablePath: "/runtime/gitExecutablePath" } },
       checkouts: invocation().checkouts,
       batchRoot: "/runs/batch",
       attemptRegistryRoot: "/runs/attempts",
       databaseUrl: "postgres://pm:password@localhost/pm",
       anthropicApiKey: "sk-ant-test-secret",
     });
+  });
+
+  it("rejects extra or missing runtime-path keys before invoking the batch", async () => {
+    const readJsonFile = vi.fn((path: string) => ({
+      value: path === "/proof/runtime-paths.json"
+        ? { ...runtimePaths(), extraPath: "/runtime/extra" }
+        : path === "/proof/trust-anchor.json"
+          ? anchor()
+          : {},
+      bytes: Buffer.from("{}"),
+      sha256: "0".repeat(64),
+    }));
+    const runBatch = vi.fn();
+    await expect(executeSentinelProductionRunInvocation(invocation(), {
+      environment: {
+        PM_DATABASE_URL: "postgres://present",
+        ANTHROPIC_API_KEY: "sk-ant-present",
+      },
+      readJsonFile,
+      runBatch,
+    })).rejects.toThrow(/runtime paths keys are not exact/iu);
+    expect(runBatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a trust anchor carrying private or outcome fields before invoking the batch", async () => {
+    const readJsonFile = vi.fn((path: string) => ({
+      value: path === "/proof/runtime-paths.json"
+        ? runtimePaths()
+        : path === "/proof/trust-anchor.json"
+          ? { ...anchor(), privateKey: "must-not-cross" }
+          : {},
+      bytes: Buffer.from("{}"),
+      sha256: "0".repeat(64),
+    }));
+    const runBatch = vi.fn();
+    await expect(executeSentinelProductionRunInvocation(invocation(), {
+      environment: {
+        PM_DATABASE_URL: "postgres://present",
+        ANTHROPIC_API_KEY: "sk-ant-present",
+      },
+      readJsonFile,
+      runBatch,
+    })).rejects.toThrow(/trust anchor keys are not exact/iu);
+    expect(runBatch).not.toHaveBeenCalled();
   });
 
   it("requires both credentials from the environment before reading or running", async () => {

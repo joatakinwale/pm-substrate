@@ -9,6 +9,9 @@ import type {
   SentinelProductionSignature,
 } from "./sentinel-production-plan.js";
 import {
+  parseSentinelRuntimeClosurePaths,
+} from "./sentinel-production-prepare-contracts.js";
+import {
   readSentinelDiagnosticJsonFile,
   redactSentinelDiagnosticError,
   sentinelDiagnosticCanonicalAbsolutePath,
@@ -23,9 +26,10 @@ import {
   type SentinelProductionExternalCommitment,
   type SentinelProductionRunInput,
 } from "./sentinel-production-runner.js";
-import type { SentinelRuntimeClosurePaths } from "./sentinel-runtime-closure.js";
 
 const SENTINEL_PRODUCTION_REFERENCE_MAX_BYTES = 1024 * 1024;
+const SHA256 = /^[a-f0-9]{64}$/u;
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u;
 
 export interface SentinelProductionRunInvocation {
   readonly schemaVersion:
@@ -96,6 +100,23 @@ function checkouts(value: unknown): SentinelProductionCheckoutSet {
       "substrate checkout",
     ),
   };
+}
+
+function parseTrustAnchor(value: unknown): SentinelExternalTrustAnchor {
+  exactKeys(value, [
+    "expectedAuthorityId",
+    "expectedAuthorityPublicKeySha256",
+    "expectedPreregistrationSha256",
+  ], "trust anchor");
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.expectedAuthorityId !== "string" || !ID.test(record.expectedAuthorityId) ||
+    typeof record.expectedAuthorityPublicKeySha256 !== "string" ||
+      !SHA256.test(record.expectedAuthorityPublicKeySha256) ||
+    typeof record.expectedPreregistrationSha256 !== "string" ||
+      !SHA256.test(record.expectedPreregistrationSha256)
+  ) throw new Error("trust anchor values are invalid");
+  return record as unknown as SentinelExternalTrustAnchor;
 }
 
 export function parseSentinelProductionRunInvocation(
@@ -194,10 +215,10 @@ export async function executeSentinelProductionRunInvocation(
   const input: SentinelProductionRunInput = {
     preregistration: preregistration.value as SentinelProductionPreregistration,
     signature: signature.value as SentinelProductionSignature,
-    trustAnchor: trustAnchor.value as SentinelExternalTrustAnchor,
+    trustAnchor: parseTrustAnchor(trustAnchor.value),
     externalCommitment:
       externalCommitment.value as SentinelProductionExternalCommitment,
-    runtime: { paths: runtimePaths.value as SentinelRuntimeClosurePaths },
+    runtime: { paths: parseSentinelRuntimeClosurePaths(runtimePaths.value) },
     checkouts: invocation.checkouts,
     batchRoot: invocation.batchRoot,
     attemptRegistryRoot: invocation.attemptRegistryRoot,

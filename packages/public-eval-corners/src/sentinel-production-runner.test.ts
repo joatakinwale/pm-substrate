@@ -22,6 +22,8 @@ import {
   SENTINEL_GENERAL_ANTHROPIC_SYSTEM_PROMPT_SHA256,
 } from "./sentinel-general-provider-proxy.js";
 import {
+  SENTINEL_PRODUCTION_REVISION,
+  SENTINEL_PRODUCTION_SOURCE_TREE,
   buildSentinelRuntimeSanitizedEnvironment,
   buildSentinelProductionSchedule,
   createSentinelProductionPreregistration,
@@ -88,8 +90,8 @@ function runtime(root: string): FixtureRuntime {
   const sanitizedEnvironment = buildSentinelRuntimeSanitizedEnvironment(node.path);
   const closureWithoutHash: SentinelRuntimeClosure = {
     closureSha256: hash("0"),
-    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v2",
-    closureDerivation: "canonical-runtime-and-transitive-tree-fields-v2",
+    closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v3",
+    closureDerivation: "canonical-runtime-transitive-trees-and-git-listings-v3",
     requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1",
     treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1",
     runnerReconstructsAndVerifiesClosure: true,
@@ -117,6 +119,7 @@ function runtime(root: string): FixtureRuntime {
     },
     workspace: {
       checkoutPath: root,
+      ignoredPathListingSha256: hash("a"),
       rootPackageJsonSha256: hash("b"),
       pnpmWorkspaceManifestSha256: hash("c"),
       rootTsconfigSha256: hash("d"),
@@ -183,6 +186,9 @@ function runtime(root: string): FixtureRuntime {
       corePackageMetadataSha256: hash("8"),
     },
     upstream: {
+      revision: SENTINEL_PRODUCTION_REVISION,
+      sourceTreeHash: SENTINEL_PRODUCTION_SOURCE_TREE,
+      ignoredPathListingSha256: sentinelProductionSha256("frontend/node_modules/\0"),
       frontendPackageLockSha256: hash("6"),
       frontendInstalledTreeSha256: hash("7"),
       serverRequirementsSha256: hash("8"),
@@ -384,13 +390,18 @@ function fixture(options: HarnessOptions = {}): {
   const inspectCheckout = (checkoutPath: string): SentinelProductionCheckoutPreflight => {
     const arm = Object.entries(checkoutPaths).find(([, path]) => path === checkoutPath)?.[0];
     const body = {
-      schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v1" as const,
+      schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v2" as const,
       checkoutPath,
       repositoryUrl: "https://github.com/microsoft/sentinel_environments",
       revision: "0faca33cc58ea62e97a928b67cd3beec7176b408",
       sourceTreeHash: "3ca2dc7160e505dc15b607ada4dd9ffe1f6a7c50",
       cleanTrackedAndUntracked: true,
-      ignoredArtifactRootSha256: hash("a"),
+      ignoredArtifactRootSha256: sentinelProductionJsonSha256({
+        ignoredListingSha256: runtimeFixture.closure.upstream.ignoredPathListingSha256,
+        frontendInstalledTreeSha256: runtimeFixture.closure.upstream.frontendInstalledTreeSha256,
+      }),
+      ignoredPathListingBase64: Buffer.from("frontend/node_modules/\0", "utf8").toString("base64"),
+      ignoredPathListingSha256: runtimeFixture.closure.upstream.ignoredPathListingSha256,
       databaseRootSha256:
         options.mismatchedRootArm === arm ? hash("b") : hash("c"),
       selectedScenarioRootSha256: hash("d"),
@@ -403,7 +414,7 @@ function fixture(options: HarnessOptions = {}): {
     return { ...body, preflightSha256: sentinelProductionJsonSha256(body) };
   };
   const artifactBody = {
-    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3" as const,
+    schemaVersion: "pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4" as const,
     fixtureIdentity: runtimeFixture.closure.closureSha256,
   };
   const runtimeArtifacts = {
@@ -828,7 +839,7 @@ describe("Sentinel production outcome-blind runner", () => {
     }
     expect(final.runtimeInspectionHeadSha256).toBe(runtimeHead);
     expect(readFileSync(resolve(result.batchRoot, firstBlock.runtimeBefore.artifactPath), "utf8"))
-      .toContain("pm.public-eval-corners.sentinel-runtime-closure-artifacts.v3");
+      .toContain("pm.public-eval-corners.sentinel-runtime-closure-artifacts.v4");
     const retained = JSON.parse(
       readFileSync(resolve(result.batchRoot, result.cells[0]!.path), "utf8"),
     ) as Record<string, unknown>;
