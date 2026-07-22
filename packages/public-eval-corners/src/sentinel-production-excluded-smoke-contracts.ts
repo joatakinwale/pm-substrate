@@ -97,7 +97,10 @@ export function sentinelDiagnosticCanonicalAbsolutePath(
   value: unknown,
   label: string,
 ): string {
-  if (typeof value !== "string" || !isAbsolute(value) || resolve(value) !== value) {
+  if (
+    typeof value !== "string" || /[\0\r\n\t]/u.test(value) ||
+    !isAbsolute(value) || resolve(value) !== value
+  ) {
     throw new Error(`${label} must be a canonical absolute path`);
   }
   return value;

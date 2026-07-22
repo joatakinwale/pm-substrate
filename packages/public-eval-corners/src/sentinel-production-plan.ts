@@ -60,7 +60,6 @@ function canonicalNodeExecutablePath(nodeExecutablePath: string): string {
   ) throw new Error("pinned Node executable path must be canonical absolute and PATH-safe");
   return nodeExecutablePath;
 }
-
 /** Build the only accepted no-inheritance environment from the pinned Node entry. */
 export function buildSentinelRuntimeSanitizedEnvironment(
   nodeExecutablePath: string,
@@ -560,7 +559,7 @@ SentinelPoweredConfirmatoryUniverse = Object.freeze({
 export interface SentinelRuntimeClosure {
   readonly closureSha256: string;
   readonly closureSchemaVersion: "pm.public-eval-corners.sentinel-runtime-closure.v3";
-  readonly closureDerivation: "canonical-runtime-git-helper-and-transitive-tree-fields-v3";
+  readonly closureDerivation: "canonical-runtime-transitive-trees-and-git-listings-v3";
   readonly requestedEntryHashSemantics: "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1";
   readonly treeHashSemantics: "sha256-canonical-relative-path-mode-type-contenthash-v1";
   readonly runnerReconstructsAndVerifiesClosure: true;
@@ -581,24 +580,14 @@ export interface SentinelRuntimeClosure {
     readonly inheritsHostEnvironment: false;
   };
   readonly git: {
-    readonly platform: NodeJS.Platform;
-    readonly resolutionStrategy: "macos-xcrun-find" | "direct-realpath";
-    readonly launcherPath: string;
-    readonly launcherSha256: string;
-    readonly resolverExecutablePath: string | null;
-    readonly resolverExecutableSha256: string | null;
     readonly version: string;
     readonly executablePath: string;
     readonly executableSha256: string;
-    readonly execPathRootPath: string;
-    readonly execPathTreeSha256: string;
-    readonly execPathTreeEntryCount: number;
-    readonly externalHelperTargetsManifestSha256: string;
-    readonly externalHelperTargetCount: number;
     readonly invocationEnvironmentSha256: string;
   };
   readonly workspace: {
     readonly checkoutPath: string;
+    readonly ignoredPathListingSha256: string;
     readonly rootPackageJsonSha256: string;
     readonly pnpmWorkspaceManifestSha256: string;
     readonly rootTsconfigSha256: string;
@@ -665,6 +654,9 @@ export interface SentinelRuntimeClosure {
     readonly corePackageMetadataSha256: string;
   };
   readonly upstream: {
+    readonly revision: string;
+    readonly sourceTreeHash: string;
+    readonly ignoredPathListingSha256: string;
     readonly frontendPackageLockSha256: string;
     readonly frontendInstalledTreeSha256: string;
     readonly serverRequirementsSha256: string;
@@ -1144,7 +1136,11 @@ function canonicalIso(value: string): boolean {
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString() === value;
 }
 
-function validateExactShape(plan: unknown, signature: unknown): readonly string[] {
+function validateExactShape(
+  plan: unknown,
+  signature: unknown,
+  includeSignature = true,
+): readonly string[] {
   const issues: string[] = [];
   const check = (value: unknown, keys: readonly string[], path: string): void => {
     if (!exactKeys(value, keys)) issues.push(`${path} keys are not exact`);
@@ -1246,13 +1242,11 @@ function validateExactShape(plan: unknown, signature: unknown): readonly string[
         "runtime.executionEnvironment.values");
     }
     check(runtime.git, [
-      "execPathRootPath", "execPathTreeEntryCount", "execPathTreeSha256", "executablePath",
-      "executableSha256", "externalHelperTargetCount", "externalHelperTargetsManifestSha256",
-      "invocationEnvironmentSha256", "launcherPath", "launcherSha256", "platform",
-      "resolutionStrategy", "resolverExecutablePath", "resolverExecutableSha256", "version",
+      "executablePath", "executableSha256", "invocationEnvironmentSha256", "version",
     ], "runtime.git");
     check(runtime.workspace, [
       "checkoutPath", "compiledOutputRootPath", "compiledOutputTreeEntryCount", "compiledOutputTreeSha256",
+      "ignoredPathListingSha256",
       "installedDependenciesRootPath", "installedDependenciesTreeEntryCount", "installedDependenciesTreeSha256",
       "packagesRootPath", "packagesTreeEntryCount", "packagesTreeSha256", "pnpmWorkspaceManifestSha256",
       "publicEvalPackageManifestSha256", "publicEvalTsconfigSha256", "rootPackageJsonSha256",
@@ -1277,7 +1271,8 @@ function validateExactShape(plan: unknown, signature: unknown): readonly string[
       "coreLibraryRootPath", "coreLibraryTreeSha256", "coreLibraryTreeEntryCount", "corePackageMetadataSha256",
     ], "runtime.browser");
     check(runtime.upstream, [
-      "frontendInstalledTreeSha256", "frontendPackageLockSha256", "serverRequirementsSha256",
+      "frontendInstalledTreeSha256", "frontendPackageLockSha256", "ignoredPathListingSha256", "revision",
+      "serverRequirementsSha256", "sourceTreeHash",
     ], "runtime.upstream");
     check(runtime.executionLease, [
       "boundPathsManifestSha256", "exactBoundPathsRequired", "immutableSnapshot", "mutationInvalidatesBlock",
@@ -1338,13 +1333,22 @@ function validateExactShape(plan: unknown, signature: unknown): readonly string[
     "authorityOwnerMustDifferFromProducer", "expectedHashAndKeyMustBeOutOfBand", "externalPreregistrationAuthorityRequired",
     "localProducerMayNotSelfPromote", "ownerDecisionStillRequiredAfterVerification",
   ], "eligibility");
-  check(signature, [
-    "algorithm", "authority", "preregistrationSha256", "publicKeyPem", "publicKeySha256", "schemaVersion", "signatureBase64",
-  ], "signature");
-  if (isRecord(signature)) {
-    check(signature.authority, ["authorityId", "independent", "ownerId", "signedAt"], "signature.authority");
+  if (includeSignature) {
+    check(signature, [
+      "algorithm", "authority", "preregistrationSha256", "publicKeyPem", "publicKeySha256", "schemaVersion", "signatureBase64",
+    ], "signature");
+    if (isRecord(signature)) {
+      check(signature.authority, ["authorityId", "independent", "ownerId", "signedAt"], "signature.authority");
+    }
   }
   return issues;
+}
+
+/** Exact structural check for producer-prepared bytes before any external signature exists. */
+export function validateSentinelProductionUnsignedPreregistrationShape(
+  preregistration: unknown,
+): readonly string[] {
+  return validateExactShape(preregistration, undefined, false);
 }
 
 function sameJson(left: unknown, right: unknown): boolean {
@@ -1366,10 +1370,7 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.providerProxyScriptSha256,
     runtime.stateSidecarScriptSha256,
     runtime.executionEnvironment.environmentSha256,
-    runtime.git.launcherSha256,
     runtime.git.executableSha256,
-    runtime.git.execPathTreeSha256,
-    runtime.git.externalHelperTargetsManifestSha256,
     runtime.git.invocationEnvironmentSha256,
     runtime.workspace.rootPackageJsonSha256,
     runtime.workspace.pnpmWorkspaceManifestSha256,
@@ -1380,6 +1381,7 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.workspace.packagesTreeSha256,
     runtime.workspace.installedDependenciesTreeSha256,
     runtime.workspace.compiledOutputTreeSha256,
+    runtime.workspace.ignoredPathListingSha256,
     runtime.node.requestedEntrySha256,
     runtime.node.resolvedExecutableSha256,
     runtime.npm.requestedCliEntrySha256,
@@ -1400,6 +1402,7 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.browser.corePackageMetadataSha256,
     runtime.upstream.frontendPackageLockSha256,
     runtime.upstream.frontendInstalledTreeSha256,
+    runtime.upstream.ignoredPathListingSha256,
     runtime.upstream.serverRequirementsSha256,
     runtime.executionLease.boundPathsManifestSha256,
   ];
@@ -1407,10 +1410,12 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     hashes.every((hash) => SHA256.test(hash)) &&
     GIT_SHA1.test(runtime.substrateRevision) &&
     GIT_SHA1.test(runtime.sourceTreeHash) &&
+    runtime.upstream.revision === SENTINEL_PRODUCTION_REVISION &&
+    runtime.upstream.sourceTreeHash === SENTINEL_PRODUCTION_SOURCE_TREE &&
     runtime.workingTreeClean === true &&
     runtime.closureSchemaVersion === "pm.public-eval-corners.sentinel-runtime-closure.v3" &&
     runtime.closureDerivation ===
-      "canonical-runtime-git-helper-and-transitive-tree-fields-v3" &&
+      "canonical-runtime-transitive-trees-and-git-listings-v3" &&
     runtime.requestedEntryHashSemantics ===
       "sha256-of-symlink-target-utf8-or-regular-file-bytes-v1" &&
     runtime.treeHashSemantics ===
@@ -1426,15 +1431,6 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     runtime.executionEnvironment.environmentSha256 ===
       sentinelProductionJsonSha256(runtime.executionEnvironment.values) &&
     GIT_VERSION.test(runtime.git.version) &&
-    (runtime.git.platform === "darwin"
-      ? runtime.git.resolutionStrategy === "macos-xcrun-find" &&
-        runtime.git.launcherPath === "/usr/bin/git" &&
-        runtime.git.resolverExecutablePath === "/usr/bin/xcrun" &&
-        typeof runtime.git.resolverExecutableSha256 === "string" &&
-        SHA256.test(runtime.git.resolverExecutableSha256)
-      : runtime.git.resolutionStrategy === "direct-realpath" &&
-        runtime.git.resolverExecutablePath === null &&
-        runtime.git.resolverExecutableSha256 === null) &&
     runtime.git.invocationEnvironmentSha256 ===
       runtime.executionEnvironment.environmentSha256 &&
     NODE_VERSION.test(runtime.node.version) &&
@@ -1452,10 +1448,7 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
       runtime.python.stdlibTreeEntryCount,
       runtime.browser.libraryTreeEntryCount,
       runtime.browser.coreLibraryTreeEntryCount,
-      runtime.git.execPathTreeEntryCount,
     ].every((count) => Number.isSafeInteger(count) && count > 0) &&
-    Number.isSafeInteger(runtime.git.externalHelperTargetCount) &&
-    runtime.git.externalHelperTargetCount >= 0 &&
     runtime.executionLease.schemaVersion ===
       "pm.public-eval-corners.sentinel-runtime-execution-lease.v1" &&
     runtime.executionLease.exactBoundPathsRequired === true &&
@@ -1466,8 +1459,6 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
       "kernel-dynamic-loader-system-libraries-and-in-process-races-outside-user-space-hash-closure" &&
     [
       runtime.git.executablePath,
-      runtime.git.launcherPath,
-      runtime.git.execPathRootPath,
       runtime.workspace.checkoutPath,
       runtime.workspace.packagesRootPath,
       runtime.workspace.installedDependenciesRootPath,
@@ -1488,6 +1479,18 @@ function validRuntime(runtime: SentinelRuntimeClosure): boolean {
     ].every((path) => ABSOLUTE_PATH.test(path))
     && runtime.closureSha256 === sentinelProductionRuntimeClosureSha256(runtime)
   );
+}
+
+/** Runtime identity/value validator used by unsigned preparation and signed verification. */
+export function isSentinelProductionRuntimeClosure(
+  value: unknown,
+): value is SentinelRuntimeClosure {
+  if (!isRecord(value)) return false;
+  try {
+    return validRuntime(value as unknown as SentinelRuntimeClosure);
+  } catch {
+    return false;
+  }
 }
 
 function validPoweredConfirmatoryUniverse(
@@ -1610,7 +1613,7 @@ function validPoweredConfirmatoryUniverse(
 export function verifySentinelProductionPreregistration(
   preregistration: unknown,
   signature: unknown,
-  trustAnchor: SentinelExternalTrustAnchor,
+  trustAnchor: unknown,
 ): SentinelProductionPlanVerification {
   const shapeIssues = validateExactShape(preregistration, signature);
   const issues = [...shapeIssues];
@@ -1620,13 +1623,29 @@ export function verifySentinelProductionPreregistration(
   } catch (error) {
     issues.push(error instanceof Error ? error.message : String(error));
   }
-  if (!SHA256.test(trustAnchor.expectedPreregistrationSha256)) {
+  const anchor = isRecord(trustAnchor) ? trustAnchor : {};
+  if (
+    Object.keys(anchor).sort().join("\0") !== [
+      "expectedAuthorityId",
+      "expectedAuthorityPublicKeySha256",
+      "expectedPreregistrationSha256",
+    ].sort().join("\0")
+  ) issues.push("out-of-band trust anchor keys are not exact");
+  const expectedPreregistrationSha256 = anchor.expectedPreregistrationSha256;
+  const expectedAuthorityId = anchor.expectedAuthorityId;
+  const expectedAuthorityPublicKeySha256 = anchor.expectedAuthorityPublicKeySha256;
+  if (typeof expectedPreregistrationSha256 !== "string" || !SHA256.test(expectedPreregistrationSha256)) {
     issues.push("out-of-band preregistration hash is invalid");
-  } else if (preregistrationSha256 !== trustAnchor.expectedPreregistrationSha256) {
+  } else if (preregistrationSha256 !== expectedPreregistrationSha256) {
     issues.push("preregistration does not match the out-of-band expected hash");
   }
-  if (!ID.test(trustAnchor.expectedAuthorityId)) issues.push("expected external authority ID is invalid");
-  if (!SHA256.test(trustAnchor.expectedAuthorityPublicKeySha256)) {
+  if (typeof expectedAuthorityId !== "string" || !ID.test(expectedAuthorityId)) {
+    issues.push("expected external authority ID is invalid");
+  }
+  if (
+    typeof expectedAuthorityPublicKeySha256 !== "string" ||
+    !SHA256.test(expectedAuthorityPublicKeySha256)
+  ) {
     issues.push("expected external authority key hash is invalid");
   }
 
@@ -1803,8 +1822,8 @@ export function verifySentinelProductionPreregistration(
     const key = createPublicKey(signed.publicKeyPem);
     const signatureBytes = Buffer.from(signed.signatureBase64, "base64");
     externallyAnchored =
-      signed.authority.authorityId === trustAnchor.expectedAuthorityId &&
-      signed.publicKeySha256 === trustAnchor.expectedAuthorityPublicKeySha256 &&
+      signed.authority.authorityId === expectedAuthorityId &&
+      signed.publicKeySha256 === expectedAuthorityPublicKeySha256 &&
       signed.publicKeySha256 === sentinelProductionSha256(signed.publicKeyPem) &&
       signed.authority.ownerId !== plan.registration.producerId &&
       signed.authority.independent === true;

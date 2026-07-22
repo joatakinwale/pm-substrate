@@ -35,7 +35,6 @@ export interface SentinelProductionExternalCommitmentRecord {
   readonly expectedAuthorityPublicKeySha256: string;
   readonly receiptSha256: string;
 }
-
 export interface SentinelProductionExternalCommitmentVerification {
   readonly valid: boolean;
   readonly locator: string;

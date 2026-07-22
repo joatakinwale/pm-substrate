@@ -20,11 +20,11 @@ import {
   buildSentinelRuntimeSanitizedEnvironment,
   isSentinelRuntimeSanitizedEnvironment,
   SENTINEL_PRODUCTION_REVISION,
-  SENTINEL_PRODUCTION_SOURCE_TREE,
   sentinelProductionJsonSha256,
   sentinelProductionRuntimeClosureSha256,
   type SentinelRuntimeClosure,
 } from "./sentinel-production-plan.js";
+import { sentinelTrackedTreeSha1FromListing } from "./sentinel-git-working-tree.js";
 import {
   acquireSentinelRuntimeExecutionLease,
   closeSentinelRuntimeExecutionLease,
@@ -47,9 +47,16 @@ const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-
 function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function gitBlobSha1(value: string | Uint8Array): string {
+  const bytes = typeof value === "string" ? Buffer.from(value, "utf8") : Buffer.from(value);
+  return createHash("sha1")
+    .update(`blob ${bytes.byteLength}\0`, "utf8")
+    .update(bytes)
+    .digest("hex");
 }
 
 function write(path: string, value: string, mode?: number): void {
@@ -63,13 +70,16 @@ interface Fixture {
   readonly dependencies: SentinelRuntimeClosureDependencies;
   readonly state: {
     dirtySubstrate: boolean;
+    ignoredSubstrate: string;
     npmVersion: string;
     pipFreeze: string;
     gitIndexFlags: string;
+    substrateSourceTreeHash: string;
+    upstreamSourceTreeHash: string;
   };
   readonly files: {
     gitExecutable: string;
-    gitExecHelper: string;
+    substrateTracked: string;
     nodeTarget: string;
     nodeRequested: string;
     frontendDependency: string;
@@ -107,6 +117,14 @@ function fixture(): Fixture {
   const frontendInstalled = join(upstream, "frontend", "node_modules");
   mkdirSync(substrate, { recursive: true });
   mkdirSync(upstream, { recursive: true });
+  const substrateTracked = join(substrate, "fixture.txt");
+  const upstreamTracked = join(upstream, "fixture.txt");
+  const substrateTrackedBytes = "substrate tracked fixture\n";
+  const upstreamTrackedBytes = "upstream tracked fixture\n";
+  const substrateTreeListing = `100644 blob ${gitBlobSha1(substrateTrackedBytes)}\tfixture.txt\0`;
+  const upstreamTreeListing = `100644 blob ${gitBlobSha1(upstreamTrackedBytes)}\tfixture.txt\0`;
+  write(substrateTracked, substrateTrackedBytes, 0o644);
+  write(upstreamTracked, upstreamTrackedBytes, 0o644);
   const scriptPaths = {
     runner: join(scripts, "sentinel-production-runner.js"),
     supervisor: join(scripts, "sentinel-production-supervisor.js"),
@@ -129,9 +147,6 @@ function fixture(): Fixture {
   write(join(substrate, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
   const gitExecutable = join(runtime, "git");
   write(gitExecutable, "fixture git\n", 0o755);
-  const gitExecPathRoot = join(runtime, "git-core");
-  const gitExecHelper = join(gitExecPathRoot, "git-fixture-helper");
-  write(gitExecHelper, "fixture git helper\n", 0o755);
   const nodeTarget = join(nodeRoot, "bin", "node-real");
   const nodeRequested = join(nodeRoot, "bin", "node");
   write(nodeTarget, "fixture node executable\n", 0o755);
@@ -184,8 +199,6 @@ function fixture(): Fixture {
   write(requirements, "fastapi==0.1\n");
   const paths: SentinelRuntimeClosurePaths = {
     gitExecutablePath: gitExecutable,
-    gitRealExecutablePath: gitExecutable,
-    gitExecPathRootPath: gitExecPathRoot,
     substrateCheckoutPath: substrate,
     rootPackageJsonPath: join(substrate, "package.json"),
     pnpmWorkspaceManifestPath: join(substrate, "pnpm-workspace.yaml"),
@@ -227,21 +240,21 @@ function fixture(): Fixture {
   };
   const state = {
     dirtySubstrate: false,
+    ignoredSubstrate: "",
     npmVersion: "11.0.0\n",
     pipFreeze: "Demo==1.0\n",
     gitIndexFlags: "H fixture.txt\n",
+    substrateSourceTreeHash: sentinelTrackedTreeSha1FromListing(substrateTreeListing),
+    upstreamSourceTreeHash: sentinelTrackedTreeSha1FromListing(upstreamTreeListing),
   };
   const runCommand = (invocation: SentinelRuntimeCommandInvocation): SentinelRuntimeCommandResult => {
     const [first] = invocation.arguments;
     if (invocation.executablePath === gitExecutable && first === "--version") {
       return commandResult("git version 2.42.0.fixture\n");
     }
-    if (invocation.executablePath === gitExecutable && first === "--exec-path") {
-      return commandResult(`${gitExecPathRoot}\n`);
-    }
     const gitWorkTree = invocation.arguments.find((argument) => argument.startsWith("--work-tree="));
     const commandIndex = invocation.arguments.findIndex((argument) =>
-      ["rev-parse", "status", "ls-files"].includes(argument));
+      ["rev-parse", "status", "ls-files", "ls-tree"].includes(argument));
     if (gitWorkTree !== undefined && commandIndex >= 0) {
       const gitCheckout = gitWorkTree.slice("--work-tree=".length);
       const command = invocation.arguments.slice(commandIndex).join(" ");
@@ -249,12 +262,22 @@ function fixture(): Fixture {
         return commandResult(`${gitCheckout === upstream ? SENTINEL_PRODUCTION_REVISION : "a".repeat(40)}\n`);
       }
       if (command === "rev-parse --verify HEAD^{tree}") {
-        return commandResult(`${gitCheckout === upstream ? SENTINEL_PRODUCTION_SOURCE_TREE : "b".repeat(40)}\n`);
+        return commandResult(`${gitCheckout === upstream
+          ? state.upstreamSourceTreeHash
+          : state.substrateSourceTreeHash}\n`);
       }
       if (command === "status --porcelain=v1 --untracked-files=all") {
         return commandResult(gitCheckout === substrate && state.dirtySubstrate ? " M README.md\n" : "");
       }
       if (command === "ls-files -v") return commandResult(state.gitIndexFlags);
+      if (command === "ls-tree -r -z --full-tree HEAD") {
+        return commandResult(gitCheckout === upstream ? upstreamTreeListing : substrateTreeListing);
+      }
+      if (command === "ls-files --others --ignored --exclude-standard --directory -z") {
+        return commandResult(gitCheckout === upstream
+          ? "frontend/node_modules/\0"
+          : state.ignoredSubstrate);
+      }
     }
     if (invocation.executablePath === nodeRequested && invocation.arguments.length === 1) {
       return commandResult("v26.0.0\n");
@@ -272,11 +295,11 @@ function fixture(): Fixture {
   };
   return {
     paths,
-    dependencies: { runCommand, platform: "linux" },
+    dependencies: { runCommand },
     state,
     files: {
       gitExecutable,
-      gitExecHelper,
+      substrateTracked,
       nodeTarget,
       nodeRequested,
       frontendDependency,
@@ -333,6 +356,70 @@ function retainRawRuntimeFixture(value: Fixture): {
   return { batchRoot, closure: derived.closure, reference };
 }
 
+function verifyCoherentlyTamperedRuntimeArtifact(
+  retained: ReturnType<typeof retainRawRuntimeFixture>,
+  mutate: (artifactBody: Record<string, unknown>) => void,
+): ReturnType<typeof verifySentinelRawRuntimeBoundary> {
+  const originalArtifact = JSON.parse(readFileSync(
+    join(retained.batchRoot, retained.reference.artifactPath as string),
+    "utf8",
+  )) as Record<string, unknown>;
+  const {
+    artifactSha256: _oldArtifactHash,
+    derivationSha256: _oldDerivation,
+    ...artifactBody
+  } = originalArtifact;
+  const newArtifactBody = structuredClone(artifactBody);
+  mutate(newArtifactBody);
+  const derivationSha256 = sentinelProductionJsonSha256(newArtifactBody);
+  const artifactWithDerivation = { ...newArtifactBody, derivationSha256 };
+  const artifactSha256 = sentinelProductionJsonSha256(artifactWithDerivation);
+  const artifactPath = `manifests/runtime/runtime-artifacts-${artifactSha256}.json`;
+  write(
+    join(retained.batchRoot, artifactPath),
+    `${JSON.stringify({ ...artifactWithDerivation, artifactSha256 }, null, 2)}\n`,
+    0o400,
+  );
+
+  const originalReceipt = JSON.parse(readFileSync(
+    join(retained.batchRoot, retained.reference.inspectionReceiptPath),
+    "utf8",
+  )) as Record<string, unknown>;
+  const lease = structuredClone(originalReceipt.executionLeaseIdentity) as Record<string, unknown>;
+  lease.acquiredDerivationSha256 = derivationSha256;
+  const { identitySha256: _oldLeaseHash, ...leaseBody } = lease;
+  lease.identitySha256 = sentinelProductionJsonSha256(leaseBody);
+  const { receiptSha256: _oldReceiptHash, ...receiptWithoutHash } = originalReceipt;
+  const receiptBody = {
+    ...receiptWithoutHash,
+    artifact: { path: artifactPath, sha256: artifactSha256, derivationSha256 },
+    executionLeaseIdentity: lease,
+  };
+  const receiptSha256 = sentinelProductionJsonSha256(receiptBody);
+  const inspectionReceiptPath = `manifests/runtime/runtime-initial-${receiptSha256}.json`;
+  write(
+    join(retained.batchRoot, inspectionReceiptPath),
+    `${JSON.stringify({ ...receiptBody, receiptSha256 }, null, 2)}\n`,
+    0o400,
+  );
+  return verifySentinelRawRuntimeBoundary({
+    batchRoot: retained.batchRoot,
+    reference: {
+      ...retained.reference,
+      inspectionReceiptPath,
+      inspectionReceiptSha256: receiptSha256,
+      artifactPath,
+      artifactSha256,
+      derivationSha256,
+      executionLeaseIdentitySha256: lease.identitySha256 as string,
+    },
+    expectedBoundary: "initial",
+    expectedBlockSequence: null,
+    expectedPreviousReceiptSha256: "0".repeat(64),
+    preregistrationClosure: retained.closure,
+  });
+}
+
 describe("Sentinel production runtime closure", () => {
   it("independently replays a retained runtime boundary against every signed path and command", () => {
     const retained = retainRawRuntimeFixture(fixture());
@@ -346,6 +433,70 @@ describe("Sentinel production runtime closure", () => {
     });
     expect(verified.valid, verified.issues.join("; ")).toBe(true);
     expect(verified.exactSupervisorPaths?.nodeExecutablePath).toBe(retained.closure.node.requestedPath);
+  });
+
+  it.each([
+    ["removes the no-helper boundary", (commands: Record<string, unknown>[]) => {
+      commands[0]!.arguments = (commands[0]!.arguments as string[])
+        .filter((argument) => argument !== "--exec-path=/dev/null");
+    }],
+    ["substitutes the Git executable", (commands: Record<string, unknown>[]) => {
+      commands[0]!.executablePath = "/tmp/forged-git";
+    }],
+    ["restores ambient -C checkout selection", (
+      commands: Record<string, unknown>[],
+      checkoutPath: string,
+    ) => {
+      commands[0]!.arguments = ["-C", checkoutPath, "rev-parse", "--verify", "HEAD"];
+    }],
+    ["changes the signed work-tree binding", (commands: Record<string, unknown>[]) => {
+      commands[0]!.arguments = (commands[0]!.arguments as string[]).map((argument) =>
+        argument.startsWith("--work-tree=") ? "--work-tree=/tmp/forged-checkout" : argument);
+    }],
+    ["forges a clean-status command output", (commands: Record<string, unknown>[]) => {
+      const bytes = Buffer.from(" M fixture.txt\n", "utf8");
+      commands[2]!.stdoutBase64 = bytes.toString("base64");
+      commands[2]!.stdoutSha256 = sha256(bytes);
+    }],
+    ["changes the retained tracked-tree identity", (commands: Record<string, unknown>[]) => {
+      const bytes = Buffer.from(`100644 blob ${"f".repeat(40)}\tfixture.txt\0`, "utf8");
+      commands[4]!.stdoutBase64 = bytes.toString("base64");
+      commands[4]!.stdoutSha256 = sha256(bytes);
+    }],
+    ["substitutes an allowed ignored-path listing", (commands: Record<string, unknown>[]) => {
+      const bytes = Buffer.from("node_modules/\0", "utf8");
+      commands[5]!.stdoutBase64 = bytes.toString("base64");
+      commands[5]!.stdoutSha256 = sha256(bytes);
+    }],
+    ["adds an undeclared ignored file", (commands: Record<string, unknown>[]) => {
+      const bytes = Buffer.from(".env\0", "utf8");
+      commands[5]!.stdoutBase64 = bytes.toString("base64");
+      commands[5]!.stdoutSha256 = sha256(bytes);
+    }],
+  ] as const)("rejects a fully rehashed Git artifact that %s", (_label, mutate) => {
+    const retained = retainRawRuntimeFixture(fixture());
+    const verified = verifyCoherentlyTamperedRuntimeArtifact(retained, (artifactBody) => {
+      const substrateGit = artifactBody.substrateGit as Record<string, unknown>;
+      const commands = substrateGit.commands as Record<string, unknown>[];
+      mutate(commands, substrateGit.checkoutPath as string);
+    });
+    expect(verified.valid).toBe(false);
+    expect(verified.issues.join("; ")).toMatch(/git|runtime|ignored|invocation/iu);
+  });
+
+  it("rejects a fully rehashed artifact that omits an originally signed ignored directory", () => {
+    const value = fixture();
+    value.state.ignoredSubstrate = "node_modules/\0";
+    const retained = retainRawRuntimeFixture(value);
+    const verified = verifyCoherentlyTamperedRuntimeArtifact(retained, (artifactBody) => {
+      const substrateGit = artifactBody.substrateGit as Record<string, unknown>;
+      const commands = substrateGit.commands as Record<string, unknown>[];
+      const bytes = Buffer.alloc(0);
+      commands[5]!.stdoutBase64 = bytes.toString("base64");
+      commands[5]!.stdoutSha256 = sha256(bytes);
+    });
+    expect(verified.valid).toBe(false);
+    expect(verified.issues.join("; ")).toMatch(/ignored-path listing differs from the signed closure/iu);
   });
 
   it("rejects a content-address-consistent runtime lease that substitutes an unsigned supervisor path", () => {
@@ -452,7 +603,8 @@ describe("Sentinel production runtime closure", () => {
     const value = fixture();
     const derived = deriveSentinelRuntimeClosure(value.paths, value.dependencies);
     expect(derived.closure.substrateRevision).toBe("a".repeat(40));
-    expect(derived.closure.sourceTreeHash).toBe("b".repeat(40));
+    expect(derived.closure.sourceTreeHash).toBe(value.state.substrateSourceTreeHash);
+    expect(derived.closure.upstream.sourceTreeHash).toBe(value.state.upstreamSourceTreeHash);
     expect(derived.closure.node.requestedEntrySha256).toBe(sha256("node-real"));
     expect(derived.closure.node.resolvedExecutableSha256).toBe(
       sha256("fixture node executable\n"),
@@ -471,6 +623,39 @@ describe("Sentinel production runtime closure", () => {
     expect(derived.artifacts.upstreamGit.revision).toBe(SENTINEL_PRODUCTION_REVISION);
     expect(verifySentinelRuntimeClosure(value.paths, derived.closure, value.dependencies).closure)
       .toEqual(derived.closure);
+  });
+
+  it("uses only Git builtins with external helpers disabled", () => {
+    const value = fixture();
+    const { artifacts } = deriveSentinelRuntimeClosure(value.paths, value.dependencies);
+    for (const git of [artifacts.substrateGit, artifacts.upstreamGit]) {
+      const prefix = [
+        "--exec-path=/dev/null",
+        "--no-pager",
+        "--no-replace-objects",
+        "--literal-pathspecs",
+        `--git-dir=${join(git.checkoutPath, ".git")}`,
+        `--work-tree=${git.checkoutPath}`,
+        "-c", `core.worktree=${git.checkoutPath}`,
+        "-c", "core.fileMode=true",
+        "-c", "core.fsmonitor=false",
+        "-c", "core.attributesFile=/dev/null",
+        "-c", "core.excludesFile=/dev/null",
+        "-c", "core.hooksPath=/dev/null",
+      ];
+      for (const command of git.commands) {
+        expect(command.arguments.slice(0, prefix.length)).toEqual(prefix);
+        expect(command.arguments).not.toContain("-C");
+      }
+    }
+  });
+
+  it("rejects the macOS Git launcher instead of hashing the unexecuted shim", () => {
+    const value = fixture();
+    expect(() => deriveSentinelRuntimeClosure(
+      { ...value.paths, gitExecutablePath: "/usr/bin/git" },
+      { ...value.dependencies, platform: "darwin" },
+    )).toThrow(/macOS \/usr\/bin\/git is a launcher/u);
   });
 
   it("rejects a stale but internally rehashed aggregate", () => {
@@ -533,6 +718,16 @@ describe("Sentinel production runtime closure", () => {
     value.state.gitIndexFlags = "S hidden-runtime.js\n";
     expect(() => deriveSentinelRuntimeClosure(value.paths, value.dependencies))
       .toThrow(/hidden or nonstandard git index flags/u);
+  });
+
+  it("rejects tree path components containing non-printing control bytes", () => {
+    const value = fixture();
+    write(
+      join(value.paths.substratePackagesRootPath, "control-\u001b-name.txt"),
+      "unsafe path\n",
+    );
+    expect(() => deriveSentinelRuntimeClosure(value.paths, value.dependencies))
+      .toThrow(/unsafe path component/iu);
   });
 
   it("rejects a resolved executable byte change", () => {
@@ -627,6 +822,21 @@ describe("Sentinel production runtime closure", () => {
     writeFileSync(value.files.gitExecutable, "mutated fixture git\n");
     expect(() => verifySentinelRuntimeClosure(value.paths, declared, value.dependencies))
       .toThrow(/does not exactly match/u);
+  });
+
+  it("rejects tracked executable-mode drift even when local Git configuration could hide it", () => {
+    const value = fixture();
+    const declared = deriveSentinelRuntimeClosure(value.paths, value.dependencies).closure;
+    chmodSync(value.files.substrateTracked, 0o755);
+    expect(() => verifySentinelRuntimeClosure(value.paths, declared, value.dependencies))
+      .toThrow(/tracked.*mode|mode.*HEAD/iu);
+  });
+
+  it("rejects an ignored runtime file outside the explicitly bound dependency and build roots", () => {
+    const value = fixture();
+    value.state.ignoredSubstrate = ".env\0";
+    expect(() => deriveSentinelRuntimeClosure(value.paths, value.dependencies))
+      .toThrow(/unexpected ignored runtime path/iu);
   });
 
   it("invalidates a verified execution lease after a post-verification mutation", () => {

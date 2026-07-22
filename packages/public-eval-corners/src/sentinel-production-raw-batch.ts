@@ -211,15 +211,20 @@ function runtimeReference(value: unknown, label: string): SentinelProductionRunt
   return value as unknown as SentinelProductionRuntimeInspectionReference;
 }
 
-function preflight(value: unknown, plan: SentinelProductionPreregistration, label: string): SentinelProductionCheckoutPreflight {
+export function verifySentinelRawCheckoutPreflight(
+  value: unknown,
+  plan: SentinelProductionPreregistration,
+  label: string,
+): SentinelProductionCheckoutPreflight {
   sentinelRawExactKeys(value, [
     "checkoutPath", "cleanTrackedAndUntracked", "databaseRootSha256", "frontendInstalledTreeSha256",
-    "frontendPackageLockSha256", "ignoredArtifactRootSha256", "issues", "preflightSha256", "repositoryUrl",
+    "frontendPackageLockSha256", "ignoredArtifactRootSha256", "ignoredPathListingBase64",
+    "ignoredPathListingSha256", "issues", "preflightSha256", "repositoryUrl",
     "revision", "schemaVersion", "selectedScenarioRootSha256", "serverRequirementsSha256", "sourceTreeHash", "valid",
   ], label);
   const { preflightSha256, ...body } = value;
   if (
-    value.schemaVersion !== "pm.public-eval-corners.sentinel-production-checkout-preflight.v1" ||
+    value.schemaVersion !== "pm.public-eval-corners.sentinel-production-checkout-preflight.v2" ||
     preflightSha256 !== sentinelRawJsonSha256(body) || value.valid !== true || !Array.isArray(value.issues) || value.issues.length !== 0 ||
     typeof value.checkoutPath !== "string" || !isAbsolute(value.checkoutPath) || resolve(value.checkoutPath) !== value.checkoutPath ||
     typeof value.repositoryUrl !== "string" || value.repositoryUrl.replace(/\.git$/u, "") !== plan.benchmark.repositoryUrl ||
@@ -229,9 +234,27 @@ function preflight(value: unknown, plan: SentinelProductionPreregistration, labe
     value.frontendPackageLockSha256 !== plan.runtime.upstream.frontendPackageLockSha256 ||
     value.serverRequirementsSha256 !== plan.runtime.upstream.serverRequirementsSha256
   ) throw new Error(`${label} is not the exact valid pinned checkout preflight`);
+  if (typeof value.ignoredPathListingBase64 !== "string") {
+    throw new Error(`${label} ignored-path listing is not retained`);
+  }
+  const ignoredListing = Buffer.from(value.ignoredPathListingBase64, "base64");
+  if (
+    ignoredListing.toString("base64") !== value.ignoredPathListingBase64 ||
+    sentinelRawSha256(ignoredListing) !== value.ignoredPathListingSha256 ||
+    value.ignoredPathListingSha256 !== plan.runtime.upstream.ignoredPathListingSha256 ||
+    value.ignoredArtifactRootSha256 !== sentinelRawJsonSha256({
+      ignoredListingSha256: value.ignoredPathListingSha256,
+      frontendInstalledTreeSha256: value.frontendInstalledTreeSha256,
+    })
+  ) throw new Error(`${label} ignored-path evidence differs from the signed runtime`);
+  const ignoredText = ignoredListing.toString("utf8");
+  if (
+    !Buffer.from(ignoredText, "utf8").equals(ignoredListing) ||
+    ignoredText !== "frontend/node_modules/\0"
+  ) throw new Error(`${label} ignored-path listing is not the exact allowed runtime directory`);
   for (const key of [
     "databaseRootSha256", "frontendInstalledTreeSha256", "frontendPackageLockSha256", "ignoredArtifactRootSha256",
-    "preflightSha256", "selectedScenarioRootSha256", "serverRequirementsSha256",
+    "ignoredPathListingSha256", "preflightSha256", "selectedScenarioRootSha256", "serverRequirementsSha256",
   ] as const) assertSha256(value[key], `${label} ${key}`);
   return value as unknown as SentinelProductionCheckoutPreflight;
 }
@@ -269,13 +292,14 @@ function parseExecutionStart(
   const retainedPreflights = value.checkoutPreflights;
   sentinelRawExactKeys(retainedPreflights, ARMS, "execution checkout preflights");
   const checkoutPreflights = Object.fromEntries(ARMS.map((arm) => [
-    arm, preflight(retainedPreflights[arm], plan, `${arm} checkout preflight`),
+    arm, verifySentinelRawCheckoutPreflight(retainedPreflights[arm], plan, `${arm} checkout preflight`),
   ])) as unknown as Record<SentinelProductionArm, SentinelProductionCheckoutPreflight>;
   if (new Set(ARMS.map((arm) => checkoutPreflights[arm].checkoutPath)).size !== 4) {
     throw new Error("four execution arms did not use four disjoint checkout paths");
   }
   const rootFields = [
-    "revision", "sourceTreeHash", "ignoredArtifactRootSha256", "databaseRootSha256", "selectedScenarioRootSha256",
+    "revision", "sourceTreeHash", "ignoredArtifactRootSha256", "ignoredPathListingSha256",
+    "databaseRootSha256", "selectedScenarioRootSha256",
     "frontendInstalledTreeSha256", "frontendPackageLockSha256", "serverRequirementsSha256",
   ] as const;
   for (const arm of ARMS.slice(1)) {

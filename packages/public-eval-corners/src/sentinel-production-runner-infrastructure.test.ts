@@ -74,6 +74,20 @@ function hiddenIndexCheckout(flag: "--assume-unchanged" | "--skip-worktree"): st
   return root;
 }
 
+function ordinaryCheckout(): string {
+  const root = mkdtempSync(resolve(tmpdir(), "pm-sentinel-checkout-ordinary-"));
+  roots.push(root);
+  git(root, ["init"]);
+  git(root, ["config", "user.email", "sentinel-test@example.invalid"]);
+  git(root, ["config", "user.name", "Sentinel Test"]);
+  git(root, ["remote", "add", "origin", SENTINEL_PRODUCTION_REPOSITORY]);
+  mkdirSync(resolve(root, "server"));
+  writeFileSync(resolve(root, "server", "server.py"), "ORIGINAL = True\n", { mode: 0o644 });
+  git(root, ["add", "server/server.py"]);
+  git(root, ["commit", "-m", "fixture"]);
+  return root;
+}
+
 describe("Sentinel production checkout preflight", () => {
   it.each(["--skip-worktree", "--assume-unchanged"] as const)(
     "rejects a status-clean checkout hidden by %s",
@@ -168,5 +182,33 @@ describe("Sentinel production checkout preflight", () => {
       sourceTreeHash: null,
       issues: ["checkout Git executable is not the closure-bound executable"],
     });
+  });
+
+  it("rejects executable-mode drift even when local core.fileMode=false makes ordinary status clean", () => {
+    const checkout = ordinaryCheckout();
+    git(checkout, ["config", "core.fileMode", "false"]);
+    chmodSync(resolve(checkout, "server", "server.py"), 0o755);
+    expect(git(checkout, ["status", "--porcelain=v1", "--untracked-files=all"])).toBe("");
+
+    const result = inspectSentinelProductionCheckout(checkout, [], plannedRuntime());
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(["tracked file mode differs from HEAD: server/server.py"]);
+  });
+
+  it("rejects unexpected ignored files that ordinary status omits", () => {
+    const checkout = ordinaryCheckout();
+    writeFileSync(resolve(checkout, ".gitignore"), "unexpected.cache\n");
+    git(checkout, ["add", ".gitignore"]);
+    git(checkout, ["commit", "-m", "ignore fixture"]);
+    writeFileSync(resolve(checkout, "unexpected.cache"), "hidden runtime input\n");
+    expect(git(checkout, ["status", "--porcelain=v1", "--untracked-files=all"])).toBe("");
+
+    const result = inspectSentinelProductionCheckout(checkout, [], plannedRuntime());
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual([
+      "checkout has non-runtime ignored artifacts: unexpected.cache",
+    ]);
   });
 });

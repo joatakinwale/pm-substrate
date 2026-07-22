@@ -31,6 +31,8 @@
     "public-eval:toolsandbox": "pnpm --filter @pm/public-eval-toolsandbox build && pnpm --filter @pm/public-eval-toolsandbox public-eval",
     "public-eval:state-bench": "pnpm --filter @pm/public-eval-state-bench build && pnpm --filter @pm/public-eval-state-bench public-eval",
     "public-eval:corners": "pnpm --filter @pm/public-eval-corners build && pnpm --filter @pm/public-eval-corners public-eval-corners",
+    "public-eval:sentinel-production-prepare": "pnpm --filter @pm/public-eval-corners build && pnpm --filter @pm/public-eval-corners sentinel-production-prepare",
+    "public-eval:sentinel-production-run": "pnpm --filter @pm/public-eval-corners build && pnpm --filter @pm/public-eval-corners sentinel-production-run",
     "public-eval:sentinel-production-smoke": "pnpm --filter @pm/public-eval-corners build && pnpm --filter @pm/public-eval-corners sentinel-production-smoke",
     "public-eval:sentinel-production-verify": "pnpm --filter @pm/public-eval-corners build && pnpm --filter @pm/public-eval-corners sentinel-production-verify",
     "public-eval:analysis": "pnpm --filter @pm/public-eval-analysis build && pnpm --filter @pm/public-eval-analysis analyze",

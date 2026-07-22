@@ -15,6 +15,7 @@ import {
   type SentinelProductionTask,
   type SentinelRuntimeClosure,
 } from "./sentinel-production-plan.js";
+import { assertSentinelTrackedWorkingTreeMatchesHead } from "./sentinel-git-working-tree.js";
 import { verifySentinelRuntimeClosure } from "./sentinel-runtime-closure.js";
 import { createSentinelProductionRuntimeLeaseIdentity } from "./sentinel-production-runner-evidence.js";
 import type {
@@ -89,7 +90,21 @@ function command(
   if (hashFile(git.executablePath) !== git.executableSha256) {
     throw new Error("checkout Git executable changed during preflight");
   }
-  return execFileSync(git.executablePath, ["-C", checkoutPath, ...arguments_], {
+  const invocationPrefix = [
+    "--exec-path=/dev/null",
+    "--no-pager",
+    "--no-replace-objects",
+    "--literal-pathspecs",
+    `--git-dir=${resolve(checkoutPath, ".git")}`,
+    `--work-tree=${checkoutPath}`,
+    "-c", `core.worktree=${checkoutPath}`,
+    "-c", "core.fileMode=true",
+    "-c", "core.fsmonitor=false",
+    "-c", "core.attributesFile=/dev/null",
+    "-c", "core.excludesFile=/dev/null",
+    "-c", "core.hooksPath=/dev/null",
+  ] as const;
+  return execFileSync(git.executablePath, [...invocationPrefix, ...arguments_], {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60_000,
     maxBuffer: 64 * 1024 * 1024,
     cwd: checkoutPath,
@@ -196,6 +211,7 @@ export function inspectSentinelProductionCheckout(
   let sourceTreeHash: string | null = null;
   let cleanTrackedAndUntracked = false;
   let ignoredArtifactRootSha256 = "", databaseRootSha256 = "", selectedScenarioRootSha256 = "";
+  let ignoredPathListingBase64 = "", ignoredPathListingSha256 = "";
   let frontendInstalledTreeSha256 = "", frontendPackageLockSha256 = "", serverRequirementsSha256 = "";
   try {
     const git = checkoutGitInvocation(plannedRuntime);
@@ -211,13 +227,25 @@ export function inspectSentinelProductionCheckout(
     if (hiddenIndexFlags.length > 0) {
       throw new Error("checkout has skip-worktree or assume-unchanged index flags");
     }
-    const ignored = command(git, canonicalPath, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"])
-      .split("\0").filter(Boolean).sort(compare);
-    const unsafeIgnored = ignored.filter((path) => !path.startsWith("frontend/node_modules/"));
+    const trackedTree = command(git, canonicalPath, ["ls-tree", "-r", "-z", "--full-tree", "HEAD"]);
+    assertSentinelTrackedWorkingTreeMatchesHead(canonicalPath, trackedTree, sourceTreeHash);
+    const ignoredListing = command(git, canonicalPath, [
+      "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z",
+    ]);
+    const ignored = ignoredListing.split("\0").filter(Boolean);
+    const canonicalIgnoredListing = ignored.length === 0
+      ? ""
+      : `${[...ignored].sort(compare).join("\0")}\0`;
+    if (ignoredListing !== canonicalIgnoredListing || new Set(ignored).size !== ignored.length) {
+      throw new Error("checkout ignored-path listing is not canonical");
+    }
+    const unsafeIgnored = ignored.filter((path) => path !== "frontend/node_modules/");
     if (unsafeIgnored.length > 0) throw new Error(`checkout has non-runtime ignored artifacts: ${unsafeIgnored.slice(0, 8).join(", ")}`);
+    ignoredPathListingBase64 = Buffer.from(ignoredListing, "utf8").toString("base64");
+    ignoredPathListingSha256 = sentinelProductionSha256(ignoredListing);
     frontendInstalledTreeSha256 = stableTreeSha256(resolve(canonicalPath, "frontend/node_modules"));
     ignoredArtifactRootSha256 = sentinelProductionJsonSha256({
-      ignoredListingSha256: sentinelProductionSha256(`${ignored.join("\0")}\0`), frontendInstalledTreeSha256,
+      ignoredListingSha256: ignoredPathListingSha256, frontendInstalledTreeSha256,
     });
     databaseRootSha256 = filesRoot(canonicalPath, DATABASE_PATHS);
     selectedScenarioRootSha256 = filesRoot(canonicalPath, selectedTasks.map(sentinelProductionScenarioRelativePath).sort(compare));
@@ -227,14 +255,18 @@ export function inspectSentinelProductionCheckout(
     if (revision !== SENTINEL_PRODUCTION_REVISION) issues.push("checkout revision changed");
     if (sourceTreeHash !== SENTINEL_PRODUCTION_SOURCE_TREE) issues.push("checkout source tree changed");
     if (!cleanTrackedAndUntracked) issues.push("checkout is not clean");
+    if (ignoredPathListingSha256 !== plannedRuntime.upstream.ignoredPathListingSha256) {
+      issues.push("checkout ignored-path listing changed");
+    }
     if (frontendInstalledTreeSha256 !== plannedRuntime.upstream.frontendInstalledTreeSha256) issues.push("frontend runtime tree changed");
     if (frontendPackageLockSha256 !== plannedRuntime.upstream.frontendPackageLockSha256) issues.push("frontend lock changed");
     if (serverRequirementsSha256 !== plannedRuntime.upstream.serverRequirementsSha256) issues.push("requirements changed");
   } catch (error) { issues.push(error instanceof Error ? error.message : String(error)); }
   const body = {
-    schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v1" as const,
+    schemaVersion: "pm.public-eval-corners.sentinel-production-checkout-preflight.v2" as const,
     checkoutPath: canonicalPath, repositoryUrl, revision, sourceTreeHash, cleanTrackedAndUntracked,
-    ignoredArtifactRootSha256, databaseRootSha256, selectedScenarioRootSha256,
+    ignoredArtifactRootSha256, ignoredPathListingBase64, ignoredPathListingSha256,
+    databaseRootSha256, selectedScenarioRootSha256,
     frontendInstalledTreeSha256, frontendPackageLockSha256, serverRequirementsSha256,
     valid: issues.length === 0, issues,
   };

@@ -89,8 +89,9 @@ qualification, not a browser-agent efficacy result.
 
 ## Sentinel causal stress test
 
-The original `pm-sentinel-live` 27-cell MicroHub design is retained only as
-excluded harness history. It cannot establish attribution: the useful baseline
+The original `pm-sentinel-live` 27-cell MicroHub design is documented here and
+preserved in Git history, but its executable implementation and obsolete bins
+have been removed. It cannot establish attribution: the useful baseline
 lived in an adapter-owned in-memory `Map`, all arms used the substrate core only
 for evidence admission, the discard arm was not Microsoft's unpublished paper
 agent, and a plain KV store was never tested. Its speed-factor-4 schedule also
@@ -131,6 +132,82 @@ incompleteness blocks a conclusion and never authorizes a replacement. A
 substrate win over native and sham shows that useful durable state mattered;
 substrate-specific attribution additionally requires a declared contrast over
 plain KV on integrity, isolation, conflict, or recovery behavior.
+
+Prepare the unsigned, outcome-free qualification bundle before any authority
+signs or any cell runs:
+
+```json
+{
+  "schemaVersion": "pm.public-eval-corners.sentinel-production-prepare-invocation.v1",
+  "outputRoot": "/proof/unsigned-qualification",
+  "runtimePathsPath": "/proof/runtime-paths-input.json",
+  "checkouts": {
+    "native": "/checkouts/native",
+    "sham": "/checkouts/sham",
+    "plain-kv": "/checkouts/plain-kv",
+    "substrate": "/checkouts/substrate"
+  },
+  "registration": {
+    "registrationId": "sentinel-qualification-001",
+    "registeredAt": "2026-07-21T12:00:00.000Z",
+    "producerId": "joat-labs-producer",
+    "repeatIds": ["repeat-01", "repeat-02", "repeat-03"],
+    "randomizationSeed": "externally-reviewed-randomization-seed",
+    "bootstrapSeed": "externally-reviewed-bootstrap-seed",
+    "rawBatchVerifierId": "pm-sentinel-production-raw-v1"
+  }
+}
+```
+
+Run the preparer with no credentials:
+
+```bash
+pnpm public-eval:sentinel-production-prepare /absolute/path/to/prepare-invocation.json
+```
+
+It strictly
+parses all 39 runtime paths, reconstructs the runtime closure, preflights four
+matched checkouts, freezes exactly 36 qualification cells in nine four-arm
+blocks, and publishes exactly six read-only files through a no-replace directory
+claim and descriptor-bound final mode commit. Before that commit it replays all
+nested command, file, tree, Python-distribution, overlapping-subtree, and Git
+evidence and rereads the exact on-disk inventory, bytes, modes, and link counts.
+The bundle is explicitly unsigned and ineligible; the producer may not self-sign
+it. Runtime and checkout roots must be physically disjoint and on a filesystem
+that faithfully preserves Git executable modes (APFS/ext4 are supported; the
+current ExFAT workspace is rejected).
+
+The final mode is not a trust signal and cannot protect against later mutation
+by another process running as the same OS user. The independent authority must
+replay the retained bytes and expected hash from its separately controlled copy;
+any later mutation makes the preparation ineligible rather than converting it
+into evidence.
+
+Run the signed four-arm batch with one secret-free invocation file:
+
+```json
+{
+  "schemaVersion": "pm.public-eval-corners.sentinel-production-run-invocation.v1",
+  "preregistrationPath": "/proof/preregistration.json",
+  "signaturePath": "/proof/signature.json",
+  "trustAnchorPath": "/proof/trust-anchor.json",
+  "externalCommitmentPath": "/proof/external-commitment.json",
+  "runtimePathsPath": "/proof/runtime-paths.json",
+  "checkouts": {
+    "native": "/checkouts/native",
+    "sham": "/checkouts/sham",
+    "plain-kv": "/checkouts/plain-kv",
+    "substrate": "/checkouts/substrate"
+  },
+  "batchRoot": "/runs/batch",
+  "attemptRegistryRoot": "/runs/attempts"
+}
+```
+
+Set `PM_DATABASE_URL` and `ANTHROPIC_API_KEY` in the environment, then run
+`pnpm public-eval:sentinel-production-run /absolute/path/to/invocation.json`.
+The invocation rejects extra keys, so neither credential can be serialized
+into it.
 
 ## Behavioral matched-arm protocol
 
