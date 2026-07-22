@@ -28,6 +28,8 @@ import { extname, join, normalize, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 
+import pg from "pg";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST =
   process.env.SUBSTRATE_DASHBOARD_DIST ?? join(HERE, "..", "dist");
@@ -48,6 +50,197 @@ const MIME = {
 const labSessions = new Map();
 const sessionStreams = new Map();
 const activeRunners = new Map();
+
+/** Lazy shared pool for the Token KPIs fold (PM_DATABASE_URL). */
+let tokenUsagePool = null;
+function getTokenUsagePool() {
+  if (!tokenUsagePool) {
+    tokenUsagePool = new pg.Pool({ connectionString: process.env.PM_DATABASE_URL });
+  }
+  return tokenUsagePool;
+}
+
+const RUN_REGISTER_PATH =
+  process.env.PM_RUN_REGISTER_PATH ??
+  join(HERE, "..", "..", "..", "docs", "evidence", "public-proof-run-register-2026-07-13.json");
+
+/**
+ * Per-scenario A/B verdicts from the paired local-lab eval ledger
+ * (evals.eval_events). Latest run per (scenario, arm); pivoted into one row
+ * with the baseline (validation OFF) and substrate (validation ON) verdicts.
+ * Empty when no DB / no runs — the renderer shows how to populate it.
+ */
+async function buildLabVerdicts() {
+  if (!process.env.PM_DATABASE_URL) return [];
+  let rows;
+  try {
+    const pool = getTokenUsagePool();
+    // Lab eval evidence is keyed by axis, not tenant — each paired run gets a
+    // hermetic ephemeral tenant (tnt_lab_*). Latest verdict per scenario/arm
+    // across all of them.
+    const res = await pool.query(
+      `SELECT DISTINCT ON (scenario_id, run_arm)
+         scenario_id, failure_class, run_arm, result,
+         state_bench_category, coordination_class,
+         event->>'expectedAdmission' AS expected_admission
+       FROM evals.eval_events
+       WHERE axis = 'local_lab' AND run_arm IS NOT NULL
+       ORDER BY scenario_id, run_arm, observed_at DESC, id DESC`,
+    );
+    rows = res.rows;
+  } catch {
+    return [];
+  }
+  const byScenario = new Map();
+  for (const r of rows) {
+    const entry = byScenario.get(r.scenario_id) ?? {
+      scenarioId: r.scenario_id,
+      failureClass: r.failure_class,
+      stateBenchCategory: r.state_bench_category ?? null,
+      coordinationClass: r.coordination_class ?? null,
+      expectedAdmission:
+        r.expected_admission ??
+        (String(r.scenario_id).endsWith("-expected-allow") ? "allow" : "block"),
+      baselineResult: null,
+      substrateResult: null,
+    };
+    if (r.run_arm === "baseline") entry.baselineResult = r.result;
+    if (r.run_arm === "substrate") entry.substrateResult = r.result;
+    byScenario.set(r.scenario_id, entry);
+  }
+  return [...byScenario.values()].sort(
+    (a, b) =>
+      a.failureClass.localeCompare(b.failureClass) ||
+      a.scenarioId.localeCompare(b.scenarioId),
+  );
+}
+
+/**
+ * Normalize the pinned run register into the benchmark comparison payload.
+ * The register is the source of truth; the arm rows and blockers below are
+ * lifted verbatim from it so the dashboard cannot overstate what ran.
+ */
+async function buildBenchmarksPayload() {
+  const raw = JSON.parse(await readFile(RUN_REGISTER_PATH, "utf8"));
+
+  const ts = raw.toolSandboxFinalDeterministicQualification ?? {};
+  const derivative = ts.lostResponseDerivative ?? {};
+  const dScore = derivative.strictScoreByArm ?? {};
+  const dDup = derivative.duplicateTargetSideEffectCountByArm ?? {};
+  const dDisp = derivative.postRestartRetryDispositionByArm ?? {};
+  const toolsandboxArms = ["native", "sham", "substrate"].map((arm) => ({
+    arm,
+    strictScore: dScore[arm] ?? null,
+    duplicateSideEffects: dDup[arm] ?? null,
+    disposition:
+      dDisp[arm] === "blocked"
+        ? "blocked the duplicate"
+        : dDisp[arm] === "executed_succeeded"
+          ? "re-sent (duplicate)"
+          : (dDisp[arm] ?? undefined),
+  }));
+
+  const sb = raw.stateBenchQualification ?? {};
+  const sentinelCorner = (raw.cornerQualifications ?? []).find((c) =>
+    String(c.cornerId ?? "").startsWith("sentinel"),
+  );
+  const otherCorners = (raw.cornerQualifications ?? []).filter(
+    (c) => !String(c.cornerId ?? "").startsWith("sentinel"),
+  );
+
+  let labScenarios = [];
+  try {
+    const lab = await defaultLoadLocalAgentLab();
+    labScenarios = (lab.SCENARIOS ?? []).map((s) => ({
+      scenarioId: s.scenarioId,
+      failureClass: s.failureClass,
+    }));
+  } catch {
+    labScenarios = [];
+  }
+
+  const labVerdicts = await buildLabVerdicts();
+
+  return {
+    recordedAt: raw.recordedAt ?? "",
+    claimBoundary: raw.claimBoundary ?? "",
+    labScenarios,
+    labVerdicts,
+    benchmarks: [
+      {
+        id: "toolsandbox",
+        level: "mechanism-qualified",
+        headline:
+          "On the lost-response + hard-restart derivative, all four arms scored a perfect strict 1.0 — but native and sham each re-sent the message after restart, while the substrate blocked the duplicate. The mechanism is qualified; stochastic public-agent efficacy is not yet measured.",
+        arms: toolsandboxArms,
+        stats: [
+          { label: "Scenario", value: "send_message · cellular-off · multi-turn" },
+          { label: "Restart", value: "SIGKILL process group → fresh process" },
+          { label: "Upstream", value: String(ts.upstreamRevision ?? "").slice(0, 12) },
+        ],
+        blockedOn: [
+          "A funded non-scripted public-agent run (the scripted probe qualifies the mechanism only; the last live attempt died on OpenAI 429 insufficient_quota before any action)",
+          "Retained provider usage / cost / latency receipts",
+          "An independently trusted oracle runtime + external trust anchor",
+        ],
+      },
+      {
+        id: "statebench",
+        level: "conformance-only",
+        headline:
+          "Adapter and procedure conformance passes, but zero official scored trajectories exist yet. STATE-Bench is the re-aim target precisely because its deterministic final-state scorer CAN see the collateral-state damage ToolSandbox's strict oracle misses.",
+        stats: [
+          { label: "Pinned upstream tests", value: String(sb.pinnedUpstreamTestResult ?? "–") },
+          { label: "Adapter tests", value: String(sb.adapterFocusedTestResult ?? "–") },
+          {
+            label: "Official scored trajectories",
+            value: `${sb.officialScoredTrajectories ?? 0} / ${sb.requiredOfficialScoredTrajectories ?? "–"}`,
+          },
+        ],
+        blockedOn: [
+          "The self-provisioned GPT-5.4 locked evaluator (endpoint / deployment / key) — a funding + setup task, not an external gatekeeper",
+          ...(sb.missingEvidenceClasses ?? []).map((m) => `Missing receipt: ${String(m).replaceAll("_", " ")}`),
+        ],
+      },
+      {
+        id: "sentinel",
+        level: sentinelCorner ? "conformance-only" : "not-run",
+        headline: sentinelCorner
+          ? "MicroHub qualification is source-pinned and cross-verified, but zero behavioral cells have run. Sentinel qualifies the mechanism and corner battery; its 19-relative-task universe is too small to carry the powered confirmatory alone."
+          : "Not yet run in this register.",
+        stats: [
+          {
+            label: "Behavioral cells executed",
+            value: String((raw.cornerBehavioralHarness ?? {}).behavioralTripletsExecuted ?? 0),
+          },
+          {
+            label: "Harness conformance",
+            value: String((raw.cornerBehavioralHarness ?? {}).focusedTestResult ?? "–"),
+          },
+          { label: "MicroHub qualification", value: sentinelCorner ? "source-verified" : "–" },
+        ],
+        blockedOn: [
+          "A redesigned, externally verified power calculation (the 19×3 / 0.10 declaration is mathematically ineligible under its own planning model)",
+          "Externally anchored attempt roots + a clean independent replay",
+        ],
+      },
+      {
+        id: "corner",
+        level: otherCorners.length > 0 ? "conformance-only" : "not-run",
+        headline:
+          otherCorners.length > 0
+            ? `${otherCorners.length} corner benchmarks are source-pinned and hash-verified (${otherCorners
+                .map((c) => c.cornerId)
+                .join(", ")}). Every one carries efficacyClaimed=false by construction — they widen coverage, they do not assert benefit.`
+            : "No corner benchmarks recorded.",
+        stats: otherCorners.map((c) => ({
+          label: String(c.cornerId ?? ""),
+          value: c.efficacyClaimed ? "efficacy claimed" : "pinned · no efficacy claim",
+        })),
+      },
+    ],
+  };
+}
 
 async function defaultLoadLocalAgentLab() {
   try {
@@ -665,6 +858,46 @@ export const server = createServer(async (req, res) => {
       databaseConfigured: Boolean(process.env.PM_DATABASE_URL),
       labSessions: labSessions.size,
     });
+  }
+
+  // --- Agent-state benchmark comparison ---
+  // Normalizes the signed public-proof run register (a pinned evidence
+  // artifact) into the four-arm comparison the dashboard shows. Read-only;
+  // never asserts efficacy — the register's own claimBoundary rides along.
+  if (pathname === "/api/benchmarks") {
+    if (method !== "GET") return sendMethodNotAllowed(res);
+    try {
+      const payload = await buildBenchmarksPayload();
+      return sendJson(res, 200, payload);
+    } catch (err) {
+      return sendJson(res, 500, { error: `benchmark register unavailable: ${String(err)}` });
+    }
+  }
+
+  // --- Token KPIs (capstone monitoring & control) ---
+  // Reads admitted eval.token.usage events via the SAME fold the CLI uses
+  // (@pm/local-agent-lab computeTokenUsage), so dashboard numbers can never
+  // drift from the runner's/report's.
+  if (pathname === "/api/token-usage/runs" || pathname === "/api/token-usage") {
+    if (method !== "GET") return sendMethodNotAllowed(res);
+    if (!process.env.PM_DATABASE_URL) {
+      return sendJson(res, 503, { error: "PM_DATABASE_URL is required for token KPIs." });
+    }
+    try {
+      const lab = await defaultLoadLocalAgentLab();
+      const pool = getTokenUsagePool();
+      const tenantId = process.env.PM_DEV_TENANT_ID ?? "tenant_dev";
+      if (pathname === "/api/token-usage/runs") {
+        const runs = await lab.listTokenUsageRuns(pool, { tenantId });
+        return sendJson(res, 200, { tenantId, runs });
+      }
+      const label = new URL(req.url ?? "/", "http://localhost").searchParams.get("label");
+      if (!label) return sendJson(res, 400, { error: "label query parameter is required" });
+      const metrics = await lab.computeTokenUsage(pool, { tenantId, runLabel: label });
+      return sendJson(res, 200, metrics);
+    } catch (err) {
+      return sendJson(res, 500, { error: `token KPIs unavailable: ${String(err)}` });
+    }
   }
 
   // --- integration workbench (D5-D) ---

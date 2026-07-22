@@ -1,5 +1,12 @@
 # External validation review — 2026-07-15
 
+*Transcribed into the repo from the received copy (encoding artifacts in the
+transport repaired; content otherwise verbatim). The point-by-point
+verification and the response plan are in
+[`external-review-response-2026-07-15.md`](./external-review-response-2026-07-15.md);
+the adopted plan and disagreements are recorded as `decision` checkpoints in
+the continuity ledger.*
+
 Independent review of the pm-substrate public-benchmark validation program, produced by
 four separately tasked reviewer agents plus cross-checks: (A) an adversarial fabrication
 audit of the Sentinel production harness (executed the test suites, read the full runner

@@ -7,8 +7,12 @@ is not the source of truth; the continuity ledger is.
 ## Session start — always
 
 ```bash
-PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate pnpm dev:resume
+set -a; source .env; set +a; pnpm dev:resume
 ```
+
+(No `.env` yet? `cp .env.example .env`. The default port is 5432; machines
+with another Postgres on 5432 set `PM_DB_PORT` — docker-compose reads it —
+and the matching port in `PM_DATABASE_URL`. This machine uses 5433.)
 
 Then read [`ROADMAP.md`](./ROADMAP.md) — north star, hard requirements, current phase.
 
