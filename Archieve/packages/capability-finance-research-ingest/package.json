@@ -1,0 +1,40 @@
+{
+  "name": "@pm/capability-finance-research-ingest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "finance-research.ingest capability skeleton for ArrowHedgeLabs Axis A event ingestion.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/continuity": "workspace:*",
+    "@pm/entity-mapping": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@pm/evals": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/projections": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": ".tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["**/*.test.ts", "dist"],
+  "references": [
+    { "path": "../types" },
+    { "path": "../projections" },
+    { "path": "../registry" }
+  ]
+}

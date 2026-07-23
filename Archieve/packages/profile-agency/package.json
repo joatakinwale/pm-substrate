@@ -1,0 +1,40 @@
+{
+  "name": "@pm/profile-agency",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tier-2 marketing-agency profile. Specializations of Tier-1 entities + edge catalog + lifecycle state machines + identity primacy declaration. Built as the anti-fixation falsification test for the substrate (G4 in research gap audit). Modeled after the real PluggedInSocial agency platform.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/evals": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@pm/capability-audit": "workspace:*",
+    "@pm/entity-mapping": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
+    "@pm/projections": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

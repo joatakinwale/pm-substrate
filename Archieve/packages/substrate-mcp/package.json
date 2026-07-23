@@ -1,0 +1,35 @@
+{
+  "name": "@pm/substrate-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP tool surface over the substrate (ROADMAP D2): substrate_resume / substrate_observe / substrate_propose / substrate_admit / substrate_checkpoint. Agents mount the substrate with a config line; observe→propose→admit runs warn-first at propose and enforced at admit through @pm/agent-state-core. stdio transport for local harnesses.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": { "pm-substrate-mcp": "./dist/stdio.js" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/continuity": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/types": "workspace:*",
+    "pg": "^8.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

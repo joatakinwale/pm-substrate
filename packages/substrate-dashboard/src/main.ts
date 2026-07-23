@@ -4,6 +4,7 @@ import { mountBenchmarks } from "./benchmarks-page.js";
 import { mountControlPlane } from "./control-plane-page.js";
 import { mountTokenKpis } from "./token-kpis-page.js";
 import { mountIntegrationWorkbench } from "./integration-workbench-page.js";
+import { mountFactorScoreboard } from "./factor-scoreboard-page.js";
 
 type Mode = "substrate" | "no_substrate" | "ab_pair";
 type SessionStatus = "running" | "completed" | "stopped" | "failed";
@@ -89,6 +90,7 @@ type DashboardView =
   | "benchmarks"
   | "lab"
   | "token-kpis"
+  | "state-factors"
   | "control-plane"
   | "integrations";
 type LabTab = "run" | "sessions" | "evidence" | "settings";
@@ -99,6 +101,7 @@ function currentView(): DashboardView {
     raw === "lab" ||
     raw === "control-plane" ||
     raw === "token-kpis" ||
+    raw === "state-factors" ||
     raw === "integrations"
   ) {
     return raw;
@@ -137,6 +140,7 @@ function renderShell(active: DashboardView): void {
           ${link("benchmarks", "Benchmarks", "benchmarks")}
           ${link("lab", "Local Agent Lab", "lab")}
           ${link("token-kpis", "Token KPIs", "tokens")}
+          ${link("state-factors", "State Factors", "tokens")}
           ${link("control-plane", "Control Plane", "control")}
         </nav>
       </aside>
@@ -330,6 +334,12 @@ async function route(): Promise<void> {
     disconnectStream();
     viewRoot().innerHTML = `<div id="token-kpis-root"></div>`;
     await mountTokenKpis(viewRoot().querySelector<HTMLElement>("#token-kpis-root")!);
+    return;
+  }
+  if (view === "state-factors") {
+    disconnectStream();
+    viewRoot().innerHTML = `<div id="state-factors-root"></div>`;
+    await mountFactorScoreboard(viewRoot().querySelector<HTMLElement>("#state-factors-root")!);
     return;
   }
   if (view === "integrations") {

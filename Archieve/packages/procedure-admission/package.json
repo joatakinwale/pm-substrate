@@ -1,0 +1,31 @@
+{
+  "name": "@pm/procedure-admission",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Replayable admission kernel for deterministic procedure and harness runs.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/agent-state-core": "workspace:*",
+    "@pm/types": "workspace:*",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

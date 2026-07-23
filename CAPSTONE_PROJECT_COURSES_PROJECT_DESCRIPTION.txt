@@ -1,0 +1,126 @@
+
+
+Capstone Project #1:
+
+The book used for course is NASA. (2015) Cost Estimating handbook -Version 4 (Retrieved from https://www.nasa.gov/ocfo/nasa-cost-estimating-handbook-ceh/)
+
+Course Description: 
+- Throughout this course, every concept you learn is tied back to real-world applications:
+         - Module tasks and projects are crafted to simulate real engineering problems you will encounter in the workforce.
+         - Case studies are drawn from current events and historical projects, demonstrating the implications of cost engineering decisions.
+         - Guest lectures and webinars feature industry professionals who discuss how they apply the lessons we cover in real operational settings.
+         - By the end of this course, you should be able to answer the question, "What's in it for me?" with a clear understanding of how cost engineering principles can directly impact your career in engineering, improve project outcomes, and contribute to effective financial and resource management in any project you undertake.
+
+- Course Learning Objectives
+The activities, content, and assignments in this course will guide your learning process to ensure you can: 
+         - Demonstrate an understanding of engineering economics, concepts, and applications.
+         - Apply cost engineering methods.
+         - Apply cost management techniques.
+         - Form strategies for the management of cost issues in interdisciplinary project environments.
+         - Apply modern software packages to conduct analysis of real-world data.
+         - Communicate results of a cost engineering analysis
+
+
+——————————-——————————-
+Capstone Project Presentation in Cost Engineering Description:
+         - For the culmination of your course, you are required to develop and present a capstone project that embodies the knowledge and skills you have acquired in cost engineering. This project will involve a comprehensive analysis of a cost engineering topic which can be an in-depth examination of a real or hypothetical project, or an analytical review of cost engineering software.          
+         - Your final deliverable will be a detailed poster presentation, which will be shared with your peers for critique and learning through a structured peer review process.
+
+Learning Outcomes:
+         - CLO A: Demonstrate an understanding of engineering economics by analyzing cost data and making informed recommendations. (MLO 1)
+         - CLO B: Apply cost engineering methods to assess and optimize project costs. (MLO 2)
+         - CLO C: Utilize cost management techniques to forecast and control project expenditures. (MLO 2)
+         - CLO D: Formulate strategies for managing cost issues within interdisciplinary project environments. (MLO 2)
+         - CLO E: Evaluate and critique cost engineering software tools based on their effectiveness in real-world applications. (MLO 2)
+         - CLO F: Communicate complex cost engineering concepts and analysis clearly through visual and oral presentations. (MLO 3)
+This assignment assesses course-level objectives (CLO) and the associated module-level objectives (MLO).
+
+Directions:
+1) Project Selection:
+         - Choose a topic that reflects a significant aspect of cost engineering. This could be a detailed cost analysis of a construction project, a case study on the use of a specific cost engineering software, or a hypothetical scenario that explores cost optimization strategies.
+
+2) Research and Analysis:
+         - Conduct thorough research on your chosen topic. 
+         - Gather data, utilize cost engineering tools, and apply the concepts learned throughout the course.
+         - Analyze your findings, focusing on the critical aspects of cost management, economic implications, and strategic importance.
+
+3) Poster Creation:
+         - Design a poster that effectively communicates your project. Include key elements such as introduction, methodology, results, and conclusions.
+         - Ensure that your poster is visually engaging and organized in a way that logically presents your analysis.
+         - Submit the Poster by Wednesday, Week 8.
+‘’’
+
+
+Capstone Project #2:
+The book used for course are 
+1. National Aeronautics and Space Administration. (2022). NASA Space Flight Program and Project Management Handbook. Headquarters, Washington, D.C.
+This handbook gives you a real-world resource for the course and for future use as reference.
+
+2.  Gawande, A. (2011). Checklist Manifesto: How to Get Things Right. Metropolitan Books.
+The Checklist Manifesto gives rationale and a process to follow to creating your own functional checklists for managing projects. The book has practical insights into managing complex project, minimizing human error, and fostering teamwork. 
+
+
+Course Description:
+This course on Project Management Methods isn't just about mastering theoretical concepts; it's about preparing you to tackle real-world challenges efficiently and effectively. 
+Here’s how the course material connects to real-life applications:
+1) Waterfall, Agile and Project Management approaches: 
+         - Understanding these methodologies is essential not just for IT or construction projects but for any complex business initiatives. For instance, learning about these approaches will enable you to manage software development projects or new product launches in your company. 
+
+2) Roles and Responsibilities of a Project Manager: 
+         - This course will equip you with the skills to lead project teams and manage resources effectively, directly applicable to roles in project coordination, team leadership, or startup management. You'll learn to navigate the complexities of team dynamics, stakeholder expectations, and project deliverables—crucial for any leadership role.
+
+3) Developing a Project Plan: 
+         - The skills in budgeting, scheduling, and resource allocation are indispensable for anyone involved in project-based work. Whether you’re overseeing a community project, organizing a major event, or leading a new business initiative, the ability to draft and execute a detailed project plan is a key competency that can set you apart in various career paths.
+
+4) Executing, Monitoring, and Controlling a Project: 
+         - This part of your learning will directly contribute to your capabilities in roles that require ongoing project oversight and adjustments. You'll learn to use tools and techniques to keep projects on track and within budget.
+
+5) Transitioning a Project to Operational Status:
+         - The final phase of a project involves ensuring that deliverables are not just completed but are fully operational and integrated into their intended environments. This skill is crucial for ensuring that the benefits of projects are realized, making it valuable for roles in project handover, operations, and in policy implementation projects.
+
+——————————-——————————-
+Capstone Project in Project Management Methods
+
+For the culmination of your course, you are required to develop and present a capstone project that embodies the knowledge and skills you have acquired in project management. This project will involve a comprehensive analysis of a project management topic, which can be an in-depth examination of a real or hypothetical project, or an analytical review of project management methodologies. Your final deliverable will be a detailed poster presentation, which will be shared with your peers for critique and learning through a structured peer review process.
+
+The end goal is for you to demonstrate your ability to integrate and communicate complex information related to the planning and execution of project management approaches and the responsibilities of a project manager. You will showcase the application of advanced project management strategies, including budgeting, scheduling, resource allocation, and project monitoring and control.
+
+Assignment Objectives
+
+This assignment will guide your learning process to ensure you can:
+
+Describe the planning and execution of a complex project incorporating a management approach. (MLO 1, 2; CLO A, E)
+Develop a comprehensive project plan that includes budgeting, scheduling, and resource allocation. (MLO 2, 2;CLO D, E)
+Analyze a complex project and develop documentation of the process  for transitioning the project to operational status. (MLO1, 2; CLO D, E)
+
+Directions:
+
+1) Project Selection
+Choose a topic that reflects a significant aspect of project management. This could be a detailed analysis of a completed project, a case study on the use of specific project management methodologies, or a hypothetical scenario that explores project planning and execution strategies.
+You have the option to work individually or in groups. Working in groups can enhance collaboration and bring diverse perspectives to your project. However, if you prefer to work individually, that is also acceptable.
+Project selection approved by Week 4.
+Feel free to share ideas on the discussion board, Capstone Project Ideas and Collaboration.
+
+2)Research and Analysis
+Conduct thorough research on your chosen topic. Gather data, utilize project management tools, and apply the concepts learned throughout the course. Include the following project management elements: 
+         - Project introduction
+         - Planning
+         - Budgeting
+         - Scheduling 
+         - Execution
+         - Monitoring
+         - Transition 
+
+3) Analyze your findings, focusing on the critical aspects of project planning, execution, monitoring, and control.
+
+4) Develop a comprehensive project plan that includes budgeting, scheduling, and resource allocation.
+
+5) Poster Creation
+Design a poster that thoroughly communicates your project. Include key elements such as introduction, methodology, results, and conclusions.
+
+6) Be sure to incorporate all necessary elements such as project background, analysis, results, and conclusions.
+
+Ensure that your poster is visually engaging and organized in a way that logically presents your analysis.
+Due: Submit your poster by Sunday, Week 13 (11:59 pm Central) 
+
+‘’’

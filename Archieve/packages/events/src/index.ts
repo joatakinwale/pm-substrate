@@ -1,0 +1,29 @@
+/**
+ * @pm/events — Append-only event log + LISTEN/NOTIFY router.
+ *
+ * Architecture rule (architecture.md, Layer 2):
+ *   Append-only. Topic-scoped streams (tenant + entity type).
+ *   Declarative subscriptions. Time-travel queries free.
+ */
+
+export type {
+  EventPublisher,
+  EventReader,
+  EventChainVerifier,
+  SubscriptionRouter,
+  PublishInput,
+  ReadQuery,
+} from "./interfaces.js";
+
+export { PostgresEventStore } from "./postgres.js";
+export {
+  admissibilityOf,
+  eventContentHash,
+  sha256Hex,
+  verifyEventChain,
+  type EventAdmissibilityReport,
+  type EventChainVerificationReport,
+  type EventProvenanceEnvelope,
+} from "./provenance.js";
+export { matchesPattern, patternToSqlLike } from "./pattern.js";
+export { ensureMonthPartition, monthRange } from "./partitions.js";

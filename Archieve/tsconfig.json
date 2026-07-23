@@ -1,0 +1,65 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/types"
+    },
+    {
+      "path": "./packages/agent-state-provenance"
+    },
+    {
+      "path": "./packages/agent-state-core"
+    },
+    {
+      "path": "./packages/substrate-mcp"
+    },
+    {
+      "path": "./packages/procedure-admission"
+    },
+    {
+      "path": "./packages/continuity"
+    },
+    {
+      "path": "./packages/tenants"
+    },
+    {
+      "path": "./packages/graph"
+    },
+    {
+      "path": "./packages/events"
+    },
+    {
+      "path": "./packages/registry"
+    },
+    {
+      "path": "./packages/workflow"
+    },
+    {
+      "path": "./packages/projections"
+    },
+    {
+      "path": "./packages/capability-kit"
+    },
+    {
+      "path": "./packages/entity-mapping"
+    },
+    {
+      "path": "./packages/integration-kit"
+    },
+    {
+      "path": "./packages/evals"
+    },
+    {
+      "path": "./packages/profile-finance-research"
+    },
+    {
+      "path": "./packages/profile-pmgovernance"
+    },
+    {
+      "path": "./packages/capability-finance-research-ingest"
+    },
+    {
+      "path": "./packages/capability-pmgovernance-stage-gate"
+    }
+  ]
+}

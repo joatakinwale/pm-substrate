@@ -1,0 +1,6 @@
+{
+  "batchPath": "/absolute/path/to/output/pm-matched-batch-<hash>.json",
+  "outputRoot": "/absolute/path/to/output",
+  "checkoutPath": "/absolute/path/to/clean/ToolSandbox",
+  "oraclePythonExecutable": "/absolute/path/to/tool-sandbox-python"
+}

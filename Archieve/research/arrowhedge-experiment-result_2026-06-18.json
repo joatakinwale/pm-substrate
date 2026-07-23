@@ -1,0 +1,85 @@
+{
+  "actionable_ticks": 5,
+  "stale_ticks": 3,
+  "arm_a_stale_action_rate": 0.6,
+  "arm_b_stale_blocked_rate": 1.0,
+  "arm_b_authority_gate_pass_rate": 0.625,
+  "delta_protection": 3,
+  "falsified": false,
+  "per_tick": [
+    {
+      "ticker": "AAPL",
+      "actionable": true,
+      "stale": false,
+      "ingested_events": 13,
+      "cop_authorityGate": {
+        "passes": 1,
+        "failures": 0
+      },
+      "cop_staleBlocks": 0,
+      "substrate_flagged": false
+    },
+    {
+      "ticker": "MSFT",
+      "actionable": true,
+      "stale": false,
+      "ingested_events": 13,
+      "cop_authorityGate": {
+        "passes": 1,
+        "failures": 0
+      },
+      "cop_staleBlocks": 0,
+      "substrate_flagged": false
+    },
+    {
+      "ticker": "NVDA",
+      "actionable": true,
+      "stale": true,
+      "ingested_events": 14,
+      "cop_authorityGate": {
+        "passes": 1,
+        "failures": 1
+      },
+      "cop_staleBlocks": 1,
+      "substrate_flagged": true
+    },
+    {
+      "ticker": "TSLA",
+      "actionable": true,
+      "stale": true,
+      "ingested_events": 14,
+      "cop_authorityGate": {
+        "passes": 1,
+        "failures": 1
+      },
+      "cop_staleBlocks": 1,
+      "substrate_flagged": true
+    },
+    {
+      "ticker": "AMZN",
+      "actionable": false,
+      "stale": false,
+      "ingested_events": 12,
+      "cop_authorityGate": {
+        "passes": 0,
+        "failures": 0
+      },
+      "cop_staleBlocks": 0,
+      "substrate_flagged": false
+    },
+    {
+      "ticker": "GOOG",
+      "actionable": true,
+      "stale": true,
+      "ingested_events": 14,
+      "cop_authorityGate": {
+        "passes": 1,
+        "failures": 1
+      },
+      "cop_staleBlocks": 1,
+      "substrate_flagged": true
+    }
+  ]
+}
+
+RESULT: Arm A stale-action rate 0.60 vs Arm B blocked rate 1.00; substrate blocked 3 stale action(s) the raw agents took.

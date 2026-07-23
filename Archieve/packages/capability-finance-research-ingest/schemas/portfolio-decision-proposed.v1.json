@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finance-research/portfolio-decision-proposed.v1.json",
+  "type": "object",
+  "required": ["researchRunId", "tickerId", "decisionId", "action", "quantity", "occurredAt"],
+  "properties": {
+    "researchRunId": { "type": "string" },
+    "tickerId": { "type": "string" },
+    "decisionId": { "type": "string" },
+    "action": { "type": "string", "enum": ["buy", "sell", "short", "cover", "hold"] },
+    "quantity": { "type": "integer", "minimum": 0 },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": true
+}

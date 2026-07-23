@@ -1,0 +1,2295 @@
+"""Liquid — the main orchestrator tying all phases together."""
+
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING, Any
+
+import httpx
+
+from liquid.auth.classifier import AuthClassifier, EscalationInfo
+from liquid.auth.manager import AuthManager
+from liquid.discovery.a2a import A2ADiscovery
+from liquid.discovery.adb import ADBDiscovery
+from liquid.discovery.bacnet import BACnetDiscovery
+from liquid.discovery.base import DiscoveryPipeline
+from liquid.discovery.browser import BrowserDiscovery
+from liquid.discovery.diff import diff_schemas
+from liquid.discovery.duckdb import DuckDBDiscovery
+from liquid.discovery.email import EmailDiscovery
+from liquid.discovery.graphql import GraphQLDiscovery
+from liquid.discovery.grpc_reflect import GRPCDiscovery
+from liquid.discovery.manifest import ManifestDiscovery
+from liquid.discovery.mcp import MCPDiscovery
+from liquid.discovery.modbus import ModbusDiscovery
+from liquid.discovery.mongodb import MongoDBDiscovery
+from liquid.discovery.mqtt import MQTTDiscovery
+from liquid.discovery.mssql import MSSQLDiscovery
+from liquid.discovery.mysql import MySQLDiscovery
+from liquid.discovery.neo4j import Neo4jDiscovery
+from liquid.discovery.opcua import OPCUADiscovery
+from liquid.discovery.openapi import OpenAPIDiscovery
+from liquid.discovery.plugin_manifest import PluginManifestDiscovery
+from liquid.discovery.postgres import PostgresDiscovery
+from liquid.discovery.redis import RedisDiscovery
+from liquid.discovery.rest_heuristic import RESTHeuristicDiscovery
+from liquid.discovery.sqlite import SQLiteDiscovery
+from liquid.discovery.sse import SSEDiscovery
+from liquid.discovery.websocket import WSDiscovery
+from liquid.discovery.wsdl import WSDLDiscovery
+from liquid.exceptions import ActionNotVerifiedError, LiquidError, Recovery
+from liquid.mapping.learning import MappingLearner
+from liquid.mapping.proposer import MappingProposer
+from liquid.mapping.reviewer import MappingReview
+from liquid.models.action import ActionConfig, ActionResult
+from liquid.models.adapter import AdapterConfig, FieldMapping, SyncConfig
+from liquid.models.schema import APISchema, EndpointKind, SchemaDiff
+from liquid.sync.engine import SyncEngine
+from liquid.sync.fetcher import Fetcher
+from liquid.sync.mapper import RecordMapper
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from datetime import datetime
+
+    from liquid.action.batch import BatchResult
+    from liquid.action.reviewer import ActionReview
+    from liquid.diff_sync import FetchChangesResult
+    from liquid.estimate import FetchEstimate
+    from liquid.events import EventHandler
+    from liquid.models.response import FetchResponse, FetchUntilResult, SearchNLResult
+    from liquid.models.schema import Endpoint
+    from liquid.models.sync import SyncResult
+    from liquid.protocols import AdapterRegistry, CacheStore, DataSink, KnowledgeStore, LLMBackend, Vault
+    from liquid.query.nl import NLCompilationCache
+    from liquid.sync.quota import QuotaInfo
+    from liquid.sync.rate_limiter import RateLimiter
+    from liquid.sync.retry import RetryPolicy
+    from liquid.telemetry import TelemetryCollector
+    from liquid.verbosity import VerbosityLevel
+
+
+def _normalize_mappings_to_record(
+    mappings: list[FieldMapping],
+    schema: APISchema,
+) -> list[FieldMapping]:
+    """Strip an envelope prefix from mapping source paths.
+
+    Discovery's selector unwraps enveloped responses (``record_path``) before
+    mapping, so the mapper runs per-record. An LLM proposer, however, often
+    writes paths relative to the whole envelope (e.g. ``instances[].id``). Strip
+    the leading ``{record_path}[].`` / ``{record_path}.`` so the path resolves
+    against a single record.
+    """
+    record_paths = [ep.record_path for ep in schema.endpoints if ep.record_path]
+    if not record_paths:
+        return mappings
+    prefixes = tuple(p for rp in record_paths for p in (f"{rp}[].", f"{rp}."))
+    out: list[FieldMapping] = []
+    for m in mappings:
+        sp = m.source_path
+        for pref in prefixes:
+            if sp.startswith(pref):
+                sp = sp[len(pref) :]
+                break
+        out.append(m.model_copy(update={"source_path": sp}) if sp != m.source_path else m)
+    return out
+
+
+def _mapping_coverage(records: list[dict[str, Any]], mappings: list[FieldMapping]) -> float:
+    """Fraction of (record, mapped-field) cells that came back non-null.
+
+    A healthy adapter scores near 1.0; a stale one (upstream renamed/removed the
+    fields it maps from) collapses toward 0 because every extraction misses.
+    """
+    if not records or not mappings:
+        return 1.0  # nothing to judge → don't trigger repair
+    targets = [m.target_field for m in mappings]
+    cells = len(records) * len(targets)
+    if cells == 0:
+        return 1.0
+    present = sum(1 for r in records for t in targets if r.get(t) is not None)
+    return present / cells
+
+
+def _path_exists(sample: dict[str, Any], path: str) -> bool:
+    """Whether ``path`` resolves in ``sample`` (the key chain is present).
+
+    Distinguishes a *stale/hallucinated* path (missing key → KeyError) from a
+    field that is simply ``null`` in this record (present key, null value) — the
+    former is a mapping error to fix, the latter is just data.
+    """
+    from liquid.sync.mapper import _extract_path
+
+    try:
+        _extract_path(sample, path)
+    except KeyError:
+        return False
+    except Exception:
+        return True  # unusual shape — don't treat as broken
+    return True
+
+
+def _has_broken_mappings(mappings: list[FieldMapping], sample: dict[str, Any]) -> bool:
+    """True if any mapping points at a path that doesn't exist in the live record."""
+    return any(not _path_exists(sample, m.source_path) for m in mappings)
+
+
+def _identity_fallback_mappings(
+    mappings: list[FieldMapping],
+    target_model: dict[str, Any],
+    schema: APISchema,
+) -> list[FieldMapping]:
+    """Add identity mappings for target fields the LLM proposer missed.
+
+    Discovery captures a real record's field names in each endpoint's
+    ``response_schema``. When a target field shares its name with a discovered
+    field but the proposer produced no mapping for it (LLM omission, or zero
+    proposals), add a direct ``field → field`` mapping. This makes fetch robust
+    to incomplete LLM mapping without inventing paths that don't exist.
+    """
+    known_fields: set[str] = set()
+    for ep in schema.endpoints:
+        props = (ep.response_schema or {}).get("properties")
+        if isinstance(props, dict):
+            known_fields.update(props.keys())
+    if not known_fields:
+        return mappings
+    mapped_targets = {m.target_field for m in mappings}
+    out = list(mappings)
+    for field in target_model:
+        if field not in mapped_targets and field in known_fields:
+            out.append(FieldMapping(source_path=field, target_field=field, confidence=0.9))
+    return out
+
+
+class Liquid:
+    """Main entry point for the Liquid library.
+
+    Connects AI agents to any API: discover → map → fetch.
+    Like Zapier, but for AI agents — and the integrations maintain themselves.
+    """
+
+    def __init__(
+        self,
+        llm: LLMBackend | None,
+        vault: Vault,
+        sink: DataSink,
+        knowledge: KnowledgeStore | None = None,
+        registry: AdapterRegistry | None = None,
+        event_handler: EventHandler | None = None,
+        http_client: httpx.AsyncClient | None = None,
+        retry_policy: RetryPolicy | None = None,
+        cache: CacheStore | None = None,
+        rate_limiter: RateLimiter | None = None,
+        contribute_telemetry: bool = False,
+        telemetry_endpoint: str | None = None,
+        normalize_output: bool = False,
+        normalize_hints: dict[str, Any] | None = None,
+        include_meta: bool = False,
+        on_evolution: Callable[[Any], None] | None = None,
+        on_schema_mismatch: Callable[[Any], None] | None = None,
+        validation_coverage_threshold: float = 0.9,
+        event_store: Any | None = None,
+        catalog: AdapterRegistry | None = None,
+        use_bundled_adapters: bool = True,
+    ) -> None:
+        self.llm = llm
+        self.vault = vault
+        self.sink = sink
+        self.knowledge = knowledge
+        self.registry = registry
+        # Read-only resolution tiers consulted by get_or_create between the user's
+        # writable registry and (last resort) discovery: bundled wheel adapters,
+        # then an optional cloud catalog. Order = priority.
+        self._read_tiers: list[AdapterRegistry] = []
+        if use_bundled_adapters:
+            from liquid.adapters import BundledAdapterRegistry
+
+            self._read_tiers.append(BundledAdapterRegistry())
+        if catalog is not None:
+            self._read_tiers.append(catalog)
+        self.event_handler = event_handler
+        self._http_client = http_client
+        self._retry_policy = retry_policy
+        self.cache = cache
+        self.rate_limiter = rate_limiter
+        self.normalize_output = normalize_output
+        self.normalize_hints = normalize_hints
+        self.include_meta = include_meta
+        self._on_evolution = on_evolution
+        self._on_schema_mismatch = on_schema_mismatch
+        self._validation_coverage_threshold = validation_coverage_threshold
+        self.event_store = event_store
+
+        self.telemetry: TelemetryCollector | None = None
+        if contribute_telemetry:
+            from liquid.telemetry import TelemetryCollector
+
+            self.telemetry = TelemetryCollector(
+                endpoint=telemetry_endpoint or "https://liquid.ertad.family/v1/telemetry",
+            )
+
+        self._auth_classifier = AuthClassifier()
+        self._auth_manager = AuthManager(vault)
+        self._mapping_proposer = MappingProposer(llm, knowledge)
+        self._mapping_learner = MappingLearner(knowledge)
+
+        from liquid.action.proposer import ActionProposer
+
+        self._action_proposer = ActionProposer(llm, knowledge)
+
+    def _dispatch_evolution_signals(self, signals: list[Any]) -> None:
+        """Fire the user-provided ``on_evolution`` callback for each signal.
+
+        Errors inside the callback are swallowed — evolution detection must
+        never take down a live fetch. Agents that want hard failure can wrap
+        their own logic inside.
+        """
+        if not signals or self._on_evolution is None:
+            return
+        for sig in signals:
+            try:
+                self._on_evolution(sig)
+            except Exception:
+                continue
+
+    async def _record_event(
+        self,
+        *,
+        kind: str,
+        adapter: str,
+        endpoint: str,
+        method: str = "GET",
+        status_code: int | None = None,
+        duration_ms: int = 0,
+        record_count: int | None = None,
+        cache_hit: bool = False,
+        evolution_count: int = 0,
+        validation_count: int = 0,
+        error_type: str | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        """Append a :class:`~liquid.observability.FetchEvent` if an event
+        store is configured. Errors inside the store are swallowed — losing
+        an audit entry is preferable to failing the user's fetch."""
+        if self.event_store is None:
+            return
+        from liquid.observability.events import EventKind, FetchEvent
+
+        try:
+            event = FetchEvent(
+                kind=EventKind(kind),
+                adapter=adapter,
+                endpoint=endpoint,
+                method=method,
+                status_code=status_code,
+                duration_ms=duration_ms,
+                record_count=record_count,
+                cache_hit=cache_hit,
+                evolution_signal_count=evolution_count,
+                validation_signal_count=validation_count,
+                error_type=error_type,
+                error_message=error_message,
+            )
+            await self.event_store.append(event)
+        except Exception:
+            return
+
+    def _validate_response(
+        self,
+        config: AdapterConfig,
+        records: list[dict[str, Any]],
+        endpoint: str,
+    ) -> list[Any]:
+        """Run :class:`~liquid.validation.ResponseValidator` and dispatch
+        callbacks. Always returns the signal list for meta-block inclusion."""
+        if not config.mappings or not records:
+            return []
+        from liquid.validation import ResponseValidator
+
+        validator = ResponseValidator(
+            config.mappings,
+            coverage_threshold=self._validation_coverage_threshold,
+        )
+        signals = validator.validate(records, endpoint=endpoint)
+        if signals and self._on_schema_mismatch is not None:
+            for sig in signals:
+                try:
+                    self._on_schema_mismatch(sig)
+                except Exception:
+                    continue
+        return signals
+
+    def _maybe_normalize(self, data: Any) -> Any:
+        """Apply output normalization when the ``normalize_output`` flag is on.
+
+        No-op otherwise — returns ``data`` unchanged.
+        """
+        if not self.normalize_output:
+            return data
+        from liquid.normalize import normalize_response
+
+        return normalize_response(data, hints=self.normalize_hints)
+
+    async def discover(self, url: str, credentials: dict[str, Any] | None = None) -> APISchema:
+        """Phase 1: Discover the API at the given URL.
+
+        When ``credentials`` are supplied they are turned into best-effort auth
+        headers so discovery can probe APIs that reject unauthenticated requests
+        (and that publish no OpenAPI spec). The same credentials are later stored
+        by :meth:`get_or_create` for fetch-time auth.
+
+        A bare ``host:port`` (no scheme) is normalized to a protocol URL via
+        port fingerprinting (e.g. ``db:5432`` → ``postgresql://db:5432``); if
+        nothing recognizes the target, the failure is enriched with a "looks
+        like X — install ..." hint when fingerprinting can name it.
+        """
+        from liquid.discovery.fingerprint import fingerprint_url
+
+        fp = fingerprint_url(url)
+        if fp.confidence == "port" and fp.normalized_url:
+            import logging
+
+            logging.getLogger(__name__).info(
+                "fingerprint: normalized %s → %s (%s)", url, fp.normalized_url, fp.evidence
+            )
+            url = fp.normalized_url
+
+        probe_auth = await self._build_probe_auth(credentials)
+        client = self._http_client or httpx.AsyncClient()
+        try:
+            pipeline = DiscoveryPipeline(
+                [
+                    # Database DSNs can't be probed over HTTP — match them first so a
+                    # DB URL (`postgres://` / `mysql://` / `sqlite://` / `neo4j://` /
+                    # `duckdb://` / `mssql://` / `mongodb://` / `redis://`)
+                    # short-circuits before the wire/HTTP strategies.
+                    PostgresDiscovery(),
+                    MySQLDiscovery(),
+                    SQLiteDiscovery(),
+                    Neo4jDiscovery(),
+                    DuckDBDiscovery(),
+                    MSSQLDiscovery(),
+                    MongoDBDiscovery(),
+                    RedisDiscovery(),
+                    EmailDiscovery(),
+                    MQTTDiscovery(),
+                    ModbusDiscovery(),
+                    OPCUADiscovery(),
+                    ADBDiscovery(),
+                    BACnetDiscovery(),
+                    # User-registered SQL backends defined as data (dialect manifests).
+                    ManifestDiscovery(),
+                    GRPCDiscovery(),
+                    WSDiscovery(),
+                    MCPDiscovery(),
+                    A2ADiscovery(http_client=client),
+                    PluginManifestDiscovery(http_client=client),
+                    # Content-type gated: only claims the URL if it actually streams
+                    # (text/event-stream or NDJSON); ordinary JSON falls through to REST.
+                    SSEDiscovery(http_client=client),
+                    OpenAPIDiscovery(http_client=client),
+                    GraphQLDiscovery(http_client=client),
+                    WSDLDiscovery(http_client=client),
+                    RESTHeuristicDiscovery(llm=self.llm, http_client=client, probe_auth=probe_auth),
+                    BrowserDiscovery(llm=self.llm),
+                ]
+            )
+            return await pipeline.discover(url)
+        finally:
+            if not self._http_client:
+                await client.aclose()
+
+    async def identify(self, url: str, *, probe: bool = True) -> Any:
+        """Identify the protocol of a target without discovering it.
+
+        Returns a :class:`~liquid.discovery.fingerprint.Fingerprint` (protocol,
+        confidence, normalized URL, whether a driver is installed, and an
+        install hint). Useful for an agent to ask "what is this, and can I
+        connect?" before committing to discovery. ``probe=False`` stays offline
+        (scheme/port only; no socket connection).
+        """
+        from liquid.discovery.fingerprint import identify as _identify
+
+        return await _identify(url, probe=probe)
+
+    async def _build_probe_auth(self, credentials: dict[str, Any] | None) -> Any:
+        """Authenticate discovery probes with the *same* scheme used for fetch.
+
+        Builds the credential-derived auth scheme against a throwaway in-memory
+        vault and returns its ``httpx.Auth``. This makes probing work uniformly
+        for every scheme — including request-signing ones (HMAC, AWS SigV4) and
+        path-embedded tokens — that a static header/param can't express.
+        """
+        if not credentials:
+            return None
+        from liquid._defaults import InMemoryVault
+        from liquid.auth.schemes import scheme_from_credentials
+
+        scheme = scheme_from_credentials("custom", credentials)
+        if scheme is None:
+            return None
+        tmp = InMemoryVault()
+        for key, value in credentials.items():
+            if key != "auth":
+                await tmp.store(f"probe/{key}", str(value))
+        try:
+            return await scheme.build_httpx_auth(tmp, "probe")
+        except Exception:
+            return None
+
+    def classify_auth(self, schema: APISchema) -> EscalationInfo:
+        """Phase 2: Classify auth requirements and return escalation info."""
+        return self._auth_classifier.classify(schema.auth)
+
+    async def store_credentials(self, adapter_id: str, credentials: dict[str, Any]) -> str:
+        """Phase 2b: Store credentials after human provides them."""
+        return await self._auth_manager.store_credentials(adapter_id, credentials)
+
+    async def propose_mappings(
+        self,
+        schema: APISchema,
+        target_model: dict[str, Any],
+    ) -> MappingReview:
+        """Phase 3: AI proposes field mappings for human review."""
+        proposals = await self._mapping_proposer.propose(schema, target_model)
+        return MappingReview(proposals)
+
+    async def create_adapter(
+        self,
+        schema: APISchema,
+        auth_ref: str,
+        mappings: list[FieldMapping],
+        sync_config: SyncConfig,
+        verified_by: str | None = None,
+        actions: list[ActionConfig] | None = None,
+    ) -> AdapterConfig:
+        """Phase 3b: Create the final adapter config after human approval."""
+        from datetime import UTC, datetime
+
+        return AdapterConfig(
+            schema=schema,
+            auth_ref=auth_ref,
+            mappings=mappings,
+            sync=sync_config,
+            actions=actions or [],
+            verified_by=verified_by,
+            verified_at=datetime.now(UTC) if verified_by else None,
+        )
+
+    async def _ensure_rate_limit_seeded(
+        self,
+        config: AdapterConfig,
+        endpoint_path: str | None = None,
+    ) -> None:
+        """Seed rate limiter with known limits on first use.
+
+        Priority:
+        1. schema.rate_limits (declared by discovery)
+        2. STATIC_KNOWN_LIMITS (hostname match)
+        3. CATEGORY_DEFAULTS (fallback)
+
+        Observed response headers still take precedence (seed doesn't overwrite).
+        """
+        if self.rate_limiter is None:
+            return
+
+        from liquid.sync.known_limits import infer_limits
+
+        limits = config.schema_.rate_limits
+        if limits is None:
+            limits = infer_limits(config.schema_.source_url, category=None)
+
+        key = f"{config.config_id}:{endpoint_path}" if endpoint_path else config.config_id
+        await self.rate_limiter.seed(key, limits)
+
+    async def sync(
+        self,
+        config: AdapterConfig,
+        cursor: str | None = None,
+        *,
+        max_tokens: int | None = None,
+    ) -> SyncResult:
+        """Phase 4: Run a deterministic sync cycle.
+
+        ``max_tokens`` is accepted for signature symmetry with
+        :meth:`fetch` / :meth:`execute` but is currently a no-op — sync
+        writes through a sink rather than returning records to the agent,
+        so there's nothing to trim. Keeping the kwarg avoids breaking
+        downstream callers that template the same signature.
+        """
+        _ = max_tokens  # accepted for API symmetry; see docstring
+        for ep in config.sync.endpoints:
+            await self._ensure_rate_limit_seeded(config, ep)
+        client = self._http_client or httpx.AsyncClient()
+        try:
+            fetcher = Fetcher(
+                http_client=client,
+                vault=self.vault,
+                adapter_id=config.config_id,
+                rate_limiter=self.rate_limiter,
+                telemetry=self.telemetry,
+            )
+            mapper = RecordMapper(config.mappings)
+            engine = SyncEngine(
+                fetcher=fetcher,
+                mapper=mapper,
+                sink=self.sink,
+                event_handler=self.event_handler,
+                retry_policy=self._retry_policy,
+            )
+            return await engine.run(config, cursor)
+        finally:
+            if not self._http_client:
+                await client.aclose()
+
+    async def get_or_create(
+        self,
+        url: str,
+        target_model: dict[str, Any],
+        credentials: dict[str, Any] | None = None,
+        auto_approve: bool = False,
+        confidence_threshold: float = 0.8,
+        include_actions: bool = False,
+        action_model: dict[str, Any] | None = None,
+    ) -> AdapterConfig | MappingReview:
+        """Connect to a service — reuse existing integration or create a new one.
+
+        This is the primary entry point for AI agents. The agent says
+        "I need Shopify data shaped like this model" and Liquid handles the rest:
+        - Checks registry for existing integration
+        - If found and healthy → returns it
+        - If not found → discovers API, proposes mappings, creates adapter
+        - If auto_approve=True and confidence is high → returns ready AdapterConfig
+        - Otherwise → returns MappingReview for human approval
+
+        Requires registry to be set on the Liquid instance.
+        """
+        if not self.registry:
+            msg = "AdapterRegistry is required for get_or_create(). Pass registry= to Liquid()."
+            raise ValueError(msg)
+
+        target_key = json.dumps(target_model, sort_keys=True)
+
+        # Resolution tiers, by priority: the user's writable registry, then the
+        # read-only tiers (bundled wheel adapters, then optional cloud catalog).
+        # Discovery (Step 3) runs only if no tier can satisfy the request.
+        from liquid.discovery.utils import infer_service_name
+
+        tiers: list[AdapterRegistry] = [self.registry, *self._read_tiers]
+        service_hint = infer_service_name(url)
+
+        # Step 1: Exact match (same URL + same model) in any tier → free, no LLM.
+        for tier in tiers:
+            exact = await tier.get(url, target_key)
+            if exact is not None:
+                return exact
+
+        # Step 2: Service match (same service, different model) → re-map only.
+        # First tier that knows the service wins (writable registry has priority).
+        for tier in tiers:
+            service_matches = await tier.get_by_service(service_hint)
+            if not service_matches:
+                continue
+            template = service_matches[0]
+            proposals = await self._mapping_proposer.propose(template.schema_, target_model)
+            review = MappingReview(proposals)
+            if auto_approve and all(m.confidence >= confidence_threshold for m in proposals):
+                review.approve_all()
+                actions = (
+                    await self._build_auto_actions(
+                        template.schema_,
+                        action_model or target_model,
+                        review.finalize(),
+                        confidence_threshold,
+                    )
+                    if include_actions
+                    else []
+                )
+                config = AdapterConfig(
+                    schema=template.schema_,
+                    auth_ref=template.auth_ref,
+                    mappings=review.finalize(),
+                    sync=SyncConfig(endpoints=[ep.path for ep in template.schema_.endpoints]),
+                    actions=actions,
+                )
+                await self.registry.save(config, target_key)  # cache into the writable tier
+                return config
+            return review
+
+        # Step 3: Full discovery (expensive). Credentials, when given, let
+        # discovery probe auth-walled APIs and are stored for fetch-time auth.
+        schema = await self.discover(url, credentials=credentials)
+
+        auth_scheme = None
+        if credentials:
+            auth_ref = await self.store_credentials(schema.service_name, credentials)
+            from liquid.auth.schemes import scheme_from_credentials
+
+            auth_scheme = scheme_from_credentials(schema.auth.type, credentials)
+        else:
+            auth_ref = f"liquid/{schema.service_name}"
+
+        proposals = await self._mapping_proposer.propose(schema, target_model)
+        review = MappingReview(proposals)
+
+        if auto_approve and all(m.confidence >= confidence_threshold for m in proposals):
+            review.approve_all()
+            mappings = _normalize_mappings_to_record(review.finalize(), schema)
+            mappings = _identity_fallback_mappings(mappings, target_model, schema)
+            actions = (
+                await self._build_auto_actions(
+                    schema,
+                    action_model or target_model,
+                    mappings,
+                    confidence_threshold,
+                )
+                if include_actions
+                else []
+            )
+            config = AdapterConfig(
+                schema=schema,
+                auth_ref=auth_ref,
+                mappings=mappings,
+                sync=SyncConfig(endpoints=[ep.path for ep in schema.endpoints]),
+                actions=actions,
+                auth_scheme=auth_scheme,
+            )
+            await self.registry.save(config, target_key)
+            return config
+
+        return review
+
+    async def fetch(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+        cache: int | str | bool | None = None,
+        *,
+        max_tokens: int | None = None,
+        include_meta: bool | None = None,
+        verbosity: VerbosityLevel = "normal",
+        auto_repair: bool = True,
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        """Fetch data through an adapter — the primary way agents get data.
+
+        If endpoint is None, fetches from the first endpoint in sync config.
+        Returns mapped records as plain dicts.
+
+        Cache behavior:
+        - cache=False: bypass cache for this call
+        - cache=int: use as TTL seconds for this call
+        - cache="5m"/"1h"/...: parsed via parse_ttl
+        - cache=None: use SyncConfig.cache_ttl default or Cache-Control header
+
+        Agent-friendly args:
+        - max_tokens: truncate the response to fit a rough token budget.
+          List responses drop trailing items; dicts trim oversize string
+          fields. When truncated, ``_meta.truncated`` is set (requires
+          ``include_meta=True`` or the instance flag).
+        - include_meta: when True, wrap the response as
+          ``{"data": [...], "_meta": {...}}`` with source/freshness/truncation
+          info. Defaults to the value set on the :class:`Liquid` instance.
+        - verbosity: shape the response for the caller's context budget:
+          ``"terse"`` (id + 1-2 primary fields), ``"normal"`` (default),
+          ``"full"`` (bypass future normalization), ``"debug"`` (full + a
+          ``_debug`` block with request URL, response headers, timing,
+          cache hit, schema version).
+        """
+        import time as _time
+
+        from liquid.cache.ttl import parse_ttl
+        from liquid.discovery.utils import managed_http_client
+
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+        if target_ep is None:
+            msg = f"Endpoint {ep_path} not found in adapter schema"
+            raise ValueError(msg)
+
+        await self._ensure_rate_limit_seeded(config, ep_path)
+
+        # Build per-endpoint TTL override map for this call.
+        cache_ttl_override: dict[str, int] = dict(config.sync.cache_ttl)
+        cache_store: CacheStore | None = self.cache
+        if cache is False:
+            # Bypass cache entirely for this call.
+            cache_store = None
+        elif isinstance(cache, int) and not isinstance(cache, bool):
+            cache_ttl_override[ep_path] = max(0, cache)
+        elif isinstance(cache, str):
+            cache_ttl_override[ep_path] = parse_ttl(cache)
+
+        t0 = _time.perf_counter()
+        async with managed_http_client(self._http_client) as client:
+            from liquid.sync.selector import EnvelopeSelector
+
+            fetcher = Fetcher(
+                http_client=client,
+                vault=self.vault,
+                selector=EnvelopeSelector(target_ep.record_path),
+                cache=cache_store,
+                adapter_id=config.config_id,
+                cache_ttl_override=cache_ttl_override,
+                rate_limiter=self.rate_limiter,
+                telemetry=self.telemetry,
+            )
+            result = await fetcher.fetch(
+                endpoint=target_ep,
+                base_url=config.schema_.source_url,
+                auth_ref=config.auth_ref,
+                auth_scheme=config.auth_scheme,
+                expected_api_version=config.schema_.api_version,
+            )
+            self._dispatch_evolution_signals(result.evolution_signals)
+            timing_ms = int((_time.perf_counter() - t0) * 1000)
+            mapper = RecordMapper(config.mappings)
+            mapped = mapper.map_batch(result.records, ep_path)
+            records: list[dict[str, Any]] = [r.mapped_data for r in mapped]
+
+            # Transparent self-heal / convergence: validate the mappings against
+            # the live response we just received. A source path that does not
+            # exist in the real data (a hallucinated or stale path) is dropped
+            # and recovered (identity match, then a focused LLM re-map shown the
+            # real record). Mappings thus converge to correct over real calls —
+            # the agent issues a plain fetch and never sees the repair.
+            sample = next((r for r in result.records if isinstance(r, dict) and r), None)
+            if auto_repair and sample is not None and _has_broken_mappings(config.mappings, sample):
+                new_mappings = await self._converge_mappings(ep_path, config.mappings, sample)
+                if new_mappings and new_mappings != config.mappings:
+                    remapped = RecordMapper(new_mappings).map_batch(result.records, ep_path)
+                    healed = [r.mapped_data for r in remapped]
+                    if _mapping_coverage(healed, new_mappings) >= _mapping_coverage(records, config.mappings):
+                        records = healed
+                        config.mappings = new_mappings  # fix the in-memory adapter
+                        await self._emit_self_heal_event(config, ep_path)
+
+            validation_signals = self._validate_response(config, records, ep_path)
+
+            await self._record_event(
+                kind="fetch",
+                adapter=config.schema_.service_name,
+                endpoint=ep_path,
+                method=target_ep.method,
+                status_code=(result.raw_response.status_code if result.raw_response is not None else None),
+                duration_ms=timing_ms,
+                record_count=len(records),
+                cache_hit=result.raw_response is None and cache_store is not None,
+                evolution_count=len(result.evolution_signals),
+                validation_count=len(validation_signals),
+            )
+            # ``full`` explicitly bypasses normalization; ``normal`` keeps
+            # current behaviour (opt-in flag).
+            if self.normalize_output and verbosity != "full":
+                records = [self._maybe_normalize(r) for r in records]
+
+            # Truncate to fit max_tokens, if requested.
+            truncated = False
+            truncated_at: str | None = None
+            if max_tokens is not None:
+                from liquid.truncate import apply_max_tokens
+
+                trunc = apply_max_tokens(records, max_tokens)
+                records = trunc.payload
+                truncated = trunc.truncated
+                truncated_at = trunc.truncated_at
+
+            # Apply verbosity shaping before meta wrapping so the _meta
+            # block (if requested) reports the post-shaping record count.
+            payload: Any = records
+            if verbosity == "terse":
+                from liquid.verbosity import apply_verbosity
+
+                payload = apply_verbosity(records, "terse")
+
+            effective_meta = self.include_meta if include_meta is None else include_meta
+            if effective_meta:
+                from liquid.meta import build_meta, wrap_with_meta
+
+                extra_meta: dict[str, Any] = {}
+                if result.evolution_signals:
+                    extra_meta["evolution"] = [s.model_dump(mode="json") for s in result.evolution_signals]
+                if validation_signals:
+                    extra_meta["validation"] = [s.model_dump(mode="json") for s in validation_signals]
+                meta = build_meta(
+                    source="live",
+                    adapter=config.schema_.service_name,
+                    endpoint=ep_path,
+                    truncated=truncated,
+                    truncated_at=truncated_at,
+                    returned_items=len(payload) if isinstance(payload, list) else None,
+                    extra=extra_meta or None,
+                )
+                payload = wrap_with_meta(payload, meta)
+
+            if verbosity == "debug":
+                from liquid.verbosity import apply_verbosity
+
+                raw_response = getattr(result, "raw_response", None)
+                response_headers: dict[str, str] = {}
+                request_url: str | None = None
+                from_cache = False
+                if raw_response is not None:
+                    response_headers = dict(raw_response.headers) if getattr(raw_response, "headers", None) else {}
+                    request_obj = getattr(raw_response, "request", None)
+                    request_url = str(request_obj.url) if request_obj is not None else None
+                else:
+                    from_cache = cache_store is not None
+                debug_info: dict[str, Any] = {
+                    "request_url": request_url,
+                    "response_headers": response_headers,
+                    "timing_ms": timing_ms,
+                    "from_cache": from_cache,
+                    "schema_version": config.version,
+                }
+                payload = apply_verbosity(payload, "debug", debug_info=debug_info)
+
+            return payload
+
+    async def write(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+        *,
+        op: str,
+        values: dict[str, Any] | None = None,
+        where: dict[str, Any] | None = None,
+        allow_write: bool = False,
+        idempotency_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Write to a database endpoint: INSERT / UPDATE / DELETE.
+
+        The reverse of :meth:`fetch` for database adapters. ``op`` is
+        ``"insert"`` | ``"update"`` | ``"delete"``; ``values`` are the row fields
+        (insert/update) and ``where`` selects rows (update/delete, required —
+        there are no blanket updates/deletes). Columns are validated against the
+        endpoint's introspected schema and every value is parameterized.
+
+        Writes are **off by default**: pass ``allow_write=True`` to permit the
+        mutation (a deliberate, reversible-decision gate, since this changes data
+        in the target store). Only database drivers support writes; calling this
+        on a read-only wire protocol raises.
+
+        Returns ``{"success", "op", "endpoint", "affected_rows"}``.
+        """
+        if not allow_write:
+            raise LiquidError(
+                "Writes are disabled by default. Pass allow_write=True to permit this mutation.",
+                recovery=Recovery(
+                    hint="This will modify data in the target store — set allow_write=True to proceed.",
+                    retry_safe=False,
+                ),
+            )
+        if op not in ("insert", "update", "delete"):
+            raise ValueError(f"op must be insert/update/delete, got {op!r}")
+
+        from liquid.discovery.utils import managed_http_client
+        from liquid.transport import get_driver, supports_write
+
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+        if target_ep is None:
+            msg = f"Endpoint {ep_path} not found in adapter schema"
+            raise ValueError(msg)
+
+        if not supports_write(get_driver(target_ep.protocol)):
+            raise LiquidError(
+                f"The {target_ep.protocol!r} driver is read-only — writes aren't supported for this endpoint.",
+                recovery=Recovery(hint="Writes are currently supported for SQL database endpoints.", retry_safe=False),
+            )
+
+        await self._ensure_rate_limit_seeded(config, ep_path)
+        async with managed_http_client(self._http_client) as client:
+            fetcher = Fetcher(
+                http_client=client,
+                vault=self.vault,
+                adapter_id=config.config_id,
+                rate_limiter=self.rate_limiter,
+                telemetry=self.telemetry,
+            )
+            wire = await fetcher.write(
+                endpoint=target_ep,
+                base_url=config.schema_.source_url,
+                auth_ref=config.auth_ref,
+                op=op,
+                values=values,
+                where=where,
+                auth_scheme=config.auth_scheme,
+                idempotency_key=idempotency_key,
+            )
+        affected = wire.records[0].get("affected_rows") if wire.records else None
+        await self._record_event(
+            kind="fetch",
+            adapter=config.schema_.service_name,
+            endpoint=ep_path,
+            method=op.upper(),
+            status_code=wire.status_code,
+            record_count=affected,
+        )
+        return {"success": True, "op": op, "endpoint": ep_path, "affected_rows": affected}
+
+    async def sense(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+        *,
+        cursor: str | None = None,
+        params: dict[str, Any] | None = None,
+        poll_interval: float = 2.0,
+        max_events: int | None = None,
+        max_seconds: float | None = None,
+    ) -> Any:
+        """Perceive a live stream of events from an endpoint — the agent's senses.
+
+        The afferent counterpart of :meth:`write` (the agent's hands) and the
+        continuous counterpart of :meth:`fetch` (a one-shot pull). Yields
+        :class:`~liquid.transport.SenseEvent`s as the world produces them — a new
+        DB row (delta-poll), a published message (Redis pub/sub), etc. — each with
+        a ``modality`` (``"data"``/``"message"``/… — open for future senses) and a
+        ``cursor`` to resume.
+
+        Only sense-capable drivers support this (raises otherwise). Returns an
+        async iterator; consume with ``async for``. ``max_events`` / ``max_seconds``
+        bound the stream so it can't block forever.
+
+        ```python
+        async for event in await liquid.sense(adapter, "/orders", max_events=10):
+            print(event.modality, event.payload)
+        ```
+        """
+        from liquid.discovery.utils import managed_http_client
+        from liquid.transport import get_driver, supports_sense
+
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+        if target_ep is None:
+            msg = f"Endpoint {ep_path} not found in adapter schema"
+            raise ValueError(msg)
+        if not supports_sense(get_driver(target_ep.protocol)):
+            raise LiquidError(
+                f"The {target_ep.protocol!r} interface can't be sensed — no live event stream.",
+                recovery=Recovery(
+                    hint="sense() works on event/stream endpoints (SQL, Redis, WebSocket, SSE/NDJSON, MCP).",
+                    retry_safe=False,
+                ),
+            )
+
+        async def _iter() -> Any:
+            async with managed_http_client(self._http_client) as client:
+                fetcher = Fetcher(
+                    http_client=client,
+                    vault=self.vault,
+                    adapter_id=config.config_id,
+                    rate_limiter=self.rate_limiter,
+                    telemetry=self.telemetry,
+                )
+                stream = await fetcher.sense(
+                    endpoint=target_ep,
+                    base_url=config.schema_.source_url,
+                    auth_ref=config.auth_ref,
+                    cursor=cursor,
+                    extra_params=params,
+                    poll_interval=poll_interval,
+                    max_events=max_events,
+                    max_seconds=max_seconds,
+                    auth_scheme=config.auth_scheme,
+                )
+                async for event in stream:
+                    yield event
+
+        return _iter()
+
+    async def sense_webhook(
+        self,
+        *,
+        port: int,
+        host: str = "127.0.0.1",
+        path: str = "/webhook",
+        verifier: Any | None = None,
+        idempotency_store: Any | None = None,
+        max_events: int | None = None,
+        max_seconds: float | None = None,
+    ) -> Any:
+        """Perceive inbound webhooks as a sense — the afferent organ, pointed inward.
+
+        Most senses connect *out*; a webhook is the inverse — the world POSTs *to*
+        the agent. This hosts a small inbound HTTP endpoint, verifies each delivery
+        with ``verifier`` (a :class:`~liquid.webhooks.WebhookVerifier`; strongly
+        recommended) and optionally de-duplicates via ``idempotency_store``, then
+        yields each verified delivery as a ``modality="message"``
+        :class:`~liquid.transport.SenseEvent` whose ``payload`` is the webhook's
+        JSON and whose ``cursor`` is the event id. Bounded by ``max_events`` /
+        ``max_seconds``; the server is torn down when the iterator finishes.
+
+        ```python
+        from liquid.webhooks import StripeWebhookVerifier, InMemoryIdempotencyStore
+        events = await liquid.sense_webhook(
+            port=8088, path="/stripe",
+            verifier=StripeWebhookVerifier(secret="whsec_..."),
+            idempotency_store=InMemoryIdempotencyStore(),
+        )
+        async for event in events:
+            print(event.payload["type"])
+        ```
+        """
+        from liquid.transport import SenseEvent
+        from liquid.webhooks.listener import WebhookListener
+
+        listener = WebhookListener(
+            host=host,
+            port=port,
+            path=path,
+            verifier=verifier,
+            idempotency_store=idempotency_store,
+        )
+
+        async def _iter() -> Any:
+            async for event in listener.events(max_events=max_events, max_seconds=max_seconds):
+                yield SenseEvent(
+                    source=path,
+                    modality="message",
+                    payload=event.payload,
+                    cursor=event.event_id,
+                )
+
+        return _iter()
+
+    async def stream(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+        *,
+        protocol: str = "auto",
+        extra_params: dict[str, Any] | None = None,
+    ) -> Any:
+        """Stream records from an endpoint that returns NDJSON or SSE.
+
+        Returns an async iterator that yields dict records (NDJSON) or
+        :class:`SSEEvent` instances (SSE). ``protocol="auto"`` detects from
+        the response ``Content-Type``. ``AdapterConfig.auth_scheme`` is
+        applied to the request; rate limiting is honoured.
+
+        The iterator holds an open HTTP stream — consume promptly or wrap
+        in ``async with`` via ``aclose()``.
+        """
+        from liquid.discovery.utils import managed_http_client
+        from liquid.streaming import parse_ndjson, parse_sse
+
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+        if target_ep is None:
+            msg = f"Endpoint {ep_path} not found in adapter schema"
+            raise ValueError(msg)
+
+        await self._ensure_rate_limit_seeded(config, ep_path)
+
+        async def _iter() -> Any:
+            async with managed_http_client(self._http_client) as client:
+                headers: dict[str, str] = {}
+                auth: httpx.Auth | None = None
+                if config.auth_scheme is not None:
+                    auth = await config.auth_scheme.build_httpx_auth(self.vault, config.auth_ref)
+                else:
+                    auth_value = await self.vault.get(config.auth_ref)
+                    headers["Authorization"] = f"Bearer {auth_value}"
+
+                url = f"{config.schema_.source_url.rstrip('/')}{ep_path}"
+                method = target_ep.method
+
+                rate_key = f"{config.config_id}:{ep_path}"
+                if self.rate_limiter is not None:
+                    await self.rate_limiter.acquire(rate_key)
+
+                async with client.stream(method, url, params=extra_params, headers=headers, auth=auth) as response:
+                    if not response.is_success:
+                        body = await response.aread()
+                        raise LiquidError(f"stream failed ({response.status_code}): {body[:200]!r}")
+
+                    resolved_protocol = protocol
+                    if resolved_protocol == "auto":
+                        ctype = response.headers.get("content-type", "").lower()
+                        if "text/event-stream" in ctype:
+                            resolved_protocol = "sse"
+                        elif "application/x-ndjson" in ctype or "application/jsonlines" in ctype:
+                            resolved_protocol = "ndjson"
+                        else:
+                            resolved_protocol = "ndjson"  # sensible default
+
+                    if resolved_protocol == "sse":
+                        async for ev in parse_sse(response.aiter_bytes()):
+                            yield ev
+                    elif resolved_protocol == "ndjson":
+                        async for obj in parse_ndjson(response.aiter_bytes()):
+                            yield obj
+                    else:
+                        raise ValueError(f"unsupported protocol: {resolved_protocol}")
+
+        return _iter()
+
+    async def fetch_with_meta(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+        *,
+        limit: int | None = None,
+        head: int | None = None,
+        tail: int | None = None,
+        fields: list[str] | None = None,
+        summary: bool = False,
+        max_tokens: int | None = None,
+        cache: int | str | bool | None = None,
+    ) -> FetchResponse:
+        """Fetch with agent-friendly metadata and context-window controls.
+
+        Parameters mirror ``fetch()`` plus:
+        - ``limit`` / ``head``: keep only the first N records (``head`` wins if both given)
+        - ``tail``: keep only the last N records
+        - ``fields``: drop everything except the named top-level fields
+        - ``summary``: return aggregate stats instead of records (no items)
+        - ``max_tokens``: truncate the record list to fit a rough token budget
+
+        Returns a ``FetchResponse`` with ``items`` + ``meta`` (total, returned,
+        truncated flag, estimated tokens, source) and optional ``summary``.
+        """
+        from liquid.models.response import FetchMeta, FetchResponse
+        from liquid.runtime.windowing import (
+            apply_limit,
+            apply_token_budget,
+            build_summary,
+            estimate_tokens,
+            select_fields,
+        )
+
+        records = await self.fetch(config, endpoint, cache=cache, include_meta=False)
+        total = len(records)
+
+        if summary:
+            return FetchResponse(
+                items=[],
+                summary=build_summary(records),
+                meta=FetchMeta(total_items=total, returned_items=0, truncated=False),
+            )
+
+        records = select_fields(records, fields)
+        records, truncated_by_limit = apply_limit(records, limit=limit, head=head, tail=tail)
+
+        truncated_by_tokens = False
+        if max_tokens is not None:
+            records, truncated_by_tokens = apply_token_budget(records, max_tokens)
+
+        truncated = truncated_by_limit or truncated_by_tokens
+
+        return FetchResponse(
+            items=records,
+            meta=FetchMeta(
+                total_items=total,
+                returned_items=len(records),
+                truncated=truncated,
+                source="api",
+                estimated_tokens=estimate_tokens(records),
+            ),
+        )
+
+    async def search(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+        *,
+        where: dict[str, Any] | None = None,
+        fields: list[str] | None = None,
+        limit: int | None = 100,
+        sort: str | None = None,  # Future: "field" or "-field" for desc
+    ) -> FetchResponse:
+        """Search records with query DSL, returning only matches.
+
+        Works with any API — pushes filters to API when supported,
+        applies remaining filters locally, always returns matching records.
+        """
+        from liquid.models.response import FetchMeta, FetchResponse
+        from liquid.query.engine import apply_query
+        from liquid.query.translator import translate_to_params
+        from liquid.runtime.windowing import apply_limit, estimate_tokens, select_fields
+
+        if not where:
+            # No filter — behave like fetch_with_meta
+            return await self.fetch_with_meta(config, endpoint, fields=fields, limit=limit)
+
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+        if target_ep is None:
+            msg = f"Endpoint {ep_path} not found in adapter schema"
+            raise ValueError(msg)
+
+        # Translate: server-side params + local remainder
+        _native_params, remaining = translate_to_params(where, target_ep)
+
+        # Fetch (native param translation is a Phase 2 optimization).
+        all_records = await self.fetch(config, endpoint, include_meta=False)
+        total_scanned = len(all_records)
+
+        # Apply local filter
+        matching = apply_query(all_records, remaining) if remaining else all_records
+
+        match_count = len(matching)
+
+        # Field selection
+        matching = select_fields(matching, fields)
+
+        # Limit
+        if limit is not None:
+            matching, _ = apply_limit(matching, limit=limit)
+
+        return FetchResponse(
+            items=matching,
+            meta=FetchMeta(
+                total_items=total_scanned,  # Total scanned
+                returned_items=len(matching),
+                truncated=limit is not None and match_count > limit,
+                estimated_tokens=estimate_tokens(matching),
+            ),
+        )
+
+    async def search_nl(
+        self,
+        adapter: str | AdapterConfig,
+        endpoint: str | None = None,
+        query: str = "",
+        *,
+        limit: int = 50,
+        fields: list[str] | None = None,
+        params: dict[str, Any] | None = None,
+        cache: NLCompilationCache | None = None,
+    ) -> SearchNLResult:
+        """Natural-language search. LLM translates query -> DSL -> executes.
+
+        Compilation results are cached per (adapter, endpoint, query text,
+        schema fingerprint). Repeat calls skip the LLM and go straight to
+        :meth:`search`. Raises :class:`~liquid.exceptions.LiquidError` when
+        no LLM is configured, and :class:`~liquid.query.nl.NLCompileError`
+        when the LLM output can't be parsed as query DSL.
+        """
+        from liquid.models.response import SearchNLResult as _SearchNLResult
+        from liquid.query.nl import compile_nl_to_dsl
+
+        if self.llm is None:
+            raise LiquidError(
+                "search_nl requires an LLM provider; configure Liquid(llm=...)",
+                recovery=Recovery(
+                    hint="Pass an llm= argument when constructing Liquid.",
+                    retry_safe=False,
+                ),
+            )
+
+        config = await self._resolve_adapter(adapter)
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+
+        # Assemble the schema field list so the cache key reflects the
+        # response shape — different schemas yield different compilations.
+        schema_fields: list[str] = []
+        if target_ep is not None and target_ep.response_schema:
+            props = target_ep.response_schema.get("properties", {})
+            if target_ep.response_schema.get("type") == "array":
+                items = target_ep.response_schema.get("items", {})
+                props = items.get("properties", {}) if isinstance(items, dict) else {}
+            if isinstance(props, dict):
+                schema_fields = list(props.keys())
+        # Fall back to the adapter's mapped target fields — every adapter has
+        # these even when the response schema is sparse.
+        if not schema_fields:
+            schema_fields = [m.target_field for m in config.mappings]
+
+        compiled, from_cache = await compile_nl_to_dsl(
+            llm=self.llm,
+            adapter_id=config.config_id,
+            endpoint=ep_path,
+            query=query,
+            fields=schema_fields,
+            cache=cache,
+        )
+
+        search_resp = await self.search(
+            config,
+            ep_path,
+            where=compiled,
+            limit=limit,
+            fields=fields,
+        )
+        _ = params  # reserved for future native-param push-down
+
+        llm_provider = type(self.llm).__name__ if self.llm is not None else None
+        # ``pages_fetched`` here reports "at least 1" — :meth:`search` does
+        # not yet surface a page count from the walker; keep this forward
+        # compatible so the field is meaningful.
+        return _SearchNLResult(
+            records=list(search_resp.items),
+            compiled_query=compiled,
+            query_text=query,
+            llm_provider=llm_provider,
+            from_cache=from_cache,
+            pages_fetched=1,
+        )
+
+    async def fetch_until(
+        self,
+        adapter: str | AdapterConfig,
+        endpoint: str | None = None,
+        predicate: Any = None,
+        *,
+        max_pages: int = 100,
+        max_records: int = 10_000,
+        params: dict[str, Any] | None = None,
+    ) -> FetchUntilResult:
+        """Auto-paginate until ``predicate`` matches, or limits are hit.
+
+        ``predicate`` can be a Python callable (``lambda o: o["date"] <
+        "2026-01-01"``) or a query DSL dict (``{"total_cents": {"$gt":
+        10_000}}``) that is evaluated per-record. Returns a
+        :class:`~liquid.models.response.FetchUntilResult` bundling the
+        records seen so far, whether a match was found, and the termination
+        reason.
+        """
+        from liquid.models.response import FetchUntilResult as _FetchUntilResult
+        from liquid.query._paginator import _walk_pages
+        from liquid.query.dsl import validate_query
+        from liquid.query.engine import _matches
+
+        if predicate is None:
+            raise ValueError("fetch_until requires a predicate (callable or DSL dict)")
+
+        config = await self._resolve_adapter(adapter)
+        ep_path = endpoint or config.sync.endpoints[0]
+
+        # Normalise the predicate into a per-record callable. DSL path uses
+        # the same matcher as :func:`apply_query` — re-validate up front so
+        # agents see a clear error before we walk any pages.
+        if callable(predicate):
+            test = predicate
+        elif isinstance(predicate, dict):
+            validate_query(predicate)
+            dsl_query = predicate
+
+            def test(record: dict[str, Any]) -> bool:
+                return _matches(record, dsl_query)
+        else:
+            raise TypeError(
+                f"predicate must be callable or dict, got {type(predicate).__name__}",
+            )
+
+        all_records: list[dict[str, Any]] = []
+        matching_record: dict[str, Any] | None = None
+        pages_fetched = 0
+        records_scanned = 0
+        stopped_reason: str = "exhausted"
+
+        async for page in _walk_pages(self, config, ep_path, params=params):
+            pages_fetched += 1
+            for record in page:
+                records_scanned += 1
+                all_records.append(record)
+                if test(record):
+                    matching_record = record
+                    stopped_reason = "matched"
+                    break
+                if records_scanned >= max_records:
+                    stopped_reason = "max_records"
+                    break
+            if matching_record is not None or stopped_reason in ("max_records",):
+                break
+            if pages_fetched >= max_pages:
+                stopped_reason = "max_pages"
+                break
+
+        return _FetchUntilResult(
+            records=all_records,
+            matched=matching_record is not None,
+            matching_record=matching_record,
+            pages_fetched=pages_fetched,
+            records_scanned=records_scanned,
+            stopped_reason=stopped_reason,  # type: ignore[arg-type]
+        )
+
+    async def fetch_changes_since(
+        self,
+        adapter: str | AdapterConfig,
+        endpoint: str | None = None,
+        *,
+        since: str | datetime,
+        timestamp_field: str | None = None,
+        params: dict[str, Any] | None = None,
+        max_pages: int = 100,
+    ) -> FetchChangesResult:
+        """Return records changed since ``since``.
+
+        When the endpoint declares a parameter like ``updated_since`` /
+        ``modified_since`` / ``since``, it's injected into the request and
+        we let the API do the filtering. Otherwise we walk every page and
+        filter client-side on a timestamp field (``updated_at`` /
+        ``modified_at`` / …; override with ``timestamp_field=``).
+
+        Raises a :class:`ValueError` when the client-filter fallback fires
+        and no timestamp field can be found on the returned records — the
+        agent should inspect the adapter's response_schema and pass
+        ``timestamp_field=`` explicitly.
+        """
+        from datetime import UTC
+        from datetime import datetime as _datetime
+
+        from liquid.diff_sync import (
+            FetchChangesResult as _FetchChangesResult,
+        )
+        from liquid.diff_sync import (
+            coerce_since,
+            detect_native_param,
+            detect_timestamp_field,
+            filter_since,
+        )
+        from liquid.query._paginator import _walk_pages
+
+        config = await self._resolve_adapter(adapter)
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+        if target_ep is None:
+            msg = f"Endpoint {ep_path} not found in adapter schema"
+            raise ValueError(msg)
+
+        since_dt = coerce_since(since)
+        until_dt = _datetime.now(UTC)
+
+        native_param = detect_native_param(target_ep)
+        merged_params: dict[str, Any] = dict(params or {})
+
+        pages_fetched = 0
+        changed: list[dict[str, Any]] = []
+
+        if native_param is not None:
+            # Native param path: inject and trust the server.
+            merged_params[native_param] = since_dt.isoformat()
+            async for page in _walk_pages(self, config, ep_path, params=merged_params):
+                pages_fetched += 1
+                changed.extend(page)
+                if pages_fetched >= max_pages:
+                    break
+            return _FetchChangesResult(
+                changed_records=changed,
+                since=since_dt,
+                until=until_dt,
+                detection_method="native_param",
+                timestamp_field=native_param,
+                pages_fetched=pages_fetched,
+            )
+
+        # Client-filter path: collect and filter locally.
+        detected_field = timestamp_field
+        collected: list[dict[str, Any]] = []
+        async for page in _walk_pages(self, config, ep_path, params=merged_params):
+            pages_fetched += 1
+            collected.extend(page)
+            if detected_field is None:
+                detected_field = detect_timestamp_field(page)
+            if pages_fetched >= max_pages:
+                break
+
+        if detected_field is None and collected:
+            raise ValueError(
+                f"Could not detect a timestamp field on {ep_path} records "
+                f"(tried: updated_at, modified_at, changed_at, last_modified). "
+                "Pass timestamp_field= explicitly."
+            )
+
+        if detected_field is not None:
+            changed = filter_since(collected, since_dt, detected_field)
+
+        return _FetchChangesResult(
+            changed_records=changed,
+            since=since_dt,
+            until=until_dt,
+            detection_method="client_filter",
+            timestamp_field=detected_field,
+            pages_fetched=pages_fetched,
+        )
+
+    async def aggregate(
+        self,
+        adapter: str | AdapterConfig,
+        endpoint: str | None = None,
+        *,
+        group_by: str | list[str] | None = None,
+        agg: dict[str, str] | None = None,
+        filter: dict[str, Any] | None = None,
+        limit: int | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Group + aggregate records on an endpoint without pulling them into the agent.
+
+        Fetches pages, applies an optional ``filter`` (Liquid query DSL),
+        buckets by ``group_by`` field(s), and returns per-bucket aggregates
+        (``count``, ``sum``, ``avg``, ``min``, ``max``, ``first``, ``last``,
+        ``distinct``). Stops early when ``limit`` records have been scanned —
+        the default cap is ``10_000`` so a misconfigured call can't burn
+        through a huge dataset.
+        """
+        from liquid.query._paginator import _walk_pages
+        from liquid.query.aggregate import aggregate_async
+
+        config = await self._resolve_adapter(adapter)
+        ep_path = endpoint or config.sync.endpoints[0]
+
+        page_iter = _walk_pages(self, config, ep_path, params=params)
+        return await aggregate_async(
+            page_iter,
+            group_by=group_by,
+            agg=agg,
+            filter=filter,
+            limit=limit,
+        )
+
+    async def text_search(
+        self,
+        adapter: str | AdapterConfig,
+        endpoint: str | None = None,
+        query: str = "",
+        *,
+        fields: list[str] | None = None,
+        limit: int = 50,
+        scan_limit: int | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Rank records by relevance to a free-text ``query``.
+
+        Walks the endpoint's pages, scores every record with a lightweight
+        BM25-style scorer across ``fields`` (or every string field when
+        unspecified), and returns the top ``limit`` matches — each with a
+        normalized score in ``[0, 1]`` and the list of fields that matched.
+        """
+        from liquid.query._paginator import _walk_pages
+        from liquid.query.text_search import search_async
+
+        config = await self._resolve_adapter(adapter)
+        ep_path = endpoint or config.sync.endpoints[0]
+
+        page_iter = _walk_pages(self, config, ep_path, params=params)
+        return await search_async(
+            page_iter,
+            query,
+            fields=fields,
+            limit=limit,
+            scan_limit=scan_limit,
+        )
+
+    async def _resolve_adapter(self, adapter: str | AdapterConfig) -> AdapterConfig:
+        """Accept either an AdapterConfig or a registered service name."""
+        if isinstance(adapter, AdapterConfig):
+            return adapter
+        if not isinstance(adapter, str):
+            raise TypeError(f"adapter must be AdapterConfig or str, got {type(adapter).__name__}")
+
+        if self.registry is None:
+            raise ValueError(
+                "Resolving adapters by name requires a registry — either pass an AdapterConfig "
+                "directly or construct Liquid(registry=...).",
+            )
+
+        # Prefer the registry's own service lookup when present.
+        if hasattr(self.registry, "get_by_service"):
+            matches = await self.registry.get_by_service(adapter)
+            if matches:
+                return matches[0]
+
+        # Fall back to scanning list_all() for a case-insensitive match.
+        if hasattr(self.registry, "list_all"):
+            all_configs = await self.registry.list_all()
+            name_lower = adapter.lower()
+            for cfg in all_configs:
+                if cfg.schema_.service_name.lower() == name_lower:
+                    return cfg
+
+        raise ValueError(f"No adapter named {adapter!r} is registered")
+
+    async def _nl_to_dsl(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None,
+        nl_query: str,
+    ) -> dict[str, Any]:
+        """Use LLM to translate natural-language query to DSL."""
+        from liquid.models.llm import Message
+
+        ep_path = endpoint or config.sync.endpoints[0]
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == ep_path), None)
+
+        # Build schema summary
+        schema_fields: list[str] = []
+        if target_ep and target_ep.response_schema:
+            props = target_ep.response_schema.get("properties", {})
+            if target_ep.response_schema.get("type") == "array":
+                items = target_ep.response_schema.get("items", {})
+                props = items.get("properties", {}) if isinstance(items, dict) else {}
+            schema_fields = list(props.keys())[:20]
+
+        prompt = (
+            f"Translate this natural-language query into a Liquid query DSL (MongoDB-style):\n\n"
+            f"Query: {nl_query}\n"
+            f"Available fields: {schema_fields}\n\n"
+            "Operators: $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, "
+            "$contains, $icontains, $startswith, $endswith, $regex, $exists, "
+            "$and, $or, $not.\n\n"
+            "Respond ONLY with a JSON object (the DSL query). No prose. Example: "
+            '{"total_cents": {"$gt": 10000}}'
+        )
+
+        response = await self.llm.chat([Message(role="user", content=prompt)])
+        text = response.content or "{}"
+
+        # Extract JSON
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start == -1 or end == 0:
+            return {}
+        try:
+            result = json.loads(text[start:end])
+        except json.JSONDecodeError:
+            return {}
+        return result if isinstance(result, dict) else {}
+
+    async def estimate_fetch(
+        self,
+        adapter: str | AdapterConfig,
+        endpoint: str | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> FetchEstimate:
+        """Return a :class:`FetchEstimate` for an endpoint WITHOUT calling it.
+
+        Agents should call this before a heavy fetch to decide whether to
+        proceed as-is, page, narrow via query DSL, or switch to
+        :meth:`aggregate` / :meth:`text_search`. Accepts either an
+        :class:`AdapterConfig` or a registered service name.
+        """
+        from liquid.estimate import estimate_fetch as _estimate
+
+        config = await self._resolve_adapter(adapter)
+        return _estimate(config, endpoint, params=params)
+
+    async def remaining_quota(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+    ) -> QuotaInfo:
+        """Return current rate-limit quota observed for an adapter / endpoint.
+
+        Returns an empty QuotaInfo if no RateLimiter is configured or no
+        observations have been recorded yet for this key.
+        """
+        from liquid.sync.quota import QuotaInfo
+
+        if self.rate_limiter is None:
+            return QuotaInfo()
+        key = f"{config.config_id}:{endpoint}" if endpoint else config.config_id
+        return await self.rate_limiter.quota(key)
+
+    async def invalidate_cache(
+        self,
+        config: AdapterConfig,
+        endpoint: str | None = None,
+    ) -> None:
+        """Invalidate cache entries for an adapter.
+
+        If endpoint is provided: delete the specific cache key for that endpoint.
+        If endpoint is None: no-op (InMemoryCache does not support pattern delete;
+        cloud implementations with key scanning may override this behavior).
+        """
+        if self.cache is None or endpoint is None:
+            return
+
+        from liquid.cache.key import compute_cache_key
+
+        target_ep = next((ep for ep in config.schema_.endpoints if ep.path == endpoint), None)
+        method = target_ep.method if target_ep is not None else "GET"
+        key = compute_cache_key(
+            adapter_id=config.config_id,
+            endpoint_path=endpoint,
+            params={},
+            method=method,
+        )
+        await self.cache.delete(key)
+
+    async def repair_adapter(
+        self,
+        config: AdapterConfig,
+        target_model: dict[str, Any],
+        auto_approve: bool = False,
+        confidence_threshold: float = 0.8,
+    ) -> AdapterConfig | MappingReview:
+        """Re-discover API, diff schemas, selectively re-map broken fields.
+
+        Returns AdapterConfig if auto_approve=True and all mappings are confident,
+        otherwise returns MappingReview for human review.
+        """
+
+        new_schema = await self.discover(config.schema_.source_url)
+        diff = diff_schemas(config.schema_, new_schema)
+
+        # Repair action mappings affected by schema changes
+        repaired_actions = _repair_actions(config.actions, diff, new_schema)
+
+        if not diff.has_breaking_changes:
+            updated = config.model_copy(
+                update={
+                    "schema_": new_schema,
+                    "actions": repaired_actions,
+                    "version": config.version + 1,
+                }
+            )
+            await self._emit_repair_event(config.config_id, diff)
+            return updated
+
+        proposals = await self._mapping_proposer.propose(
+            new_schema,
+            target_model,
+            existing_mappings=config.mappings,
+            removed_fields=diff.removed_fields,
+        )
+
+        review = MappingReview(proposals)
+
+        if auto_approve and all(m.confidence >= confidence_threshold for m in proposals):
+            review.approve_all()
+            updated = AdapterConfig(
+                config_id=config.config_id,
+                schema=new_schema,
+                auth_ref=config.auth_ref,
+                mappings=review.finalize(),
+                sync=config.sync,
+                actions=repaired_actions,
+                verified_by=config.verified_by,
+                version=config.version + 1,
+            )
+            await self._emit_repair_event(config.config_id, diff)
+            return updated
+
+        return review
+
+    async def _converge_mappings(
+        self,
+        ep_path: str,
+        mappings: list[FieldMapping],
+        sample: dict[str, Any],
+    ) -> list[FieldMapping] | None:
+        """Reconcile mappings with a live record — the convergence loop.
+
+        1. Keep mappings whose source path *exists* in the real record.
+        2. For the now-unmapped target fields, add an identity mapping when the
+           field name is a top-level key in the record (recovers hallucinated
+           paths like SpaceX's ``/v2.project_name`` → ``name``).
+        3. For fields still unmapped (renamed or nested, e.g. ``name.common``),
+           ask the LLM once, **showing it the actual record**, and keep only the
+           proposals whose path resolves.
+
+        Returns the reconciled mappings, or ``None`` to leave the adapter as-is.
+        """
+        targets = [m.target_field for m in mappings]
+        good = [m for m in mappings if _path_exists(sample, m.source_path)]
+        mapped = {m.target_field for m in good}
+        missing = [t for t in targets if t not in mapped]
+
+        for field in list(missing):
+            if field in sample and sample[field] is not None:
+                good.append(FieldMapping(source_path=field, target_field=field, confidence=0.9))
+                missing.remove(field)
+
+        if missing and self.llm is not None:
+            try:
+                proposed = await self._propose_for_fields(ep_path, missing, sample)
+            except Exception:
+                proposed = []
+            for m in proposed:
+                if m.target_field in missing and _path_exists(sample, m.source_path):
+                    good.append(m)
+                    missing.remove(m.target_field)
+
+        return good or None
+
+    async def _propose_for_fields(
+        self,
+        ep_path: str,
+        fields: list[str],
+        sample: dict[str, Any],
+    ) -> list[FieldMapping]:
+        """Focused re-map: ask the LLM for source paths for specific target
+        fields, given a *real* record so it can resolve renamed/nested paths."""
+        import json as _json
+
+        from liquid.models.llm import Message
+
+        messages = [
+            Message(
+                role="system",
+                content=(
+                    "Map each requested target field to a dot-notation source_path that exists "
+                    "in the given JSON record. Use nested paths like 'name.common' and 'a.b.c'. "
+                    "Respond ONLY with a JSON array of {source_path, target_field}. Omit a field "
+                    "if no matching source exists."
+                ),
+            ),
+            Message(
+                role="user",
+                content=(f"Record:\n{_json.dumps(sample)[:1500]}\n\nTarget fields needing a source_path: {fields}"),
+            ),
+        ]
+        resp = await self.llm.chat(messages)
+        return self._mapping_proposer._parse_mappings(resp.content or "[]")
+
+    async def _emit_self_heal_event(self, config: AdapterConfig, ep_path: str) -> None:
+        import logging
+
+        logging.getLogger(__name__).info(
+            "self-heal: re-mapped %s %s after detecting stale field mappings",
+            config.schema_.service_name,
+            ep_path,
+        )
+
+    async def _emit_repair_event(self, adapter_id: str, diff: SchemaDiff) -> None:
+        if self.event_handler:
+            from liquid.events import AdapterRepaired
+
+            await self.event_handler.handle(AdapterRepaired(adapter_id=adapter_id, diff=diff, auto_approved=True))
+
+    async def execute(
+        self,
+        config: AdapterConfig,
+        action_id: str,
+        data: dict[str, Any],
+        idempotency_key: str | None = None,
+        *,
+        max_tokens: int | None = None,
+        include_meta: bool | None = None,
+        verbosity: VerbosityLevel = "normal",
+    ) -> ActionResult:
+        """Execute a write action by action_id.
+
+        This is the primary way agents WRITE data through Liquid.
+
+        Requires the action to have been verified (verified_by set).
+
+        Agent-friendly args:
+        - max_tokens: truncate ``response_body`` (list/dict) to a token
+          budget before returning. Sets ``_meta.truncated`` on the wrapped
+          body when ``include_meta=True``.
+        - include_meta: wrap the ``response_body`` in ``{"data": ..., "_meta": ...}``
+          so agents see the source/freshness/truncation. Defaults to the
+          instance-level ``Liquid.include_meta`` flag.
+        - verbosity: shape ``response_body`` for the caller's context
+          budget — ``"terse"``, ``"normal"`` (default), ``"full"``, or
+          ``"debug"``. Matches the semantics of :meth:`fetch`.
+        """
+        action = next((a for a in config.actions if a.action_id == action_id), None)
+        if action is None:
+            msg = f"Action {action_id} not found in adapter config"
+            raise ValueError(msg)
+
+        if action.verified_by is None:
+            raise ActionNotVerifiedError(
+                f"Action {action_id} has not been verified. Call create_adapter() with verified actions to approve."
+            )
+
+        await self._ensure_rate_limit_seeded(config, action.endpoint_path)
+
+        from liquid.action.executor import ActionExecutor
+        from liquid.discovery.utils import managed_http_client
+        from liquid.sync.retry import WRITE_RETRY_DEFAULTS
+
+        async with managed_http_client(self._http_client) as client:
+            executor = ActionExecutor(
+                http_client=client,
+                vault=self.vault,
+                retry_policy=self._retry_policy or WRITE_RETRY_DEFAULTS,
+                rate_limiter=self.rate_limiter,
+                adapter_id=config.config_id,
+            )
+            result = await executor.execute(
+                action=action,
+                data=data,
+                schema=config.schema_,
+                auth_ref=config.auth_ref,
+                idempotency_key=idempotency_key,
+            )
+
+        if self.normalize_output and result.response_body is not None:
+            result = result.model_copy(update={"response_body": self._maybe_normalize(result.response_body)})
+
+        result = self._apply_body_shaping(
+            result,
+            adapter=config.schema_.service_name,
+            endpoint=action.endpoint_path,
+            max_tokens=max_tokens,
+            include_meta=include_meta,
+        )
+
+        await self._emit_action_event(config.config_id, result)
+        return result
+
+    def _apply_body_shaping(
+        self,
+        result: ActionResult,
+        *,
+        adapter: str,
+        endpoint: str,
+        max_tokens: int | None,
+        include_meta: bool | None,
+    ) -> ActionResult:
+        """Apply max_tokens + _meta wrapping to an ActionResult's response_body."""
+        body = result.response_body
+        if body is None:
+            return result
+
+        truncated = False
+        truncated_at: str | None = None
+        if max_tokens is not None:
+            from liquid.truncate import apply_max_tokens
+
+            trunc = apply_max_tokens(body, max_tokens)
+            body = trunc.payload
+            truncated = trunc.truncated
+            truncated_at = trunc.truncated_at
+
+        effective_meta = self.include_meta if include_meta is None else include_meta
+        if effective_meta:
+            from liquid.meta import build_meta, wrap_with_meta
+
+            meta = build_meta(
+                source="live",
+                adapter=adapter,
+                endpoint=endpoint,
+                truncated=truncated,
+                truncated_at=truncated_at,
+            )
+            body = wrap_with_meta(body, meta)
+        elif max_tokens is not None:
+            # Pure truncation without meta wrap.
+            pass
+
+        if body is not result.response_body:
+            return result.model_copy(update={"response_body": body})
+        return result
+
+    async def execute_intent(
+        self,
+        config: AdapterConfig,
+        intent_name: str,
+        data: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> ActionResult | list[dict[str, Any]]:
+        """Execute an intent using its canonical schema.
+
+        Looks up the adapter's binding for this intent, translates the canonical
+        input into adapter-specific fields, then executes via :meth:`execute`
+        (writes) or :meth:`fetch` (reads).
+        """
+        from liquid.intent.executor import compile_to_action_data, resolve_intent
+        from liquid.intent.registry import get_intent
+
+        # Validate intent exists canonically
+        canonical = get_intent(intent_name)
+        if canonical is None:
+            msg = f"Unknown canonical intent: {intent_name}"
+            raise ValueError(msg)
+
+        # Find adapter's binding
+        intent_config = resolve_intent(config, intent_name)
+        if intent_config is None:
+            msg = f"Adapter does not implement intent: {intent_name}"
+            raise ValueError(msg)
+
+        # Write intent (has action_id)
+        if intent_config.action_id:
+            action_data = compile_to_action_data(intent_config, data)
+            return await self.execute(
+                config,
+                intent_config.action_id,
+                action_data,
+                idempotency_key=idempotency_key,
+            )
+
+        # Read intent (has endpoint_path)
+        if intent_config.endpoint_path:
+            return await self.fetch(config, intent_config.endpoint_path, include_meta=False)
+
+        msg = f"Intent config for {intent_name} has neither action_id nor endpoint_path"
+        raise ValueError(msg)
+
+    def list_intents(self, config: AdapterConfig) -> list[str]:
+        """List canonical intent names this adapter implements."""
+        return [ic.intent_name for ic in config.intents]
+
+    async def execute_action(
+        self,
+        config: AdapterConfig,
+        action: str,
+        data: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> ActionResult:
+        """Convenience: find action by 'METHOD /path' string and execute.
+
+        Example:
+            result = await liquid.execute_action(
+                config=shopify_adapter,
+                action="POST /orders",
+                data={"amount": 99.99},
+            )
+        """
+        parts = action.split(" ", 1)
+        if len(parts) != 2:
+            msg = f"Action must be in 'METHOD /path' format, got: {action}"
+            raise ValueError(msg)
+        method, path = parts
+
+        matched = next(
+            (a for a in config.actions if a.endpoint_method == method and a.endpoint_path == path),
+            None,
+        )
+        if matched is None:
+            msg = f"Action '{action}' not found in adapter config"
+            raise ValueError(msg)
+
+        return await self.execute(config, matched.action_id, data, idempotency_key)
+
+    async def execute_batch(
+        self,
+        config: AdapterConfig,
+        action_id: str,
+        items: list[dict[str, Any]],
+        on_error: str = "continue",
+        concurrency: int = 5,
+    ) -> BatchResult:
+        """Execute a write action for each item in a batch.
+
+        Supports concurrency control and rate-limit-aware scheduling.
+        The on_error policy can be "continue" (default) or "abort".
+        """
+        action = next((a for a in config.actions if a.action_id == action_id), None)
+        if action is None:
+            msg = f"Action {action_id} not found in adapter config"
+            raise ValueError(msg)
+
+        if action.verified_by is None:
+            raise ActionNotVerifiedError(
+                f"Action {action_id} has not been verified. Call create_adapter() with verified actions to approve."
+            )
+
+        await self._ensure_rate_limit_seeded(config, action.endpoint_path)
+
+        from liquid.action.batch import BatchErrorPolicy, BatchExecutor
+        from liquid.action.executor import ActionExecutor
+        from liquid.discovery.utils import managed_http_client
+        from liquid.sync.retry import WRITE_RETRY_DEFAULTS
+
+        error_policy = BatchErrorPolicy(on_error)
+
+        async with managed_http_client(self._http_client) as client:
+            executor = ActionExecutor(
+                http_client=client,
+                vault=self.vault,
+                retry_policy=self._retry_policy or WRITE_RETRY_DEFAULTS,
+                rate_limiter=self.rate_limiter,
+                adapter_id=config.config_id,
+            )
+            batch_executor = BatchExecutor(
+                executor=executor,
+                concurrency=concurrency,
+                rate_limit=config.schema_.rate_limits,
+            )
+            result = await batch_executor.execute_batch(
+                action=action,
+                items=items,
+                schema=config.schema_,
+                auth_ref=config.auth_ref,
+                on_error=error_policy,
+            )
+
+        if self.normalize_output:
+            normalized_results = [
+                r.model_copy(update={"response_body": self._maybe_normalize(r.response_body)})
+                if r.response_body is not None
+                else r
+                for r in result.results
+            ]
+            result = result.model_copy(update={"results": normalized_results})
+
+        for action_result in result.results:
+            await self._emit_action_event(config.config_id, action_result)
+
+        return result
+
+    async def _emit_action_event(self, adapter_id: str, result: ActionResult) -> None:
+        if not self.event_handler:
+            return
+        if result.success:
+            from liquid.events import ActionExecuted
+
+            await self.event_handler.handle(
+                ActionExecuted(
+                    adapter_id=adapter_id,
+                    action_id=result.action_id,
+                    endpoint_path=result.endpoint_path,
+                    method=result.method,
+                    success=True,
+                    status_code=result.status_code,
+                )
+            )
+        else:
+            from liquid.events import ActionFailed
+
+            await self.event_handler.handle(
+                ActionFailed(
+                    adapter_id=adapter_id,
+                    action_id=result.action_id,
+                    error=result.error,
+                )
+            )
+
+    async def propose_actions(
+        self,
+        schema: APISchema,
+        agent_model: dict[str, Any],
+        endpoint_filter: Callable[[Endpoint], bool] | None = None,
+        existing_read_mappings: list[FieldMapping] | None = None,
+    ) -> dict[str, ActionReview]:
+        """Propose action mappings for all write endpoints.
+
+        Returns dict of "METHOD /path" -> ActionReview.
+        """
+        from liquid.action.reviewer import ActionReview as _ActionReview
+
+        results: dict[str, ActionReview] = {}
+
+        for ep in schema.endpoints:
+            if endpoint_filter is not None:
+                if not endpoint_filter(ep):
+                    continue
+            elif ep.kind not in (EndpointKind.WRITE, EndpointKind.DELETE):
+                continue
+
+            proposals = await self._action_proposer.propose(
+                endpoint=ep,
+                agent_model=agent_model,
+                existing_read_mappings=existing_read_mappings,
+            )
+            key = f"{ep.method} {ep.path}"
+            results[key] = _ActionReview(proposals)
+
+        return results
+
+    async def learn_from_action_review(
+        self,
+        schema: APISchema,
+        agent_model: dict[str, Any],
+        reviews: dict[str, ActionReview],
+    ) -> None:
+        """Record corrections from action reviews for future learning."""
+        for key, review in reviews.items():
+            corrections = review.corrections()
+            if corrections and self.knowledge:
+                # Convert ActionMapping corrections to FieldMapping for storage
+                field_corrections: list[tuple[FieldMapping, FieldMapping]] = []
+                for original, corrected in corrections:
+                    field_corrections.append(
+                        (
+                            FieldMapping(
+                                source_path=original.target_path,
+                                target_field=original.source_field,
+                                transform=original.transform,
+                                confidence=original.confidence,
+                            ),
+                            FieldMapping(
+                                source_path=corrected.target_path,
+                                target_field=corrected.source_field,
+                                transform=corrected.transform,
+                                confidence=corrected.confidence,
+                            ),
+                        )
+                    )
+                # Parse method and path from key
+                parts = key.split(" ", 1)
+                if len(parts) == 2:
+                    method, path = parts
+                    action_key = f"action:{method}:{path}"
+                    await self._mapping_learner.record_corrections(
+                        action_key,
+                        json.dumps(agent_model),
+                        field_corrections,
+                    )
+
+    async def _build_auto_actions(
+        self,
+        schema: APISchema,
+        agent_model: dict[str, Any],
+        read_mappings: list[FieldMapping],
+        confidence_threshold: float,
+    ) -> list[ActionConfig]:
+        """Build ActionConfigs for write endpoints when auto_approve is on."""
+        actions: list[ActionConfig] = []
+        for ep in schema.endpoints:
+            if ep.kind not in (EndpointKind.WRITE, EndpointKind.DELETE):
+                continue
+
+            proposals = await self._action_proposer.propose(
+                endpoint=ep,
+                agent_model=agent_model,
+                existing_read_mappings=read_mappings,
+            )
+            if proposals and all(m.confidence >= confidence_threshold for m in proposals):
+                actions.append(
+                    ActionConfig(
+                        endpoint_path=ep.path,
+                        endpoint_method=ep.method,
+                        mappings=proposals,
+                        verified_by="auto",
+                    )
+                )
+        return actions
+
+    async def learn_from_review(
+        self,
+        schema: APISchema,
+        target_model: dict[str, Any],
+        review: MappingReview,
+    ) -> None:
+        """Record corrections from a mapping review for future learning."""
+        corrections = review.corrections()
+        if corrections:
+            await self._mapping_learner.record_corrections(
+                schema.service_name,
+                json.dumps(target_model),
+                corrections,
+            )
+
+
+def _repair_actions(
+    actions: list[ActionConfig],
+    diff: SchemaDiff,
+    new_schema: APISchema,
+) -> list[ActionConfig]:
+    """Repair action configs based on schema diff.
+
+    - For removed write endpoints: mark affected actions as unverified (broken)
+    - For modified request schemas: reset verification so they get re-reviewed
+    """
+    if not actions:
+        return actions
+
+    removed_paths = set(diff.removed_write_endpoints)
+    modified_paths = set(diff.modified_request_schemas)
+
+    repaired: list[ActionConfig] = []
+    for action in actions:
+        if action.endpoint_path in removed_paths:
+            # Endpoint removed — mark as unverified/broken
+            repaired.append(action.model_copy(update={"verified_by": None, "verified_at": None}))
+        elif action.endpoint_path in modified_paths:
+            # Request schema changed — invalidate verification for re-review
+            repaired.append(action.model_copy(update={"verified_by": None, "verified_at": None}))
+        else:
+            repaired.append(action)
+
+    return repaired

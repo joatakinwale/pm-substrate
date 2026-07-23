@@ -1,0 +1,34 @@
+{
+  "name": "@pm/substrate-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Operational visualization dashboard for pm-substrate replay artifacts and evidence-admission metrics.",
+  "type": "module",
+  "scripts": {
+    "prebuild": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
+    "build": "tsc -p tsconfig.json && vite build",
+    "predev": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
+    "dev": "vite --host 127.0.0.1",
+    "preserve": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
+    "serve": "node server/server.mjs",
+    "prepreview": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc -p tsconfig.json",
+    "pretest": "pnpm --dir ../.. --filter @pm/local-agent-lab run build",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@pm/entity-mapping": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/integration-kit": "workspace:*",
+    "@pm/local-agent-lab": "workspace:*",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.0"
+  }
+}

@@ -1,0 +1,54 @@
+# ADR-0029 — Workflow soundness check
+
+Accepted — 2026-05-20.
+
+## Context
+
+The coordinated-reality research pass identified a useful bridge between
+workflow nets and biological checkpoint systems: a process is only reliable if
+local transitions preserve a global completion invariant.
+
+The substrate already rejected cycles at workflow install time, but acyclicity
+alone does not prove the useful property. A workflow can be acyclic and still
+contain unreachable nodes, invalid edge references, or reachable branches that
+cannot reach completion.
+
+## Decision
+
+Add a pure workflow soundness analyzer to `@pm/workflow`:
+
+- `analyzeWorkflowSoundness(doc)` returns a structured report.
+- `assertWorkflowSound(doc)` throws `WorkflowValidationError` with concrete
+  causes.
+
+The first soundness contract is intentionally small and testable:
+
+1. at least one trigger exists;
+2. at least one reachable terminal invoke node exists;
+3. node ids are unique;
+4. every edge references declared nodes;
+5. every node is reachable from some trigger;
+6. every reachable invoke node can reach a terminal invoke node;
+7. no non-terminating cycle exists outside a completion path.
+
+This is not a full Petri-net implementation yet. It is the substrate-native
+version of the bridge: expose the completion invariant as code and tests, then
+iterate toward formal workflow-net modeling if the invariant proves useful.
+
+## Consequences
+
+Workflow authors now have a direct analyzer for the design-level failure modes
+that show up as runtime confusion: orphan nodes, dead branches, and no terminal
+completion path.
+
+The check is enforced during `PostgresWorkflowRuntime.install()`. A workflow that
+does not preserve the completion invariant is rejected before it can become
+tenant runtime state.
+
+## Validation
+
+- `pnpm typecheck`
+- `PM_DATABASE_URL=postgres://pm:pm_dev_password@127.0.0.1:5432/pm_substrate pnpm test`
+- `pnpm build`
+
+As of install-enforcement: 37 test files passed, 296 tests passed.

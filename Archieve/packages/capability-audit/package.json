@@ -1,0 +1,35 @@
+{
+  "name": "@pm/capability-audit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "common/audit-log capability — Tier-1 audit projection that records every event in the stream. Profile-agnostic by design; works against any tenant's data.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/projections": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@pm/events": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/profile-finance-research": "workspace:*",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

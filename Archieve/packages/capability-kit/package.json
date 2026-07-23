@@ -1,0 +1,32 @@
+{
+  "name": "@pm/capability-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Authoring kit for substrate capabilities. defineCapability() removes the subscribe + idempotency + graph-walk + transactional publish boilerplate that every Tier-2 capability re-implemented before G10.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/types": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/events": "workspace:*",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

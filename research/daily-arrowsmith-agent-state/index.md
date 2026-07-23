@@ -1,6 +1,6 @@
 # Daily Arrowsmith Agent-State Research Index
 
-Last updated: 2026-07-13
+Last updated: 2026-07-22
 Scope: pm-substrate agent-state, operational-state, memory, workflow-agent, project-management, cross-domain Arrowsmith research, and multi-agent repository coordination.
 
 ## Collaboration Protocol
@@ -10,6 +10,25 @@ Each daily research continuation must begin by fetching `origin/main` and checki
 The run is not complete until the intended research slice is committed on `main`, pushed to `origin/main`, and the local and remote SHAs are rechecked. If parallel research creates duplicate version numbers, preserve the branch artifact when useful, mark the canonical version, and record the reconciliation in the ledger.
 
 ## Current Strongest Thesis
+
+v233 update: consolidation of the 2026-07-22 external review discussion into
+registered hypotheses with external A-inputs only (v229 stop rule respected;
+no mechanism added). Confirmation moves onto state-effect endpoints the
+mechanisms actually touch — duplicates, out-of-scope effects, corrupt
+admissions, forks, lost resumes — with the untouched upstream score kept as a
+non-inferiority guard per the state-effect endpoint amendment. Registered:
+H-F2a (admission-time read-set revalidation ≈ exchange-side sequencing, piloted
+on a superseded-snapshot trade scenario with a non-saturated baseline required
+before metrics are declared), H-F6a (capability-scoped tool handles), H-F6b
+(maker-checker split identities), and H-F6c (least-context canary-token egress
+gate with a binary provider-stream oracle). Proposes the autonomous Arrowsmith
+loop itself as the long-horizon benchmark: vanilla-vs-governed ablation on
+state-effect incidents per 100 sessions plus an external known-solution
+rediscovery oracle (~20 jargon-stripped historically solved cross-domain
+problems, content-frozen and anchored before any run; grounding: Jeppesen &
+Lakhani 2010 marginality). Recorded interpretation bound: autonomous
+operability alone is insufficient — it is not proof the state problem is
+solved. Research proposal only; efficacy remains unproven.
 
 v232 update: the first fresh deterministic ToolSandbox lost-response/process-
 restart derivative falsified the substrate arm at the boundary: a raw

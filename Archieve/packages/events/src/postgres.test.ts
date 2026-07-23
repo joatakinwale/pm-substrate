@@ -1,0 +1,387 @@
+/**
+ * Integration tests for PostgresEventStore against the running dev DB.
+ *
+ * Skipped automatically if PM_DATABASE_URL is unset. Each test uses a unique
+ * tenant id so suites can run in parallel without collisions.
+ */
+
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
+import type { TenantId } from "@pm/types";
+import { PostgresEventStore } from "./postgres.js";
+import { matchesPattern } from "./pattern.js";
+import { admissibilityOf } from "./provenance.js";
+
+const DATABASE_URL = process.env["PM_DATABASE_URL"];
+
+const describeIfDb = DATABASE_URL ? describe : describe.skip;
+
+describe("matchesPattern", () => {
+  it("matches exact", () => {
+    expect(matchesPattern("task.created", "task.created")).toBe(true);
+    expect(matchesPattern("task.created", "task.completed")).toBe(false);
+  });
+  it("matches namespace wildcard", () => {
+    expect(matchesPattern("task.*", "task.created")).toBe(true);
+    expect(matchesPattern("task.*", "task.completed")).toBe(true);
+    expect(matchesPattern("task.*", "milestone.created")).toBe(false);
+  });
+  it("matches verb wildcard", () => {
+    expect(matchesPattern("*.created", "task.created")).toBe(true);
+    expect(matchesPattern("*.created", "milestone.created")).toBe(true);
+    expect(matchesPattern("*.created", "task.completed")).toBe(false);
+  });
+  it("matches catch-all", () => {
+    expect(matchesPattern("*", "task.created")).toBe(true);
+    expect(matchesPattern("*.*", "milestone.due")).toBe(true);
+  });
+});
+
+describeIfDb("PostgresEventStore", () => {
+  let pool: pg.Pool;
+  let store: PostgresEventStore;
+  const tenantId = `tnt_test_${randomUUID().slice(0, 8)}` as TenantId;
+
+  beforeAll(async () => {
+    pool = new pg.Pool({ connectionString: DATABASE_URL });
+    store = new PostgresEventStore(pool);
+  });
+
+  afterAll(async () => {
+    await store.close();
+    // Clean up test rows so the events table doesn't grow unbounded.
+    await pool.query(`DELETE FROM events.events WHERE tenant_id = $1`, [
+      tenantId,
+    ]);
+    await pool.query(
+      `DELETE FROM events.subscriptions WHERE tenant_id = $1`,
+      [tenantId],
+    );
+    await pool.end();
+  });
+
+  it("publishes and reads back an event", async () => {
+    const ev = await store.publish({
+      tenantId,
+      type: "task.created",
+      entityId: "ent_task_1",
+      emittedBy: "cap.planner",
+      payloadSchema: "task.created/v1",
+      payload: { title: "Pick venue" },
+    });
+    expect(ev.id).toMatch(/^evt_/);
+    expect(ev.type).toBe("task.created");
+    expect(ev.payload).toEqual({ title: "Pick venue" });
+
+    const back = await store.getById(tenantId, ev.id);
+    expect(back?.id).toBe(ev.id);
+  });
+
+  it("filters reads by glob pattern + entity + time bounds", async () => {
+    await store.publish({
+      tenantId,
+      type: "task.completed",
+      entityId: "ent_task_1",
+      emittedBy: "cap.planner",
+      payloadSchema: "task.completed/v1",
+      payload: {},
+    });
+    await store.publish({
+      tenantId,
+      type: "milestone.due",
+      entityId: "ent_ms_1",
+      emittedBy: "cap.planner",
+      payloadSchema: "milestone.due/v1",
+      payload: {},
+    });
+
+    const tasks = await store.read({ tenantId, typePattern: "task.*" });
+    expect(tasks.every((e) => e.type.startsWith("task."))).toBe(true);
+    expect(tasks.length).toBeGreaterThanOrEqual(2);
+
+    const completedOnly = await store.read({
+      tenantId,
+      typePattern: "*.completed",
+    });
+    expect(completedOnly.every((e) => e.type.endsWith(".completed"))).toBe(
+      true,
+    );
+
+    const byEntity = await store.read({
+      tenantId,
+      typePattern: "*",
+      entityId: "ent_ms_1",
+    });
+    expect(byEntity.every((e) => e.entityId === "ent_ms_1")).toBe(true);
+  });
+
+  it("adds chain-of-custody provenance metadata and hashes", async () => {
+    const first = await store.publish({
+      tenantId,
+      type: "audit.first",
+      entityId: "ent_audit_1",
+      emittedBy: "cap.audit",
+      authority: "perm:audit.write",
+      payloadSchema: "audit.first/v1",
+      payload: { n: 1 },
+    });
+    const second = await store.publish({
+      tenantId,
+      type: "audit.second",
+      entityId: "ent_audit_2",
+      emittedBy: "cap.audit",
+      authority: "perm:audit.write",
+      payloadSchema: "audit.second/v1",
+      payload: { n: 2 },
+      causedBy: first.id,
+    });
+
+    expect(first.schemaVersion).toBe(1);
+    expect(first.authority).toBe("perm:audit.write");
+    expect(first.contentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(second.priorEventHash).toBe(first.contentHash);
+    expect(second.contentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(admissibilityOf(second).admissible).toBe(true);
+  });
+
+  it("verifies the tenant event hash chain and detects tampering", async () => {
+    const chainTenant = `tnt_chain_${randomUUID().slice(0, 8)}` as TenantId;
+    const a = await store.publish({
+      tenantId: chainTenant,
+      type: "chain.a",
+      entityId: "ent_chain_a",
+      emittedBy: "cap.chain",
+      authority: "perm:chain.write",
+      payloadSchema: "chain.a/v1",
+      payload: { n: 1 },
+    });
+    const b = await store.publish({
+      tenantId: chainTenant,
+      type: "chain.b",
+      entityId: "ent_chain_b",
+      emittedBy: "cap.chain",
+      authority: "perm:chain.write",
+      payloadSchema: "chain.b/v1",
+      payload: { n: 2 },
+    });
+
+    let report = await store.verifyChain(chainTenant);
+    expect(report.valid).toBe(true);
+    expect(report.checked).toBe(2);
+
+    await pool.query(
+      `UPDATE events.events SET payload = $3::jsonb WHERE tenant_id = $1 AND id = $2`,
+      [chainTenant, b.id, JSON.stringify({ n: 999 })],
+    );
+    report = await store.verifyChain(chainTenant);
+    expect(report.valid).toBe(false);
+    expect(report.brokenEventIds).toContain(b.id);
+
+    await pool.query(`DELETE FROM events.events WHERE tenant_id = $1`, [chainTenant]);
+    expect(a.contentHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("preserves causation chain", async () => {
+    const cause = await store.publish({
+      tenantId,
+      type: "contract.signed",
+      entityId: "ent_contract_1",
+      emittedBy: "cap.contracts",
+      payloadSchema: "contract.signed/v1",
+      payload: { vendorId: "ent_v_1" },
+    });
+    const effect = await store.publish({
+      tenantId,
+      type: "calendar.confirmed",
+      entityId: "ent_cal_1",
+      emittedBy: "cap.calendar",
+      payloadSchema: "calendar.confirmed/v1",
+      payload: {},
+      causedBy: cause.id,
+    });
+    expect(effect.causedBy).toBe(cause.id);
+
+    const back = await store.getById(tenantId, effect.id);
+    expect(back?.causedBy).toBe(cause.id);
+  });
+
+  it("rolls back NOTIFY when the caller's transaction rolls back", async () => {
+    const c = await pool.connect();
+    let publishedId: string | null = null;
+    try {
+      await c.query("BEGIN");
+      const ev = await store.publishWith(c, {
+        tenantId,
+        type: "task.created",
+        entityId: "ent_task_rollback",
+        emittedBy: "cap.planner",
+        payloadSchema: "task.created/v1",
+        payload: { title: "Should not survive" },
+      });
+      publishedId = ev.id;
+      await c.query("ROLLBACK");
+    } finally {
+      c.release();
+    }
+    const back = await store.getById(tenantId, publishedId! as never);
+    expect(back).toBeNull();
+  });
+
+  it("LISTEN/NOTIFY delivers live events to a registered subscriber", async () => {
+    const subId = `sub_${randomUUID().slice(0, 8)}`;
+    await store.subscribe({
+      tenantId,
+      subscriberId: subId,
+      eventTypePattern: "task.*",
+      entityTypeFilter: null,
+    });
+
+    const received: string[] = [];
+    const iter = store.consume(tenantId, subId);
+
+    const consumePromise = (async () => {
+      for await (const ev of iter) {
+        received.push(ev.type);
+        if (received.includes("task.live_test")) break;
+      }
+    })();
+
+    // Give the LISTEN connection a beat to register, then publish.
+    await new Promise((r) => setTimeout(r, 200));
+    await store.publish({
+      tenantId,
+      type: "task.live_test",
+      entityId: "ent_task_live",
+      emittedBy: "cap.planner",
+      payloadSchema: "task.live_test/v1",
+      payload: {},
+    });
+
+    // Bound the wait — if NOTIFY plumbing is broken, fail fast rather than hang.
+    await Promise.race([
+      consumePromise,
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error("live event not received in 3s")), 3000),
+      ),
+    ]);
+
+    expect(received).toContain("task.live_test");
+    await store.unsubscribe(tenantId, subId);
+  });
+
+  it("filters out other tenants' events on the same NOTIFY channel collision space", async () => {
+    const otherTenant = `tnt_test_${randomUUID().slice(0, 8)}` as TenantId;
+    const subId = `sub_${randomUUID().slice(0, 8)}`;
+    await store.subscribe({
+      tenantId,
+      subscriberId: subId,
+      eventTypePattern: "task.*",
+      entityTypeFilter: null,
+    });
+
+    const received: string[] = [];
+    const iter = store.consume(tenantId, subId);
+    const consumePromise = (async () => {
+      for await (const ev of iter) {
+        received.push(`${ev.tenantId}:${ev.type}`);
+        if (received.length >= 1) break;
+      }
+    })();
+
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Publish on the other tenant first — must NOT wake our subscriber.
+    await store.publish({
+      tenantId: otherTenant,
+      type: "task.created",
+      entityId: "ent_task_other",
+      emittedBy: "cap.planner",
+      payloadSchema: "task.created/v1",
+      payload: {},
+    });
+
+    // Then publish on our tenant — must.
+    await store.publish({
+      tenantId,
+      type: "task.created",
+      entityId: "ent_task_ours",
+      emittedBy: "cap.planner",
+      payloadSchema: "task.created/v1",
+      payload: {},
+    });
+
+    await Promise.race([
+      consumePromise,
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error("own-tenant event missed")), 3000),
+      ),
+    ]);
+
+    expect(received).toEqual([`${tenantId}:task.created`]);
+    await store.unsubscribe(tenantId, subId);
+    // Cleanup the cross-tenant test row.
+    await pool.query(`DELETE FROM events.events WHERE tenant_id = $1`, [
+      otherTenant,
+    ]);
+  });
+
+  it("LISTEN client reconnects after the underlying connection is terminated", async () => {
+    // ADR-0008 pinning test. We simulate a connection drop by calling
+    // pg_terminate_backend on the LISTEN client's PID, then publish a fresh
+    // event. The store must reconnect, re-issue LISTEN, and deliver the
+    // event to a subscriber that's already iterating.
+    const subId = `sub_reconnect_${randomUUID().slice(0, 8)}`;
+    await store.subscribe({
+      tenantId,
+      subscriberId: subId,
+      eventTypePattern: "task.*",
+      entityTypeFilter: null,
+    });
+
+    const received: string[] = [];
+    const iter = store.consume(tenantId, subId);
+    const consumePromise = (async () => {
+      for await (const ev of iter) {
+        received.push(ev.type);
+        if (ev.type === "task.after_reconnect") break;
+      }
+    })();
+
+    // Wait for LISTEN to be in place, then grab the LISTEN client's PID.
+    await new Promise((r) => setTimeout(r, 200));
+    const pidRow = await pool.query<{ pid: number }>(
+      `SELECT pid FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND query LIKE 'LISTEN%'
+        ORDER BY backend_start DESC LIMIT 1`,
+    );
+    const listenPid = pidRow.rows[0]?.pid;
+    expect(listenPid).toBeTypeOf("number");
+
+    // Terminate it. The store's error/end handler should fire and reconnect.
+    await pool.query(`SELECT pg_terminate_backend($1)`, [listenPid]);
+
+    // Give the reconnect handler a beat to acquire a new client + re-LISTEN.
+    await new Promise((r) => setTimeout(r, 800));
+
+    await store.publish({
+      tenantId,
+      type: "task.after_reconnect",
+      entityId: "ent_reconnect",
+      emittedBy: "cap.test",
+      payloadSchema: "task.after_reconnect/v1",
+      payload: {},
+    });
+
+    await Promise.race([
+      consumePromise,
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error("event after reconnect not received in 5s")), 5000),
+      ),
+    ]);
+
+    expect(received).toContain("task.after_reconnect");
+    await store.unsubscribe(tenantId, subId);
+  });
+});

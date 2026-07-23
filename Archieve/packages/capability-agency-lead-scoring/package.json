@@ -1,0 +1,36 @@
+{
+  "name": "@pm/capability-agency-lead-scoring",
+  "version": "0.1.0",
+  "private": true,
+  "description": "agency.lead-scoring capability — owns LeadScoringConfig.currentTotalLeadsScored rollup via graph-inferred topology. Subscribes to agency.lead.qualified and similar lead-progression events; resolves the scoring config by walking the graph (lead -> lead_scored_by -> config OR lead -> lead_assigned_to_user -> user_default_scoring -> config). No scoring_config_id on the lead payload — topology is the contract. G4 anti-fixation proof that a Tier-1 capability shape transfers across profiles with no substrate edits (originally proven against the since-retired wedding-era capability).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "rm -rf dist .tsbuildinfo",
+    "test": "echo \"(tests run from root)\" && true"
+  },
+  "dependencies": {
+    "@pm/capability-kit": "workspace:*",
+    "@pm/events": "workspace:*",
+    "@pm/graph": "workspace:*",
+    "@pm/profile-agency": "workspace:*",
+    "@pm/profile-registry": "workspace:*",
+    "@pm/registry": "workspace:*",
+    "@pm/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.0",
+    "typescript": "^5.9.0",
+    "vitest": "^2.1.0"
+  }
+}

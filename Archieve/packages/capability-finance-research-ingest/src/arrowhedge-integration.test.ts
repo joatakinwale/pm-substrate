@@ -1,0 +1,1082 @@
+import { describe, expect, it } from "vitest";
+import { FINANCE_RESEARCH_PROFILE } from "@pm/profile-finance-research";
+import { tenantId, timestamp } from "@pm/types";
+
+import {
+  buildArrowHedgePairedExperimentBundle,
+  buildArrowHedgePairedExperimentBundleFromIntegrationRuns,
+  buildArrowHedgeRunEnvelopeFromIntegrationSnapshot,
+  compareArrowHedgeIntegrationRunEnvelopePair,
+  fetchArrowHedgeIntegrationSnapshot,
+  validateArrowHedgeIntegrationSnapshot,
+  type ArrowHedgeIntegrationFetch,
+  type ArrowHedgeIntegrationFetchResponse,
+} from "./arrowhedge-integration.js";
+import {
+  buildArrowHedgeIngestionPlan,
+  expandArrowHedgeRunEnvelope,
+} from "./arrowhedge.js";
+
+function jsonResponse(
+  body: unknown,
+  status = 200,
+): ArrowHedgeIntegrationFetchResponse {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? "OK" : "Error",
+    async json() {
+      return body;
+    },
+    async text() {
+      return JSON.stringify(body);
+    },
+  };
+}
+
+describe("ArrowHedge integration API client", () => {
+  it("fetches and validates the neutral ArrowHedgeLab integration surface", async () => {
+    const calls: Array<{
+      url: string;
+      method: string | undefined;
+      authorization: string | undefined;
+      body: unknown;
+    }> = [];
+    const responses = new Map<string, unknown>([
+      [
+        "https://arrow.example/integration/v1/capabilities",
+        {
+          schemaVersion: "arrowhedgelab.integration.capabilities.v1",
+          adapterVersion: "integration.v1",
+          app: { name: "ai-hedge-fund", version: "2026.6.17" },
+          redaction: { apiKeys: "presence_only", rawSecrets: "never" },
+          surfaces: [
+            "/integration/v1/capabilities",
+            "/integration/v1/agents",
+            "/integration/v1/graphs/effective",
+            "/integration/v1/data/cache/summary",
+            "/integration/v1/data/source-artifacts",
+            "/integration/v1/flows",
+            "/integration/v1/flows/{id}",
+            "/integration/v1/flows/{id}/runs",
+            "/integration/v1/runs/{id}",
+            "/integration/v1/runs/{id}/events",
+            "/integration/v1/runs/{id}/source-artifacts",
+            "/integration/v1/backtests",
+            "/integration/v1/backtests/{id}",
+            "/integration/v1/backtests/{id}/days",
+            "/integration/v1/config/models",
+            "/integration/v1/config/api-keys",
+          ],
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/agents",
+        {
+          schemaVersion: "arrowhedgelab.integration.agents.v1",
+          agents: [
+            {
+              key: "warren_buffett",
+              stable_id: "arrowhedgelab.agent.warren_buffett",
+              role: "analyst",
+            },
+            {
+              key: "risk_management",
+              stable_id: "arrowhedgelab.agent.risk_management",
+              role: "risk_manager",
+            },
+            {
+              key: "portfolio_manager",
+              stable_id: "arrowhedgelab.agent.portfolio_manager",
+              role: "portfolio_manager",
+            },
+          ],
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/graphs/effective",
+        {
+          schemaVersion: "arrowhedgelab.integration.effective-graph.v1",
+          nodes: [
+            {
+              id: "warren_buffett_ab12cd",
+              type: "agent",
+              base_agent_key: "warren_buffett",
+            },
+            {
+              id: "risk_management_agent_ef34gh",
+              type: "agent",
+              base_agent_key: "risk_management",
+              synthetic: true,
+            },
+            {
+              id: "portfolio_manager_ef34gh",
+              type: "agent",
+              base_agent_key: "portfolio_manager",
+            },
+          ],
+          edges: [
+            {
+              id: "warren_buffett_ab12cd__to__risk_management_agent_ef34gh",
+              source: "warren_buffett_ab12cd",
+              target: "risk_management_agent_ef34gh",
+              synthetic: true,
+            },
+            {
+              id: "risk_management_agent_ef34gh__to__portfolio_manager_ef34gh",
+              source: "risk_management_agent_ef34gh",
+              target: "portfolio_manager_ef34gh",
+              synthetic: true,
+            },
+          ],
+          validation: { issues: [] },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/data/cache/summary",
+        {
+          schemaVersion: "arrowhedgelab.integration.cache-summary.v1",
+          records: [
+            {
+              kind: "prices",
+              cache_key: "AAPL_2024-01-01_2024-01-02",
+              row_count: 1,
+              sha256: "a".repeat(64),
+            },
+          ],
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/data/source-artifacts",
+        {
+          schemaVersion: "arrowhedgelab.integration.source-artifacts.v1",
+          provider: "financialdatasets.ai",
+          count: 1,
+          artifacts: [
+            {
+              id: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+              schemaVersion: "arrowhedgelab.integration.source-artifact.v1",
+              provider: "financialdatasets.ai",
+              kind: "prices",
+              cache_key: "AAPL_2024-01-01_2024-01-02",
+              ticker: "AAPL",
+              request: {
+                ticker: "AAPL",
+                start_date: "2024-01-01",
+                end_date: "2024-01-02",
+              },
+              observed: {
+                date_field: "time",
+                min_observed_at: "2024-01-01",
+                max_observed_at: "2024-01-02",
+              },
+              row_count: 2,
+              sha256: "c1".repeat(32),
+            },
+          ],
+          hashes: { artifactsSha256: "d1".repeat(32) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/flows",
+        {
+          schemaVersion: "arrowhedgelab.integration.flows.v1",
+          count: 1,
+          flows: [
+            {
+              schemaVersion: "arrowhedgelab.integration.flow.v1",
+              id: 7,
+              name: "AAPL validation flow",
+              hashes: { nodesSha256: "b".repeat(64), edgesSha256: "c".repeat(64) },
+            },
+          ],
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/backtests",
+        {
+          schemaVersion: "arrowhedgelab.integration.backtests.v1",
+          count: 1,
+          backtests: [
+            {
+              schemaVersion: "arrowhedgelab.integration.backtest.v1",
+              id: 11,
+              run_id: 11,
+              flow_id: 7,
+              status: "COMPLETE",
+              day_count: 1,
+              first_date: "2024-01-02",
+              last_date: "2024-01-02",
+              performance_metrics: { sharpe_ratio: 1.25 },
+              final_portfolio: { cash: 99000 },
+              hashes: { daysSha256: "7".repeat(64) },
+            },
+          ],
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/flows/7",
+        {
+          schemaVersion: "arrowhedgelab.integration.flow.v1",
+          id: 7,
+          name: "AAPL validation flow",
+          nodes: [{ id: "warren_buffett_ab12cd", type: "agent" }],
+          edges: [],
+          data: { tickers: ["AAPL"] },
+          effectiveGraph: {
+            schemaVersion: "arrowhedgelab.integration.effective-graph.v1",
+            nodes: [],
+            edges: [],
+            validation: { issues: [] },
+          },
+          hashes: {
+            nodesSha256: "b".repeat(64),
+            edgesSha256: "c".repeat(64),
+            dataSha256: "d".repeat(64),
+          },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/runs/11",
+        {
+          schemaVersion: "arrowhedgelab.integration.flow-run.v1",
+          id: 11,
+          flow_id: 7,
+          status: "COMPLETE",
+          completed_at: "2024-01-02T16:00:00.000Z",
+          requestData: {
+            tickers: ["AAPL"],
+            start_date: "2024-01-01",
+            end_date: "2024-01-02",
+            api_keys: { OPENAI_API_KEY: { present: true } },
+          },
+          results: {
+            decisions: { AAPL: { action: "buy" } },
+            provenance: {
+              schemaVersion: "arrowhedgelab.runtime-provenance.v1",
+              sourceArtifacts: [
+                {
+                  id: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  kind: "prices",
+                  ticker: "AAPL",
+                  sha256: "c1".repeat(32),
+                },
+              ],
+              toolRefs: [
+                {
+                  tool: "prices",
+                  ticker: "AAPL",
+                  sourceArtifactId: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  sha256: "c1".repeat(32),
+                },
+              ],
+              agentOutputs: [
+                {
+                  agent_id: "warren_buffett",
+                  base_agent_key: "warren_buffett",
+                  ticker: "AAPL",
+                  outputPath: "results[0].analyst_signals.warren_buffett.AAPL",
+                  outputSha256: "ab".repeat(32),
+                  sourceArtifactIds: [
+                    `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  ],
+                },
+              ],
+              decisions: [
+                {
+                  ticker: "AAPL",
+                  outputPath: "results[0].decisions.AAPL",
+                  outputSha256: "cd".repeat(32),
+                  inputAgentIds: ["warren_buffett"],
+                  sourceArtifactIds: [
+                    `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+                  ],
+                },
+              ],
+              hashes: {
+                sourceArtifactsSha256: "aa".repeat(32),
+                toolRefsSha256: "bb".repeat(32),
+                agentOutputsSha256: "cc".repeat(32),
+                decisionsSha256: "dd".repeat(32),
+              },
+            },
+          },
+          hashes: {
+            requestDataSha256: "e".repeat(64),
+            resultsSha256: "f".repeat(64),
+          },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/runs/11/events",
+        {
+          schemaVersion: "arrowhedgelab.integration.run-events.v1",
+          run_id: 11,
+          flow_id: 7,
+          count: 2,
+          events: [
+            {
+              id: "flow-run-11-1-flow_run.created",
+              sequence: 1,
+              type: "flow_run.created",
+              occurred_at: "2024-01-02T09:30:00",
+              payload: { run_id: 11, flow_id: 7 },
+              payload_sha256: "3".repeat(64),
+            },
+            {
+              id: "flow-run-11-2-flow_run.results_recorded",
+              sequence: 2,
+              type: "flow_run.results_recorded",
+              occurred_at: "2024-01-02T16:00:00",
+              payload: {
+                run_id: 11,
+                resultsSha256: "4".repeat(64),
+                backtestDayCount: 1,
+              },
+              payload_sha256: "5".repeat(64),
+            },
+          ],
+          hashes: { eventsSha256: "6".repeat(64) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/runs/11/source-artifacts",
+        {
+          schemaVersion: "arrowhedgelab.integration.run-source-artifacts.v1",
+          run_id: 11,
+          flow_id: 7,
+          request: {
+            tickers: ["AAPL"],
+            start_date: "2024-01-01",
+            end_date: "2024-01-02",
+          },
+          count: 1,
+          artifacts: [
+            {
+              id: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+              schemaVersion: "arrowhedgelab.integration.source-artifact.v1",
+              provider: "financialdatasets.ai",
+              kind: "prices",
+              cache_key: "AAPL_2024-01-01_2024-01-02",
+              ticker: "AAPL",
+              request: {
+                ticker: "AAPL",
+                start_date: "2024-01-01",
+                end_date: "2024-01-02",
+              },
+              observed: {
+                date_field: "time",
+                min_observed_at: "2024-01-01",
+                max_observed_at: "2024-01-02",
+              },
+              row_count: 2,
+              sha256: "c1".repeat(32),
+              matched_by: ["ticker", "start_date", "end_date"],
+            },
+          ],
+          hashes: { artifactsSha256: "e1".repeat(32) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/backtests/11",
+        {
+          schemaVersion: "arrowhedgelab.integration.backtest.v1",
+          id: 11,
+          run_id: 11,
+          flow_id: 7,
+          status: "COMPLETE",
+          day_count: 1,
+          first_date: "2024-01-02",
+          last_date: "2024-01-02",
+          performance_metrics: { sharpe_ratio: 1.25 },
+          final_portfolio: { cash: 99000 },
+          portfolioValues: [{ Date: "2024-01-02", "Portfolio Value": 101500 }],
+          hashes: {
+            daysSha256: "7".repeat(64),
+            performanceMetricsSha256: "8".repeat(64),
+            finalPortfolioSha256: "9".repeat(64),
+            portfolioValuesSha256: "0".repeat(64),
+          },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/backtests/11/days",
+        {
+          schemaVersion: "arrowhedgelab.integration.backtest-days.v1",
+          run_id: 11,
+          flow_id: 7,
+          count: 1,
+          days: [
+            {
+              sequence: 1,
+              date: "2024-01-02",
+              portfolio_value: 101500,
+              cash: 99000,
+              decisions: { AAPL: { action: "buy", quantity: 3 } },
+              executed_trades: { AAPL: 3 },
+              analyst_signals: {
+                warren_buffett: { AAPL: { signal: "bullish", confidence: 0.74 } },
+              },
+              current_prices: { AAPL: 185 },
+              sha256: "a1".repeat(32),
+            },
+          ],
+          hashes: { daysSha256: "b1".repeat(32) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/config/models",
+        {
+          schemaVersion: "arrowhedgelab.integration.model-config.v1",
+          defaults: { model_name: "gpt-4.1", provider: "OpenAI" },
+          models: [
+            {
+              display_name: "GPT 4.1",
+              model_name: "gpt-4.1",
+              provider: "OpenAI",
+              source: "api_models",
+            },
+          ],
+          providers: [{ name: "OpenAI", models: [] }],
+          hashes: { modelsSha256: "1".repeat(64) },
+        },
+      ],
+      [
+        "https://arrow.example/integration/v1/config/api-keys",
+        {
+          schemaVersion: "arrowhedgelab.integration.api-key-summary.v1",
+          redaction: { apiKeys: "presence_only", rawSecrets: "never" },
+          apiKeys: [
+            {
+              id: 3,
+              provider: "OPENAI_API_KEY",
+              is_active: true,
+              has_key: true,
+            },
+          ],
+          hashes: { apiKeysSha256: "2".repeat(64) },
+        },
+      ],
+    ]);
+    const fetchFn: ArrowHedgeIntegrationFetch = async (url, init) => {
+      calls.push({
+        url,
+        method: init?.method,
+        authorization: init?.headers?.authorization,
+        body: init?.body === undefined ? undefined : JSON.parse(init.body),
+      });
+      return jsonResponse(responses.get(url) ?? { error: "not found" }, responses.has(url) ? 200 : 404);
+    };
+
+    const snapshot = await fetchArrowHedgeIntegrationSnapshot({
+      integrationBaseUrl: "https://arrow.example",
+      bearerToken: "substrate-token",
+      fetchFn,
+      flowIds: [7],
+      runIds: [11],
+      backtestRunIds: [11],
+      graph: {
+        nodes: [
+          { id: "warren_buffett_ab12cd", type: "agent" },
+          { id: "portfolio_manager_ef34gh", type: "agent" },
+        ],
+        edges: [
+          {
+            id: "edge-1",
+            source: "warren_buffett_ab12cd",
+            target: "portfolio_manager_ef34gh",
+          },
+        ],
+      },
+    });
+    const validation = validateArrowHedgeIntegrationSnapshot(snapshot);
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://arrow.example/integration/v1/capabilities",
+      "https://arrow.example/integration/v1/agents",
+      "https://arrow.example/integration/v1/graphs/effective",
+      "https://arrow.example/integration/v1/data/cache/summary",
+      "https://arrow.example/integration/v1/data/source-artifacts",
+      "https://arrow.example/integration/v1/flows",
+      "https://arrow.example/integration/v1/backtests",
+      "https://arrow.example/integration/v1/config/models",
+      "https://arrow.example/integration/v1/config/api-keys",
+      "https://arrow.example/integration/v1/flows/7",
+      "https://arrow.example/integration/v1/runs/11",
+      "https://arrow.example/integration/v1/runs/11/events",
+      "https://arrow.example/integration/v1/runs/11/source-artifacts",
+      "https://arrow.example/integration/v1/backtests/11",
+      "https://arrow.example/integration/v1/backtests/11/days",
+    ]);
+    expect(calls[2]).toMatchObject({
+      method: "POST",
+      authorization: "Bearer substrate-token",
+      body: {
+        nodes: [
+          { id: "warren_buffett_ab12cd", type: "agent" },
+          { id: "portfolio_manager_ef34gh", type: "agent" },
+        ],
+        edges: [
+          {
+            id: "edge-1",
+            source: "warren_buffett_ab12cd",
+            target: "portfolio_manager_ef34gh",
+          },
+        ],
+      },
+    });
+    expect(validation).toEqual({ ready: true, issues: [] });
+    expect(snapshot.flowDetails).toHaveLength(1);
+    expect(snapshot.runDetails).toHaveLength(1);
+    expect(snapshot.runEvents).toHaveLength(1);
+    expect(snapshot.sourceArtifacts.artifacts).toHaveLength(1);
+    expect(snapshot.runSourceArtifacts[0]?.artifacts[0]?.matched_by).toEqual([
+      "ticker",
+      "start_date",
+      "end_date",
+    ]);
+    expect(snapshot.backtests.backtests).toHaveLength(1);
+    expect(snapshot.backtestDetails).toHaveLength(1);
+    expect(snapshot.backtestDays[0]?.days[0]?.decisions).toEqual({
+      AAPL: { action: "buy", quantity: 3 },
+    });
+    expect(JSON.stringify(snapshot.apiKeySummary)).not.toContain("sk-");
+    expect(snapshot.evidenceRefs.map((ref) => ref.id)).toEqual(
+      expect.arrayContaining([
+        "arrowhedgelab:integration_api:capabilities",
+        "arrowhedgelab:integration_api:agents",
+        "arrowhedgelab:integration_api:effective_graph",
+        "arrowhedgelab:integration_api:flows",
+        "arrowhedgelab:integration_api:source_artifacts",
+        "arrowhedgelab:integration_api:model_config",
+        "arrowhedgelab:integration_api:backtests",
+        "arrowhedgelab:integration_api:api_key_summary",
+        "arrowhedgelab:flow:7",
+        "arrowhedgelab:flow-run:11",
+        `arrowhedgelab:flow-run-event:11:1:${"3".repeat(64)}`,
+        `arrowhedgelab:source-artifact:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+        `arrowhedgelab:run-source-artifact:11:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+        "arrowhedgelab:backtest:11",
+        `arrowhedgelab:backtest-day:11:2024-01-02:${"a1".repeat(32)}`,
+        `arrowhedgelab:cache:prices:AAPL_2024-01-01_2024-01-02:${"a".repeat(64)}`,
+      ]),
+    );
+
+    const envelopeResult = buildArrowHedgeRunEnvelopeFromIntegrationSnapshot({
+      snapshot,
+      runId: 11,
+      substrateMode: "blocking",
+    });
+    expect(envelopeResult).toMatchObject({
+      valid: true,
+      issues: [],
+      envelope: {
+        schemaVersion: "arrowhedge.run-envelope.v1",
+        runId: "11",
+        surface: "backtest",
+        substrateMode: "blocking",
+        scope: {
+          startDate: "2024-01-01",
+          endDate: "2024-01-02",
+          tickers: ["AAPL"],
+        },
+      },
+    });
+    expect(envelopeResult.envelope?.signals).toEqual([
+      expect.objectContaining({
+        ticker: "AAPL",
+        agentId: "warren_buffett",
+        signal: "bullish",
+        confidence: 0.74,
+      }),
+    ]);
+    expect(envelopeResult.envelope?.riskStates).toEqual([
+      expect.objectContaining({
+        ticker: "AAPL",
+        currentPrice: 185,
+      }),
+    ]);
+    expect(envelopeResult.envelope?.decisions).toEqual([
+      expect.objectContaining({
+        ticker: "AAPL",
+        action: "buy",
+        quantity: 3,
+      }),
+    ]);
+    expect(envelopeResult.envelope?.evidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.stringContaining("AAPL_2024-01-01_2024-01-02"),
+          sourceArtifactId: `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+          ticker: "AAPL",
+          sha256: "c1".repeat(32),
+        }),
+        expect.objectContaining({
+          id: "ev_backtest_day_11_1",
+          ticker: "AAPL",
+          sha256: "a1".repeat(32),
+        }),
+      ]),
+    );
+    const evidenceIds = [
+      "ev_source_prices_AAPL_2024-01-01_2024-01-02",
+      "ev_backtest_day_11_1",
+    ];
+    expect(envelopeResult.envelope?.signals[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(envelopeResult.envelope?.riskStates[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(envelopeResult.envelope?.decisions[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(envelopeResult.envelope?.signals[0]?.runtimeProvenance).toMatchObject({
+      outputPath: "results[0].analyst_signals.warren_buffett.AAPL",
+      outputSha256: "ab".repeat(32),
+      sourceArtifactIds: [
+        `financialdatasets.ai:prices:AAPL_2024-01-01_2024-01-02:${"c1".repeat(32)}`,
+      ],
+      evidenceDocumentIds: ["ev_source_prices_AAPL_2024-01-01_2024-01-02"],
+    });
+    expect(envelopeResult.envelope?.decisions[0]?.runtimeProvenance).toMatchObject({
+      outputPath: "results[0].decisions.AAPL",
+      outputSha256: "cd".repeat(32),
+      inputAgentIds: ["warren_buffett"],
+      evidenceDocumentIds: ["ev_source_prices_AAPL_2024-01-01_2024-01-02"],
+    });
+    const expandedEnvelope = expandArrowHedgeRunEnvelope(envelopeResult.envelope);
+    expect(expandedEnvelope).toMatchObject({
+      valid: true,
+      issues: [],
+    });
+    expect(expandedEnvelope.snapshots).toHaveLength(1);
+    expect(expandedEnvelope.snapshots[0]?.signals[0]?.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(expandedEnvelope.snapshots[0]?.risk.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    expect(expandedEnvelope.snapshots[0]?.decision.evidenceDocumentIds).toEqual(
+      expect.arrayContaining(evidenceIds),
+    );
+    const ingestionPlan = buildArrowHedgeIngestionPlan(
+      expandedEnvelope.snapshots[0]!,
+      {
+        tenantId: tenantId("tnt_arrowhedge_integration"),
+        profile: FINANCE_RESEARCH_PROFILE,
+        adapterStartedAt: timestamp("2024-01-02T16:00:00.000Z"),
+      },
+    );
+    expect(ingestionPlan.valid).toBe(true);
+    const evidenceEntityIdsBySourceRecordId = new Map(
+      ingestionPlan.mapping.items
+        .filter((item) => item.sourceName === "EvidenceDocumentSource")
+        .map((item) => [item.sourceRecordId, item.event.entityId] as const),
+    );
+    const expectedEvidenceEntityIds = evidenceIds.map(
+      (id) => evidenceEntityIdsBySourceRecordId.get(`evidence:${id}`)!,
+    );
+    expect(
+      ingestionPlan.typedEvents.find((event) => event.type === "analyst.signal.created")?.payload,
+    ).toMatchObject({
+      tickerSymbol: "AAPL",
+      evidenceDocumentIds: expect.arrayContaining(expectedEvidenceEntityIds),
+    });
+    expect(
+      ingestionPlan.typedEvents.find((event) => event.type === "analyst.signal.created")?.payload[
+        "evidenceDocumentIds"
+      ],
+    ).toHaveLength(2);
+
+    const baselineEnvelope = {
+      ...envelopeResult.envelope!,
+      substrateMode: "observe",
+    };
+    const pairedGate = compareArrowHedgeIntegrationRunEnvelopePair({
+      baseline: baselineEnvelope,
+      substrate: envelopeResult.envelope!,
+    });
+    expect(pairedGate).toMatchObject({
+      ready: true,
+      issues: [],
+      fingerprints: {
+        scopeEqual: true,
+        graphEqual: true,
+        modelConfigEqual: true,
+        portfolioEqual: true,
+        sourceDataEqual: true,
+      },
+    });
+    const pairedBundle = buildArrowHedgePairedExperimentBundle({
+      experimentId: "exp_arrowhedge_aapl_001",
+      generatedAt: "2024-01-02T16:01:00.000Z",
+      baseline: {
+        envelope: baselineEnvelope,
+        metrics: {
+          startingEquity: 100000,
+          endingEquity: 101000,
+          realizedPnl: 1000,
+          returnPct: 0.01,
+          falsePositiveBlockCount: 0,
+          falseNegativeBlockCount: 0,
+        },
+      },
+      substrate: {
+        envelope: envelopeResult.envelope!,
+        metrics: {
+          startingEquity: 100000,
+          endingEquity: 102500,
+          realizedPnl: 2500,
+          returnPct: 0.025,
+          blockedDecisionCount: 1,
+          staleBlockCount: 1,
+          falsePositiveBlockCount: 0,
+          falseNegativeBlockCount: 0,
+          rawDecisionSha256: "ed".repeat(32),
+          blockedEventIds: ["flow-run-11-2-flow_run.results_recorded"],
+        },
+      },
+    });
+    expect(pairedBundle.schemaVersion).toBe(
+      "arrowhedge.paired-experiment-bundle.v1",
+    );
+    expect(pairedBundle.manifest).toMatchObject({
+      schemaVersion: "arrowhedge.paired-experiment-manifest.v1",
+      experimentId: "exp_arrowhedge_aapl_001",
+      generatedAt: "2024-01-02T16:01:00.000Z",
+      ready: true,
+      marketWinClaimAllowed: true,
+      baselineRunId: "11",
+      substrateRunId: "11",
+    });
+    expect(pairedBundle.manifest.baselineEnvelopeSha256).toHaveLength(64);
+    expect(pairedBundle.manifest.substrateEnvelopeSha256).toHaveLength(64);
+    expect(pairedBundle.manifest.reportSha256).toHaveLength(64);
+    expect(pairedBundle.manifest.artifacts).toEqual([
+      {
+        name: "baseline-envelope.json",
+        sha256: pairedBundle.manifest.baselineEnvelopeSha256,
+        mediaType: "application/json",
+      },
+      {
+        name: "substrate-envelope.json",
+        sha256: pairedBundle.manifest.substrateEnvelopeSha256,
+        mediaType: "application/json",
+      },
+      {
+        name: "paired-report.json",
+        sha256: pairedBundle.manifest.reportSha256,
+        mediaType: "application/json",
+      },
+    ]);
+    expect(pairedBundle.report).toMatchObject({
+      schemaVersion: "arrowhedge.paired-experiment-report.v1",
+      ready: true,
+      marketWinClaimAllowed: true,
+      claimIssues: [],
+      market: {
+        metricsAvailable: true,
+        deltas: {
+          endingEquity: 1500,
+          realizedPnl: 1500,
+          returnPct: 0.015,
+        },
+        substrateOutperformed: true,
+      },
+      governance: {
+        deltas: {
+          acceptedDecisionCount: 0,
+          blockedDecisionCount: 1,
+          staleBlockCount: 1,
+          invalidActionBlockCount: 0,
+        },
+        gates: {
+          falsePositiveBlocksZero: true,
+          falseNegativeBlocksZero: true,
+          falsePositiveEvidencePresent: true,
+          falseNegativeEvidencePresent: true,
+        },
+      },
+    });
+
+    const mismatchedGate = compareArrowHedgeIntegrationRunEnvelopePair({
+      baseline: baselineEnvelope,
+      substrate: {
+        ...envelopeResult.envelope!,
+        modelConfig: {
+          ...envelopeResult.envelope!.modelConfig,
+          defaults: { model_name: "gpt-4o", provider: "OpenAI" },
+        },
+        evidence: envelopeResult.envelope!.evidence.map((item) =>
+          item.id === "ev_source_prices_AAPL_2024-01-01_2024-01-02"
+            ? { ...item, sha256: "9".repeat(64) }
+            : item,
+        ),
+      },
+    });
+    expect(mismatchedGate.ready).toBe(false);
+    expect(mismatchedGate.issues).toEqual(
+      expect.arrayContaining([
+        "modelConfig hash mismatch",
+        "sourceData hash mismatch",
+      ]),
+    );
+    const rejectedBundle = buildArrowHedgePairedExperimentBundle({
+      experimentId: "exp_arrowhedge_aapl_rejected",
+      generatedAt: "2024-01-02T16:02:00.000Z",
+      baseline: {
+        envelope: baselineEnvelope,
+        metrics: {
+          endingEquity: 101000,
+          realizedPnl: 1000,
+          returnPct: 0.01,
+        },
+      },
+      substrate: {
+        envelope: {
+          ...envelopeResult.envelope!,
+          modelConfig: {
+            ...envelopeResult.envelope!.modelConfig,
+            defaults: { model_name: "gpt-4o", provider: "OpenAI" },
+          },
+          evidence: envelopeResult.envelope!.evidence.map((item) =>
+            item.id === "ev_source_prices_AAPL_2024-01-01_2024-01-02"
+              ? { ...item, sha256: "9".repeat(64) }
+              : item,
+          ),
+        },
+        metrics: {
+          endingEquity: 100500,
+          realizedPnl: 500,
+          returnPct: 0.005,
+          falsePositiveBlockCount: 1,
+        },
+      },
+    });
+    expect(rejectedBundle.report.ready).toBe(false);
+    expect(rejectedBundle.report.marketWinClaimAllowed).toBe(false);
+    expect(rejectedBundle.report.market).toMatchObject({
+      metricsAvailable: true,
+      deltas: {
+        endingEquity: -500,
+        realizedPnl: -500,
+        returnPct: -0.005,
+      },
+      substrateOutperformed: false,
+    });
+    expect(rejectedBundle.report.governance.gates).toMatchObject({
+      falsePositiveBlocksZero: false,
+      falseNegativeBlocksZero: false,
+      falsePositiveEvidencePresent: true,
+      falseNegativeEvidencePresent: false,
+    });
+    expect(rejectedBundle.report.claimIssues).toEqual(
+      expect.arrayContaining([
+        "readiness: modelConfig hash mismatch",
+        "readiness: sourceData hash mismatch",
+        "substrate arm did not outperform baseline on supplied market metrics",
+        "substrate false-negative block count is required",
+        "substrate false-positive blocks must be zero",
+        "substrate false-negative blocks must be zero",
+      ]),
+    );
+
+    const fetchedPairedBundle =
+      await buildArrowHedgePairedExperimentBundleFromIntegrationRuns({
+        integrationBaseUrl: "https://arrow.example",
+        bearerToken: "substrate-token",
+        fetchFn,
+        experimentId: "exp_arrowhedge_aapl_from_integration",
+        generatedAt: "2024-01-02T16:03:00.000Z",
+        graph: {
+          nodes: [
+            { id: "warren_buffett_ab12cd", type: "agent" },
+            { id: "portfolio_manager_ef34gh", type: "agent" },
+          ],
+          edges: [
+            {
+              id: "edge-1",
+              source: "warren_buffett_ab12cd",
+              target: "portfolio_manager_ef34gh",
+            },
+          ],
+        },
+        baseline: {
+          runId: 11,
+          flowId: 7,
+          substrateMode: "observe",
+          metrics: {
+            endingEquity: 101000,
+            realizedPnl: 1000,
+            returnPct: 0.01,
+          },
+        },
+        substrate: {
+          runId: 11,
+          flowId: 7,
+          substrateMode: "blocking",
+          metrics: {
+            endingEquity: 102500,
+            realizedPnl: 2500,
+            returnPct: 0.025,
+            blockedDecisionCount: 1,
+            staleBlockCount: 1,
+            falsePositiveBlockCount: 0,
+            falseNegativeBlockCount: 0,
+          },
+        },
+      });
+    expect(fetchedPairedBundle.valid).toBe(true);
+    expect(fetchedPairedBundle.issues).toEqual([]);
+    expect(fetchedPairedBundle.validation).toEqual({ ready: true, issues: [] });
+    expect(fetchedPairedBundle.bundle?.report).toMatchObject({
+      ready: true,
+      marketWinClaimAllowed: true,
+      market: {
+        baseline: {
+          endingEquity: 101000,
+          realizedPnl: 1000,
+          returnPct: 0.01,
+          eventIds: [
+            "flow-run-11-1-flow_run.created",
+            "flow-run-11-2-flow_run.results_recorded",
+          ],
+        },
+        substrate: {
+          endingEquity: 102500,
+          realizedPnl: 2500,
+          returnPct: 0.025,
+          eventIds: [
+            "flow-run-11-1-flow_run.created",
+            "flow-run-11-2-flow_run.results_recorded",
+          ],
+        },
+      },
+    });
+    expect(fetchedPairedBundle.bundle?.manifest).toMatchObject({
+      experimentId: "exp_arrowhedge_aapl_from_integration",
+      ready: true,
+      marketWinClaimAllowed: true,
+      baselineRunId: "11",
+      substrateRunId: "11",
+    });
+  });
+
+  it("reports contract issues instead of accepting a partial adapter surface", () => {
+    const validation = validateArrowHedgeIntegrationSnapshot({
+      capabilities: {
+        schemaVersion: "arrowhedgelab.integration.capabilities.v1",
+        adapterVersion: "integration.v1",
+        app: { name: "ai-hedge-fund", version: "2026.6.17" },
+        redaction: { apiKeys: "raw", rawSecrets: "never" },
+        surfaces: ["/integration/v1/capabilities"],
+      },
+      agents: {
+        schemaVersion: "arrowhedgelab.integration.agents.v1",
+        agents: [
+          {
+            key: "portfolio_manager",
+            stable_id: "arrowhedgelab.agent.portfolio_manager",
+          },
+        ],
+      },
+      effectiveGraph: {
+        schemaVersion: "arrowhedgelab.integration.effective-graph.v1",
+        nodes: [],
+        edges: [],
+        validation: {
+          issues: [{ path: "/edges/0", message: "missing source node" }],
+        },
+      },
+      cacheSummary: {
+        schemaVersion: "arrowhedgelab.integration.cache-summary.v1",
+        records: [
+          {
+            kind: "prices",
+            cache_key: "AAPL",
+            row_count: 1,
+            sha256: "",
+            rows: [{ close: 185 }],
+          },
+        ],
+      },
+      sourceArtifacts: {
+        schemaVersion: "arrowhedgelab.integration.source-artifacts.v1",
+        provider: "financialdatasets.ai",
+        count: 1,
+        artifacts: [
+          {
+            id: "financialdatasets.ai:prices:AAPL",
+            schemaVersion: "arrowhedgelab.integration.source-artifact.v1",
+            provider: "financialdatasets.ai",
+            kind: "prices",
+            cache_key: "AAPL",
+            ticker: "AAPL",
+            request: { ticker: "AAPL" },
+            observed: { date_field: "time" },
+            row_count: 1,
+            sha256: "",
+            rows: [{ close: 185 }],
+          },
+        ],
+      },
+      flows: {
+        schemaVersion: "arrowhedgelab.integration.flows.v1",
+        count: 1,
+        flows: [
+          {
+            schemaVersion: "arrowhedgelab.integration.flow.v1",
+            id: 7,
+            name: "AAPL validation flow",
+            hashes: { nodesSha256: "" },
+          },
+        ],
+      },
+      flowDetails: [],
+      runDetails: [],
+      runEvents: [],
+      runSourceArtifacts: [],
+      backtests: {
+        schemaVersion: "arrowhedgelab.integration.backtests.v1",
+        count: 0,
+        backtests: [],
+      },
+      backtestDetails: [],
+      backtestDays: [],
+      modelConfig: {
+        schemaVersion: "arrowhedgelab.integration.model-config.v1",
+        defaults: { model_name: "", provider: "" },
+        models: [],
+        providers: [],
+        hashes: { modelsSha256: "" },
+      },
+      apiKeySummary: {
+        schemaVersion: "arrowhedgelab.integration.api-key-summary.v1",
+        redaction: { apiKeys: "raw" },
+        apiKeys: [{ provider: "OPENAI_API_KEY", has_key: true, key_value: "sk-leak" }],
+        hashes: { apiKeysSha256: "" },
+      },
+      evidenceRefs: [],
+    });
+
+    expect(validation.ready).toBe(false);
+    expect(validation.issues).toEqual(
+      expect.arrayContaining([
+        "capabilities.redaction.apiKeys must be presence_only",
+        "capabilities.surfaces is missing /integration/v1/agents",
+        "agents is missing risk_management",
+        "effectiveGraph.validation.issues must be empty",
+        "cacheSummary.records[0].sha256 is required",
+        "cacheSummary.records[0] must not include raw rows",
+        "sourceArtifacts.artifacts[0].sha256 is required",
+        "sourceArtifacts.artifacts[0] must not include raw rows",
+        "flows.flows[0].hashes.nodesSha256 is required",
+        "modelConfig.defaults.model_name is required",
+        "modelConfig.models must include at least one model",
+        "apiKeySummary.redaction.apiKeys must be presence_only",
+        "apiKeySummary.apiKeys[0] must not expose key_value",
+      ]),
+    );
+  });
+});

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "finance-research/workflow-blocked-invalid-action.v1.json",
+  "type": "object",
+  "required": [
+    "researchRunId",
+    "blockedEntityId",
+    "reason",
+    "action",
+    "quantity",
+    "allowedActions",
+    "occurredAt"
+  ],
+  "properties": {
+    "researchRunId": { "type": "string" },
+    "blockedEntityId": { "type": "string" },
+    "reason": {
+      "type": "string",
+      "enum": ["action_not_allowed", "quantity_exceeds_allowed_action"]
+    },
+    "sourceSnapshotId": { "type": "string" },
+    "tickerSymbol": { "type": "string" },
+    "action": { "type": "string", "enum": ["buy", "sell", "short", "cover", "hold"] },
+    "quantity": { "type": "integer", "minimum": 0 },
+    "allowedQuantity": { "type": ["integer", "null"], "minimum": 0 },
+    "allowedActions": { "type": "object" },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": true
+}

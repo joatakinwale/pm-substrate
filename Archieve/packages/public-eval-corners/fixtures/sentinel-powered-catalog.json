@@ -1,0 +1,909 @@
+{
+  "schemaVersion": "pm.public-eval-corners.sentinel-powered-catalog-fixture.v1",
+  "revision": "0faca33cc58ea62e97a928b67cd3beec7176b408",
+  "sourceTreeHash": "3ca2dc7160e505dc15b607ada4dd9ffe1f6a7c50",
+  "manifestSha256": "48e1695b0728000c8f8e738f9d72273861bf6216e4c609935650a09067d87bc6",
+  "fullCatalogSha256": "c834011c79c134ed14c17ecbca312934de22054c77dd5fbb000ad5ae0560c132",
+  "tasks": [
+    {
+      "taskId": "microchat-attachment-absolute-active",
+      "environment": "microchat",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "a0c9fedcd1f5cdac69500117def7262911d6cfdee780a801fc124dd7678f50a5",
+      "conditionAtSeconds": 192.63,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "high"
+      },
+      "scenarioRelativePath": "scenarios/microchat/attachment-absolute-active.json"
+    },
+    {
+      "taskId": "microchat-attachment-noop",
+      "environment": "microchat",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "d47ebad13b168f16ea77f7aab5cc25d0f5d759aaff2765a9fbfb297b04bae24a",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "high"
+      },
+      "scenarioRelativePath": "scenarios/microchat/attachment-noop.json"
+    },
+    {
+      "taskId": "microchat-mentions-noop",
+      "environment": "microchat",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "55919c099ecd09b58828fb9dd0d720667f0a934346d9ab062c5f2347914820f5",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microchat/mentions-noop.json"
+    },
+    {
+      "taskId": "microchat-mentions-relative-active",
+      "environment": "microchat",
+      "role": "state-retention-relative",
+      "scenarioSha256": "5977f3d7a878647dd4d5060a8358fa0d09ffc3177904f8a3150a0cf1c6022239",
+      "conditionAtSeconds": 385.92,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microchat/mentions-relative-active.json"
+    },
+    {
+      "taskId": "microchat-missed-calls-absolute-passive",
+      "environment": "microchat",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "ebe1f0ae464186f3ea80c19fe2be63ac03a53155e8c55962eb60a67e78ed8c4b",
+      "conditionAtSeconds": 99.9,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microchat/missed-calls-absolute-passive.json"
+    },
+    {
+      "taskId": "microchat-missed-calls-relative-passive",
+      "environment": "microchat",
+      "role": "state-retention-relative",
+      "scenarioSha256": "12358c581c55360b000cef5aea18f6f988ddc289e10e54b4cc917e7bb436e801",
+      "conditionAtSeconds": 56.85,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microchat/missed-calls-relative-passive.json"
+    },
+    {
+      "taskId": "microchat-unread-absolute-active",
+      "environment": "microchat",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "51ad8afff81a119118793850369e15fa3616f360e4f0e0a9fc10b89d51d33575",
+      "conditionAtSeconds": 374.51,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microchat/unread-absolute-active.json"
+    },
+    {
+      "taskId": "microchat-unread-absolute-passive",
+      "environment": "microchat",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "f6042a39094731c3c4ae9edfe43822407b280692fa41722aafd8fc48ac0320ae",
+      "conditionAtSeconds": 407.89,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microchat/unread-absolute-passive.json"
+    },
+    {
+      "taskId": "microchat-unread-conversations-relative-passive",
+      "environment": "microchat",
+      "role": "state-retention-relative",
+      "scenarioSha256": "057bdafd47a4cdb1ae4a0dbceb68564d33b3e23c0f8ef08f289cf5a09d8af8c3",
+      "conditionAtSeconds": 388.26,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microchat/unread-conversations-relative-passive.json"
+    },
+    {
+      "taskId": "microchat-urgent-relative-active",
+      "environment": "microchat",
+      "role": "state-retention-relative",
+      "scenarioSha256": "dc99ad97fceffd637e3f8795445440983be152ba9cca066d5aedfdd214da7a35",
+      "conditionAtSeconds": 274.17,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microchat/urgent-relative-active.json"
+    },
+    {
+      "taskId": "microdin-cobol-noop",
+      "environment": "microdin",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "bd53d9550e28ccc52af0e5a6040e5aff6f22a25f6eedcf149c8aa79efb3d4f83",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/cobol-noop.json"
+    },
+    {
+      "taskId": "microdin-connections-absolute-passive",
+      "environment": "microdin",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "a695dbaa62fec223d7636c7f32d36e9c4730a4ccedd2826923a5fef9f5920c9b",
+      "conditionAtSeconds": 226.02,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microdin/connections-absolute-passive.json"
+    },
+    {
+      "taskId": "microdin-documentation-absolute-active",
+      "environment": "microdin",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "e7fe268cbac88b7c44f488b8b9942510798df83a61e47e38c533ef089e9e77e8",
+      "conditionAtSeconds": 458.57,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/documentation-absolute-active.json"
+    },
+    {
+      "taskId": "microdin-jobs-absolute-active",
+      "environment": "microdin",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "d9da9ba6bae0a839e30e9a8e831de1a6d04771c8e24141edd02535a0d7f95e00",
+      "conditionAtSeconds": 440.6,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/jobs-absolute-active.json"
+    },
+    {
+      "taskId": "microdin-jobs-absolute-passive",
+      "environment": "microdin",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "0b43b27ce12acf69a0e87c9a71da9958d4fb59030b2bed45172555a27297c05d",
+      "conditionAtSeconds": 68.4,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/jobs-absolute-passive.json"
+    },
+    {
+      "taskId": "microdin-jobs-noop",
+      "environment": "microdin",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "496c7ca513cab69d5cdf97ff877ebef5e9e0b10c8da7e9cfa1a8937399e86fb3",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/jobs-noop.json"
+    },
+    {
+      "taskId": "microdin-notifications-relative-passive",
+      "environment": "microdin",
+      "role": "state-retention-relative",
+      "scenarioSha256": "f6bd2988d8100605777a0ede0eec7e6869cd92ebf5865b1e37806097abee6026",
+      "conditionAtSeconds": 82.7,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/notifications-relative-passive.json"
+    },
+    {
+      "taskId": "microdin-posts-relative-passive",
+      "environment": "microdin",
+      "role": "state-retention-relative",
+      "scenarioSha256": "e5115fcdd26157dff5f8bc66b7954454404a4b8609e1a8f1347f48f6fc5fcac5",
+      "conditionAtSeconds": 29.21,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microdin/posts-relative-passive.json"
+    },
+    {
+      "taskId": "microdin-python-relative-active",
+      "environment": "microdin",
+      "role": "state-retention-relative",
+      "scenarioSha256": "3b983cd23f694ccec50ebefc7032cf83f3c649f7f4ad294280da1542cb3b6cfd",
+      "conditionAtSeconds": 13.53,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/python-relative-active.json"
+    },
+    {
+      "taskId": "microdin-react-relative-active",
+      "environment": "microdin",
+      "role": "state-retention-relative",
+      "scenarioSha256": "75e1bd524f705371ad9b9687616fea1fcecd368711c68968e7ba84fca041a974",
+      "conditionAtSeconds": 100.58,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microdin/react-relative-active.json"
+    },
+    {
+      "taskId": "microfy-followers-absolute-active",
+      "environment": "microfy",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "300f008e6ec17bf6aaa80dac599fe5554c4e5520e57858bfa34e9ed9859d5c0e",
+      "conditionAtSeconds": 396.19,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microfy/followers-absolute-active.json"
+    },
+    {
+      "taskId": "microfy-followers-noop",
+      "environment": "microfy",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "19d96482ccc1b214778465870123137caa12a0af6b3d98794d1161628c0b3b30",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microfy/followers-noop.json"
+    },
+    {
+      "taskId": "microfy-likes-absolute-active",
+      "environment": "microfy",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "67f3381d889af8ca4aeacc32c0d769c062cfa90b505cce6239f5725698fa1fa0",
+      "conditionAtSeconds": 92.37,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microfy/likes-absolute-active.json"
+    },
+    {
+      "taskId": "microfy-lyric-golden-relative-active",
+      "environment": "microfy",
+      "role": "state-retention-relative",
+      "scenarioSha256": "d3ca10b12b36b9c327690b60561d96c31bc16e498b2732531e7d9177e104cec6",
+      "conditionAtSeconds": 513.25,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microfy/lyric-golden-relative-active.json"
+    },
+    {
+      "taskId": "microfy-lyric-subway-absolute-active",
+      "environment": "microfy",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "5406c5626b4eda60e2a74bb400fdee3a638d7cf7d099d27b0039b3b59a952c25",
+      "conditionAtSeconds": 329.11,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microfy/lyric-subway-absolute-active.json"
+    },
+    {
+      "taskId": "microfy-lyric-tangerine-noop",
+      "environment": "microfy",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "2f6a8aa758f07c296e6a4a9c1a3c7f4ae688624a3d12c371082998b48cf37345",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microfy/lyric-tangerine-noop.json"
+    },
+    {
+      "taskId": "microfy-lyric-whiskey-relative-active",
+      "environment": "microfy",
+      "role": "state-retention-relative",
+      "scenarioSha256": "bfc935144c89dfaba4ab90adb4dc6ab1ea80bae7114b2aeca58a98f8c4a6ba63",
+      "conditionAtSeconds": 174.34,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microfy/lyric-whiskey-relative-active.json"
+    },
+    {
+      "taskId": "microfy-new-releases-relative-active",
+      "environment": "microfy",
+      "role": "state-retention-relative",
+      "scenarioSha256": "865e609daad61e716cc7bbd83b03a9b0b6174fb194693db5be0dcf4c5398a3c2",
+      "conditionAtSeconds": 45,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microfy/new-releases-relative-active.json"
+    },
+    {
+      "taskId": "microfy-plays-absolute-active",
+      "environment": "microfy",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "97b0bf271c4ac28b3d287550a16519a1c4cb357222b41dc9e27be82aa5d20d4f",
+      "conditionAtSeconds": 187.58,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microfy/plays-absolute-active.json"
+    },
+    {
+      "taskId": "microfy-public-playlists-relative-passive",
+      "environment": "microfy",
+      "role": "state-retention-relative",
+      "scenarioSha256": "d4e9f004e3084db814682e95d8d5154c1365ba20df3912dc17c639cd99c1dfc3",
+      "conditionAtSeconds": 380.51,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microfy/public-playlists-relative-passive.json"
+    },
+    {
+      "taskId": "microgram-activity-relative-passive",
+      "environment": "microgram",
+      "role": "state-retention-relative",
+      "scenarioSha256": "2365db6a6f9d6b7664a423708298ba26467001edf968996d9906f2501708e8a2",
+      "conditionAtSeconds": 61.85,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microgram/activity-relative-passive.json"
+    },
+    {
+      "taskId": "microgram-comments-absolute-passive",
+      "environment": "microgram",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "dc51fb90f05bc3ee275f54e0784036da68cf98bbfd361258aa10404f200724b7",
+      "conditionAtSeconds": 350.12,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microgram/comments-absolute-passive.json"
+    },
+    {
+      "taskId": "microgram-comments-noop",
+      "environment": "microgram",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "1cc38fd232741bfe7292598f8fbf37cfd2f8ff988a8d9c1f60505a3d72d0317c",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microgram/comments-noop.json"
+    },
+    {
+      "taskId": "microgram-comments-relative-active",
+      "environment": "microgram",
+      "role": "state-retention-relative",
+      "scenarioSha256": "17a93f01ffabb247db6b7327e6e0484ffde484292d1226f8d95c135cdaa4462c",
+      "conditionAtSeconds": 337.76,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microgram/comments-relative-active.json"
+    },
+    {
+      "taskId": "microgram-dm-keyword-absolute-active",
+      "environment": "microgram",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "2dd1382921e68a917d6d72c73e4b87a8d6e5193a65bfc3aa559e2dd2dc9b3ccd",
+      "conditionAtSeconds": 413.77,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microgram/dm-keyword-absolute-active.json"
+    },
+    {
+      "taskId": "microgram-dm-merger-noop",
+      "environment": "microgram",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "2950425b1e6be459930e59f11ecd343b25e401f848b9925a1328486be2d59f8d",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microgram/dm-merger-noop.json"
+    },
+    {
+      "taskId": "microgram-follows-absolute-active",
+      "environment": "microgram",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "013de751640e49ac2b9ffd71e1ac03cbdeab509d5df69c362ed278d0722ec08f",
+      "conditionAtSeconds": 80.04,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "medium",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microgram/follows-absolute-active.json"
+    },
+    {
+      "taskId": "microgram-likes-absolute-active",
+      "environment": "microgram",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "38c6050f6c51a5bc6ed76314dd1c02695e5cbcf7f93186a3219df4e2c03c0319",
+      "conditionAtSeconds": 56.26,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microgram/likes-absolute-active.json"
+    },
+    {
+      "taskId": "microgram-posts-relative-passive",
+      "environment": "microgram",
+      "role": "state-retention-relative",
+      "scenarioSha256": "92663a6785fc14b762dc29ad4a1b2cccfce3109681f70aa0ac3d02b171dba673",
+      "conditionAtSeconds": 200.78,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microgram/posts-relative-passive.json"
+    },
+    {
+      "taskId": "microgram-stories-absolute-passive",
+      "environment": "microgram",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "7ae4dc259da5740e864de7df17cb5b548655c577ecb629d16e3ea671ad90a621",
+      "conditionAtSeconds": 296.12,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microgram/stories-absolute-passive.json"
+    },
+    {
+      "taskId": "microlendar-description-analytics-relative-active",
+      "environment": "microlendar",
+      "role": "state-retention-relative",
+      "scenarioSha256": "5befa7a75fec07aabd9c2d7782828448e85961674747a1bc0c24ee35beb1bac5",
+      "conditionAtSeconds": 168.71,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/description-analytics-relative-active.json"
+    },
+    {
+      "taskId": "microlendar-description-hawaii-absolute-active",
+      "environment": "microlendar",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "b2d6bb1ed4174d38f0d02a1b9f3087fd66991d8c75fce3f23afe2fab7d176728",
+      "conditionAtSeconds": 572.46,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/description-hawaii-absolute-active.json"
+    },
+    {
+      "taskId": "microlendar-description-iceland-noop",
+      "environment": "microlendar",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "08811a97b8934cc1d99b24fe11da22802aa5727824e04c37bc4111f6ddc293ee",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/description-iceland-noop.json"
+    },
+    {
+      "taskId": "microlendar-description-notifications-absolute-active",
+      "environment": "microlendar",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "9530479c8b2ae95555ec4167334e87816264e38dbc5536c00cf180f0ba6920dd",
+      "conditionAtSeconds": 68.09,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "active",
+        "difficulty": "hard",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/description-notifications-absolute-active.json"
+    },
+    {
+      "taskId": "microlendar-events-absolute-passive",
+      "environment": "microlendar",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "ff16b36fd6a890a9f80f54da6d9ce8be90d6a74d3de2ed460aaf9824bb90435e",
+      "conditionAtSeconds": 20.59,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/events-absolute-passive.json"
+    },
+    {
+      "taskId": "microlendar-events-noop",
+      "environment": "microlendar",
+      "role": "anti-degenerate-noop",
+      "scenarioSha256": "32fc131d0bbd31266b0feb19d02557bef38935be4c286614b35df1efd5d59d48",
+      "conditionAtSeconds": null,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "low"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/events-noop.json"
+    },
+    {
+      "taskId": "microlendar-personal-relative-passive",
+      "environment": "microlendar",
+      "role": "state-retention-relative",
+      "scenarioSha256": "127103c256b26b3839fef5ba332dd9d98fa88c7eae7a66c9c81293ae7da662fb",
+      "conditionAtSeconds": 334.87,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/personal-relative-passive.json"
+    },
+    {
+      "taskId": "microlendar-tasks-absolute-passive",
+      "environment": "microlendar",
+      "role": "expected-allow-absolute",
+      "scenarioSha256": "ce4a62d3abd279a11d15732bbea72cf8c3be78c697b7677f65a43398ef7d10d0",
+      "conditionAtSeconds": 221.51,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "absolute",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "easy",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/tasks-absolute-passive.json"
+    },
+    {
+      "taskId": "microlendar-today-events-relative-passive",
+      "environment": "microlendar",
+      "role": "state-retention-relative",
+      "scenarioSha256": "cbce15630f7a416a35247b454dfca6bc587288ed055725e8609332c666df18ea",
+      "conditionAtSeconds": 13.11,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/today-events-relative-passive.json"
+    },
+    {
+      "taskId": "microlendar-work-relative-passive",
+      "environment": "microlendar",
+      "role": "state-retention-relative",
+      "scenarioSha256": "21c882ebc816adb38c979d444fb30a2f594e7eebd97b6dd8d864e0b5e99f6d5e",
+      "conditionAtSeconds": 125.93,
+      "eventTimelineEndSeconds": 720,
+      "killAtSeconds": 630,
+      "taxonomy": {
+        "criteria": "objective",
+        "milestoneType": "relative",
+        "eventPersistence": "persistent",
+        "monitoringApproach": "passive",
+        "difficulty": "medium",
+        "distractionLevel": "medium"
+      },
+      "scenarioRelativePath": "scenarios/microlendar/work-relative-passive.json"
+    }
+  ]
+}
